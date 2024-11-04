@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "sourceMap": true,
+    "rootDir": "./src",
+    "outDir": "./out/",
+    "allowSyntheticDefaultImports": true,
+    "jsx": "react",
+    "allowJs": true,
+    "module": "commonjs",
+    "target": "ESNext",
+    "lib": ["ES2020", "ES2018.promise", "dom"],
+    "removeComments": true,
+    "declaration": true,
+    "alwaysStrict": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strict": true,
+    "strictBindCallApply": true,
+    "strictFunctionTypes": true,
+    "strictNullChecks": false,
+    "strictPropertyInitialization": false,
+    
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    
+    "allowUnreachableCode": false,
+    "forceConsistentCasingInFileNames": true,
+    "preserveConstEnums": true
+  },
+  "include": ["./src/**/*"],
+}

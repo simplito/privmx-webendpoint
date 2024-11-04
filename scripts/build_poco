@@ -1,0 +1,37 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+
+source "$SCRIPT_PATH/config.sh"
+source "$EMSDK_DIR/emsdk_env.sh"
+
+if [ -d "$POCO_DIR" ];
+then
+    echo "$POCO_DIR directory exists. Skip download of sources."
+else
+	echo "$POCO_DIR directory does not exist. Get sources..."
+    cd "$SOURCE_DIR"
+    curl "https://pocoproject.org/releases/poco-$POCO_VERSION/poco-$POCO_VERSION-all.zip" --output poco.zip
+    unzip -o poco.zip
+fi
+
+cd "$POCO_DIR"
+
+# apply config patches for emscripten
+patch --forward -d "$POCO_DIR" -p1 -i "$BASE_DIR/patches/poco-$POCO_VERSION-all.patch" || echo "OK"
+
+if [ ! -d "./build-emscripten" ]; then
+    mkdir -p build-emscripten && cd build-emscripten
+    emcmake cmake .. -DENABLE_JWT=OFF -DENABLE_DATA=OFF -DENABLE_DATA_SQLITE=OFF -DENABLE_DATA_MYSQL=OFF -DENABLE_DATA_POSTGRESQL=OFF -DENABLE_DATA_ODBC=OFF \
+        -DENABLE_MONGODB=OFF -DENABLE_REDIS=OFF -DENABLE_PDF=OFF -DENABLE_UTIL=OFF -DENABLE_ZIP=OFF -DENABLE_SEVENZIP=OFF \
+        -DENABLE_APACHECONNECTOR=OFF -DENABLE_CPPPARSER=OFF -DENABLE_ENCODINGS=OFF -DENABLE_ENCODINGS_COMPILER=OFF \
+        -DENABLE_PAGECOMPILER=OFF -DENABLE_PAGECOMPILER_FILE2PAGE=OFF -DENABLE_POCODOC=OFF -DENABLE_TESTS=OFF -DENABLE_LONG_RUNNING_TESTS=OFF \
+        -DENABLE_NET=OFF -DENABLE_CRYPTO=OFF -DENABLE_NETSSL=OFF -DCMAKE_BUILD_TYPE=MinSizeRel
+else
+    cd build-emscripten
+fi
+
+emmake make -j20
+emmake make install

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+
+source "$SCRIPT_PATH/config.sh"
+source "$EMSDK_DIR/emsdk_env.sh"
+
+cd "$PRIVMX_CORE_DIR"
+
+if [ ! -d "./build-emscripten" ]; then
+    mkdir -p build-emscripten && cd build-emscripten
+    emcmake cmake .. -D PRIVMX_EMSCRIPTEN=ON -D PRIVMX_BUILD_ENDPOINT=ON -D PRIVMX_DRIVER_CRYPTO=OFF -D PRIVMX_DRIVER_NET=OFF \
+        -D CMAKE_BUILD_TYPE=MinSizeRel
+else
+    cd build-emscripten
+fi
+emmake make -j20
+emmake make install

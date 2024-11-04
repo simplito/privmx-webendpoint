@@ -1,0 +1,20 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+
+source "$SCRIPT_PATH/config.sh"
+source "$EMSDK_DIR/emsdk_env.sh"
+
+cd "$ENDPOINT_WEB_API_DIR/cpp"
+cp "$DRIVER_WEB_CONTEXT_DIR/out/loader.js" "$ENDPOINT_WEB_API_DIR/cpp/js/"
+cp "$PRIVMX_CORE_DIR/emscripten/jslibrary/websocket.js" "$ENDPOINT_WEB_API_DIR/cpp/js/"
+rm -rf ./build-emscripten
+mkdir -p build-emscripten && cd build-emscripten
+emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
+emmake make -j20
+
+cd "$ENDPOINT_WEB_API_DIR/ts"
+npm i --registry=https://npmregistry.privmx.com
+npx -y webpack

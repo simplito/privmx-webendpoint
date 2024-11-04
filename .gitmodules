@@ -1,0 +1,28 @@
+[submodule "src/pson-cpp"]
+	path = src/pson-cpp
+	url = ssh://git@gitlab.simplito.com:1022/platform/privmx/endpoint/libs/pson-cpp.git
+	branch = master
+[submodule "src/privmx-core"]
+	path = src/privmx-core
+	url = ssh://git@gitlab.simplito.com:1022/platform/privmx/endpoint/privmx-core.git
+	branch = main
+[submodule "src/endpoint-web-api"]
+	path = src/endpoint-web-api
+	url = ssh://git@gitlab.simplito.com:1022/platform/privmx/endpoint/endpoint-web-api.git
+	branch = main
+[submodule "src/driver-web-context"]
+	path = src/driver-web-context
+	url = ssh://git@gitlab.simplito.com:1022/platform/privmx/endpoint/driver-web-context.git
+	branch = main
+[submodule "src/privmxdrv-crypto-web"]
+	path = src/privmxdrv-crypto-web
+	url = ssh://git@gitlab.simplito.com:1022/platform/privmx/endpoint/privmxdrv-crypto-web.git
+	branch = main
+[submodule "src/privmxdrv-ecc-web"]
+	path = src/privmxdrv-ecc-web
+	url = ssh://git@gitlab.simplito.com:1022/platform/privmx/endpoint/privmxdrv-ecc-web.git
+	branch = main
+[submodule "src/privmxdrv-net-web"]
+	path = src/privmxdrv-net-web
+	url = ssh://git@gitlab.simplito.com:1022/platform/privmx/endpoint/privmxdrv-net-web.git
+	branch = main

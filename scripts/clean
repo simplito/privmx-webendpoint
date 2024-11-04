@@ -1,0 +1,23 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+
+source "$SCRIPT_PATH/config.sh"
+
+rm -rf "$GMP_DIR/build-emscripten"
+rm -rf "$POCO_DIR/build-emscripten"
+rm -rf "$PSON_DIR/build-emscripten"
+rm -rf "$PRIVMX_DRV_CRYPTO/build-emscripten"
+rm -rf "$PRIVMX_DRV_ECC/build-emscripten"
+rm -rf "$PRIVMX_DRV_NET/build-emscripten"
+rm -rf "$PRIVMX_CORE_DIR/build-emscripten"
+rm -rf "$DRIVER_WEB_CONTEXT_DIR/dist"
+rm -rf "$DRIVER_WEB_CONTEXT_DIR/out"
+rm -rf "$DRIVER_WEB_CONTEXT_DIR/node_modules"
+rm -rf "$ENDPOINT_WEB_API_DIR/cpp/build-emscripten"
+rm -rf "$ENDPOINT_WEB_API_DIR/ts/dist"
+rm -rf "$ENDPOINT_WEB_API_DIR/ts/out"
+rm -rf "$ENDPOINT_WEB_API_DIR/ts/node_modules"
+rm -rf "$OUT_DIR"

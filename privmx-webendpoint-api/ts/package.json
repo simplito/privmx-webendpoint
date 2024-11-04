@@ -1,0 +1,41 @@
+{
+  "name": "privmx-endpoint-wasm-api",
+  "version": "1.0.0",
+  "description": "",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "/dist"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "compile": "tsc"
+  },
+  "author": "",
+  "license": "PrivMX Free License",
+  "devDependencies": {
+    "@types/node": "^20.9.0",
+    "@types/privfs-client": "^2.7.2",
+    "@types/privmx-contact-api-types": "^0.0.12",
+    "@types/privmx-rpc": "^2.4.2",
+    "@types/privmx-server-api": "^1.0.202311141544",
+    "@types/webpack": "^5.28.5",
+    "assert": "^2.1.0",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.0",
+    "process": "^0.11.10",
+    "stream-browserify": "^3.0.0",
+    "ts-loader": "^9.5.1",
+    "ts-node": "^10.9.1",
+    "tslib": "^2.6.2",
+    "typescript": "^5.2.2",
+    "vm-browserify": "^1.1.2",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.15.1"
+  },
+  "dependencies": {
+    "privmx-crypto": "^2.4.2"
+  }
+}

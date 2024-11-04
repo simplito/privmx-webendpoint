@@ -1,0 +1,16 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+
+source "$SCRIPT_PATH/config.sh"
+
+mkdir -p "$OUT_DIR"
+cd "$OUT_DIR"
+
+cp "$DRIVER_WEB_CONTEXT_DIR/dist/driver-web-context.js" "$OUT_DIR"
+cp "$ENDPOINT_WEB_API_DIR/cpp/build-emscripten/endpoint-wasm-module.js" "$OUT_DIR"
+cp "$ENDPOINT_WEB_API_DIR/cpp/build-emscripten/endpoint-wasm-module.wasm" "$OUT_DIR"
+cp "$ENDPOINT_WEB_API_DIR/cpp/build-emscripten/endpoint-wasm-module.worker.js" "$OUT_DIR"
+cp "$ENDPOINT_WEB_API_DIR/ts/dist/privmx-endpoint-web.js" "$OUT_DIR"

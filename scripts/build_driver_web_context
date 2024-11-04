@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+
+source "$SCRIPT_PATH/config.sh"
+source "$EMSDK_DIR/emsdk_env.sh"
+
+cd "$DRIVER_WEB_CONTEXT_DIR"
+
+npm i --registry="https://npmregistry.privmx.com"
+npm run build

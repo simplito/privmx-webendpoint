@@ -1,0 +1,75 @@
+image: gitlab.simplito.com:5050/pmxcpp/devtools/docker/builder-gcc11:latest
+
+build (manual):
+  stage: build
+  rules:
+    - when: manual
+  script:
+    - git submodule set-url src/pson-cpp https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/libs/pson-cpp
+    - git submodule set-url src/privmx-core https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/privmx-core
+    - git submodule set-url src/endpoint-web-api https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/endpoint-web-api
+    - git submodule set-url src/driver-web-context https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/driver-web-context
+    - git submodule set-url src/privmxdrv-crypto-web https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/privmxdrv-crypto-web
+    - git submodule set-url src/privmxdrv-ecc-web https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/privmxdrv-ecc-web
+    - git submodule set-url src/privmxdrv-net-web https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/privmxdrv-net-web
+    - git submodule update --init --recursive
+    - ./build.sh
+    - mv out privmx-endpoint-web-${CI_COMMIT_SHORT_SHA}
+    - zip -r privmx-endpoint-web-${CI_COMMIT_SHORT_SHA}.zip privmx-endpoint-web-${CI_COMMIT_SHORT_SHA}
+  artifacts:
+    paths:
+      - privmx-endpoint-web-${CI_COMMIT_SHORT_SHA}.zip
+
+build (tag):
+  stage: build
+  rules:
+    - if: $CI_COMMIT_TAG
+  script:
+    - git submodule set-url src/pson-cpp https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/libs/pson-cpp
+    - git submodule set-url src/privmx-core https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/privmx-core
+    - git submodule set-url src/endpoint-web-api https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/endpoint-web-api
+    - git submodule set-url src/driver-web-context https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/driver-web-context
+    - git submodule set-url src/privmxdrv-crypto-web https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/privmxdrv-crypto-web
+    - git submodule set-url src/privmxdrv-ecc-web https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/privmxdrv-ecc-web
+    - git submodule set-url src/privmxdrv-net-web https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/endpoint/privmxdrv-net-web
+    - git submodule update --init --recursive
+    - ./build.sh
+    - mv out privmx-endpoint-web-${CI_COMMIT_TAG}
+    - zip -r privmx-endpoint-web-${CI_COMMIT_TAG}.zip privmx-endpoint-web-${CI_COMMIT_TAG}
+  artifacts:
+    paths:
+      - privmx-endpoint-web-${CI_COMMIT_TAG}.zip
+
+deploy (manual):
+  stage: deploy
+  needs: [build (manual)]
+  before_script:
+    - eval $(ssh-agent -s)
+    - chmod 400 "$DEPLOY_SCRIPT_KEY"
+    - ssh-add "$DEPLOY_SCRIPT_KEY"
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - cp "$SSH_KNOWN_HOSTS" ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/tools/builds-deployer.git ./deployer
+    - sed -i 's/java_deployer/deployer/g' ./deployer/client-side/config.sh
+  script:
+    - ./deployer/client-side/deploy --publish --package=privmx-endpoint-web-${CI_COMMIT_SHORT_SHA}.zip --src=privmx-endpoint-web-${CI_COMMIT_SHORT_SHA}.zip --channel=dev
+
+deploy (tag):
+  stage: deploy
+  needs: [build (tag)]
+  rules:
+    - if: $CI_COMMIT_TAG
+  before_script:
+    - eval $(ssh-agent -s)
+    - chmod 400 "$DEPLOY_SCRIPT_KEY"
+    - ssh-add "$DEPLOY_SCRIPT_KEY"
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - cp "$SSH_KNOWN_HOSTS" ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.simplito.com/platform/privmx/tools/builds-deployer.git ./deployer
+    - sed -i 's/java_deployer/deployer/g' ./deployer/client-side/config.sh
+  script:
+    - ./deployer/client-side/deploy --publish --package=privmx-endpoint-web-${CI_COMMIT_TAG}.zip --src=privmx-endpoint-web-${CI_COMMIT_TAG}.zip --channel=staging

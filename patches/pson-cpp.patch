@@ -1,0 +1,13 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 062367a..8ded94b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.11.4)
+ 
+ project(Pson)
+ 
++add_compile_options(-pthread)
++
+ option(PSON_MAKE_EXE "Building pson2json and json2pson programs" OFF)
+ message(STATUS "Building pson2json and json2pson programs - PSON_MAKE_EXE=${PSON_MAKE_EXE}")
+ 

@@ -1,0 +1,5 @@
+.vscode/
+emsdk/
+src/poco*
+src/gmp*
+out/

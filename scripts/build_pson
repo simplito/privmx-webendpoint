@@ -1,0 +1,22 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+
+source "$SCRIPT_PATH/config.sh"
+source "$EMSDK_DIR/emsdk_env.sh"
+
+cd "$PSON_DIR"
+
+# apply config patches for emscripten
+patch --forward -d "$PSON_DIR" -p1 -i "$BASE_DIR/patches/pson-cpp.patch" || echo "OK"
+
+if [ ! -d "./build-emscripten" ]; then
+    mkdir -p build-emscripten && cd build-emscripten
+    emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
+else
+    cd build-emscripten
+fi
+emmake make -j20
+emmake make install
