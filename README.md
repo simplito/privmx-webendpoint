@@ -104,6 +104,6 @@ function uInt8ToStr(arr) {
   return (new TextDecoder()).decode(arr);
 }
 ```
-A complete project that uses the above code example can be found [here](https://github.com/simplito/privmx-webendpoint/tree/main/exmaples/minimal).
+A complete project that uses the above code example can be found [here](https://github.com/simplito/privmx-webendpoint/tree/main/examples/minimal).
 
 For more detailed information about API functions, visit https://docs.privmx.dev.
