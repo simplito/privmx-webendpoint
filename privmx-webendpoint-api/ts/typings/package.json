@@ -1,0 +1,6 @@
+{
+    "name": "@types/endpoint-wasmapi",
+    "version": "1.0.0",
+    "typings": "./index.d.ts"
+  }
+  

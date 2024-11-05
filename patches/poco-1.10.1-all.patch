@@ -1,0 +1,46 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index b664afd..b3d5d81 100755
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -2,6 +2,9 @@ cmake_minimum_required(VERSION 3.5.0)
+ 
+ project(Poco)
+ 
++set(CMAKE_POSITION_INDEPENDENT_CODE ON)
++add_compile_options(-pthread)
++
+ file(STRINGS "${PROJECT_SOURCE_DIR}/libversion" SHARED_LIBRARY_VERSION)
+ # Read the version information from the VERSION file
+ file(STRINGS "${PROJECT_SOURCE_DIR}/VERSION" PACKAGE_VERSION)
+diff --git a/Foundation/include/Poco/Config.h b/Foundation/include/Poco/Config.h
+index fb3cca8..e2c4925 100755
+--- a/Foundation/include/Poco/Config.h
++++ b/Foundation/include/Poco/Config.h
+@@ -31,8 +31,8 @@
+ 
+ 
+ // Define to disable FPEnvironment support
+-// #define POCO_NO_FPENVIRONMENT
+-
++#define POCO_NO_FPENVIRONMENT
++#define POCO_NO_INOTIFY
+ 
+ // Define if std::wstring is not available
+ // #define POCO_NO_WSTRING
+diff --git a/Foundation/src/utils.h b/Foundation/src/utils.h
+index c87cee1..973d8a2 100755
+--- a/Foundation/src/utils.h
++++ b/Foundation/src/utils.h
+@@ -74,9 +74,11 @@
+ #undef DOUBLE_CONVERSION_CORRECT_DOUBLE_OPERATIONS
+ #endif  // _WIN32
+ #else
+-#error Target architecture was not detected as supported by Double-Conversion.
++#undef DOUBLE_CONVERSION_CORRECT_DOUBLE_OPERATIONS
+ #endif
+ 
++#undef DOUBLE_CONVERSION_CORRECT_DOUBLE_OPERATIONS
++
+ #if defined(__GNUC__)
+ #define DOUBLE_CONVERSION_UNUSED __attribute__((unused))
+ #else

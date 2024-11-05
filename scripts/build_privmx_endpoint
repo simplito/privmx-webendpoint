@@ -1,0 +1,49 @@
+#!/bin/bash
+set -e
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+if [ -z "$1" ]; then
+    echo "$0: Parameter missing."
+    exit -1;
+fi
+VERSION=$1
+
+source "$SCRIPT_PATH/config.sh"
+source "$EMSDK_DIR/emsdk_env.sh"
+
+PRIVMX_ENDPOINT_DIR="$SOURCE_DIR/privmx-endpoint-$VERSION"
+
+if [ -d "$PRIVMX_ENDPOINT_DIR" ];
+then
+    echo "$PRIVMX_ENDPOINT_DIR directory exists. Skip download of sources."
+else
+	echo "$PRIVMX_ENDPOINT_DIR directory does not exist. Get sources..."
+
+    ZIP_TMP_DIR=$(mktemp -d)
+    OUT_TMP_DIR=$(mktemp -d)
+    curl -L \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer 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" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    https://api.github.com/repos/simplito/privmx-endpoint/zipball/$VERSION -o $ZIP_TMP_DIR/$VERSION.zip
+
+    unzip "$ZIP_TMP_DIR/$VERSION.zip" -d $OUT_TMP_DIR
+    rm -rf $ZIP_TMP_DIR
+    cd $OUT_TMP_DIR
+    ZIP_INNER_DIR=`ls`
+    mv $ZIP_INNER_DIR $PRIVMX_ENDPOINT_DIR
+    cd "$SOURCE_DIR"
+    rm -rf $OUT_TMP_DIR
+fi
+
+cd "$PRIVMX_ENDPOINT_DIR"
+
+
+if [ ! -d "./build-emscripten" ]; then
+    mkdir -p build-emscripten && cd build-emscripten
+    emcmake cmake .. -D PRIVMX_EMSCRIPTEN=ON -D PRIVMX_BUILD_ENDPOINT=ON -D PRIVMX_DRIVER_CRYPTO=OFF -D PRIVMX_DRIVER_NET=OFF \
+        -D CMAKE_BUILD_TYPE=MinSizeRel
+else
+    cd build-emscripten
+fi
+emmake make -j20
+emmake make install

@@ -1,0 +1,5 @@
+.vscode/
+emsdk/
+src/
+out/
+build-emscripten/

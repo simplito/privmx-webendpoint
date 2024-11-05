@@ -1,0 +1,13 @@
+diff --git a/emscripten/cache/sysroot/include/emscripten/wire.h b/emscripten/cache/sysroot/include/emscripten/wire.h
+index a2bdb12..cce866c 100644
+--- a/emscripten/cache/sysroot/include/emscripten/wire.h
++++ b/emscripten/cache/sysroot/include/emscripten/wire.h
+@@ -267,7 +267,7 @@ EMSCRIPTEN_DEFINE_NATIVE_BINDING_TYPE(signed long);
+ EMSCRIPTEN_DEFINE_NATIVE_BINDING_TYPE(unsigned long);
+ EMSCRIPTEN_DEFINE_NATIVE_BINDING_TYPE(float);
+ EMSCRIPTEN_DEFINE_NATIVE_BINDING_TYPE(double);
+-EMSCRIPTEN_DEFINE_NATIVE_BINDING_TYPE(int64_t);
++//  EMSCRIPTEN_DEFINE_NATIVE_BINDING_TYPE(int64_t);
+ EMSCRIPTEN_DEFINE_NATIVE_BINDING_TYPE(uint64_t);
+ 
+ template<>

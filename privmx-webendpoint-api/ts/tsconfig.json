@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "rootDir": "./src",
+    "module": "CommonJS",
+    "target": "ESNext",    
+    "lib": ["ES2020", "ES2018.promise", "dom"],              
+    "allowJs": true,                                 
+    "declaration": true,    
+    "esModuleInterop": true,                             
+    "forceConsistentCasingInFileNames": true,           
+    "strict": true,                                     
+    "skipLibCheck": true,
+    "outDir": "./dist/",
+    "allowSyntheticDefaultImports": true,
+    //"moduleResolution": "node",
+    
+  },
+  "include": ["./src/**/*"],
+  "exclude": [
+    "loader",
+    "node_modules"
+  ],
+}
