@@ -1,0 +1,21 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+
+source "$SCRIPT_PATH/config.sh"
+
+rm -rf "$SCRIPT_PATH/../src"
+rm -rf "$PRIVMX_WEBENDPOINT_API_SRC/cpp/build-emscripten"
+rm -rf "$PRIVMX_WEBENDPOINT_API_SRC/ts/dist"
+rm -rf "$PRIVMX_WEBENDPOINT_API_SRC/ts/out"
+rm -rf "$PRIVMX_WEBENDPOINT_API_SRC/ts/node_modules"
+rm -rf "$PRIVMX_WEBENDPOINT_DRV_ECC_SRC/build-emscripten"
+rm -rf "$PRIVMX_WEBENDPOINT_DRV_NET_SRC/build-emscripten"
+rm -rf "$PRIVMX_WEBENDPOINT_DRV_CRYPTO_SRC/build-emscripten"
+rm -rf "$PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC/build-emscripten"
+rm -rf "$PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC/out"
+rm -rf "$PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC/node_modules"
+rm -rf "$OUT_DIR"
+mkdir -p "$SCRIPT_PATH/../src"

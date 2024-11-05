@@ -36,8 +36,16 @@ fi
 
 cd "$PSON_DIR"
 
-# apply config patches for emscripten
-patch --forward -d "$PSON_DIR" -p1 -i "$BASE_DIR/patches/pson-cpp.patch" || echo "OK"
+# apply config patches for emscripte
+set +e
+patch_out=$(patch --forward -d "$PSON_DIR" -p1 -i "$BASE_DIR/patches/pson-cpp.patch")
+status=$?
+if [ $status -eq 1 ]; then
+    if [[ $patch_out == *"FAILED"* ]]; then
+        echo "Patching PSON FAILED"; exit -1;
+    fi
+fi
+set -e
 
 if [ ! -d "./build-emscripten" ]; then
     mkdir -p build-emscripten && cd build-emscripten
