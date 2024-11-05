@@ -7,6 +7,11 @@ SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 source "$SCRIPT_PATH/config.sh"
 source "$EMSDK_DIR/emsdk_env.sh"
 
+sep() {
+    echo "=========================== $1 =========================="
+}
+
+sep "PRIVMX_WEBENDPOINT_DRV_CRYPTO_SRC"
 cd "$PRIVMX_WEBENDPOINT_DRV_CRYPTO_SRC"
 
 if [ ! -d "./build-emscripten" ]; then
@@ -18,6 +23,7 @@ fi
 emmake make -j20
 emmake make install
 
+sep "PRIVMX_WEBENDPOINT_DRV_ECC_SRC"
 cd "$PRIVMX_WEBENDPOINT_DRV_ECC_SRC"
 
 if [ ! -d "./build-emscripten" ]; then
@@ -29,6 +35,7 @@ fi
 emmake make -j20
 emmake make install
 
+sep "PRIVMX_WEBENDPOINT_DRV_NET_SRC"
 cd "$PRIVMX_WEBENDPOINT_DRV_NET_SRC"
 
 if [ ! -d "./build-emscripten" ]; then

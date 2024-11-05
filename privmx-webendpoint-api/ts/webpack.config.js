@@ -4,7 +4,7 @@ module.exports = {
   entry: {
     bundle: './src/index.ts'
   },
-  mode: 'development',
+  mode: 'production',
   plugins: [
     new webpack.ProvidePlugin({
         Buffer: ['buffer', 'Buffer'],

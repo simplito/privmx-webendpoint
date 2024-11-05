@@ -16,8 +16,10 @@ cp "$PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC/out/loader.js" "$PRIVMX_WEBENDPOINT_API_
 cp "$PRIVMX_ENDPOINT_SRC-$PRIVMX_ENDPOINT_VERSION/emscripten/jslibrary/websocket.js" "$PRIVMX_WEBENDPOINT_API_SRC/cpp/js/"
 rm -rf ./build-emscripten
 mkdir -p build-emscripten && cd build-emscripten
-emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
-emmake make -j20
+echo "EMSDK_DIR PASSED TO CMAKE: $EMSDK_DIR"
+echo "====================================="
+SDK_DIR=$EMSDK_DIR emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
+SDK_DIR=$EMSDK_DIR emmake make -j20
 
 cd "$PRIVMX_WEBENDPOINT_API_SRC/ts"
 npm ci --registry=https://npmregistry.privmx.com
