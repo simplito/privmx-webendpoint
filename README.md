@@ -60,7 +60,7 @@ const runSample = (async () => {
   listenForEvents(eventQueue);
 
   // initialize Endpoint connection and Threads API
-  const connection = await EndpointFactory.platformConnect(userPrivKey, solutionId, platformUrl);
+  const connection = await EndpointFactory.connect(userPrivKey, solutionId, platformUrl);
   const threadsApi = await EndpointFactory.createThreadApi(connection);
 
   const contexts = await connection.listContexts(defaultListQuery);
