@@ -62,17 +62,17 @@ export class EndpointFactory {
    *
    * @param {string} userPrivKey user's private key
    * @param {string} solutionId ID of the Solution
-   * @param {string} platformUrl Platform's Endpoint URL
+   * @param {string} bridgeUrl the Bridge Server URL
    * @returns {Connection} instance of Connection
    */
   static async connect(
     userPrivKey: string,
     solutionId: string,
-    platformUrl: string
+    bridgeUrl: string
   ): Promise<Connection> {
     const nativeApi = new ConnectionNative(this.api);
     const ptr = await nativeApi.newConnection();
-    await nativeApi.connect(ptr, [userPrivKey, solutionId, platformUrl]);
+    await nativeApi.connect(ptr, [userPrivKey, solutionId, bridgeUrl]);
 
     return new Connection(nativeApi, ptr);
   }
@@ -81,17 +81,17 @@ export class EndpointFactory {
    * Connects to the Platform backend as a guest user.
    *
    * @param {string} solutionId ID of the Solution
-   * @param {string} platformUrl the Platform's Endpoint URL
+   * @param {string} bridgeUrl the Bridge Server URL
    *
    * @returns {Connection} instance of Connection
    */
   static async connectPublic(
     solutionId: string,
-    platformUrl: string
+    bridgeUrl: string
   ): Promise<Connection> {
     const nativeApi = new ConnectionNative(this.api);
     const ptr = await nativeApi.newConnection();
-    await nativeApi.connectPublic(ptr, [solutionId, platformUrl]);
+    await nativeApi.connectPublic(ptr, [solutionId, bridgeUrl]);
     return new Connection(nativeApi, ptr);
   }
 
