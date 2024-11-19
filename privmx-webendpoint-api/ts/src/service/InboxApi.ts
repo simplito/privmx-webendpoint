@@ -19,6 +19,7 @@ import {
   InboxPublicView,
   InboxEntry,
   FilesConfig,
+  ContainerWithoutItemPolicy,
 } from "../Types";
 
 export class InboxApi extends BaseApi {
@@ -36,6 +37,7 @@ export class InboxApi extends BaseApi {
    * @param {Uint8Array} publicMeta public (unencrypted) metadata
    * @param {Uint8Array} privateMeta private (encrypted) metadata
    * @param {FilesConfig} filesConfig struct to override default file configuration
+   * @param {ContainerWithoutItemPolicy} policies contains policies for the Inbox
    * @returns {string} ID of the created Inbox
    */
   async createInbox(
@@ -44,7 +46,9 @@ export class InboxApi extends BaseApi {
     managers: UserWithPubKey[],
     publicMeta: Uint8Array,
     privateMeta: Uint8Array,
-    filesConfig?: FilesConfig | undefined
+    filesConfig?: FilesConfig,
+    policies?: ContainerWithoutItemPolicy,
+
   ): Promise<string> {
     return this.native.createInbox(this.servicePtr, [
       contextId,
@@ -53,6 +57,7 @@ export class InboxApi extends BaseApi {
       publicMeta,
       privateMeta,
       filesConfig,
+      policies,
     ]);
   }
 
@@ -69,6 +74,7 @@ export class InboxApi extends BaseApi {
    * @param {number} version current version of the updated Inbox
    * @param {boolean} force force update (without checking version)
    * @param {boolean} forceGenerateNewKey force to regenerate a key for the Inbox
+   * @param {ContainerWithoutItemPolicy} policies Inbox policies
    */
   async updateInbox(
     inboxId: string,
@@ -79,7 +85,8 @@ export class InboxApi extends BaseApi {
     filesConfig: FilesConfig | undefined,
     version: number,
     force: boolean,
-    forceGenerateNewKey: boolean
+    forceGenerateNewKey: boolean,
+    policies?: ContainerWithoutItemPolicy,
   ): Promise<void> {
     return this.native.updateInbox(this.servicePtr, [
       inboxId,
@@ -91,6 +98,7 @@ export class InboxApi extends BaseApi {
       version,
       force,
       forceGenerateNewKey,
+      policies,
     ]);
   }
 

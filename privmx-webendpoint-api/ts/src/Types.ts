@@ -108,6 +108,7 @@ limitations under the License.
      * @param {number} lastMsgDate timestamp of last posted message
      * @param {Uint8Array} publicMeta Thread's public meta data
      * @param {Uint8Array} privateMeta Thread's private mata data
+     * @param {ContainerPolicy} policy Thread's policies
      * @param {number} messagesCount total number of messages in the Thread
      * @param {number} statusCode status code of retrival and decryption of the Thread
      * 
@@ -125,6 +126,7 @@ limitations under the License.
         lastMsgDate: number;
         publicMeta: Uint8Array;
         privateMeta: Uint8Array;
+        policy: ContainerPolicy;
         messagesCount: number;
         statusCode: number;
     };
@@ -188,6 +190,7 @@ limitations under the License.
      * @param {number} version version number (changes on updates)
      * @param {Uint8Array} publicMeta Store's public meta data
      * @param {Uint8Array} privateMeta Store's private mata data
+     * @param {ContainerPolicy} policy Store's policies
      * @param {number} filesCount total number of files in the Store
      * @param {number} statusCode status code of retrival and decryption of the Store
      * 
@@ -205,6 +208,7 @@ limitations under the License.
         version: number;
         publicMeta: Uint8Array;
         privateMeta: Uint8Array;
+        policy: ContainerPolicy;
         filesCount: number;
         statusCode: number;
     };
@@ -268,6 +272,7 @@ limitations under the License.
      * @param {Uint8Array} publicMeta Inbox' public meta data
      * @param {Uint8Array} privateMeta Inbox' private mata data
      * @param {FilesConfig} filesConfig Inbox' files configuration
+     * @param {ContainerWithoutItemPolicy} policy Inbox' policies
      * @param {number} statusCode status code of retrival and decryption of the Inbox
      * 
      */
@@ -284,6 +289,7 @@ limitations under the License.
         publicMeta: Uint8Array;
         privateMeta: Uint8Array;
         filesConfig?: FilesConfig;
+        policy: ContainerWithoutItemPolicy;
         statusCode: number;        
     };
     /**
@@ -341,7 +347,73 @@ limitations under the License.
         maxCount: number;
         maxFileSize: number;
         maxWholeUploadSize: number;
-    };    
+    };
+    
+    
+    /**
+     * Holds Container policies settings
+     * 
+     * @type {ContainerWithoutItemPolicy}
+     * 
+     * @param {PolicyEntry} get determine who can get a container
+     * @param {PolicyEntry} update determine who can update a container
+     * @param {PolicyEntry} delete determine who can delete a container
+     * @param {PolicyEntry} updatePolicy determine who can update the policy of a container
+     * @param {PolicyEntry} updaterCanBeRemovedFromManagers determine whether the updater can be removed from the list of managers
+     * @param {PolicyEntry} ownerCanBeRemovedFromManagers determine whether the owner can be removed from the list of managers
+     */
+    export interface ContainerWithoutItemPolicy extends ItemPolicy {
+        get?: PolicyEntry;
+        update?: PolicyEntry;
+        delete?: PolicyEntry;
+        updatePolicy?: PolicyEntry;
+        updaterCanBeRemovedFromManagers?: PolicyBooleanEntry;
+        ownerCanBeRemovedFromManagers?: PolicyBooleanEntry;
+    }
+    
+    /**
+     * Holds Container policies settings
+     * Extends {ContainerWithoutItemPolicy} with the `item` field
+     * 
+     * @type {ContainerPolicy}
+     * 
+     * @param {ItemPolicy} item item policies
+     */
+    export interface ContainerPolicy extends ContainerWithoutItemPolicy {
+        item?: ItemPolicy;
+    }
+    
+    /**
+     * @type {PolicyEntry}
+     */
+    export type PolicyEntry = "inherit"|"yes"|"no"|"default"|"none"|"all"|"user"|"owner"|"manager"|"itemOwner"|"itemOwner&user"|"itemOwner&user,manager"|"owner&user"|"manager&owner"|"itemOwner,manager"|"itemOwner,owner"|"itemOwner,manager,owner"|"manager,owner"|(string&{__policyEntry: never});
+
+    /**
+     * @type {PolicyBooleanEntry}
+     */
+    export type PolicyBooleanEntry = "inherit"|"default"|"yes"|"no";
+    
+    /**
+     * Holds Container's item policies settings
+     * 
+     * @type {ContainerWithoutItemPolicy}
+     * 
+     * @param {PolicyEntry} get determine who can get an item
+     * @param {PolicyEntry} listMy determine who can list items created by me
+     * @param {PolicyEntry} listAll determine who can list all items
+     * @param {PolicyEntry} create determine who can create an item
+     * @param {PolicyEntry} update determine who can update an item
+     * @param {PolicyEntry} delete determine who can delete an item
+     */
+    export interface ItemPolicy {
+        get?: PolicyEntry;
+        listMy?: PolicyEntry;
+        listAll?: PolicyEntry;
+        create?: PolicyEntry;
+        update?: PolicyEntry;
+        delete?: PolicyEntry;
+    }
+    
 // }
 
 /**

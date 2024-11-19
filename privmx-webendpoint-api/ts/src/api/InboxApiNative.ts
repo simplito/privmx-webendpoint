@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { PagingQuery, PagingList, UserWithPubKey, Inbox, InboxPublicView, InboxEntry, FilesConfig } from "../Types";
+import { PagingQuery, PagingList, UserWithPubKey, Inbox, InboxPublicView, InboxEntry, FilesConfig, ContainerWithoutItemPolicy } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class InboxApiNative extends BaseNative {
@@ -23,10 +23,10 @@ export class InboxApiNative extends BaseNative {
     async create(ptr: number, args: []): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.InboxApi_create(taskId, ptr, args));
     }
-    async createInbox(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, FilesConfig|undefined]): Promise<string> {
+    async createInbox(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, FilesConfig|undefined, ContainerWithoutItemPolicy|undefined]): Promise<string> {
         return this.runAsync<string>((taskId)=>this.api.lib.InboxApi_createInbox(taskId, ptr, args));
     }
-    async updateInbox(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, FilesConfig|undefined, number, boolean, boolean]): Promise<void> {
+    async updateInbox(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, FilesConfig|undefined, number, boolean, boolean, ContainerWithoutItemPolicy|undefined]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.InboxApi_updateInbox(taskId, ptr, args));
     }
     async getInbox(ptr: number, args: [string]): Promise<Inbox> {
