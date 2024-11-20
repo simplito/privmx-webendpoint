@@ -17,6 +17,7 @@ import {
   UserWithPubKey,
   Thread,
   Message,
+  ContainerPolicy,
 } from "../Types";
 
 export class ThreadApi extends BaseApi {
@@ -33,6 +34,7 @@ export class ThreadApi extends BaseApi {
    * the created Thread
    * @param {Uint8Array} publicMeta public (unencrypted) metadata
    * @param {Uint8Array} privateMeta private (encrypted) metadata
+   * @param {ContainerPolicy} policies Thread's policies
    * @returns {string} ID of the created Thread
    */
   async createThread(
@@ -40,7 +42,8 @@ export class ThreadApi extends BaseApi {
     users: UserWithPubKey[],
     managers: UserWithPubKey[],
     publicMeta: Uint8Array,
-    privateMeta: Uint8Array
+    privateMeta: Uint8Array,
+    policies?: ContainerPolicy,
   ): Promise<string> {
     return this.native.createThread(this.servicePtr, [
       contextId,
@@ -48,6 +51,7 @@ export class ThreadApi extends BaseApi {
       managers,
       publicMeta,
       privateMeta,
+      policies,
     ]);
   }
 
@@ -63,6 +67,7 @@ export class ThreadApi extends BaseApi {
    * @param {number} version current version of the updated Thread
    * @param {boolean} force force update (without checking version)
    * @param {boolean} forceGenerateNewKey force to regenerate a key for the Thread
+   * @param {ContainerPolicy} policies Thread's policies
    */
   async updateThread(
     threadId: string,
@@ -72,7 +77,8 @@ export class ThreadApi extends BaseApi {
     privateMeta: Uint8Array,
     version: number,
     force: boolean,
-    forceGenerateNewKey: boolean
+    forceGenerateNewKey: boolean,
+    policies?: ContainerPolicy,
   ): Promise<void> {
     return this.native.updateThread(this.servicePtr, [
       threadId,
@@ -83,6 +89,7 @@ export class ThreadApi extends BaseApi {
       version,
       force,
       forceGenerateNewKey,
+      policies,
     ]);
   }
 

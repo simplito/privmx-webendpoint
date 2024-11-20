@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { PagingQuery, PagingList, UserWithPubKey, Thread, Message } from "../Types";
+import { PagingQuery, PagingList, UserWithPubKey, Thread, Message, ContainerPolicy } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class ThreadApiNative extends BaseNative {
@@ -23,10 +23,10 @@ export class ThreadApiNative extends BaseNative {
     async create(ptr: number, args: []): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.ThreadApi_create(taskId, ptr, args));
     }
-    async createThread(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array]): Promise<string> {
+    async createThread(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, ContainerPolicy|undefined]): Promise<string> {
         return this.runAsync<string>((taskId)=>this.api.lib.ThreadApi_createThread(taskId, ptr, args));
     }
-    async updateThread(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, number, boolean, boolean]): Promise<void> {
+    async updateThread(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, number, boolean, boolean, ContainerPolicy|undefined]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.ThreadApi_updateThread(taskId, ptr, args));
     }
     async deleteThread(ptr: number, args: [string]): Promise<void> {

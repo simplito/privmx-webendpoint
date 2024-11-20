@@ -11,7 +11,7 @@ limitations under the License.
 
 import { BaseApi } from "./BaseApi";
 import { StoreApiNative } from "../api/StoreApiNative";
-import { PagingQuery, PagingList, UserWithPubKey, Store, File } from "../Types";
+import { PagingQuery, PagingList, UserWithPubKey, Store, File, ContainerPolicy } from "../Types";
 
 export class StoreApi extends BaseApi {
   constructor(private native: StoreApiNative, ptr: number) {
@@ -27,6 +27,7 @@ export class StoreApi extends BaseApi {
    * created Store
    * @param {Uint8Array} publicMeta public (unencrypted) metadata
    * @param {Uint8Array} privateMeta private (encrypted) metadata
+   * @param {ContainerPolicy} policies Store's policies
    * @returns {string} created Store ID
    */
   async createStore(
@@ -34,7 +35,8 @@ export class StoreApi extends BaseApi {
     users: UserWithPubKey[],
     managers: UserWithPubKey[],
     publicMeta: Uint8Array,
-    privateMeta: Uint8Array
+    privateMeta: Uint8Array,
+    policies?: ContainerPolicy,
   ): Promise<string> {
     return this.native.createStore(this.servicePtr, [
       contextId,
@@ -42,6 +44,7 @@ export class StoreApi extends BaseApi {
       managers,
       publicMeta,
       privateMeta,
+      policies
     ]);
   }
 
@@ -57,6 +60,7 @@ export class StoreApi extends BaseApi {
    * @param {number} version current version of the updated Store
    * @param {boolean} force force update (without checking version)
    * @param {boolean} forceGenerateNewKey force to regenerate a key for the Store
+   * @param {ContainerPolicy} policies Store's policies
    */
   async updateStore(
     storeId: string,
@@ -66,7 +70,8 @@ export class StoreApi extends BaseApi {
     privateMeta: Uint8Array,
     version: number,
     force: boolean,
-    forceGenerateNewKey: boolean
+    forceGenerateNewKey: boolean,
+    policies?: ContainerPolicy,
   ): Promise<void> {
     return this.native.updateStore(this.servicePtr, [
       storeId,
@@ -77,6 +82,7 @@ export class StoreApi extends BaseApi {
       version,
       force,
       forceGenerateNewKey,
+      policies
     ]);
   }
 
