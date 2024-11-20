@@ -359,8 +359,8 @@ limitations under the License.
      * @param {PolicyEntry} update determine who can update a container
      * @param {PolicyEntry} delete determine who can delete a container
      * @param {PolicyEntry} updatePolicy determine who can update the policy of a container
-     * @param {PolicyEntry} updaterCanBeRemovedFromManagers determine whether the updater can be removed from the list of managers
-     * @param {PolicyEntry} ownerCanBeRemovedFromManagers determine whether the owner can be removed from the list of managers
+     * @param {PolicyBooleanEntry} updaterCanBeRemovedFromManagers determine whether the updater can be removed from the list of managers
+     * @param {PolicyBooleanEntry} ownerCanBeRemovedFromManagers determine whether the owner can be removed from the list of managers
      */
     export interface ContainerWithoutItemPolicy extends ItemPolicy {
         get?: PolicyEntry;
