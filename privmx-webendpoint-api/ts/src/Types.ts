@@ -362,7 +362,7 @@ limitations under the License.
      * @param {PolicyBooleanEntry} updaterCanBeRemovedFromManagers determine whether the updater can be removed from the list of managers
      * @param {PolicyBooleanEntry} ownerCanBeRemovedFromManagers determine whether the owner can be removed from the list of managers
      */
-    export interface ContainerWithoutItemPolicy extends ItemPolicy {
+    export interface ContainerWithoutItemPolicy {
         get?: PolicyEntry;
         update?: PolicyEntry;
         delete?: PolicyEntry;
@@ -373,7 +373,6 @@ limitations under the License.
     
     /**
      * Holds Container policies settings
-     * Extends {ContainerWithoutItemPolicy} with the `item` field
      * 
      * @type {ContainerPolicy}
      * 
