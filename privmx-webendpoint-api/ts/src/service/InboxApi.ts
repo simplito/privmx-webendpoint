@@ -37,7 +37,7 @@ export class InboxApi extends BaseApi {
    * @param {Uint8Array} publicMeta public (unencrypted) metadata
    * @param {Uint8Array} privateMeta private (encrypted) metadata
    * @param {FilesConfig} filesConfig struct to override default file configuration
-   * @param {ContainerWithoutItemPolicy} policies contains policies for the Inbox
+   * @param {ContainerWithoutItemPolicy} policies Inbox policies
    * @returns {string} ID of the created Inbox
    */
   async createInbox(
