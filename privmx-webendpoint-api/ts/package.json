@@ -18,7 +18,6 @@
   "license": "PrivMX Free License",
   "devDependencies": {
     "@types/dom-mediacapture-transform": "^0.1.9",
-    "@types/dom-webcodecs": "^0.1.11",
     "@types/webrtc": "^0.0.43",
     "@types/node": "^20.9.0",
     "@types/privfs-client": "^2.7.2",
