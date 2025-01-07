@@ -9,35 +9,45 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// export { EndpointFactory, ThreadApi, StoreApi, InboxApi, CryptoApi} from "./service";
-import { EndpointFactory } from "./service/EndpointFactory"; 
-// import {ThreadApi} from "./service/ThreadApi"; 
-//     import {StoreApi} from "./service/StoreApi"; 
-//     import {InboxApi} from "./service/InboxApi"; 
-//     import {CryptoApi} from "./service/CryptoApi"; 
-//     import {Connection} from "./service/Connection"; 
-//     import {EventQueue } from "./service/EventQueue";
+import { EndpointFactory } from "./service/EndpointFactory";
+import  * as Types from "./Types";
 
-// import { EndpointFactory, ThreadApi, StoreApi, InboxApi, CryptoApi, Connection, EventQueue } from "./service";
+declare function endpointWasmModule(): Promise<any>; // Provided by emscripten js glue code
 
-
-// export {EndpointFactory, ThreadApi, StoreApi, InboxApi, CryptoApi, Connection, EventQueue};
-
-// declare function endpointWasmModule(): Promise<any>; // Provided by emscripten js glue code
-
-// function setLib(){
-//     endpointWasmModule().then((lib: any)=>{
-//         EndpointFactory.init(lib);
-//         dispatchEvent(new CustomEvent('libInitialized'));
-//     }).catch((err: Error)=>console.log(err));
-// }
 class Endpoint {
-    public static async loadLibrary(endpointWasmModuleJsPath: string): Promise<void> {
-        // const wasmLibModule = await import(/* webpackChunkName: "endpoint-wasm-module" */`${endpointWasmModuleJsPath}`);
-        // console.log({wasmLibModule});
-        // const module = await wasmLibModule();
-        // console.log({module});
+   /**
+   * Load the Endpoint's WASM assets and initialize the Endpoint library.
+   *
+   * @param {string} [assetsBasePath] base path/url to the Endpoint's WebAssembly assets (like: endpoint-wasm-module.js, driver-web-context.js and others)
+   */
+    public static async loadLibrary(assetsBasePath?: string): Promise<void> {
+        if (assetsBasePath) {
+            const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
+            for (const asset of assets) {
+                await this.loadScript(assetsBasePath + "/" + asset);
+            }
+        }
+        const lib = await this.initWasm();
+        EndpointFactory.init(lib);
+    }
+
+    private static async loadScript(url: string): Promise<void> {
+        return new Promise<void>(resolve => {
+            const head = document.getElementsByTagName('head')[0];
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = url;
+    
+            script.onload = () => {
+                resolve()
+            };
+            head.appendChild(script);    
+        });
+    }
+
+    private static async initWasm(): Promise<any> {
+        return endpointWasmModule();
     }
 }
 
-export {Endpoint, EndpointFactory};
+export {Endpoint, EndpointFactory, Types};

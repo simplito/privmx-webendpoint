@@ -1,6 +1,6 @@
 {
-  "name": "privmx-webendpoint-api",
-  "version": "1.0.28",
+  "name": "@simplito/privmx-webendpoint",
+  "version": "1.0.0",
   "description": "",
   "type": "commonjs",
   "main": "dist/mjs/index.js",
