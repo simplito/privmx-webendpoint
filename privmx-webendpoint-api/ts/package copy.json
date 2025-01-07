@@ -1,9 +1,9 @@
 {
   "name": "privmx-webendpoint-api",
-  "version": "1.0.28",
+  "version": "1.0.23",
   "description": "",
-  "type": "commonjs",
-  "main": "dist/mjs/index.js",
+  "type": "module",
+  "module": "dist/mjs/index.js",
   "types": "./dist/mjs/index.d.ts",
   "files": [
     "/dist"

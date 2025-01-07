@@ -27,20 +27,14 @@ import { ThreadApi } from "./ThreadApi";
  * Contains static factory methods - generators for Connection and APIs.
  */
 export class EndpointFactory {
-  static api: Api;
-  static eventQueueInstance: EventQueue;
+  private static api: Api;
+  private static eventQueueInstance: EventQueue;
 
   /**
    * //doc-gen:ignore
    */
   static init(lib: any) {
     this.api = new Api(lib);
-    // this.eventQueueNative = new EventQueueNative(api);
-    // this.connectionNative = new ConnectionNative(api);
-    // this.threadApiNative = new ThreadApiNative(api);
-    // this.storeApiNative = new StoreApiNative(api);
-    // this.inboxApiNative = new InboxApiNative(api);
-    // this.cryptoApiNative = new CryptoApiNative(api);
   }
 
   /**
