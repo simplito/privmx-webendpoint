@@ -1,7 +1,7 @@
 
 {
   "compilerOptions": {
-    "outDir": "dist/mjs",
+    "rootDir": "./src",
     "target": "ESNext",
     "lib": [
       "es2015",
@@ -16,6 +16,7 @@
     "newLine": "lf",
     "stripInternal": true,
     "strict": false,
-    "sourceMap": true
+    "sourceMap": false
   },
+  "exclude": ["node_modules"]
 }

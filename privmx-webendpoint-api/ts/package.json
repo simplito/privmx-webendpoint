@@ -1,20 +1,21 @@
 {
   "name": "@simplito/privmx-webendpoint",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "description": "",
   "type": "commonjs",
   "main": "dist/mjs/index.js",
-  "types": "./dist/mjs/index.d.ts",
+  "types": "dist/mjs/index.d.ts",
   "files": [
     "/dist"
 ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "compile": "tsc",
-    "build_hybrid": "rm -rf ./dist && tsc -p tsconfig.esm.json",
-    "build": "npm run build:esm",
-    "build:cjs": "tsc",
-    "build:esm": "tsc -p tsconfig.esm.json",
+    "build": "npm run clean && npm run build:bundle && npm run build:mjs && npm run build:fixup",
+    "clean": "rm -rf ./dist",
+    "build:bundle": "webpack",
+    "build:mjs": "tsc -p tsconfig.mjs.json",
+    "build:fixup": "node fixup-package-json.js",
     "watch": "tsc -w"
   },
   "author": "",
