@@ -1,12 +1,13 @@
 {
   "name": "@simplito/privmx-webendpoint",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "",
   "type": "commonjs",
   "main": "dist/mjs/index.js",
   "types": "dist/mjs/index.d.ts",
   "files": [
-    "/dist"
+    "/dist",
+    "/assets"
 ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",

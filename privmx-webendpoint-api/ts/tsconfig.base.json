@@ -11,7 +11,6 @@
       "dom"
     ],
     "module": "CommonJS",
-    "declaration": true,
     "pretty": true,
     "newLine": "lf",
     "stripInternal": true,
