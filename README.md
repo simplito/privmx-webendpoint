@@ -30,7 +30,7 @@ endpoint-wasm-module.worker.js
 endpoint-wasm-module.js
 privmx-endpoint-web.js
 ```
-
+The above assets can be downloaded as a prebuilt package from the [npmjs.org](https://www.npmjs.com/package/@simplito/privmx-webendpoint) or they can be built using tools from the repository you are currently in.
 
 #### You must also ensure that:
 

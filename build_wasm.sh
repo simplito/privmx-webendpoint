@@ -24,6 +24,6 @@ sep "build_driver_web_context"
 "$SCRIPT_PATH/scripts/build_driver_web_context"
 sep "build_api"
 "$SCRIPT_PATH/scripts/build_api" $PRIVMX_ENDPOINT
-sep "install"
-"$SCRIPT_PATH/scripts/install"
+sep "add assets to npm"
+"$SCRIPT_PATH/scripts/add_assets_to_npm"
 echo "BUILD SUCCESS"
