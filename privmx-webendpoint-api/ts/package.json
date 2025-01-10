@@ -1,26 +1,31 @@
 {
-  "name": "privmx-webendpoint-api",
-  "version": "1.0.0",
+  "name": "@simplito/privmx-webendpoint",
+  "version": "2.1.3",
   "description": "",
   "type": "commonjs",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/mjs/index.js",
+  "types": "dist/mjs/index.d.ts",
   "files": [
-    "/dist"
-  ],
+    "/dist",
+    "/assets"
+],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "compile": "tsc",
-    "build": "webpack"
+    "build": "npm run clean && npm run build:bundle && npm run build:mjs && npm run build:fixup",
+    "clean": "rm -rf ./dist",
+    "build:bundle": "webpack",
+    "build:mjs": "tsc -p tsconfig.mjs.json",
+    "build:fixup": "node fixup-package-json.js",
+    "watch": "tsc -w"
   },
   "author": "",
   "license": "PrivMX Free License",
+  "engines": {
+    "node": ">=4"
+  },
   "devDependencies": {
     "@types/node": "^20.9.0",
-    "@types/privfs-client": "^2.7.2",
-    "@types/privmx-contact-api-types": "^0.0.12",
-    "@types/privmx-rpc": "^2.4.2",
-    "@types/privmx-server-api": "^1.0.202311141544",
     "@types/webpack": "^5.28.5",
     "assert": "^2.1.0",
     "buffer": "^6.0.3",
@@ -37,6 +42,5 @@
     "webpack-dev-server": "^4.15.1"
   },
   "dependencies": {
-    "privmx-crypto": "^2.4.2"
   }
 }

@@ -2,7 +2,7 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist/bundle",
-    "declaration": false
-  }
+    "outDir": "dist/mjs",
+    "declaration": true
+  },
 }

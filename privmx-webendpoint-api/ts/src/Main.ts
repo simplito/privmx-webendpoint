@@ -9,8 +9,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Api } from "./api/Api";
-import { IdGenerator } from "./api/IdGenerator";
 import { EndpointFactory } from "./service/EndpointFactory";
 
 declare function endpointWasmModule(): Promise<any>; // Provided by emscripten js glue code
