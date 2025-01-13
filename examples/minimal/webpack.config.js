@@ -1,9 +1,10 @@
 const path = require('path');
+const webpack = require("webpack");
 
 module.exports = env => {
     const host = process.env.HOST || 'localhost';    
     return {
-        entry: "./fake.js",
+        entry: "./src/app.js",
         mode: "development",
         devServer: {
           static: {
@@ -13,7 +14,7 @@ module.exports = env => {
           compress: true,
           liveReload: true,
           host,
-          port: 4001,
+          port: 4002,
           headers: {
             "Cross-Origin-Embedder-Policy": "require-corp",
             "Cross-Origin-Opener-Policy": "same-origin"
