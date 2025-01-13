@@ -3,6 +3,7 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist/bundle",
-    "declaration": false
+    "declaration": false,
+    "moduleResolution": "node"
   }
 }

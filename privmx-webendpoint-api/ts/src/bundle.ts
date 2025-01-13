@@ -9,6 +9,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {EndpointFactory} from './Main';
-export {EndpointFactory};
-(self as any).EndpointFactory = EndpointFactory;
+// import {EndpointFactory} from './Main';
+import { EndpointFactory as Endpoint } from "./service/EndpointFactory";
+export {Endpoint}
