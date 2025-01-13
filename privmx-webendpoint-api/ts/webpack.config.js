@@ -39,5 +39,13 @@ module.exports = {
       return pathData.chunk.name == 'bundle' ? 'privmx-endpoint-web.js' : 'privmx-endpoint-web.[name].js';
     },
     path: path.resolve(__dirname, 'dist/bundle'),
+    library: {
+      name: {
+        root: 'PrivmxWebEndpoint',
+        amd: 'privmx-webendoint',
+        commonjs: 'privmx-webendpoint',
+      },
+      type: 'umd',
+    }
   },
 };

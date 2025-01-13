@@ -11,11 +11,23 @@
       "dom"
     ],
     "module": "CommonJS",
-    "pretty": true,
-    "newLine": "lf",
-    "stripInternal": true,
-    "strict": false,
-    "sourceMap": false
+    "declaration": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strict": true,
+    "strictBindCallApply": true,
+    "strictFunctionTypes": true,
+    "strictNullChecks": false,
+    "strictPropertyInitialization": false,
+    
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUnusedParameters": true,
+    
+    "allowUnreachableCode": false,
+    "forceConsistentCasingInFileNames": true,
+    "preserveConstEnums": true
+
   },
   "exclude": ["node_modules"]
 }
