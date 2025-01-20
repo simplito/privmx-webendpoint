@@ -44,7 +44,8 @@
     "build:bundle": "webpack",
     "build:mjs": "tsc -p tsconfig.mjs.json",
     "build:fixup": "node fixup-package-json.js",
-    "watch": "tsc -w"
+    "watch": "tsc -w",
+    "watch:mjs": "tsc -w -p tsconfig.mjs.json"
   },
   "engines": {
     "node": ">=4"
