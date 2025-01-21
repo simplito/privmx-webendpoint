@@ -239,6 +239,7 @@ export class StoreApi extends BaseApi {
 
   /**
    * Reads file data.
+   * Single read call moves the files's cursor position by decleared length or set it at the end of the file.
    *
    * @param {string} fileHandle handle to write file data
    * @param {number} length size of data to read
