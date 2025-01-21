@@ -292,7 +292,7 @@ export class InboxApi extends BaseApi {
    * @param {number} fileHandle handle to the file
    * @returns {string} ID of closed file
    */
-  async closeFile(fileHandle: number): Promise<void> {
+  async closeFile(fileHandle: number): Promise<string> {
     return this.native.closeFile(this.servicePtr, [fileHandle]);
   }
 

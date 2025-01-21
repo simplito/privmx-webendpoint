@@ -264,7 +264,7 @@ export class StoreApi extends BaseApi {
    * @param {string} fileHandle handle to read/write file data
    * @returns {string} ID of closed file
    */
-  async closeFile(fileHandle: number): Promise<void> {
+  async closeFile(fileHandle: number): Promise<string> {
     return this.native.closeFile(this.servicePtr, [fileHandle]);
   }
 

@@ -71,8 +71,8 @@ export class InboxApiNative extends BaseNative {
     async seekInFile(ptr: number, args: [number, number]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.InboxApi_seekInFile(taskId, ptr, args));
     }
-    async closeFile(ptr: number, args: [number]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.InboxApi_closeFile(taskId, ptr, args));
+    async closeFile(ptr: number, args: [number]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.InboxApi_closeFile(taskId, ptr, args));
     }
     async subscribeForInboxEvents(ptr: number, args: []): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.InboxApi_subscribeForInboxEvents(taskId, ptr, args));
