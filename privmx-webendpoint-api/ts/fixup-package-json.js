@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const DIST_BUNDLE_PATH = "dist/bundle";
-const DIST_MJS_PATH = "dist/mjs";
+const DIST_MJS_PATH = "dist";
 
 if (fs.existsSync(DIST_BUNDLE_PATH)) {
   fs.appendFileSync(path.resolve(DIST_BUNDLE_PATH, "package.json"), JSON.stringify({
