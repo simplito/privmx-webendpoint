@@ -31,6 +31,9 @@ export class CryptoApiNative extends BaseNative {
     async derivePrivateKey(ptr: number, args: [string, string]): Promise<string> {
         return this.runAsync<string>((taskId)=>this.api.lib.CryptoApi_derivePrivateKey(taskId, ptr, args));
     }
+    async derivePrivateKey_deprecated(ptr: number, args: [string, string]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.CryptoApi_derivePrivateKey_deprecated(taskId, ptr, args));
+    }
     async derivePublicKey(ptr: number, args: [string]): Promise<string> {
         return this.runAsync<string>((taskId)=>this.api.lib.CryptoApi_derivePublicKey(taskId, ptr, args));
     }
