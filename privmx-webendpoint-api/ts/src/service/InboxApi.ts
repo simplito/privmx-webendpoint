@@ -239,7 +239,7 @@ export class InboxApi extends BaseApi {
    * (note: To send the entire file - divide it into pieces of the desired size and call the function for each fragment.)
    * You do not have to be logged in to call this function.
    *
-   * @param {number} inboxHandle ID of the Inbox to which the request applies
+   * @param {number} inboxHandle Handle to the prepared Inbox entry
    * @param {number} inboxFileHandle handle to the file where the uploaded chunk belongs
    * @param {Uint8Array} dataChunk - file chunk to send
    */
