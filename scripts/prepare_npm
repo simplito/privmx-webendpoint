@@ -8,7 +8,7 @@ NPM_PACKAGE_VERSION="1.0.0"
 if [ -n "$1" ]; then
     NPM_PACKAGE_VERSION="$1"
 fi
-WORKING_DIR="$PRIVMX_WEBENDPOINT_API_SRC/ts/"
+WORKING_DIR="$PRIVMX_WEBENDPOINT_API_SRC/ts"
 PUB_DIR="$WORKING_DIR/pub"
 
 mkdir -p $PUB_DIR
@@ -21,8 +21,9 @@ sed -i "s/{__VERSION__}/$1/g" $WORKING_DIR/package.json
 cd $WORKING_DIR
 npm run build
 
-cp -R "$WORKING_DIR/dist/*" "$PUB_DIR"
-cp "$WORKING_DIR/package.json" "$PUB_DIR"
+cp -R ./dist/* "$PUB_DIR"
+cp -R ./assets "$PUB_DIR"
+cp ./package.json "$PUB_DIR"
 
 cd "$PUB_DIR"
 
