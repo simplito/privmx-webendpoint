@@ -47,7 +47,7 @@ export class CryptoApi extends BaseApi {
    * @returns {string} generated ECC key in WIF format
    */
   async derivePrivateKey(password: string, salt: string): Promise<string> {
-    return this.native.derivePrivateKey_deprecated(this.servicePtr, [password, salt]);
+    return this.native.derivePrivateKey(this.servicePtr, [password, salt]);
   }
 
     /**
@@ -59,7 +59,7 @@ export class CryptoApi extends BaseApi {
      * @returns {string} generated ECC key in WIF format
      */
     async derivePrivateKey2(password: string, salt: string): Promise<string> {
-      return this.native.derivePrivateKey(this.servicePtr, [password, salt]);
+      return this.native.derivePrivateKey2(this.servicePtr, [password, salt]);
     }
 
   /**

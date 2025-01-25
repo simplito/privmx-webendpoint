@@ -109,7 +109,7 @@ namespace api {
     API_FUNCTION_HEADER(CryptoApi, signData)
     API_FUNCTION_HEADER(CryptoApi, generatePrivateKey)
     API_FUNCTION_HEADER(CryptoApi, derivePrivateKey)
-    API_FUNCTION_HEADER(CryptoApi, derivePrivateKey_deprecated)
+    API_FUNCTION_HEADER(CryptoApi, derivePrivateKey2)
     API_FUNCTION_HEADER(CryptoApi, derivePublicKey)
     API_FUNCTION_HEADER(CryptoApi, generateKeySymmetric)
     API_FUNCTION_HEADER(CryptoApi, encryptDataSymmetric)

@@ -187,7 +187,7 @@ namespace api {
     API_FUNCTION(CryptoApi, signData)
     API_FUNCTION(CryptoApi, generatePrivateKey)
     API_FUNCTION(CryptoApi, derivePrivateKey)
-    API_FUNCTION(CryptoApi, derivePrivateKey_deprecated)
+    API_FUNCTION(CryptoApi, derivePrivateKey2)
     API_FUNCTION(CryptoApi, derivePublicKey)
     API_FUNCTION(CryptoApi, generateKeySymmetric)
     API_FUNCTION(CryptoApi, encryptDataSymmetric)
