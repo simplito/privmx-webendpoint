@@ -11,6 +11,7 @@ fi
 WORKING_DIR="$PRIVMX_WEBENDPOINT_API_SRC/ts"
 PUB_DIR="$WORKING_DIR/pub"
 
+rm -rf "$PUB_DIR"
 mkdir -p $PUB_DIR
 
 
