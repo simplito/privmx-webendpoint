@@ -47,7 +47,6 @@ export class Connection extends BaseApi {
    */
   async disconnect(): Promise<void> {
     await this.native.disconnect(this.servicePtr, []);
-    console.log("on connection.disconnect", { _servicePtr: this.servicePtr });
     await this.freeApis();
     await this.native.deleteConnection(this.servicePtr);
   }

@@ -39,6 +39,18 @@ export class CryptoApi extends BaseApi {
   }
 
   /**
+   * (deprecated) Generates a new private ECC key from a password using pbkdf2.
+   *
+   * @param {string} password the password used to generate the new key
+   * @param {string} salt random string (additional input for the hashing function)
+
+   * @returns {string} generated ECC key in WIF format
+   */
+  async derivePrivateKey(password: string, salt: string): Promise<string> {
+    return this.native.derivePrivateKey(this.servicePtr, [password, salt]);
+  }
+
+    /**
      * Generates a new private ECC key from a password using pbkdf2.
      *
      * @param {string} password the password used to generate the new key
@@ -46,9 +58,9 @@ export class CryptoApi extends BaseApi {
 
      * @returns {string} generated ECC key in WIF format
      */
-  async derivePrivateKey(password: string, salt: string): Promise<string> {
-    return this.native.derivePrivateKey(this.servicePtr, [password, salt]);
-  }
+    async derivePrivateKey2(password: string, salt: string): Promise<string> {
+      return this.native.derivePrivateKey2(this.servicePtr, [password, salt]);
+    }
 
   /**
    * Generates a new public ECC key as a pair to an existing private key.

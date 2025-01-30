@@ -1,9 +1,0 @@
-{
-    "name": "endpoint-wasmapi",
-    "version": "1.0.0",
-    "eslintConfig": {
-        "rules": {
-          "no-undef":"off"
-        }
-      }
-}

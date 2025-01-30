@@ -2,7 +2,7 @@ const path = require('path');
 const webpack = require('webpack');
 module.exports = {
   entry: {
-    bundle: './src/index.ts'
+    bundle: './src/bundle.ts'
   },
   mode: 'production',
   plugins: [
@@ -38,6 +38,14 @@ module.exports = {
     filename: (pathData) => {
       return pathData.chunk.name == 'bundle' ? 'privmx-endpoint-web.js' : 'privmx-endpoint-web.[name].js';
     },
-    path: path.resolve(__dirname, 'dist'),
+    path: path.resolve(__dirname, 'dist/bundle'),
+    library: {
+      name: {
+        root: 'PrivmxWebEndpoint',
+        amd: 'privmx-webendoint',
+        commonjs: 'privmx-webendpoint',
+      },
+      type: 'umd',
+    }
   },
 };

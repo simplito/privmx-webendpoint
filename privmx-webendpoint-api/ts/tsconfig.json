@@ -1,29 +1,9 @@
+
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "rootDir": "./src",
-    "module": "ESNext",
-    "target": "ESNext",    
-    "lib": ["ES2020", "ES2018.promise", "dom"],              
-    "allowJs": true,                                 
-    "declaration": true,    
-    "esModuleInterop": true,                             
-    "forceConsistentCasingInFileNames": true,           
-    "strict": true,                                     
-    "skipLibCheck": true,
-    "outDir": "./dist/",
-    "allowSyntheticDefaultImports": true,
-    //"moduleResolution": "node",
-    "baseUrl": ".",
-    "paths": {
-      "appServer/*": ["./app_server_types/src/*"]
-    }
-  },
-  "include": ["./src/**/*"],
-  "exclude": [
-    "loader",
-    "node_modules"
-  ],
-  "references": [
-    {"path": "./app_server_types"}
-  ]
+    "outDir": "dist/bundle",
+    "declaration": false,
+    "moduleResolution": "node"
+  }
 }

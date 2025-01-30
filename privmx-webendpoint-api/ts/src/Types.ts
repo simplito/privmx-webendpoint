@@ -26,6 +26,7 @@ limitations under the License.
         type: string;
         channel: string;
         connectionId: number;
+        data?: unknown;
     };
     
     /**

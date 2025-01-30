@@ -9,6 +9,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {EndpointFactory} from './Main';
-export {EndpointFactory};
-(self as any).EndpointFactory = EndpointFactory;
+import { EndpointFactory } from "./service/EndpointFactory";
+import { EventQueue, StoreApi, ThreadApi, InboxApi, Connection, CryptoApi, BaseApi } from "./service";
+import  * as Types from "./Types";
+
+export {
+    EndpointFactory as Endpoint, 
+    Types,
+    EventQueue,
+    StoreApi, ThreadApi, InboxApi, CryptoApi, Connection, BaseApi,
+};
