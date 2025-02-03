@@ -1,17 +1,12 @@
 {
-  "name": "privmx-endpoint-web-minimal",
+  "name": "privmx-webendpoint-examples",
   "version": "1.0.0",
   "description": "",
-  "main": "fake.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "serve": "webpack serve"
   },
-  "repository": {
-    "type": "git",
-    "url": "ssh://git@gitlab.simplito.com:1022/privmx/privmx-endpoint-web-minimal.git"
-  },
-  "author": "",
+  "author": "Simplito Sp. z o.o.",
   "license": "ISC",
   "devDependencies": {
     "webpack": "^5.75.0",

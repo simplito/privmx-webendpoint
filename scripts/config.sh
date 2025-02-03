@@ -38,3 +38,5 @@ PRIVMX_WEBENDPOINT_DRV_ECC_SRC="$DRIVERS_DIR/privmx-webendpoint-drv-ecc"
 PRIVMX_WEBENDPOINT_DRV_NET_SRC="$DRIVERS_DIR/privmx-webendpoint-drv-net"
 PRIVMX_WEBENDPOINT_DRV_CRYPTO_SRC="$DRIVERS_DIR/privmx-webendpoint-drv-crypto"
 PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC="$DRIVERS_DIR/privmx-webendpoint-drv-context"
+
+NPM_ASSETS_DIR="$PRIVMX_WEBENDPOINT_API_SRC/ts/assets"

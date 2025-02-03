@@ -1,26 +1,52 @@
 {
-  "name": "privmx-webendpoint-api",
-  "version": "1.0.0",
-  "description": "",
-  "type": "commonjs",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "files": [
-    "/dist"
+  "name": "@simplito/privmx-webendpoint",
+  "version": "2.2.0",
+  "description": "PrivMX Web Endpoint library",
+  "author": "Simplito",
+  "license": "PrivMX Free License",
+  "keywords": [
+    "privmx",
+    "endpoint",
+    "simplito",
+    "e2ee",
+    "end-to-end",
+    "encryption",
+    "end-to-end-encryption",
+    "decryption",
+    "cryptography",
+    "communication",
+    "data transfer",
+    "messaging",
+    "messages",
+    "files",
+    "storage",
+    "chat",
+    "thread",
+    "storing",
+    "secure",
+    "private",
+    "privacy",
+    "privacy-protection",
+    "security"
   ],
+  "type": "commonjs",
+  "main": "index.js",
+  "types": "index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "compile": "tsc",
-    "build": "webpack"
+    "build": "npm run clean && npm run build:bundle && npm run build:mjs && npm run build:fixup",
+    "clean": "rm -rf ./dist",
+    "build:bundle": "webpack",
+    "build:mjs": "tsc -p tsconfig.mjs.json",
+    "build:fixup": "node fixup-package-json.js",
+    "watch": "tsc -w"
   },
-  "author": "",
-  "license": "PrivMX Free License",
+  "engines": {
+    "node": ">=4"
+  },
   "devDependencies": {
     "@types/node": "^20.9.0",
-    "@types/privfs-client": "^2.7.2",
-    "@types/privmx-contact-api-types": "^0.0.12",
-    "@types/privmx-rpc": "^2.4.2",
-    "@types/privmx-server-api": "^1.0.202311141544",
     "@types/webpack": "^5.28.5",
     "assert": "^2.1.0",
     "buffer": "^6.0.3",
@@ -34,9 +60,16 @@
     "vm-browserify": "^1.1.2",
     "webpack": "^5.89.0",
     "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^4.15.1"
+    "webpack-dev-server": "^4.15.1",
+    "@babel/core": "^7.26.0",
+    "@babel/preset-env": "^7.26.0",
+    "@types/jest": "^29.5.14",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.4.2",
+    "ts-jest": "^29.2.5"
   },
   "dependencies": {
-    "privmx-crypto": "^2.4.2"
   }
 }
+

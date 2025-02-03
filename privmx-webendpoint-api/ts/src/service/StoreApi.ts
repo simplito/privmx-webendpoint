@@ -239,6 +239,7 @@ export class StoreApi extends BaseApi {
 
   /**
    * Reads file data.
+   * Single read call moves the files's cursor position by declared length or set it at the end of the file.
    *
    * @param {string} fileHandle handle to write file data
    * @param {number} length size of data to read
@@ -264,7 +265,7 @@ export class StoreApi extends BaseApi {
    * @param {string} fileHandle handle to read/write file data
    * @returns {string} ID of closed file
    */
-  async closeFile(fileHandle: number): Promise<void> {
+  async closeFile(fileHandle: number): Promise<string> {
     return this.native.closeFile(this.servicePtr, [fileHandle]);
   }
 
