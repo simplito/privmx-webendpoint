@@ -11,6 +11,7 @@ fi
 WORKING_DIR="$PRIVMX_WEBENDPOINT_API_SRC/ts"
 PUB_DIR="$WORKING_DIR/pub"
 
+rm -rf "$PUB_DIR"
 mkdir -p $PUB_DIR
 
 
@@ -23,6 +24,8 @@ npm run build
 
 cp -R ./dist/* "$PUB_DIR"
 cp -R ./assets "$PUB_DIR"
+cp ./LICENSE.md "$PUB_DIR"
+cp ./README.md "$PUB_DIR"
 cp ./package.json "$PUB_DIR"
 
 cd "$PUB_DIR"
