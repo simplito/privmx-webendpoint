@@ -1,6 +1,5 @@
 "use strict";
 
-let listenForEventsPromise;
 const Endpoint = PrivmxWebEndpoint.Endpoint;
 
 const runSample = (async () => {
@@ -45,15 +44,11 @@ runSample();
 
 
 // helpers
-function listenForEvents(eventQueue) {
-  if (!listenForEventsPromise) {
-    listenForEventsPromise = eventQueue.waitEvent();
-    listenForEventsPromise.then(result => {
-      console.log("onEvent", result);
-      listenForEventsPromise = null;
-      listenForEvents(eventQueue);
-    })
-  }
+function listenForEvents(eventsQueue) {
+    eventsQueue.waitEvent().then(event => {
+        console.log("onEvent", event);
+        listenForEvents(eventsQueue);
+    });
 }
 
 function strToUInt8(text) {
