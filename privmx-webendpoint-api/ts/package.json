@@ -1,6 +1,6 @@
 {
   "name": "@simplito/privmx-webendpoint",
-  "version": "2.2.3",
+  "version": "2.2.5",
   "description": "PrivMX Web Endpoint library",
   "author": "Simplito",
   "license": "PrivMX Free License",
@@ -70,6 +70,7 @@
     "ts-jest": "^29.2.5"
   },
   "dependencies": {
+      "elliptic": "^6.6.1"
   }
 }
 
