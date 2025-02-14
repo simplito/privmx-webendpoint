@@ -39,6 +39,8 @@ export async function submitForm(inboxName: string) {
         encoder.encode(JSON.stringify(inboxPrivateMeta))
     )
 
+    console.log(inboxID)
+
     //listing inboxes from context
     const inboxesList = await inboxApi.listInboxes(CONTEXT_ID, {skip: 0, limit: 100, sortOrder: "desc"})
     const decodedInboxes = inboxesList.readItems.map(inbox => {

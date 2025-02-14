@@ -8,7 +8,7 @@ export default defineConfig({
             configureServer: server => {
                 server.middlewares.use((req, res, next) => {
                     // Apply headers only to relevant paths
-                    if (req.url.startsWith('/primx-assets') || req.url === '/your-page') {
+                    if (req.url.startsWith('/privmx-assets') || req.url === '/') {
                         res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
                         res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
                     }
