@@ -179,7 +179,7 @@ export class FileUploader {
     }) {
         const streamer = new FileUploader(preparedFileUpload.file, {
             closeFile() {
-                return inboxApi.closeFile(preparedFileUpload.handle);
+                return Promise.resolve('')
             },
             writeToFile(chunk) {
                 return inboxApi.writeToFile(inboxHandle, preparedFileUpload.handle, chunk);
