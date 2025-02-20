@@ -107,6 +107,7 @@ namespace api {
     void CryptoApi_deleteCryptoApi(int taskId, int ptr);
     API_FUNCTION_HEADER(CryptoApi, create)
     API_FUNCTION_HEADER(CryptoApi, signData)
+    API_FUNCTION_HEADER(CryptoApi, verifySignature)
     API_FUNCTION_HEADER(CryptoApi, generatePrivateKey)
     API_FUNCTION_HEADER(CryptoApi, derivePrivateKey)
     API_FUNCTION_HEADER(CryptoApi, derivePrivateKey2)

@@ -103,6 +103,7 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(CryptoApi, deleteCryptoApi)
     BINDING_FUNCTION(CryptoApi, create)
     BINDING_FUNCTION(CryptoApi, signData)
+    BINDING_FUNCTION(CryptoApi, verifySignature)
     BINDING_FUNCTION(CryptoApi, generatePrivateKey)
     BINDING_FUNCTION(CryptoApi, derivePrivateKey)
     BINDING_FUNCTION(CryptoApi, derivePrivateKey2)

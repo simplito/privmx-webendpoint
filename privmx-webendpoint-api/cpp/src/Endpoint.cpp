@@ -185,6 +185,7 @@ namespace api {
     }
     API_FUNCTION(CryptoApi, create)
     API_FUNCTION(CryptoApi, signData)
+    API_FUNCTION(CryptoApi, verifySignature)
     API_FUNCTION(CryptoApi, generatePrivateKey)
     API_FUNCTION(CryptoApi, derivePrivateKey)
     API_FUNCTION(CryptoApi, derivePrivateKey2)
