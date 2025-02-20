@@ -25,6 +25,9 @@ export class CryptoApiNative extends BaseNative {
     async signData(ptr: number, args: [Uint8Array, string]): Promise<Uint8Array> {
         return this.runAsync<Uint8Array>((taskId)=>this.api.lib.CryptoApi_signData(taskId, ptr, args));
     }
+    async verifySignature(ptr: number, args: [Uint8Array, Uint8Array, string]): Promise<boolean> {
+        return this.runAsync<boolean>((taskId)=>this.api.lib.CryptoApi_verifySignature(taskId, ptr, args));
+    }
     async generatePrivateKey(ptr: number, args: [string|undefined]): Promise<string> {
         return this.runAsync<string>((taskId)=>this.api.lib.CryptoApi_generatePrivateKey(taskId, ptr, args));
     }

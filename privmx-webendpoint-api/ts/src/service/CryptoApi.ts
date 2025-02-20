@@ -29,6 +29,19 @@ export class CryptoApi extends BaseApi {
   }
 
   /**
+   * Validate a signature of data using given key.
+   *
+   * @param {Uint8Array} data buffer
+   * @param {Uint8Array} signature signature of data to verify
+   * @param {string} publicKey public ECC key in BASE58DER format used to validate data
+   * @return data validation result
+   */
+  async verifySignature(data: Uint8Array, signature: Uint8Array, publicKey: string) {
+    return this.native.verifySignature(this.servicePtr, [data, signature, publicKey]);
+  }
+
+
+  /**
    * Generates a new private ECC key.
    *
    * @param {string} [randomSeed] optional string used as the base to generate the new key
