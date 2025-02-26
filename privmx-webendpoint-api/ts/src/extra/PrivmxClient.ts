@@ -28,10 +28,10 @@ import {
     private threadApi: Promise<ThreadApi> | null = null;
     private storeApi: Promise<StoreApi> | null = null;
     private inboxApi: Promise<InboxApi> | null = null;
-    
+
     private connectionEventManager: Promise<ConnectionEventsManager> | null =
       null;
-    private threadEventManger: Promise<ThreadEventsManager> | null = null;
+    private threadEventManager: Promise<ThreadEventsManager> | null = null;
     private storeEventManager: Promise<StoreEventsManager> | null = null;
     private inboxEventManager: Promise<InboxEventsManager> | null = null;
   
@@ -211,16 +211,16 @@ import {
      * @returns {Promise<ThreadEventsManager>}
      */
     public async getThreadEventManager(): Promise<ThreadEventsManager> {
-      if (this.threadEventManger) {
-        return this.threadEventManger;
+      if (this.threadEventManager) {
+        return this.threadEventManager;
       }
   
-      this.threadEventManger = (async () => {
+      this.threadEventManager = (async () => {
         const eventManager = await PrivmxClient.getEventManager();
         return eventManager.getThreadEventManager(await this.getThreadApi());
       })();
   
-      return this.threadEventManger;
+      return this.threadEventManager;
     }
   
     /**
@@ -256,5 +256,25 @@ import {
   
       return this.inboxEventManager;
     }
+
+    /**
+   * @description Disconnects from the PrivMX bridge.
+   * @returns {Promise<void>}
+   */
+  public async disconnect(): Promise<void> {
+    try {
+      await this.connection.disconnect();
+      this.threadApi = null;
+      this.storeApi = null;
+      this.inboxApi = null;
+      this.connectionEventManager = null;
+      this.threadEventManager = null;
+      this.storeEventManager = null;
+      this.inboxEventManager = null;
+    } catch (e) {
+      console.error('Error during disconnection:', e);
+    }
+  }
+
   }
   
