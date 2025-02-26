@@ -43,26 +43,39 @@ import {
   
     /**
      * @description Sets up the PrivMX endpoint if it hasn't been set up yet.
+     * @param {string} folderPath - The path to the folder where PrivMX assets are stored.
      * @returns {Promise<void>}
      */
-    private static async setup(): Promise<void> {
+  
+    public static async setup(folderPath: string): Promise<void> {
       if (!PrivmxClient.isSetup) {
-        await EndpointFactory.setup("/privmx-assets");
+        await EndpointFactory.setup(folderPath);
         PrivmxClient.isSetup = true;
       }
     }
-  
+
+    private static checkSetup(){
+      if(!this.isSetup){
+        throw new Error("Endpoint not initialized, use PrivMXClient.setup(folderPath).");
+
+      }
+    }
+
     /**
      * @description Gets the Crypto API.
      * @returns {Promise<CryptoApi>}
      */
     public static async getCryptoApi(): Promise<CryptoApi> {
-      if (!this.cryptoApi) {
-        this.cryptoApi = (async () => {
-          await PrivmxClient.setup();
-          return EndpointFactory.createCryptoApi();
-        })();
+      if(this.cryptoApi){
+        return this.cryptoApi;
       }
+
+      this.checkSetup()
+
+      this.cryptoApi = (async () => {
+        return EndpointFactory.createCryptoApi();
+      })();
+      
       return this.cryptoApi;
     }
   
@@ -74,10 +87,9 @@ import {
       if (this.eventQueue) {
         return this.eventQueue;
       }
+
+      this.checkSetup();
   
-      if (!PrivmxClient.isSetup) {
-        await PrivmxClient.setup();
-      }
       this.eventQueue = (async () => {
         return EndpointFactory.getEventQueue();
       })();
@@ -93,7 +105,9 @@ import {
       if (this.eventManager) {
         return this.eventManager;
       }
-  
+
+      this.checkSetup();
+
       this.eventManager = (async () => {
         const eventQueue = await PrivmxClient.getEventQueue();
         return EventManager.startEventLoop(eventQueue);
@@ -115,7 +129,8 @@ import {
       solutionId: string,
       bridgeUrl: string
     ): Promise<PrivmxClient> {
-      await PrivmxClient.setup();
+      this.checkSetup();
+
       const connection = await EndpointFactory.connect(
         privateKey,
         solutionId,
