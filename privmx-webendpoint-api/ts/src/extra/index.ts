@@ -6,6 +6,7 @@ import * as Generics from "./generics";
 import * as Inboxes from "./inbox";
 
 import { FileUploader, StreamReader, downloadFile } from "./files";
+import { PrivmxClient } from "./PrivmxClient";
 
 
 export {
@@ -21,5 +22,6 @@ export {
     StoreEventsManager, 
     InboxEventsManager, 
     BaseEventManager, 
-    StreamReader
+    StreamReader,
+    PrivmxClient
 };
