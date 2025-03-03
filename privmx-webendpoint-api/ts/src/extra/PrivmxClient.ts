@@ -61,7 +61,7 @@ export class PrivmxClient {
    * @constructor
    * @param {Connection} connection - The connection object.
    */
-  public constructor(private connection: Connection) {}
+  private constructor(private connection: Connection) {}
 
   /**
    * @description Sets up the PrivMX endpoint if it hasn't been set up yet.

@@ -42,7 +42,7 @@ export class PublicConnection {
    * @constructor
    * @param {Connection} connection - The connection object.
    */
-  public constructor(private connection: Connection) {}
+  constructor(private connection: Connection) {}
 
 
   /**
