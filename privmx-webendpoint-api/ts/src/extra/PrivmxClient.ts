@@ -14,6 +14,7 @@ import {
   StoreEventsManager,
   ThreadEventsManager,
 } from './events';
+import { PublicConnection } from './PublicConnection';
 
 /**
  * @class PrivmxClient
@@ -60,7 +61,7 @@ export class PrivmxClient {
    * @constructor
    * @param {Connection} connection - The connection object.
    */
-  constructor(private connection: Connection) {}
+  public constructor(private connection: Connection) {}
 
   /**
    * @description Sets up the PrivMX endpoint if it hasn't been set up yet.
@@ -165,6 +166,26 @@ export class PrivmxClient {
     return new PrivmxClient(connection);
   }
 
+    /**
+   * Connects to the Platform backend as a guest user.
+   *
+   * @param {string} solutionId ID of the Solution
+   * @param {string} bridgeUrl the Bridge Server URL
+   *
+   * @returns {Promise<PublicConnection>} Promised instance of Connection
+   */
+  static async connectPublic(solutionId: string, bridgeUrl: string): Promise<PublicConnection>{
+    this.checkSetup();
+
+    const connection = await EndpointFactory.connectPublic(solutionId, bridgeUrl)
+
+    if(!connection){
+      throw new Error('ERROR: Could not connect to bridge');
+    }
+
+    return new PublicConnection(connection);
+  }
+
   /**
    * @description Gets the connection object.
    * @returns {Connection}
@@ -181,7 +202,7 @@ export class PrivmxClient {
    * @description Gets the Thread API.
    * @returns {Promise<ThreadApi>}
    */
-  public getThreadApi(): Promise<ThreadApi> {
+  public async getThreadApi(): Promise<ThreadApi> {
     if (!this.threadApi) {
       this.threadApi = (() => {
         const connection = this.getConnection();
@@ -195,7 +216,7 @@ export class PrivmxClient {
    * @description Gets the Store API.
    * @returns {Promise<StoreApi>}
    */
-  public getStoreApi(): Promise<StoreApi> {
+  public async getStoreApi(): Promise<StoreApi> {
     if (!this.storeApi) {
       this.storeApi = (async () => {
         const connection = this.getConnection();
@@ -209,7 +230,7 @@ export class PrivmxClient {
    * @description Gets the Inbox API.
    * @returns {Promise<InboxApi>}
    */
-  public getInboxApi(): Promise<InboxApi> {
+  public async getInboxApi(): Promise<InboxApi> {
     if (!this.inboxApi) {
       this.inboxApi = (async () => {
         const connection = this.getConnection();
@@ -312,8 +333,4 @@ export class PrivmxClient {
       console.error('Error during disconnection:', e);
     }
   }
-}
-
-async function test() {
-  await PrivmxClient.setup('/path/to/privmx/assets');
 }

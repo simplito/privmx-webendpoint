@@ -17,6 +17,7 @@ import * as Inboxes from './inbox';
 
 import { FileUploader, StreamReader, downloadFile } from './files';
 import { PrivmxClient } from './PrivmxClient';
+import { PublicConnection } from './PublicConnection';
 
 export {
   Files,
@@ -33,6 +34,7 @@ export {
   BaseEventManager,
   StreamReader,
   PrivmxClient,
+  PublicConnection,
   Channel,
   ConnectionEventsManager,
   EventPayload,
