@@ -71,6 +71,7 @@ namespace api {
     API_FUNCTION(Connection, connectPublic)
     API_FUNCTION(Connection, getConnectionId)
     API_FUNCTION(Connection, listContexts)
+    API_FUNCTION(Connection, getContextUsers)
     API_FUNCTION(Connection, disconnect)
 
     void ThreadApi_newThreadApi(int taskId, int connectionPtr) {

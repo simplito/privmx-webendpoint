@@ -88,6 +88,20 @@ limitations under the License.
         userId: string;
         pubKey: string;
     };
+
+    /**
+     * Contains Infomation about user
+     *
+     * @type {UserInfo}
+     * 
+     * @param {UserWithPubKey} user User publicKey and usetId
+     * @param {boolean} isActive is user connected to the Bridge
+     * 
+     */
+    export interface UserInfo {
+        user: UserWithPubKey;
+        isActive: boolean;
+    };
 // }
 
 // export namespace thread {

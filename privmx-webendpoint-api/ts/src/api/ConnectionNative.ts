@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { PagingQuery, PagingList, Context } from "../Types";
+import { PagingQuery, PagingList, Context, UserInfo } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class ConnectionNative extends BaseNative {
@@ -44,6 +44,9 @@ export class ConnectionNative extends BaseNative {
     }
     async listContexts(ptr: number, args: [PagingQuery]): Promise<PagingList<Context>> {
         return this.runAsync<PagingList<Context>>((taskId)=>this.api.lib.Connection_listContexts(taskId, ptr, args));
+    }
+    async getContextUsers(ptr: number, args: [string]): Promise<UserInfo[]> {
+        return this.runAsync<UserInfo[]>((taskId)=>this.api.lib.Connection_getContextUsers(taskId, ptr, args));
     }
     async disconnect(ptr: number, args: []): Promise<void> {
         await this.runAsync<void>((taskId)=>this.api.lib.Connection_disconnect(taskId, ptr, args));

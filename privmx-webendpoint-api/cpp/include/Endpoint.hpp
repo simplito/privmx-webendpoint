@@ -34,6 +34,7 @@ namespace api {
     API_FUNCTION_HEADER(Connection, connectPublic)
     API_FUNCTION_HEADER(Connection, getConnectionId)
     API_FUNCTION_HEADER(Connection, listContexts)
+    API_FUNCTION_HEADER(Connection, getContextUsers)
     API_FUNCTION_HEADER(Connection, disconnect)
 
     void ThreadApi_newThreadApi(int taskId, int connectionPtr);
