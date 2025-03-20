@@ -1,4 +1,4 @@
-import { Endpoint } from '..';
+import { InboxApi } from '..';
 import { FileUploader } from './files';
 
 /**
@@ -34,7 +34,7 @@ export interface InboxEntryPayload {
 /**
  * Sends an entry to the specified inbox.
  *
- * @param {Awaited<ReturnType<typeof Endpoint.createInboxApi>>} inboxApi - The API instance used to interact with the inbox.
+ * @param {InboxApi} inboxApi - The API instance used to interact with the inbox.
  * @param {string} inboxId - The ID of the target inbox where the entry will be sent.
  * @param {InboxEntryPayload} payload - The data payload for the inbox entry, including files, metadata, and other information.
  *
@@ -42,7 +42,7 @@ export interface InboxEntryPayload {
  *
  */
 export async function sendEntry(
-    inboxApi: Awaited<ReturnType<typeof Endpoint.createInboxApi>>,
+    inboxApi: InboxApi,
     inboxId: string,
     payload: InboxEntryPayload
 ): Promise<void> {

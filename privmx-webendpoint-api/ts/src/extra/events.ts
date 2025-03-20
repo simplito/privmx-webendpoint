@@ -44,7 +44,7 @@ export interface EventPayload {
         threadId: string;
     };
     threadNewMessage: Types.Message;
-    threadMessageUpdated: Types.Message;
+    threadUpdatedMessage: Types.Message;
     threadMessageDeleted: {
         threadId: string;
         messageId: string;
@@ -89,7 +89,7 @@ type EventHandler<E extends keyof EventPayload> = {
 export type OnMessageEventHandler =
     | EventHandler<'threadMessageDeleted'>
     | EventHandler<'threadNewMessage'>
-    | EventHandler<'threadMessageUpdated'>;
+    | EventHandler<'threadUpdatedMessage'>;
 
 export type OnThreadEventHandler =
     | EventHandler<'threadCreated'>

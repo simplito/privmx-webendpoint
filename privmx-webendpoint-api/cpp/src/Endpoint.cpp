@@ -17,6 +17,7 @@ limitations under the License.
 #include <privmx/endpoint/store/varinterface/StoreApiVarInterface.hpp>
 #include <privmx/endpoint/inbox/varinterface/InboxApiVarInterface.hpp>
 #include <privmx/endpoint/crypto/varinterface/CryptoApiVarInterface.hpp>
+#include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
 
 #include "Macros.hpp"
 #include "Mapper.hpp"
@@ -32,6 +33,7 @@ using ThreadApiVar = privmx::endpoint::thread::ThreadApiVarInterface;
 using StoreApiVar = privmx::endpoint::store::StoreApiVarInterface;
 using InboxApiVar = privmx::endpoint::inbox::InboxApiVarInterface;
 using CryptoApiVar = privmx::endpoint::crypto::CryptoApiVarInterface;
+using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
 
 namespace privmx {
 namespace webendpoint {
@@ -71,6 +73,7 @@ namespace api {
     API_FUNCTION(Connection, connectPublic)
     API_FUNCTION(Connection, getConnectionId)
     API_FUNCTION(Connection, listContexts)
+    API_FUNCTION(Connection, getContextUsers)
     API_FUNCTION(Connection, disconnect)
 
     void ThreadApi_newThreadApi(int taskId, int connectionPtr) {
@@ -194,6 +197,25 @@ namespace api {
     API_FUNCTION(CryptoApi, encryptDataSymmetric)
     API_FUNCTION(CryptoApi, decryptDataSymmetric)
     API_FUNCTION(CryptoApi, convertPEMKeytoWIFKey)
+
+
+    void EventApi_newEventApi(int taskId, int connectionPtr) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+            auto connection = (ConnectionVar*)connectionPtr;
+            auto api = new EventApiVar(connection->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            return (int)api;
+        });
+    }
+    void EventApi_deleteEventApi(int taskId, int ptr) {
+        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+            delete (EventApiVar*)ptr;
+        });
+    }
+    API_FUNCTION(EventApi, create)
+    API_FUNCTION(EventApi, emitEvent)
+    API_FUNCTION(EventApi, subscribeForCustomEvents)
+    API_FUNCTION(EventApi, unsubscribeFromCustomEvents)
+
 
 } // namespace api
 } // namespace webendpoint
