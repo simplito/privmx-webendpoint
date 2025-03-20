@@ -38,13 +38,14 @@ limitations under the License.
      * @param {number} limit limit of elements to return for query
      * @param {SortOrder} sortOrder Order of elements in result. Use "asc" for ascending, "desc" for descening.
      * @param {string} [lastId] id of the element from which query results should start
-     * 
+     * @param {string} [queryAsJson] extra query parameters in serialized JSON
      */
     export interface PagingQuery {
         skip: number;
         limit: number;
         sortOrder: SortOrder;
         lastId?: string;
+        queryAsJson?: string;
     };
 
     /**
