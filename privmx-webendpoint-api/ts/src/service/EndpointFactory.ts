@@ -12,12 +12,14 @@ limitations under the License.
 import { Api } from "../api/Api";
 import { ConnectionNative } from "../api/ConnectionNative";
 import { CryptoApiNative } from "../api/CryptoApiNative";
+import { EventApiNative } from "../api/EventApiNative";
 import { EventQueueNative } from "../api/EventQueueNative";
 import { InboxApiNative } from "../api/InboxApiNative";
 import { StoreApiNative } from "../api/StoreApiNative";
 import { ThreadApiNative } from "../api/ThreadApiNative";
 import { Connection } from "./Connection";
 import { CryptoApi } from "./CryptoApi";
+import { EventApi } from "./EventApi";
 import { EventQueue } from "./EventQueue";
 import { InboxApi } from "./InboxApi";
 import { StoreApi } from "./StoreApi";
@@ -196,5 +198,24 @@ export class EndpointFactory {
         const ptr = await nativeApi.newApi();
         await nativeApi.create(ptr, []);
         return new CryptoApi(nativeApi, ptr);
+    }
+
+    /**
+     * Creates an instance of 'EventApi'.
+     * 
+     * @param connection instance of 'Connection'
+     * 
+     * @returns {EventApi} instance of EventApi
+     */
+    static async createEventApi(connection: Connection): Promise<EventApi> {
+        if ("events" in connection.apisRefs) {
+            throw new Error("EventApi already registered for given connection.");
+        }
+        const nativeApi = new EventApiNative(this.api);
+        const ptr = await nativeApi.newApi(connection.servicePtr);
+        connection.apisRefs["events"] = { _apiServicePtr: ptr };
+        connection.nativeApisDeps["events"] = nativeApi;
+        await nativeApi.create(ptr, []);
+        return new EventApi(nativeApi, ptr);
     }
 }

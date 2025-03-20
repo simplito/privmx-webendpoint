@@ -30,6 +30,7 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(Connection, connectPublic)
     BINDING_FUNCTION(Connection, getConnectionId)
     BINDING_FUNCTION(Connection, listContexts)
+    BINDING_FUNCTION(Connection, getContextUsers)
     BINDING_FUNCTION(Connection, disconnect)
 
     BINDING_FUNCTION(ThreadApi, newThreadApi)
@@ -112,4 +113,11 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(CryptoApi, encryptDataSymmetric)
     BINDING_FUNCTION(CryptoApi, decryptDataSymmetric)
     BINDING_FUNCTION(CryptoApi, convertPEMKeytoWIFKey)
+
+    BINDING_FUNCTION(EventApi, newEventApi)
+    BINDING_FUNCTION(EventApi, deleteEventApi)
+    BINDING_FUNCTION(EventApi, create)
+    BINDING_FUNCTION(EventApi, emitEvent)
+    BINDING_FUNCTION(EventApi, subscribeForCustomEvents)
+    BINDING_FUNCTION(EventApi, unsubscribeFromCustomEvents)
 }

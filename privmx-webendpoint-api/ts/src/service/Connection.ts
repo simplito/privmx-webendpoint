@@ -11,7 +11,7 @@ limitations under the License.
 
 import { BaseApi } from "./BaseApi";
 import { ConnectionNative } from "../api/ConnectionNative";
-import { PagingQuery, PagingList, Context } from "../Types";
+import { PagingQuery, PagingList, Context, UserInfo } from "../Types";
 import { BaseNative } from "../api/BaseNative";
 
 export class Connection extends BaseApi {
@@ -39,6 +39,17 @@ export class Connection extends BaseApi {
    */
   async listContexts(pagingQuery: PagingQuery): Promise<PagingList<Context>> {
     return this.native.listContexts(this.servicePtr, [pagingQuery]);
+  }
+
+  /**
+   * Gets a list of users of given context.
+   * 
+   * @param contextId ID of the Context
+   * 
+   * @returns a list of the UserInfo objects
+   */
+  async getContextUsers(contextId: string): Promise<UserInfo[]> {
+    return this.native.getContextUsers(this.servicePtr, [contextId]);
   }
 
   /**
