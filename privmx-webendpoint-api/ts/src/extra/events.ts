@@ -41,9 +41,10 @@ export interface EventPayload {
     threadStatsChanged: {
         lastMsgDate: number;
         messagesCount: number;
+        threadId: string;
     };
     threadNewMessage: Types.Message;
-    threadMessageUpdated: Types.Message;
+    threadUpdatedMessage: Types.Message;
     threadMessageDeleted: {
         threadId: string;
         messageId: string;
@@ -55,7 +56,7 @@ export interface EventPayload {
         contextId: string;
         storeId: string;
         lastFileDate: number;
-        files: number;
+        filesCount: number;
     };
     storeFileCreated: Types.File;
     storeFileUpdated: Types.File;
@@ -88,7 +89,7 @@ type EventHandler<E extends keyof EventPayload> = {
 export type OnMessageEventHandler =
     | EventHandler<'threadMessageDeleted'>
     | EventHandler<'threadNewMessage'>
-    | EventHandler<'threadMessageUpdated'>;
+    | EventHandler<'threadUpdatedMessage'>;
 
 export type OnThreadEventHandler =
     | EventHandler<'threadCreated'>

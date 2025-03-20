@@ -32,6 +32,10 @@
   "type": "commonjs",
   "main": "index.js",
   "types": "index.d.ts",
+  "exports": {
+    ".": "./index.js",
+    "./extra": "./extra/index.js"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "compile": "tsc",
@@ -70,6 +74,7 @@
     "ts-jest": "^29.2.5"
   },
   "dependencies": {
+      "elliptic": "^6.6.1"
   }
 }
 

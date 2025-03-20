@@ -34,6 +34,7 @@ namespace api {
     API_FUNCTION_HEADER(Connection, connectPublic)
     API_FUNCTION_HEADER(Connection, getConnectionId)
     API_FUNCTION_HEADER(Connection, listContexts)
+    API_FUNCTION_HEADER(Connection, getContextUsers)
     API_FUNCTION_HEADER(Connection, disconnect)
 
     void ThreadApi_newThreadApi(int taskId, int connectionPtr);
@@ -107,6 +108,7 @@ namespace api {
     void CryptoApi_deleteCryptoApi(int taskId, int ptr);
     API_FUNCTION_HEADER(CryptoApi, create)
     API_FUNCTION_HEADER(CryptoApi, signData)
+    API_FUNCTION_HEADER(CryptoApi, verifySignature)
     API_FUNCTION_HEADER(CryptoApi, generatePrivateKey)
     API_FUNCTION_HEADER(CryptoApi, derivePrivateKey)
     API_FUNCTION_HEADER(CryptoApi, derivePrivateKey2)
@@ -115,6 +117,13 @@ namespace api {
     API_FUNCTION_HEADER(CryptoApi, encryptDataSymmetric)
     API_FUNCTION_HEADER(CryptoApi, decryptDataSymmetric)
     API_FUNCTION_HEADER(CryptoApi, convertPEMKeytoWIFKey)
+
+    void EventApi_newEventApi(int taskId, int connectionPtr);
+    void EventApi_deleteEventApi(int taskId, int ptr);
+    API_FUNCTION_HEADER(EventApi, create)
+    API_FUNCTION_HEADER(EventApi, emitEvent)
+    API_FUNCTION_HEADER(EventApi, subscribeForCustomEvents)
+    API_FUNCTION_HEADER(EventApi, unsubscribeFromCustomEvents)
 
 } // namespace api
 } // namespace webendpoint
