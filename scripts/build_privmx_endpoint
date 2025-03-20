@@ -35,9 +35,8 @@ else
 fi
 
 cd "$PRIVMX_ENDPOINT_DIR"
-if [ "$2" != "devel" ]; then
-    rm -rf ./build-emscripten
-fi
+
+rm -rf ./build-emscripten
 mkdir -p build-emscripten && cd build-emscripten
 emcmake cmake .. -D PRIVMX_EMSCRIPTEN=ON -D PRIVMX_BUILD_ENDPOINT=ON -D PRIVMX_DRIVER_CRYPTO=OFF -D PRIVMX_DRIVER_NET=OFF \
     -D CMAKE_BUILD_TYPE=MinSizeRel
