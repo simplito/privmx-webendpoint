@@ -197,7 +197,12 @@ namespace api {
     API_FUNCTION(CryptoApi, encryptDataSymmetric)
     API_FUNCTION(CryptoApi, decryptDataSymmetric)
     API_FUNCTION(CryptoApi, convertPEMKeytoWIFKey)
-
+    API_FUNCTION(CryptoApi, generateBip39)
+    API_FUNCTION(CryptoApi, fromMnemonic)
+    API_FUNCTION(CryptoApi, fromEntropy)
+    API_FUNCTION(CryptoApi, entropyToMnemonic)
+    API_FUNCTION(CryptoApi, mnemonicToEntropy)
+    API_FUNCTION(CryptoApi, mnemonicToSeed)
 
     void EventApi_newEventApi(int taskId, int connectionPtr) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{

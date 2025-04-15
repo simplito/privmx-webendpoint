@@ -117,6 +117,12 @@ namespace api {
     API_FUNCTION_HEADER(CryptoApi, encryptDataSymmetric)
     API_FUNCTION_HEADER(CryptoApi, decryptDataSymmetric)
     API_FUNCTION_HEADER(CryptoApi, convertPEMKeytoWIFKey)
+    API_FUNCTION_HEADER(CryptoApi, generateBip39)
+    API_FUNCTION_HEADER(CryptoApi, fromMnemonic)
+    API_FUNCTION_HEADER(CryptoApi, fromEntropy)
+    API_FUNCTION_HEADER(CryptoApi, entropyToMnemonic)
+    API_FUNCTION_HEADER(CryptoApi, mnemonicToEntropy)
+    API_FUNCTION_HEADER(CryptoApi, mnemonicToSeed)
 
     void EventApi_newEventApi(int taskId, int connectionPtr);
     void EventApi_deleteEventApi(int taskId, int ptr);

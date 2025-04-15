@@ -9,6 +9,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { ExtKey } from "./service/ExtKey";
+
 // export namespace core {
     export type SortOrder = "desc" | "asc";
     
@@ -450,3 +452,13 @@ export interface Error {
     description: string;
     full: string
 }
+/** 
+ * @param {string} mnemonic BIP-39 mnemonic
+ * @param {ExtKey} extKey Ecc Key
+ * @param {Uint8Array} entropy BIP-39 entropy
+*/
+export interface BIP39 {
+    mnemonic: string;
+    extKey: ExtKey;
+    entropy: Uint8Array;
+};

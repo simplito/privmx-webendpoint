@@ -113,6 +113,12 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(CryptoApi, encryptDataSymmetric)
     BINDING_FUNCTION(CryptoApi, decryptDataSymmetric)
     BINDING_FUNCTION(CryptoApi, convertPEMKeytoWIFKey)
+    BINDING_FUNCTION(CryptoApi, generateBip39)
+    BINDING_FUNCTION(CryptoApi, fromMnemonic)
+    BINDING_FUNCTION(CryptoApi, fromEntropy)
+    BINDING_FUNCTION(CryptoApi, entropyToMnemonic)
+    BINDING_FUNCTION(CryptoApi, mnemonicToEntropy)
+    BINDING_FUNCTION(CryptoApi, mnemonicToSeed)
 
     BINDING_FUNCTION(EventApi, newEventApi)
     BINDING_FUNCTION(EventApi, deleteEventApi)
