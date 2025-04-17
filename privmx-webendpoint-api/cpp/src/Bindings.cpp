@@ -126,4 +126,21 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(EventApi, emitEvent)
     BINDING_FUNCTION(EventApi, subscribeForCustomEvents)
     BINDING_FUNCTION(EventApi, unsubscribeFromCustomEvents)
+
+    BINDING_FUNCTION(ExtKey, deleteExtKey)
+    BINDING_FUNCTION(ExtKey, fromSeed)
+    BINDING_FUNCTION(ExtKey, fromBase58)
+    BINDING_FUNCTION(ExtKey, generateRandom)
+    
+    BINDING_FUNCTION(ExtKey, derive)
+    BINDING_FUNCTION(ExtKey, deriveHardened)
+    BINDING_FUNCTION(ExtKey, getPrivatePartAsBase58)
+    BINDING_FUNCTION(ExtKey, getPublicPartAsBase58)
+    BINDING_FUNCTION(ExtKey, getPrivateKey)
+    BINDING_FUNCTION(ExtKey, getPublicKey)
+    BINDING_FUNCTION(ExtKey, getPrivateEncKey)
+    BINDING_FUNCTION(ExtKey, getPublicKeyAsBase58Address)
+    BINDING_FUNCTION(ExtKey, getChainCode)
+    BINDING_FUNCTION(ExtKey, verifyCompactSignatureWithHash)
+    BINDING_FUNCTION(ExtKey, isPrivate)
 }

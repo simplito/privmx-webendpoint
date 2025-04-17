@@ -459,6 +459,6 @@ export interface Error {
 */
 export interface BIP39 {
     mnemonic: string;
-    extKey: ExtKey;
     entropy: Uint8Array;
+    extKey: ExtKey;
 };

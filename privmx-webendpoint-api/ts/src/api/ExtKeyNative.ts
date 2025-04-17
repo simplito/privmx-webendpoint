@@ -1,5 +1,4 @@
-import { BaseApi } from "../service";
-import { Api } from "./Api";
+import { ApiStatic } from "./ApiStatic";
 import { BaseNative } from "./BaseNative";
 export type ExtKeyNativePtr = number & {__extKeyNativePtr: never};
 
@@ -11,28 +10,24 @@ export class ExtKeyNative extends BaseNative {
         await this.runAsync<void>((taskId)=>this.api.lib.ExtKey_deleteExtKey(taskId, ptr));
     }
 
-    async newExtKey(): Promise<number> {
-        return this.runAsync<number>((taskId)=>this.api.lib.ExtKey_newExtKey(taskId));
-    }
     async deleteExtKey(ptr: number): Promise<void> {
         await this.runAsync<void>((taskId)=>this.api.lib.ExtKey_deleteExtKey(taskId, ptr));
         this.deleteApiRef();
     }
 
-    // static fromSeed(ptr: number, args: [Uint8Array]): ExtKey {
-    //     // seed: Uint8Array
-    //     // const ptr = this.runAsync<void>((taskId)=>this.api.lib.ExtKey_create(taskId, ptr, args));
-    //     throw new Error("not implemented");
-    // }
-    // static fromBase58(ptr: number, args: [string]): ExtKey {
-    //     // base58: string
-    //     // return this.runAsync<void>((taskId)=>this.api.lib.ExtKey_create(taskId, ptr, args));
-    //     throw new Error("not implemented");
-    // }
-    // static generateRandom(ptr: number, args: []): ExtKey {
-    //     // return this.runAsync<void>((taskId)=>this.api.lib.ExtKey_create(taskId, ptr, args));
-    //     throw new Error("not implemented");
-    // }
+    static async fromSeed(args: [Uint8Array]): Promise<ExtKeyNativePtr> {
+        const api = ApiStatic.getInstance();
+        return api.runAsync<ExtKeyNativePtr>((taskId)=>api.lib.ExtKey_fromSeed(taskId, args));
+    }
+    static async fromBase58(args: [string]): Promise<ExtKeyNativePtr> {
+        // base58: string
+        const api = ApiStatic.getInstance();
+        return api.runAsync<ExtKeyNativePtr>((taskId)=>api.lib.ExtKey_fromBase58(taskId, args));
+    }
+    static async generateRandom(args: []): Promise<ExtKeyNativePtr> {
+        const api = ApiStatic.getInstance();
+        return api.runAsync<ExtKeyNativePtr>((taskId)=>api.lib.ExtKey_generateRandom(taskId, args));
+    }
 
     async derive(ptr: number, args: [number]): Promise<ExtKeyNativePtr> {
         // index: number

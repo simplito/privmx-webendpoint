@@ -94,7 +94,7 @@ export class CryptoApiNative extends BaseNative {
         return {
             mnemonic: bipNative.mnemonic,
             entropy: bipNative.entropy,
-            extKey: ExtKey.fromPtr(this.api, bipNative.extKey)
+            extKey: ExtKey.fromPtr(bipNative.extKey)
         };
     }
 }

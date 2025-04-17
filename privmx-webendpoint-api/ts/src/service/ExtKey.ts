@@ -1,52 +1,63 @@
 import { Api } from "../api/Api";
+import { ApiStatic } from "../api/ApiStatic";
 import { ExtKeyNative, ExtKeyNativePtr } from "../api/ExtKeyNative";
+import { FinalizationHelper } from "../FinalizationHelper";
 import { BaseApi } from "./BaseApi";
 
 export class ExtKey extends BaseApi {
 
-    // /**
-    //  * Creates ExtKey from given seed.
-    //  * @param {Uint8Array} seed the seed used to generate Key
-    //  * @returns {ExtKey} object
-    // */
-    // static fromSeed(seed: Uint8Array): ExtKey {
-    //     throw new Error("not implemented");
-    // }
-    // /**
-    //  * Decodes ExtKey from Base58 format.
-    //  *
-    //  * @param {string} base58 the ExtKey in Base58
-    //  * @returns {ExtKey} object
-    // */
-    // static fromBase58(base58: string): ExtKey {
-    //     throw new Error("not implemented");
-    // }
+    /**
+     * Creates ExtKey from given seed.
+     * @param {Uint8Array} seed the seed used to generate Key
+     * @returns {ExtKey} object
+    */
+    static async fromSeed(seed: Uint8Array): Promise<ExtKey> {
+        const ptr = await ExtKeyNative.fromSeed([seed]);
+        const native = new ExtKeyNative(ApiStatic.getInstance());
+        const extKey = new ExtKey(native, ptr as ExtKeyNativePtr);
+        const fh = FinalizationHelper.getInstance();
+        fh.register(extKey, {ptr: ptr, apiId: "extKey"});
+        return extKey;
+    }
+    /**
+     * Decodes ExtKey from Base58 format.
+     *
+     * @param {string} base58 the ExtKey in Base58
+     * @returns {ExtKey} object
+    */
+    static async fromBase58(base58: string): Promise<ExtKey> {
+        const ptr = await ExtKeyNative.fromBase58([base58]);
+        const native = new ExtKeyNative(ApiStatic.getInstance());
+        const extKey = new ExtKey(native, ptr as ExtKeyNativePtr);
+        const fh = FinalizationHelper.getInstance();
+        fh.register(extKey, {ptr: ptr, apiId: "extKey"});
+        return extKey;
+    }
 
-    // /**
-    //  * Generates a new ExtKey.
-    //  *
-    //  * @returns {ExtKey} object
-    // */
-    // static generateRandom(): ExtKey {
-    //     throw new Error("not implemented");
-    // }
+    /**
+     * Generates a new ExtKey.
+     *
+     * @returns {ExtKey} object
+    */
+    static async generateRandom(): Promise<ExtKey> {
+        const ptr = await ExtKeyNative.generateRandom([]);
+        const native = new ExtKeyNative(ApiStatic.getInstance());
+        const extKey = new ExtKey(native, ptr as ExtKeyNativePtr);
+        const fh = FinalizationHelper.getInstance();
+        fh.register(extKey, {ptr: ptr, apiId: "extKey"});
+        return extKey;
+    }
 
     /**
      * //doc-gen:ignore
      */
-    private constructor(private native: ExtKeyNative, ptr: ExtKeyNativePtr) {
+    private constructor(private native: ExtKeyNative, public ptr: ExtKeyNativePtr) {
         super(ptr);
     }
 
-    static async create(api: Api) {
-        const nativeApi = new ExtKeyNative(api);
-        const ptr = await nativeApi.newExtKey();
-        return new ExtKey(nativeApi, ptr as ExtKeyNativePtr);
-    }
-
-    static fromPtr(api: Api, ptr: ExtKeyNativePtr) {
-        const nativeApi = new ExtKeyNative(api);
-        return new ExtKey(nativeApi, ptr as ExtKeyNativePtr);
+    static fromPtr(ptr: ExtKeyNativePtr) {
+        const native = new ExtKeyNative(ApiStatic.getInstance());
+        return new ExtKey(native, ptr as ExtKeyNativePtr);
     }
 
     /**
@@ -57,8 +68,11 @@ export class ExtKey extends BaseApi {
      * @returns {ExtKey} object 
      */
     async derive(index: number): Promise<ExtKey> {
-        const extKeyPtr = await this.native.derive(this.servicePtr, [index]);
-        return new ExtKey(this.native, extKeyPtr);
+        const ptr = await this.native.derive(this.servicePtr, [index]);
+        const extKey =  new ExtKey(this.native, ptr);
+        const fh = FinalizationHelper.getInstance();
+        fh.register(extKey, {ptr: ptr, apiId: "extKey"});
+        return extKey;
     }
 
 
@@ -160,4 +174,5 @@ export class ExtKey extends BaseApi {
     async isPrivate(): Promise<boolean> {
         return this.native.isPrivate(this.servicePtr, []);
     }
+
 }
