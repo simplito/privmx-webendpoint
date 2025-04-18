@@ -1,10 +1,14 @@
-import { Api } from "../api/Api";
 import { ApiStatic } from "../api/ApiStatic";
 import { ExtKeyNative, ExtKeyNativePtr } from "../api/ExtKeyNative";
 import { FinalizationHelper } from "../FinalizationHelper";
 import { BaseApi } from "./BaseApi";
 
 export class ExtKey extends BaseApi {
+    private static async freeExtKey(ptr: number): Promise<void> {
+        const nativeApi = new ExtKeyNative(ApiStatic.getInstance());
+        await nativeApi.deleteExtKey(ptr);
+        console.log(ptr, "freed.");
+    }
 
     /**
      * Creates ExtKey from given seed.
@@ -16,7 +20,7 @@ export class ExtKey extends BaseApi {
         const native = new ExtKeyNative(ApiStatic.getInstance());
         const extKey = new ExtKey(native, ptr as ExtKeyNativePtr);
         const fh = FinalizationHelper.getInstance();
-        fh.register(extKey, {ptr: ptr, apiId: "extKey"});
+        fh.register(extKey, {ptr: ptr, onFree: () => this.freeExtKey(ptr)});
         return extKey;
     }
     /**
@@ -30,7 +34,7 @@ export class ExtKey extends BaseApi {
         const native = new ExtKeyNative(ApiStatic.getInstance());
         const extKey = new ExtKey(native, ptr as ExtKeyNativePtr);
         const fh = FinalizationHelper.getInstance();
-        fh.register(extKey, {ptr: ptr, apiId: "extKey"});
+        fh.register(extKey, {ptr: ptr, onFree: () => this.freeExtKey(ptr)});
         return extKey;
     }
 
@@ -43,8 +47,9 @@ export class ExtKey extends BaseApi {
         const ptr = await ExtKeyNative.generateRandom([]);
         const native = new ExtKeyNative(ApiStatic.getInstance());
         const extKey = new ExtKey(native, ptr as ExtKeyNativePtr);
+        
         const fh = FinalizationHelper.getInstance();
-        fh.register(extKey, {ptr: ptr, apiId: "extKey"});
+        fh.register(extKey, {ptr: ptr, onFree: () => this.freeExtKey(ptr)});
         return extKey;
     }
 
@@ -71,7 +76,7 @@ export class ExtKey extends BaseApi {
         const ptr = await this.native.derive(this.servicePtr, [index]);
         const extKey =  new ExtKey(this.native, ptr);
         const fh = FinalizationHelper.getInstance();
-        fh.register(extKey, {ptr: ptr, apiId: "extKey"});
+        fh.register(extKey, {ptr: ptr, onFree: () => ExtKey.freeExtKey(ptr)});
         return extKey;
     }
 

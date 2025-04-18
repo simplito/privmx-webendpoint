@@ -7,12 +7,12 @@ export class ExtKeyNative extends BaseNative {
         throw new Error("Use the specialized version of method instead.");
     }
     async deleteApi(ptr: number): Promise<void> {
-        await this.runAsync<void>((taskId)=>this.api.lib.ExtKey_deleteExtKey(taskId, ptr));
+        return this.runAsync<void>((taskId)=>this.api.lib.ExtKey_deleteExtKey(taskId, ptr));
     }
 
     async deleteExtKey(ptr: number): Promise<void> {
-        await this.runAsync<void>((taskId)=>this.api.lib.ExtKey_deleteExtKey(taskId, ptr));
-        this.deleteApiRef();
+        console.log("deleteExtKey for ptr: ", ptr);
+        return this.runAsync<void>((taskId)=>this.api.lib.ExtKey_deleteExtKey(taskId, ptr));
     }
 
     static async fromSeed(args: [Uint8Array]): Promise<ExtKeyNativePtr> {

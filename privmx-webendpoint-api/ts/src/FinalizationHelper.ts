@@ -3,7 +3,7 @@ import { ExtKeyNative } from "./api/ExtKeyNative";
 
 interface NativeObjInfo {
     ptr: number;
-    apiId: string;
+    onFree: () => Promise<void>;
 }
 
 export class FinalizationHelper {
@@ -24,18 +24,33 @@ export class FinalizationHelper {
     }
 
     private finalizationRegistry: FinalizationRegistry<NativeObjInfo>;
+    private finalizationQueue: (() => Promise<void> | null)[] = [];
+    private scheduler: any = null;
 
     private constructor(private wasmLib: any) {
         this.finalizationRegistry = new FinalizationRegistry(onCleanup => {
             const api = ApiStatic.getInstance();
-
-            if (onCleanup.apiId === "extKey") {
-                const nativeApi = new ExtKeyNative(api);
-                nativeApi.deleteExtKey(onCleanup.ptr);
-                console.log("Object freed..", onCleanup);
-            }
-            
+            this.finalizationQueue.push(onCleanup.onFree);
+            console.log("Object queued to be freed..", onCleanup);
+            this.scheduleCleanup();
         });
+    }
+
+    private scheduleCleanup() {
+        if (this.scheduler) {
+            return;
+        }
+        console.log("cleanup scheduled..");
+        this.scheduler = setTimeout(async () => {
+            console.log("cleanup fired.");
+            for (const freeCall of this.finalizationQueue) {
+                await freeCall();
+            }
+            this.finalizationQueue = [];
+            clearTimeout(this.scheduler);
+            this.scheduler = null;
+            console.log("cleanup ended");
+        }, 1000);
     }
 
     public register(target: WeakKey, info: NativeObjInfo) {
