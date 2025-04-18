@@ -11,6 +11,7 @@ limitations under the License.
 
 #include "Endpoint.hpp"
 
+#include <privmx/endpoint/crypto/varinterface/ExtKeyVarInterface.hpp>
 #include <privmx/endpoint/core/varinterface/EventQueueVarInterface.hpp>
 #include <privmx/endpoint/core/varinterface/ConnectionVarInterface.hpp>
 #include <privmx/endpoint/thread/varinterface/ThreadApiVarInterface.hpp>
@@ -18,6 +19,7 @@ limitations under the License.
 #include <privmx/endpoint/inbox/varinterface/InboxApiVarInterface.hpp>
 #include <privmx/endpoint/crypto/varinterface/CryptoApiVarInterface.hpp>
 #include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
+#include "privmx/endpoint/core/VarDeserializer.hpp"
 
 #include "Macros.hpp"
 #include "Mapper.hpp"
@@ -34,6 +36,7 @@ using StoreApiVar = privmx::endpoint::store::StoreApiVarInterface;
 using InboxApiVar = privmx::endpoint::inbox::InboxApiVarInterface;
 using CryptoApiVar = privmx::endpoint::crypto::CryptoApiVarInterface;
 using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
+using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
 
 namespace privmx {
 namespace webendpoint {
@@ -197,6 +200,71 @@ namespace api {
     API_FUNCTION(CryptoApi, encryptDataSymmetric)
     API_FUNCTION(CryptoApi, decryptDataSymmetric)
     API_FUNCTION(CryptoApi, convertPEMKeytoWIFKey)
+    API_FUNCTION(CryptoApi, generateBip39)
+    API_FUNCTION(CryptoApi, fromMnemonic)
+    API_FUNCTION(CryptoApi, fromEntropy)
+    API_FUNCTION(CryptoApi, entropyToMnemonic)
+    API_FUNCTION(CryptoApi, mnemonicToEntropy)
+    API_FUNCTION(CryptoApi, mnemonicToSeed)
+
+    void EventApi_newEventApi(int taskId, int connectionPtr) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+            auto connection = (ConnectionVar*)connectionPtr;
+            auto api = new EventApiVar(connection->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            return (int)api;
+        });
+    }
+    void EventApi_deleteEventApi(int taskId, int ptr) {
+        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+            delete (EventApiVar*)ptr;
+        });
+    }
+    API_FUNCTION(EventApi, create)
+    API_FUNCTION(EventApi, emitEvent)
+    API_FUNCTION(EventApi, subscribeForCustomEvents)
+    API_FUNCTION(EventApi, unsubscribeFromCustomEvents)
+
+    void ExtKey_deleteExtKey(int taskId, int ptr) {
+        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+            delete (ExtKeyVar*)ptr;
+        });
+    }
+
+    void ExtKey_fromSeed(int taskId, emscripten::val args) {
+        Poco::Dynamic::Var argsVar = Mapper::map(args);
+        ProxyedTaskRunner::getInstance()->runTask(taskId,[&, argsVar] {
+            auto service = new ExtKeyVar(core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            return service->fromSeed(argsVar);
+        });    
+    }
+
+    void ExtKey_fromBase58(int taskId, emscripten::val args) {
+        Poco::Dynamic::Var argsVar = Mapper::map(args);
+        ProxyedTaskRunner::getInstance()->runTask(taskId,[&, argsVar] {
+            auto service = new ExtKeyVar(core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            return service->fromBase58(argsVar);
+        });   
+    }
+
+    void ExtKey_generateRandom(int taskId, emscripten::val args) {
+        Poco::Dynamic::Var argsVar = Mapper::map(args);
+        ProxyedTaskRunner::getInstance()->runTask(taskId,[&, argsVar] {
+            auto service = new ExtKeyVar(core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            return service->generateRandom(argsVar);
+        });   
+    }
+
+    API_FUNCTION(ExtKey, derive)
+    API_FUNCTION(ExtKey, deriveHardened)
+    API_FUNCTION(ExtKey, getPrivatePartAsBase58)
+    API_FUNCTION(ExtKey, getPublicPartAsBase58)
+    API_FUNCTION(ExtKey, getPrivateKey)
+    API_FUNCTION(ExtKey, getPublicKey)
+    API_FUNCTION(ExtKey, getPrivateEncKey)
+    API_FUNCTION(ExtKey, getPublicKeyAsBase58Address)
+    API_FUNCTION(ExtKey, getChainCode)
+    API_FUNCTION(ExtKey, verifyCompactSignatureWithHash)
+    API_FUNCTION(ExtKey, isPrivate)
 
 
     void EventApi_newEventApi(int taskId, int connectionPtr) {

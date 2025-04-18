@@ -9,9 +9,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { ExtKey } from "../service/ExtKey";
+import { BIP39 } from "../Types";
 import { BaseNative } from "./BaseNative";
+import { ExtKeyNativePtr } from "./ExtKeyNative";
 
+export interface BIP39Native {
+    mnemonic: string;
+    extKey: ExtKeyNativePtr;
+    entropy: Uint8Array;
+};
 export class CryptoApiNative extends BaseNative {
+
     async newApi(): Promise<number> {
         return this.runAsync<number>((taskId)=>this.api.lib.CryptoApi_newCryptoApi(taskId));
     }
@@ -51,5 +60,41 @@ export class CryptoApiNative extends BaseNative {
     }
     async convertPEMKeytoWIFKey(ptr: number, args: [string]): Promise<string> {
         return this.runAsync<string>((taskId)=>this.api.lib.CryptoApi_convertPEMKeytoWIFKey(taskId, ptr, args));
+    }
+
+
+    async generateBip39(ptr: number, args: [number, string]): Promise<BIP39> {
+        const bipNative = await this.runAsync<BIP39Native>((taskId)=>this.api.lib.CryptoApi_generateBip39(taskId, ptr, args));
+        return this.convertBIP(bipNative);
+    }
+
+    async fromMnemonic(ptr: number, args: [string, string]): Promise<BIP39> {
+        const bipNative = await this.runAsync<BIP39Native>((taskId)=>this.api.lib.CryptoApi_fromMnemonic(taskId, ptr, args));
+        return this.convertBIP(bipNative);
+    }
+
+    async fromEntropy(ptr: number, args: [Uint8Array, string]): Promise<BIP39> {
+        const bipNative = await this.runAsync<BIP39Native>((taskId)=>this.api.lib.CryptoApi_fromEntropy(taskId, ptr, args));
+        return this.convertBIP(bipNative);
+    }
+
+    async entropyToMnemonic(ptr: number, args: [Uint8Array]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.CryptoApi_entropyToMnemonic(taskId, ptr, args));
+    }
+
+    async mnemonicToEntropy(ptr: number, args: [string]): Promise<Uint8Array> {
+        return this.runAsync<Uint8Array>((taskId)=>this.api.lib.CryptoApi_mnemonicToEntropy(taskId, ptr, args));
+    }
+
+    async mnemonicToSeed(ptr: number, args: [string, string]): Promise<Uint8Array> {
+        return this.runAsync<Uint8Array>((taskId)=>this.api.lib.CryptoApi_mnemonicToSeed(taskId, ptr, args));
+    }
+
+    private convertBIP(bipNative: BIP39Native): BIP39 {
+        return {
+            mnemonic: bipNative.mnemonic,
+            entropy: bipNative.entropy,
+            extKey: ExtKey.fromPtr(bipNative.extKey)
+        };
     }
 }

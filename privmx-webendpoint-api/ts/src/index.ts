@@ -10,12 +10,12 @@ limitations under the License.
 */
 
 import { EndpointFactory } from "./service/EndpointFactory";
-import { EventQueue, StoreApi, ThreadApi, InboxApi, Connection, CryptoApi, BaseApi } from "./service";
+import { EventQueue, StoreApi, ThreadApi, InboxApi, Connection, CryptoApi, BaseApi, ExtKey } from "./service";
 import  * as Types from "./Types";
 
 export {
     EndpointFactory as Endpoint, 
     Types,
     EventQueue,
-    StoreApi, ThreadApi, InboxApi, CryptoApi, Connection, BaseApi,
+    StoreApi, ThreadApi, InboxApi, CryptoApi, Connection, BaseApi, ExtKey
 };
