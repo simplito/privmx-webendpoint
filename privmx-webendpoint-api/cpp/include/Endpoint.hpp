@@ -150,6 +150,13 @@ namespace api {
     API_FUNCTION_HEADER(ExtKey, isPrivate)
 
 
+    void EventApi_newEventApi(int taskId, int connectionPtr);
+    void EventApi_deleteEventApi(int taskId, int ptr);
+    API_FUNCTION_HEADER(EventApi, create)
+    API_FUNCTION_HEADER(EventApi, emitEvent)
+    API_FUNCTION_HEADER(EventApi, subscribeForCustomEvents)
+    API_FUNCTION_HEADER(EventApi, unsubscribeFromCustomEvents)
+
 } // namespace api
 } // namespace webendpoint
 } // namespace privmx

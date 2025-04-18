@@ -266,6 +266,25 @@ namespace api {
     API_FUNCTION(ExtKey, verifyCompactSignatureWithHash)
     API_FUNCTION(ExtKey, isPrivate)
 
+
+    void EventApi_newEventApi(int taskId, int connectionPtr) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+            auto connection = (ConnectionVar*)connectionPtr;
+            auto api = new EventApiVar(connection->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            return (int)api;
+        });
+    }
+    void EventApi_deleteEventApi(int taskId, int ptr) {
+        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+            delete (EventApiVar*)ptr;
+        });
+    }
+    API_FUNCTION(EventApi, create)
+    API_FUNCTION(EventApi, emitEvent)
+    API_FUNCTION(EventApi, subscribeForCustomEvents)
+    API_FUNCTION(EventApi, unsubscribeFromCustomEvents)
+
+
 } // namespace api
 } // namespace webendpoint
 } // namespace privmx
