@@ -31,7 +31,6 @@ export class FinalizationHelper {
         this.finalizationRegistry = new FinalizationRegistry(onCleanup => {
             const api = ApiStatic.getInstance();
             this.finalizationQueue.push(onCleanup.onFree);
-            console.log("Object queued to be freed..", onCleanup);
             this.scheduleCleanup();
         });
     }
@@ -40,16 +39,13 @@ export class FinalizationHelper {
         if (this.scheduler) {
             return;
         }
-        console.log("cleanup scheduled..");
         this.scheduler = setTimeout(async () => {
-            console.log("cleanup fired.");
             for (const freeCall of this.finalizationQueue) {
                 await freeCall();
             }
             this.finalizationQueue = [];
             clearTimeout(this.scheduler);
             this.scheduler = null;
-            console.log("cleanup ended");
         }, 1000);
     }
 

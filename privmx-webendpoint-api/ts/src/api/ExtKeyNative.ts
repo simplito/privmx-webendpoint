@@ -11,7 +11,6 @@ export class ExtKeyNative extends BaseNative {
     }
 
     async deleteExtKey(ptr: number): Promise<void> {
-        console.log("deleteExtKey for ptr: ", ptr);
         return this.runAsync<void>((taskId)=>this.api.lib.ExtKey_deleteExtKey(taskId, ptr));
     }
 

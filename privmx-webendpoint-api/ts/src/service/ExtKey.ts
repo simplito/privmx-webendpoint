@@ -7,7 +7,6 @@ export class ExtKey extends BaseApi {
     private static async freeExtKey(ptr: number): Promise<void> {
         const nativeApi = new ExtKeyNative(ApiStatic.getInstance());
         await nativeApi.deleteExtKey(ptr);
-        console.log(ptr, "freed.");
     }
 
     /**
