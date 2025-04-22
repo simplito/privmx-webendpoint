@@ -199,12 +199,4 @@ export class CryptoApi extends BaseApi {
     async mnemonicToSeed(mnemonic: string, password?: string): Promise<Uint8Array> {
         return this.native.mnemonicToSeed(this.servicePtr, [mnemonic, password]);
     }
-
-    async free() {
-        // should cleanup all the ExtKey instances created when returning BIP39
-        // references should be kept on native level
-        // Every ExtKey instance should have free as well
-
-        // there will be FinalizationHelper to do this automatically
-    }
 }
