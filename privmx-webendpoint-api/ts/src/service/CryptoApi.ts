@@ -143,7 +143,7 @@ export class CryptoApi extends BaseApi {
      * @param {string} password the password used to generate the Key
      * @returns {BIP39} object containing ECC Key and associated with it BIP-39 mnemonic and entropy
      */
-    async generateBip39(strength: number, password?: string): Promise<BIP39> {
+    async generateBip39(strength: number, password: string = ""): Promise<BIP39> {
         return this.native.generateBip39(this.servicePtr, [strength, password]);
     }
 
@@ -154,7 +154,7 @@ export class CryptoApi extends BaseApi {
      * @param {string} password the password used to generate the Key
      * @return BIP39_t object containing ECC Key and associated with it BIP-39 mnemonic and entropy
      */
-    async fromMnemonic(mnemonic: string, password?: string): Promise<BIP39> {
+    async fromMnemonic(mnemonic: string, password: string = ""): Promise<BIP39> {
         return this.native.fromMnemonic(this.servicePtr, [mnemonic, password]);
     }
 
@@ -165,7 +165,7 @@ export class CryptoApi extends BaseApi {
      * @param {string} password the password used to generate the Key
      * @return {BIP39} object containing ECC Key and associated with it BIP-39 mnemonic and entropy
      */
-    async fromEntropy(entropy: Uint8Array, password?: string): Promise<BIP39> {
+    async fromEntropy(entropy: Uint8Array, password: string = ""): Promise<BIP39> {
         return this.native.fromEntropy(this.servicePtr, [entropy, password]);
     }
 
@@ -196,7 +196,7 @@ export class CryptoApi extends BaseApi {
      * @param {string} password the password used to generate the seed
      * @return {Uint8Array} generated seed 
      */
-    async mnemonicToSeed(mnemonic: string, password?: string): Promise<Uint8Array> {
+    async mnemonicToSeed(mnemonic: string, password: string = ""): Promise<Uint8Array> {
         return this.native.mnemonicToSeed(this.servicePtr, [mnemonic, password]);
     }
 }
