@@ -25,6 +25,9 @@ import { InboxApi } from "./InboxApi";
 import { StoreApi } from "./StoreApi";
 import { ThreadApi } from "./ThreadApi";
 
+/**
+ * //doc-gen:ignore
+ */
 declare function endpointWasmModule(): Promise<any>; // Provided by emscripten js glue code
 
 /**

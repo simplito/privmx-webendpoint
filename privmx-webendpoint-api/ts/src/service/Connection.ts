@@ -15,7 +15,15 @@ import { PagingQuery, PagingList, Context, UserInfo } from "../Types";
 import { BaseNative } from "../api/BaseNative";
 
 export class Connection extends BaseApi {
+  
+  /**
+   * //doc-gen:ignore
+   */
   apisRefs: { [apiId: string]: { _apiServicePtr: number } } = {};
+
+  /**
+   * //doc-gen:ignore
+   */
   nativeApisDeps: { [apiId: string]: BaseNative } = {};
 
   constructor(private native: ConnectionNative, ptr: number) {
