@@ -20,6 +20,7 @@ limitations under the License.
 #include <privmx/endpoint/crypto/varinterface/CryptoApiVarInterface.hpp>
 #include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
 #include "privmx/endpoint/core/VarDeserializer.hpp"
+#include <privmx/endpoint/core/UserVerifierInterface.hpp>
 
 #include "Macros.hpp"
 #include "Mapper.hpp"
@@ -38,6 +39,8 @@ using CryptoApiVar = privmx::endpoint::crypto::CryptoApiVarInterface;
 using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
 using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
 
+using UserVerifierInterface = privmx::endpoint::core::UserVerifierInterface;
+using VerificationRequest = privmx::endpoint::core::VerificationRequest;
 namespace privmx {
 namespace webendpoint {
 namespace api {
@@ -78,6 +81,66 @@ namespace api {
     API_FUNCTION(Connection, listContexts)
     API_FUNCTION(Connection, getContextUsers)
     API_FUNCTION(Connection, disconnect)
+
+
+    EM_ASYNC_JS(EM_VAL, verifier_caller, (EM_VAL name_handle, EM_VAL val_handle), {
+        let name = Emval.toValue(name_handle);
+        let params = Emval.toValue(val_handle);
+        let response = {};
+
+        try {
+            response = await userVierifier_verify(params);
+        } catch (error) {
+            console.error("Error on userVerifier_verify call from C for", params);
+            let ret = { status: -1, buff: "", error: error.toString()};
+            return Emval.toHandle(ret);
+        }
+        let ret = {status: 1, buff: response, error: ""};
+        return Emval.toHandle(ret);
+    });
+
+    val Bindings::callVerifierOnJS(val& name, val& params) {
+        auto ret = val::take_ownership(verifier_caller(name.as_handle(), params.as_handle()));
+        emscripten_sleep(0);
+        return ret;
+    }
+
+    class CustomUserVerifierInterface: public virtual UserVerifierInterface {
+    public:
+        std::vector<bool> verify(const std::vector<VerificationRequest>& request) override {
+            emscripten::val name { emscripten::val::u8string("userVerifier_verify") }; // here we should pass ptr
+            emscripten::val params { emscripten::val::object() };
+            params.set("request", typed_memory_view(request.size(), request.data())); 
+            
+            emscripten::val result = callVerifierOnJS(name, params);
+
+            int status = result["status"].as<int>();
+            if (status < 0) {
+                auto errorString = result["error"].as<std::string>();
+                Bindings::printErrorInJS(errorString);
+                throw std::runtime_error("Error: on verify");
+            }
+
+            std::vector<bool> out { result["buff"].as<std::vector<bool>>() };
+            return out;
+        };
+    };
+
+    void Connection_newUserVerifierInterface(int taskId, int connectionPtr) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+            auto connection = (ConnectionVar*)connectionPtr;
+            auto customInterfaceRawPtr = new CustomUserVerifierInterface();
+            std::shared_ptr<CustomUserVerifierInterface> customVerifier(customInterfaceRawPtr);
+            connection->setUserVerifier(customVerifier);
+            return (int)customInterfaceRawPtr;
+        });
+    }
+
+        void ThreadApi_deleteUserVerifierInterface(int taskId, int ptr) {
+            ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+                delete (CustomUserVerifierInterface*)ptr;
+            });
+        }
 
     void ThreadApi_newThreadApi(int taskId, int connectionPtr) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{

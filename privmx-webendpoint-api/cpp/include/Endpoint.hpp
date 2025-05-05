@@ -36,6 +36,8 @@ namespace api {
     API_FUNCTION_HEADER(Connection, listContexts)
     API_FUNCTION_HEADER(Connection, getContextUsers)
     API_FUNCTION_HEADER(Connection, disconnect)
+    void Connection_newUserVerifierInterface(int taskId, int connectionPtr);
+    void Connection_deleteUserVerifierInterface(int taskId, int ptr);
 
     void ThreadApi_newThreadApi(int taskId, int connectionPtr);
     void ThreadApi_deleteThreadApi(int taskId, int ptr);

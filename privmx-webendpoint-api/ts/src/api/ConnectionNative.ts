@@ -9,7 +9,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { PagingQuery, PagingList, Context, UserInfo } from "../Types";
+import { UserVerifierInterface } from "../service/UserVerifierInterface";
+import { PagingQuery, PagingList, Context, UserInfo, VerificationRequest } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class ConnectionNative extends BaseNative {
@@ -50,5 +51,17 @@ export class ConnectionNative extends BaseNative {
     }
     async disconnect(ptr: number, args: []): Promise<void> {
         await this.runAsync<void>((taskId)=>this.api.lib.Connection_disconnect(taskId, ptr, args));
+    }
+    async setUserVerifier(_ptr: number, args: [UserVerifierInterface]): Promise<void> {
+        const [verifierInterface] = args;
+        // register verifier JS callback in global scope
+
+        (globalThis as any).userVierifier_verify = async (request: VerificationRequest[]) => {
+            console.log("verify call on data", request);
+            if (verifierInterface && typeof verifierInterface.verify === "function") {
+                return verifierInterface.verify(request)
+            }
+            throw new Error("Call on UserVerifierInterface with missing implementation");
+        }
     }
 }
