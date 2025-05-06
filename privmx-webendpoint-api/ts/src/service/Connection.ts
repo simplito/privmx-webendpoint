@@ -82,7 +82,7 @@ export class Connection extends BaseApi {
      * 
      */
     setUserVerifier(verifier: UserVerifierInterface) {
-      return this.native.setUserVerifier(this.servicePtr, [verifier]);
+      return this.native.setUserVerifier(this.servicePtr, [this.servicePtr, verifier]);
     }
 
   private async freeApis() {

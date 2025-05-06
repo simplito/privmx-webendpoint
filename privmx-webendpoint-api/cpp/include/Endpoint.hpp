@@ -13,8 +13,10 @@ limitations under the License.
 #define _PRIVMXLIB_WEBENDPOINT_ENDPOINT_HPP_
 
 #include <emscripten/val.h>
-
+#include <emscripten.h>
+#include <emscripten/bind.h>
 #include "Macros.hpp"
+#include "Mapper.hpp"
 
 namespace privmx {
 namespace webendpoint {
@@ -38,6 +40,7 @@ namespace api {
     API_FUNCTION_HEADER(Connection, disconnect)
     void Connection_newUserVerifierInterface(int taskId, int connectionPtr);
     void Connection_deleteUserVerifierInterface(int taskId, int ptr);
+    emscripten::val callVerifierOnJS(emscripten::val& name, emscripten::val& params);
 
     void ThreadApi_newThreadApi(int taskId, int connectionPtr);
     void ThreadApi_deleteThreadApi(int taskId, int ptr);

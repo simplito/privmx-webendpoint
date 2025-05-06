@@ -32,6 +32,8 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(Connection, listContexts)
     BINDING_FUNCTION(Connection, getContextUsers)
     BINDING_FUNCTION(Connection, disconnect)
+    BINDING_FUNCTION(Connection, newUserVerifierInterface)
+    BINDING_FUNCTION(Connection, deleteUserVerifierInterface)
 
     BINDING_FUNCTION(ThreadApi, newThreadApi)
     BINDING_FUNCTION(ThreadApi, deleteThreadApi)
