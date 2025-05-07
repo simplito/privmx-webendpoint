@@ -366,7 +366,136 @@ import { ExtKey } from "./service/ExtKey";
         maxFileSize: number;
         maxWholeUploadSize: number;
     };
+// }
+
+// export namespace Kvdb {
+
+    /**
+     * Holds all available information about a Kvdb.
+     * 
+     * @type {Kvdb}
+     * 
+     * @param {string} contextId ID of the Context
+     * @param {string} kvdbId ID ot the Kvdb
+     * @param {number} createDate Kvdb creation timestamp
+     * @param {string} author ID of the user who created the Kvdb
+     * @param {number} lastModificationDate Kvdb last modification timestamp
+     * @param {string} lastModifier ID of the user who last modified the Kvdb
+     * @param {string[]} users list of users (their IDs) with access to the Kvdb
+     * @param {string[]} managers list of users (their IDs) with management rights
+     * @param {number} version version number (changes on updates)
+     * @param {number} lastMsgDate timestamp of last posted message
+     * @param {Uint8Array} publicMeta Kvdb's public meta data
+     * @param {Uint8Array} privateMeta Kvdb's private mata data
+     * @param {ContainerPolicy} policy Kvdb's policies
+     * @param {number} entries total number of messages in the Kvdb
+     * @param {number} entries total number of messages in the Kvdb
+     * @param {number} statusCode status code of retrival and decryption of the Kvdb
+     * @param {number} schemaVersion Version of the Kvdb data structure and how it is encoded/encrypted
+     */
+    export interface Kvdb {
+        contextId: string;
+        kvdbId: string;
+        createDate: number;
+        creator: string;
+        lastModificationDate: number;
+        lastModifier: string;
+        users: string[];
+        managers: string[];
+        version: number;
+        lastMsgDate: number;
+        publicMeta: Uint8Array;
+        privateMeta: Uint8Array;
+        policy: ContainerPolicy;
+        messagesCount: number;
+        statusCode: number;
+        schemaVersion: number;
+    };
     
+    /**
+     * Holds information about the KvdbEntry.
+     * 
+     * @type {KvdbEntry}
+     * 
+     * @param {ServerMessageInfo} info Kvdb entry's information created by server
+     * @param {Uint8Array} publicMeta Kvdb entry's public meta data
+     * @param {Uint8Array} privateMeta Kvdb entry's private mata data
+     * @param {Uint8Array} data Kvdb entry's data
+     * @param {string} authorPubKey public key of an author of the Kvdb entry
+     * @param {number} statusCode status code of retrival and decryption of the Kvdb entry
+     * @param {number} schemaVersion Version of the Kvdb entry data structure and how it is encoded/encrypted
+     */
+    export interface KvdbEntry {
+        info: ServerMessageInfo;
+        publicMeta: Uint8Array;
+        privateMeta: Uint8Array;
+        data: Uint8Array;
+        authorPubKey: string;
+        statusCode: number;
+        schemaVersion: number;
+    };
+    
+    /**
+     * Holds message's information created by server
+     * 
+     * @type {ServerKvdbEntryInfo}
+     * 
+     * @param {string} kvdbId ID of the kvdb
+     * @param {string} key Kvdb entry's key
+     * @param {number} createDate entry creation timestamp
+     * @param {string} author ID of the user who created the entry
+     * 
+     */
+    export interface ServerKvdbEntryInfo {
+        kvdbId: string;
+        key: string;
+        createDate: number;
+        author: string;
+    };
+
+    export type KvdbSortBy = "createDate" | "itemKey" | "lastModificationDate";
+    /**
+     * Contains query parameters for listEntriesKeys (PagingList)
+     * 
+     * @type {KvdbKeysPagingQuery}
+     * 
+     * @param {number} skip number of elements to skip from result
+     * @param {number} limit limit of elements to return for query
+     * @param {SortOrder} sortOrder Order of elements in result. Use "asc" for ascending, "desc" for descening.
+     * @param {KvdbSortBy} sortBy Order of elements are sorted in result
+     * @param {string} [lastKey] id of the element from which query results should start
+     * @param {string} [prefix] extra query parameters in serialized JSON
+     */
+    export interface KvdbKeysPagingQuery {
+        skip: number;
+        limit: number;
+        sortOrder: SortOrder;
+        sortBy?: KvdbSortBy;
+        lastId?: string;
+        queryAsJson?: string;
+    };
+
+    /**
+     * Contains query parameters for methods returning lists (PagingList)
+     * 
+     * @type {KvdbEntryPagingQuery}
+     * 
+     * @param {number} skip number of elements to skip from result
+     * @param {number} limit limit of elements to return for query
+     * @param {SortOrder} sortOrder Order of elements in result. Use "asc" for ascending, "desc" for descening.
+     * @param {KvdbSortBy} sortBy Order of elements are sorted in result
+     * @param {string} [lastKey] id of the element from which query results should start
+     * @param {string} [prefix] extra query parameters in serialized JSON
+     */
+    export interface KvdbEntryPagingQuery {
+        skip: number;
+        limit: number;
+        sortOrder: SortOrder;
+        sortBy?: KvdbSortBy;
+        lastKey?: string;
+        queryAsJson?: string;
+    };
+// }
     
     /**
      * Holds Container policies settings
@@ -431,8 +560,6 @@ import { ExtKey } from "./service/ExtKey";
         delete?: PolicyEntry;
     }
     
-// }
-
 /**
  * Holds error details
  * 
