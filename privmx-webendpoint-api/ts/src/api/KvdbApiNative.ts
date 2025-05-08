@@ -48,13 +48,13 @@ export class KvdbApiNative extends BaseNative {
         return this.runAsync<PagingList<KvdbEntry>>((taskId)=>this.api.lib.KvdbApi_listEntries(taskId, ptr, args));
     }
     async setEntry(ptr: number, args: [string, string, Uint8Array, Uint8Array, Uint8Array, number]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_deleteMessage(taskId, ptr, args));
+        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_setEntry(taskId, ptr, args));
     }
     async deleteEntry(ptr: number, args: [string, string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_updateMessage(taskId, ptr, args));
+        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_deleteEntry(taskId, ptr, args));
     }
     async deleteEntries(ptr: number, args: [string, string[]]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_updateMessage(taskId, ptr, args));
+        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_deleteEntries(taskId, ptr, args));
     }
     async subscribeForKvdbEvents(ptr: number, args: []): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_subscribeForKvdbEvents(taskId, ptr, args));
@@ -63,9 +63,9 @@ export class KvdbApiNative extends BaseNative {
         return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_unsubscribeFromKvdbEvents(taskId, ptr, args));
     }
     async subscribeForEntryEvents(ptr: number, args: [string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_subscribeForMessageEvents(taskId, ptr, args));
+        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_subscribeForEntryEvents(taskId, ptr, args));
     }
     async unsubscribeFromEntryEvents(ptr: number, args: [string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_unsubscribeFromMessageEvents(taskId, ptr, args));
+        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_unsubscribeFromEntryEvents(taskId, ptr, args));
     }
 }

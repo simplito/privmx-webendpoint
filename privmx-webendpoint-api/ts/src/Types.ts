@@ -417,20 +417,22 @@ import { ExtKey } from "./service/ExtKey";
      * 
      * @type {KvdbEntry}
      * 
-     * @param {ServerMessageInfo} info Kvdb entry's information created by server
+     * @param {ServerKvdbEntryInfo} info Kvdb entry's information created by server
      * @param {Uint8Array} publicMeta Kvdb entry's public meta data
      * @param {Uint8Array} privateMeta Kvdb entry's private mata data
      * @param {Uint8Array} data Kvdb entry's data
      * @param {string} authorPubKey public key of an author of the Kvdb entry
+     * @param {number} version version of the Kvdb entry
      * @param {number} statusCode status code of retrival and decryption of the Kvdb entry
      * @param {number} schemaVersion Version of the Kvdb entry data structure and how it is encoded/encrypted
      */
     export interface KvdbEntry {
-        info: ServerMessageInfo;
+        info: ServerKvdbEntryInfo;
         publicMeta: Uint8Array;
         privateMeta: Uint8Array;
         data: Uint8Array;
         authorPubKey: string;
+        version: number;
         statusCode: number;
         schemaVersion: number;
     };
