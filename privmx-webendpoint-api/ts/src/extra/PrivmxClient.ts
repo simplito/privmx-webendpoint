@@ -6,8 +6,8 @@ import {
   InboxApi,
   StoreApi,
   ThreadApi,
+  KvdbApi,
 } from '../service';
-import { KvdbApi } from '../service/KvdbApi';
 import {
   ConnectionEventsManager,
   EventManager,
