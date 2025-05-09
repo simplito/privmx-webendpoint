@@ -23,9 +23,15 @@ limitations under the License.
 #include "privmx/endpoint/core/VarSerializer.hpp"
 #include <privmx/endpoint/core/UserVerifierInterface.hpp>
 
+#include "CustomUserVerifierInterface.hpp"
+
 #include "Macros.hpp"
 #include "Mapper.hpp"
 #include "ProxyedTaskRunner.hpp"
+#include <emscripten/threading.h>
+#include <emscripten/proxying.h>
+
+
 
 using namespace privmx::endpoint;
 using namespace privmx::webendpoint;
@@ -83,85 +89,9 @@ namespace api {
     API_FUNCTION(Connection, getContextUsers)
     API_FUNCTION(Connection, disconnect)
 
-    EM_JS(emscripten::EM_VAL, print_error_main, (const char* msg), {
-        console.error(UTF8ToString(msg));
-    });
-    void printErrorInJS(const std::string& msg) {
-        print_error_main(msg.c_str());
-    }
-
-    EM_ASYNC_JS(emscripten::EM_VAL, verifier_caller, (emscripten::EM_VAL name_handle, emscripten::EM_VAL val_handle), {
-        let name = Emval.toValue(name_handle);
-        let params = Emval.toValue(val_handle);
-        let response = {};
-
-        try {
-            response = await userVierifier_verify(params);
-        } catch (error) {
-            console.error("Error on userVerifier_verify call from C for", params);
-            let ret = { status: -1, buff: "", error: error.toString()};
-            return Emval.toHandle(ret);
-        }
-        let ret = {status: 1, buff: response, error: ""};
-        return Emval.toHandle(ret);
-    });
-
-    emscripten::val callVerifierOnJS(emscripten::val& name, emscripten::val& params) {
-        auto ret = emscripten::val::take_ownership(verifier_caller(name.as_handle(), params.as_handle()));
-        emscripten_sleep(0);
-        return ret;
-    }
-
-    class CustomUserVerifierInterface: public virtual UserVerifierInterface {
-    public:
-        std::vector<bool> verify(const std::vector<VerificationRequest>& request) override {
-            printErrorInJS("on verify (cpp)");
-            emscripten::val name { emscripten::val::u8string("userVerifier_verify") }; // here we should pass ptr
-            emscripten::val params { emscripten::val::object() };
-
-            std::shared_ptr<core::VarSerializer> serializer = std::make_shared<core::VarSerializer>(core::VarSerializer::Options{.addType=true, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
-
-            Poco::JSON::Array::Ptr result = Poco::JSON::Array::Ptr(new Poco::JSON::Array());
-            int size = request.size();
-            for (int i = 0; i < size; ++i) {
-                auto serialized = serializer->serialize(request[i]);
-                result->set(i, serialized);
-            }
-            emscripten::val valResult = Mapper::map((pson_value*)&result);
-            params.set("request", valResult); 
-            
-            emscripten::val jsResult = callVerifierOnJS(name, params);
-
-            int status = jsResult["status"].as<int>();
-            if (status < 0) {
-                printErrorInJS("Error: on verify");
-                throw std::runtime_error("Error: on verify");
-            }
-
-            std::vector<bool> out { jsResult["buff"].as<std::vector<bool>>() };
-            return out;
-        };
-    };
-
-    class UserVerifierHolder {
-        public:
-            std::shared_ptr<CustomUserVerifierInterface> getInstance() {
-                if (!_verifierInterface) {
-                    _verifierInterface = std::make_shared<CustomUserVerifierInterface>();
-                }
-                printErrorInJS("==> get verifier instance");
-                return _verifierInterface;
-            }
-
-        private:
-            std::shared_ptr<CustomUserVerifierInterface> _verifierInterface;
-    };
-
     void Connection_newUserVerifierInterface(int taskId, int connectionPtr) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
             auto connection = (ConnectionVar*)connectionPtr;
-            // auto customInterfaceRawPtr = new CustomUserVerifierInterface();
-            // std::shared_ptr<CustomUserVerifierInterface> customVerifier(customInterfaceRawPtr);
             auto customInterfaceRawPtr = new UserVerifierHolder();
             connection->getApi().setUserVerifier(customInterfaceRawPtr->getInstance());
             return (int)customInterfaceRawPtr;

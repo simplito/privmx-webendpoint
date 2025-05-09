@@ -228,3 +228,18 @@ emscripten::val Mapper::map(pson_value* res) {
             return emscripten::val::undefined();
     }
 }
+
+emscripten::val Mapper::convertInt64ToJsSafeInteger(int64_t val) {
+    if (val < MIN_JS_SAFE_INTEGER || MAX_JS_SAFE_INTEGER < val) {
+        std::cerr << "value is: " << val << std::endl;
+        throw privmx::endpoint::core::Exception("Number exceeded js safe integer range");
+    }
+    bool isNegative = false;
+    if (val < 0) {
+        isNegative = true;
+        val *= -1;
+    }
+    long mostPart = val / CANONICAL_NUMBER_FACTOR;
+    long leastPart = val % CANONICAL_NUMBER_FACTOR;
+    return emscripten::val::take_ownership(convertCanonicalIntegerToJsSafeInteger(isNegative, mostPart, leastPart));
+}
