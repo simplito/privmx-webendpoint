@@ -24,14 +24,9 @@ public:
     std::vector<bool> verify(const std::vector<endpoint::core::VerificationRequest>& request) override;
 private:
     void printErrorInJS(const std::string& msg);
-    emscripten::val callVerifierOnJS(emscripten::val& name, emscripten::val& params);
     emscripten::val callVerifierOnJS(emscripten::EM_VAL name, emscripten::EM_VAL params);
-    // void runTaskAsync(const std::function<void(const std::function<void(const std::vector<bool>)>&)>& func, const std::function<void(const std::vector<bool>)>& callback);
     void runTaskAsync(const std::function<void(void)>& func);
     emscripten::val mapToVal(const std::vector<endpoint::core::VerificationRequest>& request);
-    emscripten::val mapToVal2(const std::vector<endpoint::core::VerificationRequest>& request);
-    emscripten::val mapToVal(const std::string& val);
-    emscripten::val mapToVal(int64_t val);
 };
 
 class UserVerifierHolder {

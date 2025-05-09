@@ -25,7 +25,6 @@ class Mapper {
 public:
     static Poco::Dynamic::Var map(emscripten::val value);
     static emscripten::val map(pson_value* value);
-    static emscripten::val convertInt64ToJsSafeInteger(const int64_t val);
 };
 
 } // namespace webebdpoint

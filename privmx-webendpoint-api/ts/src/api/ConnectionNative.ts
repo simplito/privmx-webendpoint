@@ -55,28 +55,18 @@ export class ConnectionNative extends BaseNative {
     }
     async setUserVerifier(_ptr: number, args: [number, UserVerifierInterface]): Promise<void> {
         if (this.userVerifierPtr > -1) {
-            console.log("deleting old verifier interface...");
             await this.deleteUserVerifierInterface(this.userVerifierPtr);
-            console.log("after delete...");
             this.userVerifierPtr = -1;
         }
 
         const [connectionPtr, verifierInterface] = args;
-        // register verifier JS callback in global scope
-        console.log("registering verifier in global scope");
-
         (window as any).userVierifier_verify = async (request: VerificationRequest[]) => {
-            console.log("verify call on data", request);
             if (verifierInterface && typeof verifierInterface.verify === "function") {
                 return verifierInterface.verify(request)
             }
             throw new Error("Call on UserVerifierInterface with missing implementation");
         }
-        console.log("is registered?(v2) ", (window as any).userVierifier_verify)
-
-        console.log("call: Connection_newUserVerifierInterface");
         this.userVerifierPtr = await this.runAsync<number>((taskId) => this.api.lib.Connection_newUserVerifierInterface(taskId, connectionPtr));
-        console.log("after: Connection_newUserVerifierInterface");
     }
 
     protected async newUserVerifierInterface(connectionPtr: number): Promise<number> {
