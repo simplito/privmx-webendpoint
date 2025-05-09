@@ -413,7 +413,7 @@ import { ExtKey } from "./service/ExtKey";
     /**
      * Holds Container's item policies settings
      * 
-     * @type {ItemPolicy}
+     * @type {ContainerWithoutItemPolicy}
      * 
      * @param {PolicyEntry} get determine who can get an item
      * @param {PolicyEntry} listMy determine who can list items created by me
@@ -453,10 +453,6 @@ export interface Error {
     full: string
 }
 /**
- * Contains ECC generated key using BIP-39.
- * 
- * @type {BIP39}
- *  
  * @param {string} mnemonic BIP-39 mnemonic
  * @param {ExtKey} extKey Ecc Key
  * @param {Uint8Array} entropy BIP-39 entropy
