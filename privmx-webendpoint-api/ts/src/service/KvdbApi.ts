@@ -20,6 +20,7 @@ import {
   KvdbEntry,
   KvdbKeysPagingQuery,
   KvdbEntryPagingQuery,
+  DeleteEntriesResult,
 } from "../Types";
 
 export class KvdbApi extends BaseApi {
@@ -213,7 +214,7 @@ export class KvdbApi extends BaseApi {
   async deleteEntries(
     kvdbId: string,
     keys: string[],
-  ): Promise<void> {
+  ): Promise<DeleteEntriesResult> {
     return this.native.deleteEntries(this.servicePtr, [
       kvdbId,
       keys,
