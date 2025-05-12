@@ -5,6 +5,7 @@ import {
   InboxApi,
   StoreApi,
   ThreadApi,
+  KvdbApi
 } from '../service';
 
 import { InboxEntryPayload } from './inbox';

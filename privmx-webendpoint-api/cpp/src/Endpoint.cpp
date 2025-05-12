@@ -17,6 +17,7 @@ limitations under the License.
 #include <privmx/endpoint/thread/varinterface/ThreadApiVarInterface.hpp>
 #include <privmx/endpoint/store/varinterface/StoreApiVarInterface.hpp>
 #include <privmx/endpoint/inbox/varinterface/InboxApiVarInterface.hpp>
+#include <privmx/endpoint/kvdb/varinterface/KvdbApiVarInterface.hpp>
 #include <privmx/endpoint/crypto/varinterface/CryptoApiVarInterface.hpp>
 #include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
 #include "privmx/endpoint/core/VarDeserializer.hpp"
@@ -34,6 +35,7 @@ using ConnectionVar = privmx::endpoint::core::ConnectionVarInterface;
 using ThreadApiVar = privmx::endpoint::thread::ThreadApiVarInterface;
 using StoreApiVar = privmx::endpoint::store::StoreApiVarInterface;
 using InboxApiVar = privmx::endpoint::inbox::InboxApiVarInterface;
+using KvdbApiVar = privmx::endpoint::kvdb::KvdbApiVarInterface;
 using CryptoApiVar = privmx::endpoint::crypto::CryptoApiVarInterface;
 using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
 using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
@@ -177,6 +179,35 @@ namespace api {
     API_FUNCTION(InboxApi, unsubscribeFromInboxEvents)
     API_FUNCTION(InboxApi, subscribeForEntryEvents)
     API_FUNCTION(InboxApi, unsubscribeFromEntryEvents)
+
+    void KvdbApi_newKvdbApi(int taskId, int connectionPtr) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+            auto connection = (ConnectionVar*)connectionPtr;
+            auto kvdbApi = new KvdbApiVar(connection->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            return (int)kvdbApi;
+        });
+    }
+    void KvdbApi_deleteKvdbApi(int taskId, int ptr) {
+        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+            delete (KvdbApiVar*)ptr;
+        });
+    }
+    API_FUNCTION(KvdbApi, create)
+    API_FUNCTION(KvdbApi, createKvdb)
+    API_FUNCTION(KvdbApi, updateKvdb)
+    API_FUNCTION(KvdbApi, deleteKvdb)
+    API_FUNCTION(KvdbApi, getKvdb)
+    API_FUNCTION(KvdbApi, listKvdbs)
+    API_FUNCTION(KvdbApi, getEntry)
+    API_FUNCTION(KvdbApi, listEntriesKeys)
+    API_FUNCTION(KvdbApi, listEntries)
+    API_FUNCTION(KvdbApi, setEntry)
+    API_FUNCTION(KvdbApi, deleteEntry)
+    API_FUNCTION(KvdbApi, deleteEntries)
+    API_FUNCTION(KvdbApi, subscribeForKvdbEvents)
+    API_FUNCTION(KvdbApi, unsubscribeFromKvdbEvents)
+    API_FUNCTION(KvdbApi, subscribeForEntryEvents)
+    API_FUNCTION(KvdbApi, unsubscribeFromEntryEvents)
 
     void CryptoApi_newCryptoApi(int taskId) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&]{
