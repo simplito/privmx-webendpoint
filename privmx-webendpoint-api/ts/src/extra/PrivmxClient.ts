@@ -6,6 +6,7 @@ import {
   InboxApi,
   StoreApi,
   ThreadApi,
+  KvdbApi,
 } from '../service';
 import {
   ConnectionEventsManager,
@@ -50,6 +51,7 @@ export class PrivmxClient {
   private threadApi: Promise<ThreadApi> | null = null;
   private storeApi: Promise<StoreApi> | null = null;
   private inboxApi: Promise<InboxApi> | null = null;
+  private kvdbApi: Promise<KvdbApi> | null = null;
 
   private connectionEventManager: Promise<ConnectionEventsManager> | null =
     null;
@@ -242,6 +244,20 @@ export class PrivmxClient {
       })();
     }
     return this.inboxApi;
+  }
+
+  /**
+   * @description Gets the Kvdb API.
+   * @returns {Promise<KvdbApi>}
+   */
+  public async getKvdbApi(): Promise<KvdbApi> {
+    if (!this.kvdbApi) {
+      this.kvdbApi = (async () => {
+        const connection = this.getConnection();
+        return EndpointFactory.createKvdbApi(connection);
+      })();
+    }
+    return this.kvdbApi;
   }
 
   /**

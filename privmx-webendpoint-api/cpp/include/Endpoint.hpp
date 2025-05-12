@@ -109,6 +109,26 @@ namespace api {
     API_FUNCTION_HEADER(InboxApi, subscribeForEntryEvents)
     API_FUNCTION_HEADER(InboxApi, unsubscribeFromEntryEvents)
 
+    void KvdbApi_newKvdbApi(int taskId, int connectionPtr);
+    void KvdbApi_deleteKvdbApi(int taskId, int ptr);
+    API_FUNCTION_HEADER(KvdbApi, create)
+    API_FUNCTION_HEADER(KvdbApi, createKvdb)
+    API_FUNCTION_HEADER(KvdbApi, updateKvdb)
+    API_FUNCTION_HEADER(KvdbApi, deleteKvdb)
+    API_FUNCTION_HEADER(KvdbApi, getKvdb)
+    API_FUNCTION_HEADER(KvdbApi, listKvdbs)
+    API_FUNCTION_HEADER(KvdbApi, getEntry)
+    API_FUNCTION_HEADER(KvdbApi, listEntriesKeys)
+    API_FUNCTION_HEADER(KvdbApi, listEntries)
+    API_FUNCTION_HEADER(KvdbApi, setEntry)
+    API_FUNCTION_HEADER(KvdbApi, deleteEntry)
+    API_FUNCTION_HEADER(KvdbApi, deleteEntries)
+    API_FUNCTION_HEADER(KvdbApi, subscribeForKvdbEvents)
+    API_FUNCTION_HEADER(KvdbApi, unsubscribeFromKvdbEvents)
+    API_FUNCTION_HEADER(KvdbApi, subscribeForEntryEvents)
+    API_FUNCTION_HEADER(KvdbApi, unsubscribeFromEntryEvents)
+
+
     void CryptoApi_newCryptoApi(int taskId);
     void CryptoApi_deleteCryptoApi(int taskId, int ptr);
     API_FUNCTION_HEADER(CryptoApi, create)
