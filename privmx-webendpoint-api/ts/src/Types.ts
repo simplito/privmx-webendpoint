@@ -581,7 +581,7 @@ export interface Error {
     description: string;
     full: string
 }
-/** 
+/**
  * @param {string} mnemonic BIP-39 mnemonic
  * @param {ExtKey} extKey Ecc Key
  * @param {Uint8Array} entropy BIP-39 entropy
@@ -591,3 +591,36 @@ export interface BIP39 {
     entropy: Uint8Array;
     extKey: ExtKey;
 };
+
+/**
+ * 
+ * @type {VerificationRequest}
+ * 
+ * @param {string} contextId Id of the Context
+ * @param {string} senderId Id of the sender
+ * @param {string} senderPubKey Public key of the sender
+ * @param {number} date The data creation date
+ * @param {BridgeIdentity} bridgeIdentity Bridge Identity
+ */
+export interface VerificationRequest {
+    contextId: string;
+    senderId: string;
+    senderPubKey: string;
+    date: number;
+    bridgeIdentity?: BridgeIdentity;
+};
+
+/**
+ * Bridge server identification details.
+ * 
+ * @type {BridgeIdentity}
+ * 
+ * @param {string} url Bridge URL
+ * @param {string} pubKey Bridge public Key
+ * @param {string} instanceId Bridge instance Id given by PKI
+ */
+export interface BridgeIdentity {
+    url: string;
+    pubKey?: string;
+    instanceId?: string;
+}

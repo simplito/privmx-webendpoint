@@ -1,6 +1,6 @@
 {
   "name": "@simplito/privmx-webendpoint",
-  "version": "kvdb-module",
+  "version": "2.3.0-rc6",
   "description": "PrivMX Web Endpoint library",
   "author": "Simplito",
   "license": "PrivMX Free License",

@@ -9,11 +9,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { PagingQuery, PagingList, Context, UserInfo } from "../Types";
+import { UserVerifierInterface } from "../service/UserVerifierInterface";
+import { PagingQuery, PagingList, Context, UserInfo, VerificationRequest } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class ConnectionNative extends BaseNative {
     protected lastConnectionId: number = -1;
+    protected userVerifierPtr: number = -1;
 
     protected async newApi(_connectionPtr: number): Promise<number> { 
         throw new Error("Use the newConnection() - specialized version of method instead.");
@@ -50,5 +52,28 @@ export class ConnectionNative extends BaseNative {
     }
     async disconnect(ptr: number, args: []): Promise<void> {
         await this.runAsync<void>((taskId)=>this.api.lib.Connection_disconnect(taskId, ptr, args));
+    }
+    async setUserVerifier(_ptr: number, args: [number, UserVerifierInterface]): Promise<void> {
+        if (this.userVerifierPtr > -1) {
+            await this.deleteUserVerifierInterface(this.userVerifierPtr);
+            this.userVerifierPtr = -1;
+        }
+
+        const [connectionPtr, verifierInterface] = args;
+        (window as any).userVierifier_verify = async (request: VerificationRequest[]) => {
+            if (verifierInterface && typeof verifierInterface.verify === "function") {
+                return verifierInterface.verify(request)
+            }
+            throw new Error("Call on UserVerifierInterface with missing implementation");
+        }
+        this.userVerifierPtr = await this.runAsync<number>((taskId) => this.api.lib.Connection_newUserVerifierInterface(taskId, connectionPtr));
+    }
+
+    protected async newUserVerifierInterface(connectionPtr: number): Promise<number> {
+        return this.runAsync<number>((taskId) => this.api.lib.Connection_newUserVerifierInterface(taskId, connectionPtr));
+    }
+
+    protected async deleteUserVerifierInterface(ptr: number): Promise<void> {
+        await this.runAsync<void>((taskId)=>this.api.lib.Connection_deleteUserVerifierInterface(taskId, ptr));
     }
 }

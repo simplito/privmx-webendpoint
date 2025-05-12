@@ -21,10 +21,18 @@ limitations under the License.
 #include <privmx/endpoint/crypto/varinterface/CryptoApiVarInterface.hpp>
 #include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
 #include "privmx/endpoint/core/VarDeserializer.hpp"
+#include "privmx/endpoint/core/VarSerializer.hpp"
+#include <privmx/endpoint/core/UserVerifierInterface.hpp>
+
+#include "CustomUserVerifierInterface.hpp"
 
 #include "Macros.hpp"
 #include "Mapper.hpp"
 #include "ProxyedTaskRunner.hpp"
+#include <emscripten/threading.h>
+#include <emscripten/proxying.h>
+
+
 
 using namespace privmx::endpoint;
 using namespace privmx::webendpoint;
@@ -40,6 +48,8 @@ using CryptoApiVar = privmx::endpoint::crypto::CryptoApiVarInterface;
 using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
 using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
 
+using UserVerifierInterface = privmx::endpoint::core::UserVerifierInterface;
+using VerificationRequest = privmx::endpoint::core::VerificationRequest;
 namespace privmx {
 namespace webendpoint {
 namespace api {
@@ -80,6 +90,21 @@ namespace api {
     API_FUNCTION(Connection, listContexts)
     API_FUNCTION(Connection, getContextUsers)
     API_FUNCTION(Connection, disconnect)
+
+    void Connection_newUserVerifierInterface(int taskId, int connectionPtr) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+            auto connection = (ConnectionVar*)connectionPtr;
+            auto customInterfaceRawPtr = new UserVerifierHolder();
+            connection->getApi().setUserVerifier(customInterfaceRawPtr->getInstance());
+            return (int)customInterfaceRawPtr;
+        });
+    }
+
+    void Connection_deleteUserVerifierInterface(int taskId, int ptr) {
+        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+            delete (UserVerifierHolder*)ptr;
+        });
+    }
 
     void ThreadApi_newThreadApi(int taskId, int connectionPtr) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
