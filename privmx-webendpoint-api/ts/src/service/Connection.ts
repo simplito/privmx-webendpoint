@@ -81,7 +81,7 @@ export class Connection extends BaseApi {
      * @param verifier an implementation of the UserVerifierInterface
      * 
      */
-    setUserVerifier(verifier: UserVerifierInterface) {
+    setUserVerifier(verifier: UserVerifierInterface): Promise<void> {
       return this.native.setUserVerifier(this.servicePtr, [this.servicePtr, verifier]);
     }
 
