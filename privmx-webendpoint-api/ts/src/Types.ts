@@ -9,6 +9,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { ExtKey } from "./service/ExtKey";
+
 // export namespace core {
     export type SortOrder = "desc" | "asc";
     
@@ -36,7 +38,7 @@ limitations under the License.
      * 
      * @param {number} skip number of elements to skip from result
      * @param {number} limit limit of elements to return for query
-     * @param {SortOrder} sortOrder Order of elements in result. Use "asc" for ascending, "desc" for descening.
+     * @param {SortOrder} sortOrder Order of elements in result. Use "asc" for ascending, "desc" for descending.
      * @param {string} [lastId] id of the element from which query results should start
      * @param {string} [queryAsJson] extra query parameters in serialized JSON
      */
@@ -91,11 +93,11 @@ limitations under the License.
     };
 
     /**
-     * Contains Infomation about user
+     * Contains Information about user
      *
      * @type {UserInfo}
      * 
-     * @param {UserWithPubKey} user User publicKey and usetId
+     * @param {UserWithPubKey} user User publicKey and userId
      * @param {boolean} isActive is user connected to the Bridge
      * 
      */
@@ -122,11 +124,11 @@ limitations under the License.
      * @param {string[]} managers list of users (their IDs) with management rights
      * @param {number} version version number (changes on updates)
      * @param {number} lastMsgDate timestamp of last posted message
-     * @param {Uint8Array} publicMeta Thread's public meta data
-     * @param {Uint8Array} privateMeta Thread's private mata data
+     * @param {Uint8Array} publicMeta Thread's public metadata
+     * @param {Uint8Array} privateMeta Thread's private metadata
      * @param {ContainerPolicy} policy Thread's policies
      * @param {number} messagesCount total number of messages in the Thread
-     * @param {number} statusCode status code of retrival and decryption of the Thread
+     * @param {number} statusCode status code of retrieval and decryption of the Thread
      * 
      */
     export interface Thread {
@@ -153,11 +155,11 @@ limitations under the License.
      * @type {Message}
      * 
      * @param {ServerMessageInfo} info message's information created by server
-     * @param {Uint8Array} publicMeta message's public meta data
-     * @param {Uint8Array} privateMeta message's private mata data
+     * @param {Uint8Array} publicMeta message's public metadata
+     * @param {Uint8Array} privateMeta message's private metadata
      * @param {Uint8Array} data message's data
      * @param {string} authorPubKey public key of an author of the message
-     * @param {number} statusCode status code of retrival and decryption of the message
+     * @param {number} statusCode status code of retrieval and decryption of the message
      * 
      */
     export interface Message {
@@ -204,11 +206,11 @@ limitations under the License.
      * @param {string[]} users list of users (their IDs) with access to the Store
      * @param {string[]} managers list of users (their IDs) with management rights
      * @param {number} version version number (changes on updates)
-     * @param {Uint8Array} publicMeta Store's public meta data
-     * @param {Uint8Array} privateMeta Store's private mata data
+     * @param {Uint8Array} publicMeta Store's public metadata
+     * @param {Uint8Array} privateMeta Store's private metadata
      * @param {ContainerPolicy} policy Store's policies
      * @param {number} filesCount total number of files in the Store
-     * @param {number} statusCode status code of retrival and decryption of the Store
+     * @param {number} statusCode status code of retrieval and decryption of the Store
      * 
      */
     export interface Store {
@@ -235,11 +237,11 @@ limitations under the License.
      * @type {File}
      * 
      * @param {ServerFileInfo} info file's information created by server
-     * @param {Uint8Array} publicMeta file's public meta data
-     * @param {Uint8Array} privateMeta file's private mata data
+     * @param {Uint8Array} publicMeta file's public metadata
+     * @param {Uint8Array} privateMeta file's private metadata
      * @param {number} size file's size
      * @param {string} authorPubKey public key of an author of the file
-     * @param {number} tatusCode status code of retrival and decryption of the file
+     * @param {number} tatusCode status code of retrieval and decryption of the file
      * 
      */    
     export interface File {
@@ -285,11 +287,11 @@ limitations under the License.
      * @param {string[]} users list of users (their IDs) with access to the Inbox
      * @param {string[]} managers list of users (their IDs) with management rights
      * @param {number} version version number (changes on updates)
-     * @param {Uint8Array} publicMeta Inbox' public meta data
-     * @param {Uint8Array} privateMeta Inbox' private mata data
+     * @param {Uint8Array} publicMeta Inbox' public metadata
+     * @param {Uint8Array} privateMeta Inbox' private metadata
      * @param {FilesConfig} filesConfig Inbox' files configuration
      * @param {ContainerWithoutItemPolicy} policy Inbox' policies
-     * @param {number} statusCode status code of retrival and decryption of the Inbox
+     * @param {number} statusCode status code of retrieval and decryption of the Inbox
      * 
      */
     export interface Inbox {
@@ -315,7 +317,7 @@ limitations under the License.
      * 
      * @param {string} inboxId ID of the Inbox
      * @param {number} version version of the Inbox
-     * @param {Uint8Array} publicMeta Inbox' public meta data
+     * @param {Uint8Array} publicMeta Inbox' public metadata
      * 
      */
     export interface InboxPublicView {
@@ -335,7 +337,7 @@ limitations under the License.
      * @param {File[]} files list of files attached to the entry
      * @param {string} authorPubKey public key of the author of an entry
      * @param {number} createDate Inbox entry creation timestamp
-     * @param {number} statusCode status code of retrival and decryption of the Inbox entry
+     * @param {number} statusCode status code of retrieval and decryption of the Inbox entry
      */
     export interface InboxEntry {
         entryId: string;
@@ -352,8 +354,8 @@ limitations under the License.
      * 
      * @type {FilesConfig}
      * 
-     * @param {int64_t} minCount minimum numer of files required when sending inbox entry
-     * @param {int64_t} maxCount maximum numer of files allowed when sending inbox entry
+     * @param {int64_t} minCount minimum number of files required when sending inbox entry
+     * @param {int64_t} maxCount maximum number of files allowed when sending inbox entry
      * @param {int64_t} maxFileSize maximum file size allowed when sending inbox entry
      * @param {int64_t} maxWholeUploadSize maximum size of all files in total allowed when sending inbox entry
      * 
@@ -449,4 +451,47 @@ export interface Error {
     scope: string;
     description: string;
     full: string
+}
+/**
+ * @param {string} mnemonic BIP-39 mnemonic
+ * @param {ExtKey} extKey Ecc Key
+ * @param {Uint8Array} entropy BIP-39 entropy
+*/
+export interface BIP39 {
+    mnemonic: string;
+    entropy: Uint8Array;
+    extKey: ExtKey;
+};
+
+/**
+ * 
+ * @type {VerificationRequest}
+ * 
+ * @param {string} contextId Id of the Context
+ * @param {string} senderId Id of the sender
+ * @param {string} senderPubKey Public key of the sender
+ * @param {number} date The data creation date
+ * @param {BridgeIdentity} bridgeIdentity Bridge Identity
+ */
+export interface VerificationRequest {
+    contextId: string;
+    senderId: string;
+    senderPubKey: string;
+    date: number;
+    bridgeIdentity?: BridgeIdentity;
+};
+
+/**
+ * Bridge server identification details.
+ * 
+ * @type {BridgeIdentity}
+ * 
+ * @param {string} url Bridge URL
+ * @param {string} pubKey Bridge public Key
+ * @param {string} instanceId Bridge instance Id given by PKI
+ */
+export interface BridgeIdentity {
+    url: string;
+    pubKey?: string;
+    instanceId?: string;
 }

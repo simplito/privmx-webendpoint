@@ -38,6 +38,7 @@ export class EmCrypto {
         sha256: this.sha256,
         sha512: this.sha512,
         ripemd160: this.ripemd160,
+        hash160: this.hash160,
         aes256EcbEncrypt: this.aes256EcbEncrypt,
         aes256EcbDecrypt: this.aes256EcbDecrypt,
         aes256CbcPkcs7Encrypt: this.aes256CbcPkcs7Encrypt,
@@ -307,6 +308,15 @@ export class EmCrypto {
             hash: { name: EmCrypto.HASH_ALGORITHM_MAP[params.hash] }
         }, key, params.length * 8);
     }
+
+    private async hash160(params: Types.HASH160_PARAMS): Promise<ArrayBuffer> {
+        assertArgsValid(params, Types.HASH160_PARAMS);
+        assertIsUint8Array(params.data);
+        const sha256 = await subtle.digest("SHA-256", new Uint8Array(params.data));
+        return crypto.createHash("ripemd160").update(Buffer.from(sha256)).digest();
+    }
+
+
 
     private fillWithZeroesTo32(buffer: Buffer) {
         return buffer.length < 32 ? Buffer.concat([Buffer.alloc(32 - buffer.length).fill(0), buffer]) : buffer;

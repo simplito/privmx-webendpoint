@@ -10,6 +10,7 @@ limitations under the License.
 */
 
 import { Api } from "../api/Api";
+import { ApiStatic } from "../api/ApiStatic";
 import { ConnectionNative } from "../api/ConnectionNative";
 import { CryptoApiNative } from "../api/CryptoApiNative";
 import { EventApiNative } from "../api/EventApiNative";
@@ -17,6 +18,7 @@ import { EventQueueNative } from "../api/EventQueueNative";
 import { InboxApiNative } from "../api/InboxApiNative";
 import { StoreApiNative } from "../api/StoreApiNative";
 import { ThreadApiNative } from "../api/ThreadApiNative";
+import { FinalizationHelper } from "../FinalizationHelper";
 import { Connection } from "./Connection";
 import { CryptoApi } from "./CryptoApi";
 import { EventApi } from "./EventApi";
@@ -25,6 +27,9 @@ import { InboxApi } from "./InboxApi";
 import { StoreApi } from "./StoreApi";
 import { ThreadApi } from "./ThreadApi";
 
+/**
+ * //doc-gen:ignore
+ */
 declare function endpointWasmModule(): Promise<any>; // Provided by emscripten js glue code
 
 /**
@@ -68,6 +73,8 @@ export class EndpointFactory {
      */
     private static init(lib: any) {
         this.api = new Api(lib);
+        ApiStatic.init(this.api);
+        FinalizationHelper.init(lib);
     }
 
     /**
