@@ -119,7 +119,7 @@ export class ExtKey extends BaseApi {
      * @returns {string} ECC key in WIF format
     */
     async getPrivateKey(): Promise<string> {
-        return this.native.getPublicPartAsBase58(this.servicePtr, []);
+        return this.native.getPrivateKey(this.servicePtr, []);
     }
 
     /**
