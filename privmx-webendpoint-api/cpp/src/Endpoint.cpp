@@ -11,17 +11,28 @@ limitations under the License.
 
 #include "Endpoint.hpp"
 
+#include <privmx/endpoint/crypto/varinterface/ExtKeyVarInterface.hpp>
 #include <privmx/endpoint/core/varinterface/EventQueueVarInterface.hpp>
 #include <privmx/endpoint/core/varinterface/ConnectionVarInterface.hpp>
 #include <privmx/endpoint/thread/varinterface/ThreadApiVarInterface.hpp>
 #include <privmx/endpoint/store/varinterface/StoreApiVarInterface.hpp>
 #include <privmx/endpoint/inbox/varinterface/InboxApiVarInterface.hpp>
+#include <privmx/endpoint/kvdb/varinterface/KvdbApiVarInterface.hpp>
 #include <privmx/endpoint/crypto/varinterface/CryptoApiVarInterface.hpp>
 #include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
+#include "privmx/endpoint/core/VarDeserializer.hpp"
+#include "privmx/endpoint/core/VarSerializer.hpp"
+#include <privmx/endpoint/core/UserVerifierInterface.hpp>
+
+#include "CustomUserVerifierInterface.hpp"
 
 #include "Macros.hpp"
 #include "Mapper.hpp"
 #include "ProxyedTaskRunner.hpp"
+#include <emscripten/threading.h>
+#include <emscripten/proxying.h>
+
+
 
 using namespace privmx::endpoint;
 using namespace privmx::webendpoint;
@@ -32,9 +43,13 @@ using ConnectionVar = privmx::endpoint::core::ConnectionVarInterface;
 using ThreadApiVar = privmx::endpoint::thread::ThreadApiVarInterface;
 using StoreApiVar = privmx::endpoint::store::StoreApiVarInterface;
 using InboxApiVar = privmx::endpoint::inbox::InboxApiVarInterface;
+using KvdbApiVar = privmx::endpoint::kvdb::KvdbApiVarInterface;
 using CryptoApiVar = privmx::endpoint::crypto::CryptoApiVarInterface;
 using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
+using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
 
+using UserVerifierInterface = privmx::endpoint::core::UserVerifierInterface;
+using VerificationRequest = privmx::endpoint::core::VerificationRequest;
 namespace privmx {
 namespace webendpoint {
 namespace api {
@@ -75,6 +90,21 @@ namespace api {
     API_FUNCTION(Connection, listContexts)
     API_FUNCTION(Connection, getContextUsers)
     API_FUNCTION(Connection, disconnect)
+
+    void Connection_newUserVerifierInterface(int taskId, int connectionPtr) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+            auto connection = (ConnectionVar*)connectionPtr;
+            auto customInterfaceRawPtr = new UserVerifierHolder();
+            connection->getApi().setUserVerifier(customInterfaceRawPtr->getInstance());
+            return (int)customInterfaceRawPtr;
+        });
+    }
+
+    void Connection_deleteUserVerifierInterface(int taskId, int ptr) {
+        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+            delete (UserVerifierHolder*)ptr;
+        });
+    }
 
     void ThreadApi_newThreadApi(int taskId, int connectionPtr) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
@@ -175,6 +205,35 @@ namespace api {
     API_FUNCTION(InboxApi, subscribeForEntryEvents)
     API_FUNCTION(InboxApi, unsubscribeFromEntryEvents)
 
+    void KvdbApi_newKvdbApi(int taskId, int connectionPtr) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+            auto connection = (ConnectionVar*)connectionPtr;
+            auto kvdbApi = new KvdbApiVar(connection->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            return (int)kvdbApi;
+        });
+    }
+    void KvdbApi_deleteKvdbApi(int taskId, int ptr) {
+        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+            delete (KvdbApiVar*)ptr;
+        });
+    }
+    API_FUNCTION(KvdbApi, create)
+    API_FUNCTION(KvdbApi, createKvdb)
+    API_FUNCTION(KvdbApi, updateKvdb)
+    API_FUNCTION(KvdbApi, deleteKvdb)
+    API_FUNCTION(KvdbApi, getKvdb)
+    API_FUNCTION(KvdbApi, listKvdbs)
+    API_FUNCTION(KvdbApi, getEntry)
+    API_FUNCTION(KvdbApi, listEntriesKeys)
+    API_FUNCTION(KvdbApi, listEntries)
+    API_FUNCTION(KvdbApi, setEntry)
+    API_FUNCTION(KvdbApi, deleteEntry)
+    API_FUNCTION(KvdbApi, deleteEntries)
+    API_FUNCTION(KvdbApi, subscribeForKvdbEvents)
+    API_FUNCTION(KvdbApi, unsubscribeFromKvdbEvents)
+    API_FUNCTION(KvdbApi, subscribeForEntryEvents)
+    API_FUNCTION(KvdbApi, unsubscribeFromEntryEvents)
+
     void CryptoApi_newCryptoApi(int taskId) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&]{
             auto service = new CryptoApiVar(core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
@@ -197,6 +256,54 @@ namespace api {
     API_FUNCTION(CryptoApi, encryptDataSymmetric)
     API_FUNCTION(CryptoApi, decryptDataSymmetric)
     API_FUNCTION(CryptoApi, convertPEMKeytoWIFKey)
+    API_FUNCTION(CryptoApi, generateBip39)
+    API_FUNCTION(CryptoApi, fromMnemonic)
+    API_FUNCTION(CryptoApi, fromEntropy)
+    API_FUNCTION(CryptoApi, entropyToMnemonic)
+    API_FUNCTION(CryptoApi, mnemonicToEntropy)
+    API_FUNCTION(CryptoApi, mnemonicToSeed)
+
+    void ExtKey_deleteExtKey(int taskId, int ptr) {
+        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+            delete (ExtKeyVar*)ptr;
+        });
+    }
+
+    void ExtKey_fromSeed(int taskId, emscripten::val args) {
+        Poco::Dynamic::Var argsVar = Mapper::map(args);
+        ProxyedTaskRunner::getInstance()->runTask(taskId,[&, argsVar] {
+            auto service = new ExtKeyVar(core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            return service->fromSeed(argsVar);
+        });    
+    }
+
+    void ExtKey_fromBase58(int taskId, emscripten::val args) {
+        Poco::Dynamic::Var argsVar = Mapper::map(args);
+        ProxyedTaskRunner::getInstance()->runTask(taskId,[&, argsVar] {
+            auto service = new ExtKeyVar(core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            return service->fromBase58(argsVar);
+        });   
+    }
+
+    void ExtKey_generateRandom(int taskId, emscripten::val args) {
+        Poco::Dynamic::Var argsVar = Mapper::map(args);
+        ProxyedTaskRunner::getInstance()->runTask(taskId,[&, argsVar] {
+            auto service = new ExtKeyVar(core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            return service->generateRandom(argsVar);
+        });   
+    }
+
+    API_FUNCTION(ExtKey, derive)
+    API_FUNCTION(ExtKey, deriveHardened)
+    API_FUNCTION(ExtKey, getPrivatePartAsBase58)
+    API_FUNCTION(ExtKey, getPublicPartAsBase58)
+    API_FUNCTION(ExtKey, getPrivateKey)
+    API_FUNCTION(ExtKey, getPublicKey)
+    API_FUNCTION(ExtKey, getPrivateEncKey)
+    API_FUNCTION(ExtKey, getPublicKeyAsBase58Address)
+    API_FUNCTION(ExtKey, getChainCode)
+    API_FUNCTION(ExtKey, verifyCompactSignatureWithHash)
+    API_FUNCTION(ExtKey, isPrivate)
 
 
     void EventApi_newEventApi(int taskId, int connectionPtr) {

@@ -34,7 +34,7 @@ export class EventApi extends BaseApi {
      * @param {string} contextId ID of the Context
      * @param {string} channelName name of the Channel
      * @param {Uint8Array} eventData event's data
-     * @param {UserWithPubKey[]} users list of UserWithPubKey objects which defines the recipeints of the event
+     * @param {UserWithPubKey[]} users list of UserWithPubKey objects which defines the recipients of the event
      */
     async emitEvent(contextId: string, channelName: string, eventData: Uint8Array, users: UserWithPubKey[]) {
       return this.native.emitEvent(this.servicePtr, [contextId, channelName, eventData, users]);

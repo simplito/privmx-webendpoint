@@ -10,21 +10,28 @@ limitations under the License.
 */
 
 import { Api } from "../api/Api";
+import { ApiStatic } from "../api/ApiStatic";
 import { ConnectionNative } from "../api/ConnectionNative";
 import { CryptoApiNative } from "../api/CryptoApiNative";
 import { EventApiNative } from "../api/EventApiNative";
 import { EventQueueNative } from "../api/EventQueueNative";
 import { InboxApiNative } from "../api/InboxApiNative";
+import { KvdbApiNative } from "../api/KvdbApiNative";
 import { StoreApiNative } from "../api/StoreApiNative";
 import { ThreadApiNative } from "../api/ThreadApiNative";
+import { FinalizationHelper } from "../FinalizationHelper";
 import { Connection } from "./Connection";
 import { CryptoApi } from "./CryptoApi";
 import { EventApi } from "./EventApi";
 import { EventQueue } from "./EventQueue";
 import { InboxApi } from "./InboxApi";
+import { KvdbApi } from "./KvdbApi";
 import { StoreApi } from "./StoreApi";
 import { ThreadApi } from "./ThreadApi";
 
+/**
+ * //doc-gen:ignore
+ */
 declare function endpointWasmModule(): Promise<any>; // Provided by emscripten js glue code
 
 /**
@@ -68,6 +75,8 @@ export class EndpointFactory {
      */
     private static init(lib: any) {
         this.api = new Api(lib);
+        ApiStatic.init(this.api);
+        FinalizationHelper.init(lib);
     }
 
     /**
@@ -186,6 +195,25 @@ export class EndpointFactory {
         connection.nativeApisDeps["inboxes"] = nativeApi;
         await nativeApi.create(ptr, []);
         return new InboxApi(nativeApi, ptr);
+    }
+
+    /**
+     * Creates an instance of the Kvdb API.
+     *
+     * @param {Connection} connection instance of Connection
+     *
+     * @returns {KvdbApi} instance of KvdbApi
+     */
+    static async createKvdbApi(connection: Connection): Promise<KvdbApi> {
+        if ("kvdbs" in connection.apisRefs) {
+            throw new Error("KvdbApi already registered for given connection.");
+        }
+        const nativeApi = new KvdbApiNative(this.api);
+        const ptr = await nativeApi.newApi(connection.servicePtr);
+        await nativeApi.create(ptr, []);
+        connection.apisRefs["kvdbs"] = { _apiServicePtr: ptr };
+        connection.nativeApisDeps["kvdbs"] = nativeApi;
+        return new KvdbApi(nativeApi, ptr);
     }
 
     /**

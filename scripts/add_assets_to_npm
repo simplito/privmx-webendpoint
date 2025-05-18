@@ -5,8 +5,10 @@ set -e
 SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 
 source "$SCRIPT_PATH/config.sh"
+echo "Adding assets to npm. Assets dir: $NPM_ASSETS_DIR"
+cd "$PRIVMX_WEBENDPOINT_API_SRC/ts"
 
-mkdir -p "$NPM_ASSETS_DIR"
+mkdir -p "./assets"
 cd "$NPM_ASSETS_DIR"
 
 cp "$PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC/dist/driver-web-context.js" "$NPM_ASSETS_DIR"

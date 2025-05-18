@@ -13,8 +13,10 @@ limitations under the License.
 #define _PRIVMXLIB_WEBENDPOINT_ENDPOINT_HPP_
 
 #include <emscripten/val.h>
-
+#include <emscripten.h>
+#include <emscripten/bind.h>
 #include "Macros.hpp"
+#include "Mapper.hpp"
 
 namespace privmx {
 namespace webendpoint {
@@ -36,6 +38,9 @@ namespace api {
     API_FUNCTION_HEADER(Connection, listContexts)
     API_FUNCTION_HEADER(Connection, getContextUsers)
     API_FUNCTION_HEADER(Connection, disconnect)
+    void Connection_newUserVerifierInterface(int taskId, int connectionPtr);
+    void Connection_deleteUserVerifierInterface(int taskId, int ptr);
+    emscripten::val callVerifierOnJS(emscripten::val& name, emscripten::val& params);
 
     void ThreadApi_newThreadApi(int taskId, int connectionPtr);
     void ThreadApi_deleteThreadApi(int taskId, int ptr);
@@ -104,6 +109,26 @@ namespace api {
     API_FUNCTION_HEADER(InboxApi, subscribeForEntryEvents)
     API_FUNCTION_HEADER(InboxApi, unsubscribeFromEntryEvents)
 
+    void KvdbApi_newKvdbApi(int taskId, int connectionPtr);
+    void KvdbApi_deleteKvdbApi(int taskId, int ptr);
+    API_FUNCTION_HEADER(KvdbApi, create)
+    API_FUNCTION_HEADER(KvdbApi, createKvdb)
+    API_FUNCTION_HEADER(KvdbApi, updateKvdb)
+    API_FUNCTION_HEADER(KvdbApi, deleteKvdb)
+    API_FUNCTION_HEADER(KvdbApi, getKvdb)
+    API_FUNCTION_HEADER(KvdbApi, listKvdbs)
+    API_FUNCTION_HEADER(KvdbApi, getEntry)
+    API_FUNCTION_HEADER(KvdbApi, listEntriesKeys)
+    API_FUNCTION_HEADER(KvdbApi, listEntries)
+    API_FUNCTION_HEADER(KvdbApi, setEntry)
+    API_FUNCTION_HEADER(KvdbApi, deleteEntry)
+    API_FUNCTION_HEADER(KvdbApi, deleteEntries)
+    API_FUNCTION_HEADER(KvdbApi, subscribeForKvdbEvents)
+    API_FUNCTION_HEADER(KvdbApi, unsubscribeFromKvdbEvents)
+    API_FUNCTION_HEADER(KvdbApi, subscribeForEntryEvents)
+    API_FUNCTION_HEADER(KvdbApi, unsubscribeFromEntryEvents)
+
+
     void CryptoApi_newCryptoApi(int taskId);
     void CryptoApi_deleteCryptoApi(int taskId, int ptr);
     API_FUNCTION_HEADER(CryptoApi, create)
@@ -117,6 +142,12 @@ namespace api {
     API_FUNCTION_HEADER(CryptoApi, encryptDataSymmetric)
     API_FUNCTION_HEADER(CryptoApi, decryptDataSymmetric)
     API_FUNCTION_HEADER(CryptoApi, convertPEMKeytoWIFKey)
+    API_FUNCTION_HEADER(CryptoApi, generateBip39)
+    API_FUNCTION_HEADER(CryptoApi, fromMnemonic)
+    API_FUNCTION_HEADER(CryptoApi, fromEntropy)
+    API_FUNCTION_HEADER(CryptoApi, entropyToMnemonic)
+    API_FUNCTION_HEADER(CryptoApi, mnemonicToEntropy)
+    API_FUNCTION_HEADER(CryptoApi, mnemonicToSeed)
 
     void EventApi_newEventApi(int taskId, int connectionPtr);
     void EventApi_deleteEventApi(int taskId, int ptr);
@@ -124,6 +155,22 @@ namespace api {
     API_FUNCTION_HEADER(EventApi, emitEvent)
     API_FUNCTION_HEADER(EventApi, subscribeForCustomEvents)
     API_FUNCTION_HEADER(EventApi, unsubscribeFromCustomEvents)
+
+    void ExtKey_deleteExtKey(int taskId, int ptr);
+    void ExtKey_fromSeed(int taskId, emscripten::val args);
+    void ExtKey_fromBase58(int taskId, emscripten::val args);
+    void ExtKey_generateRandom(int taskId, emscripten::val args);
+    API_FUNCTION_HEADER(ExtKey, derive)
+    API_FUNCTION_HEADER(ExtKey, deriveHardened)
+    API_FUNCTION_HEADER(ExtKey, getPrivatePartAsBase58)
+    API_FUNCTION_HEADER(ExtKey, getPublicPartAsBase58)
+    API_FUNCTION_HEADER(ExtKey, getPrivateKey)
+    API_FUNCTION_HEADER(ExtKey, getPublicKey)
+    API_FUNCTION_HEADER(ExtKey, getPrivateEncKey)
+    API_FUNCTION_HEADER(ExtKey, getPublicKeyAsBase58Address)
+    API_FUNCTION_HEADER(ExtKey, getChainCode)
+    API_FUNCTION_HEADER(ExtKey, verifyCompactSignatureWithHash)
+    API_FUNCTION_HEADER(ExtKey, isPrivate)
 
 } // namespace api
 } // namespace webendpoint
