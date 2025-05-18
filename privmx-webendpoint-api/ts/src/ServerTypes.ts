@@ -1,9 +1,9 @@
-import type * as ServerTypes from "appServer/types/ApiTypes";
-import type * as StreamsApi from "appServer/types/StreamsApiTypes";
-import type {AppRequest, RequestOpaque} from "appServer/types/BaseServerTypes";
-import type * as SignalingFromServer from "appServer/types/SignalingSenderTypes";
-import type * as SignalingApi from "appServer/types/SignalingReceiverTypes";
-import type * as MediaServerApiTypes  from "appServer/mediaServer/MediaServerWebSocketApiTypes"
+import type * as ServerTypes from "./webStreams/types/ApiTypes";
+import type * as StreamsApi from "./webStreams/types/StreamsApiTypes";
+import type {AppRequest, RequestOpaque} from "./webStreams/types/BaseServerTypes";
+import type * as SignalingFromServer from "./webStreams/types/SignalingSenderTypes";
+import type * as SignalingApi from "./webStreams/types/SignalingReceiverTypes";
+import type * as MediaServerApiTypes  from "./webStreams/types/MediaServerWebSocketApiTypes"
 
 
 export {ServerTypes as Types, AppRequest, StreamsApi, SignalingFromServer, SignalingApi, MediaServerApiTypes};

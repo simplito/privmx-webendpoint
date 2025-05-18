@@ -18,6 +18,7 @@ import { EventQueueNative } from "../api/EventQueueNative";
 import { InboxApiNative } from "../api/InboxApiNative";
 import { KvdbApiNative } from "../api/KvdbApiNative";
 import { StoreApiNative } from "../api/StoreApiNative";
+import { StreamsPmxApiNative } from "../api/StreamsPmxApiNative";
 import { ThreadApiNative } from "../api/ThreadApiNative";
 import { FinalizationHelper } from "../FinalizationHelper";
 import { Connection } from "./Connection";
@@ -27,6 +28,7 @@ import { EventQueue } from "./EventQueue";
 import { InboxApi } from "./InboxApi";
 import { KvdbApi } from "./KvdbApi";
 import { StoreApi } from "./StoreApi";
+import { StreamApi } from "./StreamApi";
 import { ThreadApi } from "./ThreadApi";
 
 /**
@@ -245,5 +247,34 @@ export class EndpointFactory {
         connection.nativeApisDeps["events"] = nativeApi;
         await nativeApi.create(ptr, []);
         return new EventApi(nativeApi, ptr);
+    }
+
+    /**
+     * Creates an instance of the Stream API.
+     *
+     * @param {Connection} connection instance of Connection
+     * @param {EventApi} eventApi instance of EventApi
+     * @param {StoreApi} storeApi instance of StoreApi
+     * @returns {StreamApi} instance of StreamApi
+     */
+    static async createStreamApi(
+        connection: Connection,
+        eventApi: EventApi,
+    ): Promise<StreamApi> {
+        if ("streams" in connection.apisRefs) {
+            throw new Error("StreamApi already registered for given connection.");
+        }
+        const nativeApi = new StreamsPmxApiNative(this.api);
+        const webRtcImplPtr = await nativeApi.newWebRtcInterfaceImpl(); 
+        const ptr = await nativeApi.newApi(
+            connection.servicePtr,
+            eventApi.servicePtr,
+            webRtcImplPtr
+        );
+        connection.apisRefs["streams"] = { _apiServicePtr: ptr };
+        connection.apisRefs["streams_webrtcimpl"] = { _apiServicePtr: webRtcImplPtr };
+        connection.nativeApisDeps["streams"] = nativeApi;
+        await nativeApi.create(ptr, []);
+        return new StreamApi(nativeApi, ptr);
     }
 }

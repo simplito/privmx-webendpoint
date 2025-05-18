@@ -25,6 +25,7 @@ limitations under the License.
 #include <privmx/endpoint/core/UserVerifierInterface.hpp>
 
 #include "CustomUserVerifierInterface.hpp"
+#include <privmx/endpoint/stream/varinterface/StreamApiVarInterface.hpp>
 
 #include "Macros.hpp"
 #include "Mapper.hpp"
@@ -47,6 +48,7 @@ using KvdbApiVar = privmx::endpoint::kvdb::KvdbApiVarInterface;
 using CryptoApiVar = privmx::endpoint::crypto::CryptoApiVarInterface;
 using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
 using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
+using StreamApiVar = privmx::endpoint::stream::StreamApiVarInterface;
 
 using UserVerifierInterface = privmx::endpoint::core::UserVerifierInterface;
 using VerificationRequest = privmx::endpoint::core::VerificationRequest;
@@ -323,6 +325,32 @@ namespace api {
     API_FUNCTION(EventApi, subscribeForCustomEvents)
     API_FUNCTION(EventApi, unsubscribeFromCustomEvents)
 
+
+    void StreamsPmxApi_newStreamsPmxApi(int taskId, int connectionPtr) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+            auto connection = (ConnectionVar*)connectionPtr;
+            auto api = new StreamsApiVar(connection->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            return (int)api;
+        });
+    }
+    void StreamsPmxApi_deleteStreamsPmxApi(int taskId, int ptr) {
+        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+            delete (StreamsApiVar*)ptr;
+        });
+    }
+    API_FUNCTION(StreamsPmxApi, create)
+    API_FUNCTION(StreamsPmxApi, createStreamRoom)
+    API_FUNCTION(StreamsPmxApi, updateStreamRoom)
+    API_FUNCTION(StreamsPmxApi, deleteStreamRoom)
+    API_FUNCTION(StreamsPmxApi, getStreamRoom)
+    API_FUNCTION(StreamsPmxApi, listStreamRooms)
+    API_FUNCTION(StreamsPmxApi, createStream)
+    API_FUNCTION(StreamsPmxApi, publishStream)
+    API_FUNCTION(StreamsPmxApi, unpublishStream)
+    API_FUNCTION(StreamsPmxApi, joinStream)
+    API_FUNCTION(StreamsPmxApi, listStreams)
+    API_FUNCTION(StreamsPmxApi, leaveStream)
+    API_FUNCTION(StreamsPmxApi, keyManagement)
 
 } // namespace api
 } // namespace webendpoint

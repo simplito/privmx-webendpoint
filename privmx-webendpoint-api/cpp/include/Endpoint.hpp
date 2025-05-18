@@ -172,6 +172,23 @@ namespace api {
     API_FUNCTION_HEADER(ExtKey, verifyCompactSignatureWithHash)
     API_FUNCTION_HEADER(ExtKey, isPrivate)
 
+    void StreamsPmxApi_newStreamsPmxApi(int taskId, int connectionPtr);
+    void StreamsPmxApi_deleteStreamsPmxApi(int taskId, int ptr);
+    API_FUNCTION_HEADER(StreamsPmxApi, create)
+    API_FUNCTION_HEADER(StreamsPmxApi, createStreamRoom)
+    API_FUNCTION_HEADER(StreamsPmxApi, updateStreamRoom)
+    API_FUNCTION_HEADER(StreamsPmxApi, deleteStreamRoom)
+    API_FUNCTION_HEADER(StreamsPmxApi, getStreamRoom)
+    API_FUNCTION_HEADER(StreamsPmxApi, listStreamRooms)
+    API_FUNCTION_HEADER(StreamsPmxApi, createStream)
+    API_FUNCTION_HEADER(StreamsPmxApi, publishStream)
+    API_FUNCTION_HEADER(StreamsPmxApi, unpublishStream)
+    API_FUNCTION_HEADER(StreamsPmxApi, joinStream)
+    API_FUNCTION_HEADER(StreamsPmxApi, listStreams)
+    API_FUNCTION_HEADER(StreamsPmxApi, leaveStream)
+    API_FUNCTION_HEADER(StreamsPmxApi, keyManagement)
+
+
 } // namespace api
 } // namespace webendpoint
 } // namespace privmx

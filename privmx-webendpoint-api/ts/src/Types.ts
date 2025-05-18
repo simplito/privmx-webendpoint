@@ -561,6 +561,30 @@ import { ExtKey } from "./service/ExtKey";
         update?: PolicyEntry;
         delete?: PolicyEntry;
     }
+
+    export interface StreamRoom {
+        contextId: string;
+        streamRoomId: string;
+        createDate: number;
+        creator: string;
+        lastModificationDate: number;
+        lastModifier: string;
+        users: string[];
+        managers: string[];
+        version: number;
+        publicMeta: Uint8Array;
+        privateMeta: Uint8Array;
+         policy: ContainerPolicy;
+        statusCode: number;
+    }
+    
+    export interface Stream {
+        streamId: number;
+        userId: string;
+    }
+
+    /** reserved for future use */
+    export interface StreamSettings {}
     
 /**
  * Holds error details
@@ -623,4 +647,26 @@ export interface BridgeIdentity {
     url: string;
     pubKey?: string;
     instanceId?: string;
+
+
+// webrtc interface tmp types
+export interface Key {
+    keyId: string;
+    key: Uint8Array;
+    type: number; // 0 - local, 1 - remote
+};
+
+export class updateKeysModel {
+  keys: Key[]; 
+  type: string;
+}
+
+export interface createAnswerAndSetDescriptionsModel {
+  sdp: string; 
+  type: string;
+}
+
+export interface setAnswerAndSetRemoteDescriptionModel {
+  sdp: string; 
+  type: string;
 }
