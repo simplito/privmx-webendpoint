@@ -5,6 +5,8 @@ import { SignalingApi } from "./AppServerSignaling";
 import { EncKey, InitOptions, PeerCredentials, RemoteStreamListener, VideoStream } from "./WebRtcClientTypes";
 import { WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
+import { UpdateKeysModel } from "../service/WebRtcInterface";
+import { TurnCredentials } from "../Types";
 
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
@@ -123,9 +125,9 @@ export class WebRtcClient {
         return this.configuration;
     }
 
-    async createPeerConnectionWithLocalStream(stream: MediaStream): Promise<RTCPeerConnection> {
-        this.peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
-
+    async createPeerConnectionWithLocalStream(stream: MediaStream, peerCredentials: TurnCredentials): Promise<RTCPeerConnection> {
+        // this.peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
+        this.peerCredentials = {username: peerCredentials.username, password: peerCredentials.password, expirationTime: peerCredentials.expirationTime};
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
 
         this.peerConnection = this.createPeerConnectionMulti(this.configuration);
@@ -264,7 +266,7 @@ export class WebRtcClient {
         return connection;
     }
 
-    private getActivePeerConnection(): RTCPeerConnection {
+    public getActivePeerConnection(): RTCPeerConnection {
         if (!this.peerConnection) {
             throw new Error("PeerConnection not initialized!");
         }
@@ -305,6 +307,10 @@ export class WebRtcClient {
         }
         channel.send(message);
         console.log("Message sent!");
+    }
+
+    async updateKeys(model: UpdateKeysModel) {
+        console.warn("updateKeys in webRtcClient.. missing implementation");
     }
 
     private addRemoteTrack(event: RTCTrackEvent) {

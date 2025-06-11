@@ -325,6 +325,20 @@ namespace api {
     API_FUNCTION(EventApi, subscribeForCustomEvents)
     API_FUNCTION(EventApi, unsubscribeFromCustomEvents)
 
+    void StreamsPmxApi_newWebRtcInterface(int taskId, int streamsApiPtr) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+            auto streamsApi = (StreamsApiVar*)streamsApiPtr;
+            auto webRtcInterfaceImplRawPtr = new WebRtcInterfaceHolder();
+            streamsApi->getApi().setWebRtcInterface(webRtcInterfaceImplRawPtr->getInstance());
+            return (int)webRtcInterfaceImplRawPtr;
+        });
+    }
+
+    void StreamsPmxApi_deleteWebRtcInterface(int taskId, int ptr) {
+        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+            delete (WebRtcInterfaceHolder*)ptr;
+        });
+    }
 
     void StreamsPmxApi_newStreamsPmxApi(int taskId, int connectionPtr) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
@@ -351,6 +365,7 @@ namespace api {
     API_FUNCTION(StreamsPmxApi, listStreams)
     API_FUNCTION(StreamsPmxApi, leaveStream)
     API_FUNCTION(StreamsPmxApi, keyManagement)
+    API_FUNCTION(StreamsPmxApi, getTurnCredentials)
 
 } // namespace api
 } // namespace webendpoint

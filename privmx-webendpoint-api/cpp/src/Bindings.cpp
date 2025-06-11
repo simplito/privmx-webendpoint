@@ -180,4 +180,5 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(StreamsPmxApi, listStreams)
     BINDING_FUNCTION(StreamsPmxApi, leaveStream)
     BINDING_FUNCTION(StreamsPmxApi, keyManagement)
+    BINDING_FUNCTION(StreamsPmxApi, getTurnCredentials)
 }

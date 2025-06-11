@@ -1,0 +1,101 @@
+/*!
+PrivMX Web Endpoint.
+Copyright © 2024 Simplito sp. z o.o.
+
+This file is part of the PrivMX Platform (https://privmx.dev).
+This software is Licensed under the PrivMX Free License.
+
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamRoom, StreamSettings, TurnCredentials, UserWithPubKey } from "../Types";
+import { WebRtcClient } from "../webStreams/WebRtcClient";
+import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
+import { BaseNative } from "./BaseNative";
+
+export class StreamsPmxApiNative extends BaseNative {
+    protected webRtcInterfacePtr: number = -1;
+    protected webRtcInterfaceImpl: WebRtcInterfaceImpl | null;
+
+    async newWebRtcInterfaceImpl(): Promise<number> {
+         // - init webRtcInterface po stronie CPP i zwrot wskaznika
+        return this.runAsync<number>((taskId)=>this.api.lib.StreamsPmxApi_newStreamsWebRtcInterfaceImpl(taskId));
+    }
+    async newApi(connectionPtr: number, eventApiPtr: number, webRtcInterfaceImplPtr: number): Promise<number> {
+        // TODO: tutaj jeszcze kilka rzeczy:
+        // - init em_webrtc po stronie JS
+
+        // po przekazaniu tutaj wskaznika do webrtc, mozemy go pozniej juz nie przekazywac w pozostalych funkcjach
+        return this.runAsync<number>((taskId)=>this.api.lib.StreamsPmxApi_newStreamsPmxApi(taskId, connectionPtr, eventApiPtr, webRtcInterfaceImplPtr));
+    }
+    async deleteApi(ptr: number): Promise<void> {
+        await this.runAsync<void>((taskId)=>this.api.lib.StreamsPmxApi_deleteStreamsPmxApi(taskId, ptr));
+        this.deleteApiRef();
+    }
+    async create(ptr: number, args: []): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamsPmxApi_create(taskId, ptr, args));
+    }
+
+    async createStreamRoom(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, ContainerPolicy|undefined]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.StreamsPmxApi_createStreamRoom(taskId, ptr, args));
+    }
+    async updateStreamRoom(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, number, boolean, boolean, ContainerPolicy|undefined]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamsPmxApi_updateStreamRoom(taskId, ptr, args));
+    }
+    async deleteStreamRoom(ptr: number, args: [string]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamsPmxApi_deleteStreamRoom(taskId, ptr, args));
+    }
+    async getStreamRoom(ptr: number, args: [string]): Promise<StreamRoom> {
+        return this.runAsync<StreamRoom>((taskId)=>this.api.lib.StreamsPmxApi_getStreamRoom(taskId, ptr, args));
+    }
+    async listStreamRooms(ptr: number, args: [string, PagingQuery]): Promise<PagingList<StreamRoom>> {
+        return this.runAsync<PagingList<StreamRoom>>((taskId)=>this.api.lib.StreamsPmxApi_listStreamRooms(taskId, ptr, args));
+    }
+    async createStream(ptr: number, args: [string, number]): Promise<number> {
+        return this.runAsync<number>((taskId)=>this.api.lib.StreamsPmxApi_createStream(taskId, ptr, args));
+    }
+    async publishStream(ptr: number, args: [number]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamsPmxApi_publishStream(taskId, ptr, args));
+    }
+    async unpublishStream(ptr: number, args: [number]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamsPmxApi_unpublishStream(taskId, ptr, args));
+    }
+
+    async joinStream(ptr: number, args: [string, number[]]): Promise<number> {
+        return this.runAsync<number>((taskId)=>this.api.lib.StreamsPmxApi_joinStream(taskId, ptr, args));
+    }
+    async listStreams(ptr: number, args: [string]): Promise<Stream[]> {
+        return this.runAsync<Stream[]>((taskId)=>this.api.lib.StreamsPmxApi_listStreams(taskId, ptr, args));
+    }
+    async leaveStream(ptr: number, args: [number]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamsPmxApi_leaveStream(taskId, ptr, args));
+    }
+    async keyManagement(ptr: number, args: [boolean]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamsPmxApi_keyManagement(taskId, ptr, args));
+    }
+    async getTurnCredentials(ptr: number, args: []): Promise<TurnCredentials> {
+        return this.runAsync<TurnCredentials>((taskId)=>this.api.lib.StreamsPmxApi_getTurnCredentials(taskId, ptr, args));
+    }
+    protected async setWebRtcInterface(_ptr: number, args: [number, WebRtcClient]): Promise<void> {
+        if (this.webRtcInterfacePtr > -1) {
+            await this.deleteWebRtcInterface(this.webRtcInterfacePtr);
+            this.webRtcInterfacePtr = -1;
+            this.webRtcInterfaceImpl = null;
+        }
+
+        const [connectionPtr, client] = args;
+        this.webRtcInterfaceImpl = new WebRtcInterfaceImpl(client);
+        (window as any).webRtcInterfaceToNativeHandler = this.webRtcInterfaceImpl;
+
+        this.webRtcInterfacePtr = await this.newWebRtcInterface(connectionPtr);
+    }
+
+    protected async newWebRtcInterface(connectionPtr: number): Promise<number> {
+        return this.runAsync<number>((taskId) => this.api.lib.StreamsPmxApi_newWebRtcInterface(taskId, connectionPtr));
+    }
+
+    protected async deleteWebRtcInterface(ptr: number): Promise<void> {
+        await this.runAsync<void>((taskId)=>this.api.lib.StreamsPmxApi_deleteWebRtcInterface(taskId, ptr));
+    }
+}

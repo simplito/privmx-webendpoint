@@ -187,6 +187,7 @@ namespace api {
     API_FUNCTION_HEADER(StreamsPmxApi, listStreams)
     API_FUNCTION_HEADER(StreamsPmxApi, leaveStream)
     API_FUNCTION_HEADER(StreamsPmxApi, keyManagement)
+    API_FUNCTION_HEADER(StreamsPmxApi, getTurnCredentials)
 
 
 } // namespace api

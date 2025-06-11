@@ -647,7 +647,7 @@ export interface BridgeIdentity {
     url: string;
     pubKey?: string;
     instanceId?: string;
-
+}
 
 // webrtc interface tmp types
 export interface Key {
@@ -656,17 +656,9 @@ export interface Key {
     type: number; // 0 - local, 1 - remote
 };
 
-export class updateKeysModel {
-  keys: Key[]; 
-  type: string;
-}
-
-export interface createAnswerAndSetDescriptionsModel {
-  sdp: string; 
-  type: string;
-}
-
-export interface setAnswerAndSetRemoteDescriptionModel {
-  sdp: string; 
-  type: string;
-}
+export interface TurnCredentials {
+    url: string;
+    username: string;
+    password: string;
+    expirationTime: number;
+};
