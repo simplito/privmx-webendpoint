@@ -368,29 +368,29 @@ import { ExtKey } from "./service/ExtKey";
     };
 // }
 
-// export namespace Kvdb {
+// export namespace kvdb {
 
     /**
-     * Holds all available information about a Kvdb.
+     * Holds all available information about a KVDB.
      * 
      * @type {Kvdb}
      * 
      * @param {string} contextId ID of the Context
-     * @param {string} kvdbId ID ot the Kvdb
-     * @param {number} createDate Kvdb creation timestamp
-     * @param {string} author ID of the user who created the Kvdb
-     * @param {number} lastModificationDate Kvdb last modification timestamp
-     * @param {string} lastModifier ID of the user who last modified the Kvdb
-     * @param {string[]} users list of users (their IDs) with access to the Kvdb
+     * @param {string} kvdbId ID ot the KVDB
+     * @param {number} createDate KVDB creation timestamp
+     * @param {string} author ID of the user who created the KVDB
+     * @param {number} lastModificationDate KVDB last modification timestamp
+     * @param {string} lastModifier ID of the user who last modified the KVDB
+     * @param {string[]} users list of users (their IDs) with access to the KVDB
      * @param {string[]} managers list of users (their IDs) with management rights
      * @param {number} version version number (changes on updates)
      * @param {number} lastMsgDate timestamp of last posted message
-     * @param {Uint8Array} publicMeta Kvdb's public meta data
-     * @param {Uint8Array} privateMeta Kvdb's private mata data
-     * @param {ContainerPolicy} policy Kvdb's policies
-     * @param {number} entries total number of messages in the Kvdb
-     * @param {number} statusCode status code of retrival and decryption of the Kvdb
-     * @param {number} schemaVersion Version of the Kvdb data structure and how it is encoded/encrypted
+     * @param {Uint8Array} publicMeta KVDB's public meta data
+     * @param {Uint8Array} privateMeta KVDB's private mata data
+     * @param {ContainerPolicy} policy KVDB's policies
+     * @param {number} entries total number of messages in the KVDB
+     * @param {number} statusCode status code of retrival and decryption of the KVDB
+     * @param {number} schemaVersion Version of the KVDB data structure and how it is encoded/encrypted
      */
     export interface Kvdb {
         contextId: string;
@@ -416,14 +416,14 @@ import { ExtKey } from "./service/ExtKey";
      * 
      * @type {KvdbEntry}
      * 
-     * @param {ServerKvdbEntryInfo} info Kvdb entry's information created by server
-     * @param {Uint8Array} publicMeta Kvdb entry's public meta data
-     * @param {Uint8Array} privateMeta Kvdb entry's private mata data
-     * @param {Uint8Array} data Kvdb entry's data
-     * @param {string} authorPubKey public key of an author of the Kvdb entry
-     * @param {number} version version of the Kvdb entry
-     * @param {number} statusCode status code of retrival and decryption of the Kvdb entry
-     * @param {number} schemaVersion Version of the Kvdb entry data structure and how it is encoded/encrypted
+     * @param {ServerKvdbEntryInfo} info KVDB entry's information created by server
+     * @param {Uint8Array} publicMeta KVDB entry's public meta data
+     * @param {Uint8Array} privateMeta KVDB entry's private mata data
+     * @param {Uint8Array} data KVDB entry's data
+     * @param {string} authorPubKey public key of an author of the KVDB entry
+     * @param {number} version version of the KVDB entry
+     * @param {number} statusCode status code of retrival and decryption of the KVDB entry
+     * @param {number} schemaVersion Version of the KVDB entry data structure and how it is encoded/encrypted
      */
     export interface KvdbEntry {
         info: ServerKvdbEntryInfo;
@@ -442,7 +442,7 @@ import { ExtKey } from "./service/ExtKey";
      * @type {ServerKvdbEntryInfo}
      * 
      * @param {string} kvdbId ID of the kvdb
-     * @param {string} key Kvdb entry's key
+     * @param {string} key KVDB entry's key
      * @param {number} createDate entry creation timestamp
      * @param {string} author ID of the user who created the entry
      * 
