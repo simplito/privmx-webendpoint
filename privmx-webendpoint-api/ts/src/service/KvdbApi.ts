@@ -109,7 +109,7 @@ export class KvdbApi extends BaseApi {
    * Gets a Kvdb by given Kvdb ID.
    *
    * @param {string} kvdbId ID of Kvdb to get
-   * @returns {Kvdb} struct containing info about the Kvdb
+   * @returns {Kvdb} containing info about the Kvdb
    */
   async getKvdb(kvdbId: string): Promise<Kvdb> {
     return this.native.getKvdb(this.servicePtr, [kvdbId]);
@@ -119,8 +119,8 @@ export class KvdbApi extends BaseApi {
    * Gets a list of Kvdbs in given Context.
    *
    * @param {string} contextId ID of the Context to get the Kvdbs from
-   * @param {PagingQuery} pagingQuery struct with list query parameters
-   * @returns {PagingList<Kvdb>} struct containing a list of Kvdbs
+   * @param {PagingQuery} pagingQuery with list query parameters
+   * @returns {PagingList<Kvdb>} containing a list of Kvdbs
    */
   async listKvdbs(
     contextId: string,
@@ -134,7 +134,7 @@ export class KvdbApi extends BaseApi {
    *
    * @param {string} kvdbId kvdb ID of the kvdb entry to get
    * @param {string} key key of the kvdb entry to get
-   * @returns {Message} struct containing the kvdb entry
+   * @returns {Message} containing the kvdb entry
    */
   async getEntry(kvdbId: string, key: string): Promise<KvdbEntry> {
     return this.native.getEntry(this.servicePtr, [kvdbId, key]);
@@ -144,8 +144,8 @@ export class KvdbApi extends BaseApi {
    * Gets a list of kvdb entries keys from a Kvdb.
    *
    * @param {string} kvdbId ID of the Kvdb to list kvdb entries from
-   * @param {KvdbKeysPagingQuery} pagingQuery struct with list query parameters
-   * @returns {PagingList<string>} struct containing a list of kvdb entries
+   * @param {KvdbKeysPagingQuery} pagingQuery with list query parameters
+   * @returns {PagingList<string>} containing a list of kvdb entries
    */
   async listEntriesKeys(
     kvdbId: string,
@@ -158,8 +158,8 @@ export class KvdbApi extends BaseApi {
    * Gets a list of kvdb entries from a Kvdb.
    *
    * @param {string} kvdbId ID of the Kvdb to list kvdb entries from
-   * @param {KvdbEntryPagingQuery} pagingQuery struct with list query parameters
-   * @returns {PagingList<KvdbEntry>} struct containing a list of kvdb entries
+   * @param {KvdbEntryPagingQuery} pagingQuery  with list query parameters
+   * @returns {PagingList<KvdbEntry>}  containing a list of kvdb entries
    */
   async listEntries(
     kvdbId: string,
@@ -169,9 +169,9 @@ export class KvdbApi extends BaseApi {
   }
 
   /**
-   * Sends a kvdb entry in a Kvdb.
-   * @param {string} kvdbId ID of the Kvdb to send kvdb entry to
-   * @param {string} key 
+   * Sets a kvdb entry in the given Kvdb.
+   * @param {string} kvdbId ID of the Kvdb to set the entry to
+   * @param {string} key kvdb entry key
    * @param {Uint8Array} publicMeta public kvdb entry metadata
    * @param {Uint8Array} privateMeta private kvdb entry metadata
    * @param {Uint8Array} data content of the kvdb entry
@@ -206,10 +206,11 @@ export class KvdbApi extends BaseApi {
   }
 
   /**
-   * Deletes a kvdb entries by given kvdb entry ID.
+   * Deletes a kvdb entries by given kvdb ID and the list of entries keys.
    *
-   * @param {string} kvdbId kvdb ID of the kvdb entry to delete
+   * @param {string} kvdbId ID of the kvdb database to delete from
    * @param {string[]} keys keys of the kvdb entries to delete
+   * @returns {Map<string, boolean>} map with the statuses of deletion for every key
    */
   async deleteEntries(
     kvdbId: string,
