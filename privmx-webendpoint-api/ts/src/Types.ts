@@ -389,7 +389,6 @@ import { ExtKey } from "./service/ExtKey";
      * @param {Uint8Array} privateMeta Kvdb's private mata data
      * @param {ContainerPolicy} policy Kvdb's policies
      * @param {number} entries total number of messages in the Kvdb
-     * @param {number} entries total number of messages in the Kvdb
      * @param {number} statusCode status code of retrival and decryption of the Kvdb
      * @param {number} schemaVersion Version of the Kvdb data structure and how it is encoded/encrypted
      */
@@ -407,7 +406,7 @@ import { ExtKey } from "./service/ExtKey";
         publicMeta: Uint8Array;
         privateMeta: Uint8Array;
         policy: ContainerPolicy;
-        messagesCount: number;
+        entries: number;
         statusCode: number;
         schemaVersion: number;
     };

@@ -53,8 +53,8 @@ export class KvdbApiNative extends BaseNative {
     async deleteEntry(ptr: number, args: [string, string]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_deleteEntry(taskId, ptr, args));
     }
-    async deleteEntries(ptr: number, args: [string, string[]]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_deleteEntries(taskId, ptr, args));
+    async deleteEntries(ptr: number, args: [string, string[]]): Promise<Map<string, boolean>> {
+        return this.runAsync<Map<string, boolean>>((taskId)=>this.api.lib.KvdbApi_deleteEntries(taskId, ptr, args));
     }
     async subscribeForKvdbEvents(ptr: number, args: []): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_subscribeForKvdbEvents(taskId, ptr, args));
