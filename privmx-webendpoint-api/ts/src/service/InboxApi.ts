@@ -36,7 +36,7 @@ export class InboxApi extends BaseApi {
    * the created Inbox
    * @param {Uint8Array} publicMeta public (unencrypted) metadata
    * @param {Uint8Array} privateMeta private (encrypted) metadata
-   * @param {FilesConfig} filesConfig struct to override default file configuration
+   * @param {FilesConfig} filesConfig to override default file configuration
    * @param {ContainerWithoutItemPolicy} policies Inbox policies
    * @returns {string} ID of the created Inbox
    */
@@ -70,7 +70,7 @@ export class InboxApi extends BaseApi {
    * the created Inbox
    * @param {Uint8Array} publicMeta public (unencrypted) metadata
    * @param {Uint8Array} privateMeta private (encrypted) metadata
-   * @param {FilesConfig} filesConfig struct to override default files configuration
+   * @param {FilesConfig} filesConfig  to override default files configuration
    * @param {number} version current version of the updated Inbox
    * @param {boolean} force force update (without checking version)
    * @param {boolean} forceGenerateNewKey force to regenerate a key for the Inbox
@@ -106,7 +106,7 @@ export class InboxApi extends BaseApi {
    * Gets a single Inbox by given Inbox ID.
    *
    * @param {string} inboxId ID of the Inbox to get
-   * @returns {Inbox} struct containing information about the Inbox
+   * @returns {Inbox} containing information about the Inbox
    */
   async getInbox(inboxId: string): Promise<Inbox> {
     return this.native.getInbox(this.servicePtr, [inboxId]);
@@ -116,8 +116,8 @@ export class InboxApi extends BaseApi {
    * Gets s list of Inboxes in given Context.
    *
    * @param {string} contextId ID of the Context to get Inboxes from
-   * @param {PagingQuery} pagingQuery struct with list query parameters
-   * @returns {PagingList<Inbox>} struct containing list of Inboxes
+   * @param {PagingQuery} pagingQuery  with list query parameters
+   * @returns {PagingList<Inbox>} containing list of Inboxes
    */
   async listInboxes(
     contextId: string,
@@ -131,7 +131,7 @@ export class InboxApi extends BaseApi {
    * You do not have to be logged in to call this function.
    *
    * @param {string} inboxId ID of the Inbox to get
-   * @returns {InboxPublicView} struct containing public accessible information about the Inbox
+   * @returns {InboxPublicView} containing public accessible information about the Inbox
    */
   async getInboxPublicView(inboxId: string): Promise<InboxPublicView> {
     return this.native.getInboxPublicView(this.servicePtr, [inboxId]);
@@ -184,7 +184,7 @@ export class InboxApi extends BaseApi {
    * Gets an entry from an Inbox.
    *
    * @param {string} inboxEntryId ID of an entry to read from the Inbox
-   * @returns {InboxEntry} struct containing data of the selected entry stored in the Inbox
+   * @returns {InboxEntry} containing data of the selected entry stored in the Inbox
    */
   async readEntry(inboxEntryId: string): Promise<InboxEntry> {
     return this.native.readEntry(this.servicePtr, [inboxEntryId]);
@@ -194,8 +194,8 @@ export class InboxApi extends BaseApi {
    * Gets list of entries in given Inbox.
    *
    * @param {string} inboxId ID of the Inbox
-   * @param {PagingQuery} pagingQuery struct with list query parameters
-   * @returns {PagingList<InboxEntry>} struct containing list of entries
+   * @param {PagingQuery} pagingQuery with list query parameters
+   * @returns {PagingList<InboxEntry>} containing list of entries
    */
   async listEntries(
     inboxId: string,
