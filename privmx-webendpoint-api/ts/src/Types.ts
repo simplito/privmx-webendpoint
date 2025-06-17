@@ -496,6 +496,13 @@ import { ExtKey } from "./service/ExtKey";
         lastKey?: string;
         queryAsJson?: string;
     };
+
+    /**
+     * Holds information about the entries deletion result.
+     * 
+     * @type {DeleteEntriesResult}
+     */
+    export type DeleteEntriesResult = Map<string, boolean>;
 // }
     
     /**
