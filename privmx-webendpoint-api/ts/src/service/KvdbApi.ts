@@ -206,7 +206,7 @@ export class KvdbApi extends BaseApi {
   }
 
   /**
-   * Deletes a kvdb entries by given kvdb ID and the list of entries keys.
+   * Deletes KVDB entries by given KVDB IDs and the list of entry keys.
    *
    * @param {string} kvdbId ID of the kvdb database to delete from
    * @param {string[]} keys keys of the kvdb entries to delete
