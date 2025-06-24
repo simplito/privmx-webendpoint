@@ -118,6 +118,7 @@ namespace api {
     API_FUNCTION_HEADER(KvdbApi, getKvdb)
     API_FUNCTION_HEADER(KvdbApi, listKvdbs)
     API_FUNCTION_HEADER(KvdbApi, getEntry)
+    API_FUNCTION_HEADER(KvdbApi, hasEntry)
     API_FUNCTION_HEADER(KvdbApi, listEntriesKeys)
     API_FUNCTION_HEADER(KvdbApi, listEntries)
     API_FUNCTION_HEADER(KvdbApi, setEntry)
