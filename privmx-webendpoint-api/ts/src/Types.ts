@@ -390,7 +390,7 @@ import { ExtKey } from "./service/ExtKey";
      * @param {Uint8Array} publicMeta KVDB's public meta data
      * @param {Uint8Array} privateMeta KVDB's private mata data
      * @param {ContainerPolicy} policy KVDB's policies
-     * @param {number} entries total number of messages in the KVDB
+     * @param {number} entries total number of entries in the KVDB
      * @param {number} statusCode status code of retrival and decryption of the KVDB
      * @param {number} schemaVersion Version of the KVDB data structure and how it is encoded/encrypted
      */
