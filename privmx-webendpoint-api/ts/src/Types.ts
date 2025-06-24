@@ -40,6 +40,7 @@ import { ExtKey } from "./service/ExtKey";
      * @param {number} limit limit of elements to return for query
      * @param {SortOrder} sortOrder Order of elements in result. Use "asc" for ascending, "desc" for descending.
      * @param {string} [lastId] id of the element from which query results should start
+     * @param {string} [sortBy] field name to sort elements by
      * @param {string} [queryAsJson] extra query parameters in serialized JSON
      */
     export interface PagingQuery {
@@ -47,6 +48,7 @@ import { ExtKey } from "./service/ExtKey";
         limit: number;
         sortOrder: SortOrder;
         lastId?: string;
+        sortBy?: string;
         queryAsJson?: string;
     };
 
@@ -366,7 +368,101 @@ import { ExtKey } from "./service/ExtKey";
         maxFileSize: number;
         maxWholeUploadSize: number;
     };
+// }
+
+// export namespace kvdb {
+
+    /**
+     * Holds all available information about a KVDB.
+     * 
+     * @type {Kvdb}
+     * 
+     * @param {string} contextId ID of the Context
+     * @param {string} kvdbId ID ot the KVDB
+     * @param {number} createDate KVDB creation timestamp
+     * @param {string} author ID of the user who created the KVDB
+     * @param {number} lastModificationDate KVDB last modification timestamp
+     * @param {string} lastModifier ID of the user who last modified the KVDB
+     * @param {string[]} users list of users (their IDs) with access to the KVDB
+     * @param {string[]} managers list of users (their IDs) with management rights
+     * @param {number} version version number (changes on updates)
+     * @param {number} lastMsgDate timestamp of last posted message
+     * @param {Uint8Array} publicMeta KVDB's public meta data
+     * @param {Uint8Array} privateMeta KVDB's private mata data
+     * @param {ContainerPolicy} policy KVDB's policies
+     * @param {number} entries total number of messages in the KVDB
+     * @param {number} statusCode status code of retrival and decryption of the KVDB
+     * @param {number} schemaVersion Version of the KVDB data structure and how it is encoded/encrypted
+     */
+    export interface Kvdb {
+        contextId: string;
+        kvdbId: string;
+        createDate: number;
+        creator: string;
+        lastModificationDate: number;
+        lastModifier: string;
+        users: string[];
+        managers: string[];
+        version: number;
+        lastMsgDate: number;
+        publicMeta: Uint8Array;
+        privateMeta: Uint8Array;
+        policy: ContainerPolicy;
+        entries: number;
+        statusCode: number;
+        schemaVersion: number;
+    };
     
+    /**
+     * Holds information about the KvdbEntry.
+     * 
+     * @type {KvdbEntry}
+     * 
+     * @param {ServerKvdbEntryInfo} info KVDB entry's information created by server
+     * @param {Uint8Array} publicMeta KVDB entry's public meta data
+     * @param {Uint8Array} privateMeta KVDB entry's private mata data
+     * @param {Uint8Array} data KVDB entry's data
+     * @param {string} authorPubKey public key of an author of the KVDB entry
+     * @param {number} version version of the KVDB entry
+     * @param {number} statusCode status code of retrival and decryption of the KVDB entry
+     * @param {number} schemaVersion Version of the KVDB entry data structure and how it is encoded/encrypted
+     */
+    export interface KvdbEntry {
+        info: ServerKvdbEntryInfo;
+        publicMeta: Uint8Array;
+        privateMeta: Uint8Array;
+        data: Uint8Array;
+        authorPubKey: string;
+        version: number;
+        statusCode: number;
+        schemaVersion: number;
+    };
+    
+    /**
+     * Holds message's information created by server
+     * 
+     * @type {ServerKvdbEntryInfo}
+     * 
+     * @param {string} kvdbId ID of the kvdb
+     * @param {string} key KVDB entry's key
+     * @param {number} createDate entry creation timestamp
+     * @param {string} author ID of the user who created the entry
+     * 
+     */
+    export interface ServerKvdbEntryInfo {
+        kvdbId: string;
+        key: string;
+        createDate: number;
+        author: string;
+    };
+
+    /**
+     * Holds information about the entries deletion result.
+     * 
+     * @type {DeleteEntriesResult}
+     */
+    export type DeleteEntriesResult = Map<string, boolean>;
+// }
     
     /**
      * Holds Container policies settings
@@ -431,8 +527,6 @@ import { ExtKey } from "./service/ExtKey";
         delete?: PolicyEntry;
     }
     
-// }
-
 /**
  * Holds error details
  * 
@@ -495,3 +589,16 @@ export interface BridgeIdentity {
     pubKey?: string;
     instanceId?: string;
 }
+
+/**
+ * PKI Verification options
+ * 
+ * @type {PKIVerificationOptions}
+ * 
+ * @param {string} [bridgePubKey] Bridge public key
+ * @param {string} [bridgeInstanceId] Bridge instance Id given by PKI
+ */
+export interface PKIVerificationOptions {
+    bridgePubKey?: string;
+    bridgeInstanceId?: string;
+};

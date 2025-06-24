@@ -106,7 +106,7 @@ export class ThreadApi extends BaseApi {
    * Gets a Thread by given Thread ID.
    *
    * @param {string} threadId ID of Thread to get
-   * @returns {Thread} struct containing info about the Thread
+   * @returns {Thread}  containing info about the Thread
    */
   async getThread(threadId: string): Promise<Thread> {
     return this.native.getThread(this.servicePtr, [threadId]);
@@ -116,8 +116,8 @@ export class ThreadApi extends BaseApi {
    * Gets a list of Threads in given Context.
    *
    * @param {string} contextId ID of the Context to get the Threads from
-   * @param {PagingQuery} pagingQuery struct with list query parameters
-   * @returns {PagingList<Thread>} struct containing a list of Threads
+   * @param {PagingQuery} pagingQuery  with list query parameters
+   * @returns {PagingList<Thread>}  containing a list of Threads
    */
   async listThreads(
     contextId: string,
@@ -130,7 +130,7 @@ export class ThreadApi extends BaseApi {
    * Gets a message by given message ID.
    *
    * @param {string} messageId ID of the message to get
-   * @returns {Message} struct containing the message
+   * @returns {Message}  containing the message
    */
   async getMessage(messageId: string): Promise<Message> {
     return this.native.getMessage(this.servicePtr, [messageId]);
@@ -140,8 +140,8 @@ export class ThreadApi extends BaseApi {
    * Gets a list of messages from a Thread.
    *
    * @param {string} threadId ID of the Thread to list messages from
-   * @param {PagingQuery} pagingQuery struct with list query parameters
-   * @returns {PagingList<Message>} struct containing a list of messages
+   * @param {PagingQuery} pagingQuery  with list query parameters
+   * @returns {PagingList<Message>}  containing a list of messages
    */
   async listMessages(
     threadId: string,

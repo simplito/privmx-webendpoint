@@ -3,5 +3,6 @@ emsdk/
 /src
 out/
 build-emscripten/
+examples/*/node_modules/
 
 

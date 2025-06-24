@@ -99,7 +99,7 @@ export class StoreApi extends BaseApi {
    * Gets a single Store by given Store ID.
    *
    * @param {string} storeId ID of the Store to get
-   * @returns {Store} struct containing information about the Store
+   * @returns {Store}  containing information about the Store
    */
   async getStore(storeId: string): Promise<Store> {
     return this.native.getStore(this.servicePtr, [storeId]);
@@ -109,8 +109,8 @@ export class StoreApi extends BaseApi {
    * Gets a list of Stores in given Context.
    *
    * @param {string} contextId ID of the Context to get the Stores from
-   * @param {PagingQuery} pagingQuery struct with list query parameters
-   * @returns {PagingList<Store>} struct containing list of Stores
+   * @param {PagingQuery} pagingQuery  with list query parameters
+   * @returns {PagingList<Store>}  containing list of Stores
    */
   async listStores(
     contextId: string,
@@ -207,7 +207,7 @@ export class StoreApi extends BaseApi {
    * Gets a single file by the given file ID.
    *
    * @param {string} fileId ID of the file to get
-   * @returns {File} struct containing information about the file
+   * @returns {File}  containing information about the file
    */
   async getFile(fileId: string): Promise<File> {
     return this.native.getFile(this.servicePtr, [fileId]);
@@ -217,8 +217,8 @@ export class StoreApi extends BaseApi {
    * Gets a list of files in given Store.
    *
    * @param {string} storeId ID of the Store to get files from
-   * @param {PagingQuery} pagingQuery struct with list query parameters
-   * @returns {PagingList<File>} struct containing list of files
+   * @param {PagingQuery} pagingQuery  with list query parameters
+   * @returns {PagingList<File>}  containing list of files
    */
   async listFiles(
     storeId: string,

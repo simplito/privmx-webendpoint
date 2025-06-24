@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { UserVerifierInterface } from "../service/UserVerifierInterface";
-import { PagingQuery, PagingList, Context, UserInfo, VerificationRequest } from "../Types";
+import { PagingQuery, PagingList, Context, UserInfo, VerificationRequest, PKIVerificationOptions } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class ConnectionNative extends BaseNative {
@@ -31,11 +31,11 @@ export class ConnectionNative extends BaseNative {
         await this.runAsync<void>((taskId)=>this.api.lib.Connection_deleteConnection(taskId, ptr));
         this.deleteApiRef();
     }
-    async connect(ptr: number, args: [string, string, string]): Promise<void> {
+    async connect(ptr: number, args: [string, string, string, PKIVerificationOptions]): Promise<void> {
         await this.runAsync<void>((taskId)=>this.api.lib.Connection_connect(taskId, ptr, args));
         await this.getConnectionId(ptr, []);
     }
-    async connectPublic(ptr: number, args: [string, string]): Promise<void> {
+    async connectPublic(ptr: number, args: [string, string, PKIVerificationOptions]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.Connection_connectPublic(taskId, ptr, args));
     }
     async getConnectionId(ptr: number, args: []): Promise<number> {

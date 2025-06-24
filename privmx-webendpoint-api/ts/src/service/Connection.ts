@@ -11,7 +11,7 @@ limitations under the License.
 
 import { BaseApi } from "./BaseApi";
 import { ConnectionNative } from "../api/ConnectionNative";
-import { PagingQuery, PagingList, Context, UserInfo } from "../Types";
+import { PagingQuery, PagingList, Context, UserInfo, PKIVerificationOptions } from "../Types";
 import { BaseNative } from "../api/BaseNative";
 import { UserVerifierInterface } from "./UserVerifierInterface";
 
@@ -43,8 +43,8 @@ export class Connection extends BaseApi {
   /**
    * Gets a list of Contexts available for the user.
    *
-   * @param pagingQuery struct with list query parameters
-   * @returns {PagingList<Context>} struct containing a list of Contexts
+   * @param pagingQuery with list query parameters
+   * @returns {PagingList<Context>} containing a list of Contexts
    */
   async listContexts(pagingQuery: PagingQuery): Promise<PagingList<Context>> {
     return this.native.listContexts(this.servicePtr, [pagingQuery]);
