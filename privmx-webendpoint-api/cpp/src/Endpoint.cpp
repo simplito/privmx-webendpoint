@@ -224,6 +224,7 @@ namespace api {
     API_FUNCTION(KvdbApi, getKvdb)
     API_FUNCTION(KvdbApi, listKvdbs)
     API_FUNCTION(KvdbApi, getEntry)
+    API_FUNCTION(KvdbApi, hasEntry)
     API_FUNCTION(KvdbApi, listEntriesKeys)
     API_FUNCTION(KvdbApi, listEntries)
     API_FUNCTION(KvdbApi, setEntry)

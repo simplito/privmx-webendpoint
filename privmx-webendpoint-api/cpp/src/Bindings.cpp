@@ -111,6 +111,7 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(KvdbApi, getKvdb)
     BINDING_FUNCTION(KvdbApi, listKvdbs)
     BINDING_FUNCTION(KvdbApi, getEntry)
+    BINDING_FUNCTION(KvdbApi, hasEntry)
     BINDING_FUNCTION(KvdbApi, listEntriesKeys)
     BINDING_FUNCTION(KvdbApi, listEntries)
     BINDING_FUNCTION(KvdbApi, setEntry)
