@@ -183,7 +183,8 @@ export class KvdbApi extends BaseApi {
    * @param {Uint8Array} publicMeta public KVDB entry metadata
    * @param {Uint8Array} privateMeta private KVDB entry metadata
    * @param {Uint8Array} data content of the KVDB entry
-   * @returns {string} ID of the new KVDB entry
+   * @param {number} [version] KVDB entry version (when updating the entry)
+   * @returns {string} ID of the KVDB entry
    */
   async setEntry(
     kvdbId: string,
@@ -191,7 +192,7 @@ export class KvdbApi extends BaseApi {
     publicMeta: Uint8Array,
     privateMeta: Uint8Array,
     data: Uint8Array,
-    version: number,
+    version?: number,
   ): Promise<void> {
     return this.native.setEntry(this.servicePtr, [
       kvdbId,
@@ -199,7 +200,7 @@ export class KvdbApi extends BaseApi {
       publicMeta,
       privateMeta,
       data,
-      version
+      version || 0
     ]);
   }
 
