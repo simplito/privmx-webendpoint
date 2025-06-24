@@ -11,7 +11,7 @@ limitations under the License.
 
 import { BaseApi } from "./BaseApi";
 import { ConnectionNative } from "../api/ConnectionNative";
-import { PagingQuery, PagingList, Context, UserInfo } from "../Types";
+import { PagingQuery, PagingList, Context, UserInfo, PKIVerificationOptions } from "../Types";
 import { BaseNative } from "../api/BaseNative";
 import { UserVerifierInterface } from "./UserVerifierInterface";
 

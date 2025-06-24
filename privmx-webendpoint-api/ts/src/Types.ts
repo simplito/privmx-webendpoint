@@ -40,6 +40,7 @@ import { ExtKey } from "./service/ExtKey";
      * @param {number} limit limit of elements to return for query
      * @param {SortOrder} sortOrder Order of elements in result. Use "asc" for ascending, "desc" for descending.
      * @param {string} [lastId] id of the element from which query results should start
+     * @param {string} [sortBy] field name to sort elements by
      * @param {string} [queryAsJson] extra query parameters in serialized JSON
      */
     export interface PagingQuery {
@@ -47,6 +48,7 @@ import { ExtKey } from "./service/ExtKey";
         limit: number;
         sortOrder: SortOrder;
         lastId?: string;
+        sortBy?: string;
         queryAsJson?: string;
     };
 
@@ -454,49 +456,6 @@ import { ExtKey } from "./service/ExtKey";
         author: string;
     };
 
-    export type KvdbSortBy = "createDate" | "itemKey" | "lastModificationDate";
-    /**
-     * Contains query parameters for listEntriesKeys (PagingList)
-     * 
-     * @type {KvdbKeysPagingQuery}
-     * 
-     * @param {number} skip number of elements to skip from result
-     * @param {number} limit limit of elements to return for query
-     * @param {SortOrder} sortOrder Order of elements in result. Use "asc" for ascending, "desc" for descening.
-     * @param {KvdbSortBy} sortBy Order of elements are sorted in result
-     * @param {string} [lastKey] id of the element from which query results should start
-     * @param {string} [prefix] extra query parameters in serialized JSON
-     */
-    export interface KvdbKeysPagingQuery {
-        skip: number;
-        limit: number;
-        sortOrder: SortOrder;
-        sortBy?: KvdbSortBy;
-        lastId?: string;
-        queryAsJson?: string;
-    };
-
-    /**
-     * Contains query parameters for methods returning lists (PagingList)
-     * 
-     * @type {KvdbEntryPagingQuery}
-     * 
-     * @param {number} skip number of elements to skip from result
-     * @param {number} limit limit of elements to return for query
-     * @param {SortOrder} sortOrder Order of elements in result. Use "asc" for ascending, "desc" for descening.
-     * @param {KvdbSortBy} sortBy Order of elements are sorted in result
-     * @param {string} [lastKey] id of the element from which query results should start
-     * @param {string} [prefix] extra query parameters in serialized JSON
-     */
-    export interface KvdbEntryPagingQuery {
-        skip: number;
-        limit: number;
-        sortOrder: SortOrder;
-        sortBy?: KvdbSortBy;
-        lastKey?: string;
-        queryAsJson?: string;
-    };
-
     /**
      * Holds information about the entries deletion result.
      * 
@@ -630,3 +589,16 @@ export interface BridgeIdentity {
     pubKey?: string;
     instanceId?: string;
 }
+
+/**
+ * PKI Verification options
+ * 
+ * @type {PKIVerificationOptions}
+ * 
+ * @param {string} [bridgePubKey] Bridge public key
+ * @param {string} [bridgeInstanceId] Bridge instance Id given by PKI
+ */
+export interface PKIVerificationOptions {
+    bridgePubKey?: string;
+    bridgeInstanceId?: string;
+};

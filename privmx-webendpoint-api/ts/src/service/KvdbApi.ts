@@ -18,9 +18,7 @@ import {
   Kvdb,
   ContainerPolicy,
   KvdbEntry,
-  KvdbKeysPagingQuery,
-  KvdbEntryPagingQuery,
-  DeleteEntriesResult,
+  DeleteEntriesResult
 } from "../Types";
 
 export class KvdbApi extends BaseApi {
@@ -130,7 +128,7 @@ export class KvdbApi extends BaseApi {
   }
 
   /**
-   * Gets a kvdb entry by given kvdb entry key and kvdb ID.
+   * Gets a KVDB entry by given KVDB entry key and KVDB ID.
    *
    * @param {string} kvdbId kvdb ID of the kvdb entry to get
    * @param {string} key key of the kvdb entry to get
@@ -141,15 +139,25 @@ export class KvdbApi extends BaseApi {
   }
 
   /**
+   * Check whether the KVDB entry exists.
+   *
+   * @param {string} kvdbId kvdb ID of the kvdb entry to check
+   * @param {string} key key of the kvdb entry to check
+   * @returns {Message} struct containing the kvdb entry
+   */
+  async hasEntry(kvdbId: string, key: string): Promise<boolean> {
+    return this.native.hasEntry(this.servicePtr, [kvdbId, key]);
+  }
+  /**
    * Gets a list of kvdb entries keys from a Kvdb.
    *
    * @param {string} kvdbId ID of the Kvdb to list kvdb entries from
-   * @param {KvdbKeysPagingQuery} pagingQuery with list query parameters
+   * @param {PagingQuery} pagingQuery with list query parameters
    * @returns {PagingList<string>} containing a list of kvdb entries
    */
   async listEntriesKeys(
     kvdbId: string,
-    pagingQuery: KvdbKeysPagingQuery
+    pagingQuery: PagingQuery
   ): Promise<PagingList<string>> {
     return this.native.listEntriesKeys(this.servicePtr, [kvdbId, pagingQuery]);
   }
@@ -158,12 +166,12 @@ export class KvdbApi extends BaseApi {
    * Gets a list of kvdb entries from a Kvdb.
    *
    * @param {string} kvdbId ID of the Kvdb to list kvdb entries from
-   * @param {KvdbEntryPagingQuery} pagingQuery  with list query parameters
-   * @returns {PagingList<KvdbEntry>}  containing a list of kvdb entries
+   * @param {PagingQuery} pagingQuery with list query parameters
+   * @returns {PagingList<KvdbEntry>} containing a list of kvdb entries
    */
   async listEntries(
     kvdbId: string,
-    pagingQuery: KvdbEntryPagingQuery
+    pagingQuery: PagingQuery
   ): Promise<PagingList<KvdbEntry>> {
     return this.native.listEntries(this.servicePtr, [kvdbId, pagingQuery]);
   }
