@@ -30,13 +30,13 @@ export class KvdbApi extends BaseApi {
    * Creates a new KVDB in given Context.
    *
    * @param {string} contextId ID of the Context to create the KVDB in
-   * @param {UserWithPubKey[]} users array of UserWithPubKey structs which indicates who will have access to the created Kvdb
+   * @param {UserWithPubKey[]} users array of UserWithPubKey structs which indicates who will have access to the created KVDB
    * @param {UserWithPubKey[]} managers array of UserWithPubKey structs which indicates who will have access (and management rights) to
-   * the created Kvdb
+   * the created KVDB
    * @param {Uint8Array} publicMeta public (unencrypted) metadata
    * @param {Uint8Array} privateMeta private (encrypted) metadata
-   * @param {ContainerPolicy} policies Kvdb's policies
-   * @returns {string} ID of the created Kvdb
+   * @param {ContainerPolicy} policies KVDB's policies
+   * @returns {string} ID of the created KVDB
    */
   async createKvdb(
     contextId: string,
@@ -57,18 +57,18 @@ export class KvdbApi extends BaseApi {
   }
 
   /**
-   * Updates an existing Kvdb.
+   * Updates an existing KVDB.
    *
    * @param {string} kvdbId ID of the KVDB to update
-   * @param {UserWithPubKey[]} users array of UserWithPubKey structs which indicates who will have access to the created Kvdb
+   * @param {UserWithPubKey[]} users array of UserWithPubKey structs which indicates who will have access to the created KVDB
    * @param {UserWithPubKey[]} managers array of UserWithPubKey structs which indicates who will have access (and management rights) to
-   * the created Kvdb
+   * the created KVDB
    * @param {Uint8Array} publicMeta public (unencrypted) metadata
    * @param {Uint8Array} privateMeta private (encrypted) metadata
-   * @param {number} version current version of the updated Kvdb
+   * @param {number} version current version of the updated KVDB
    * @param {boolean} force force update (without checking version)
-   * @param {boolean} forceGenerateNewKey force to regenerate a key for the Kvdb
-   * @param {ContainerPolicy} policies Kvdb's policies
+   * @param {boolean} forceGenerateNewKey force to regenerate a key for the KVDB
+   * @param {ContainerPolicy} policies KVDB's policies
    */
   async updateKvdb(
     kvdbId: string,
@@ -107,7 +107,7 @@ export class KvdbApi extends BaseApi {
    * Gets a KVDB by given KVDB ID.
    *
    * @param {string} kvdbId ID of KVDB to get
-   * @returns {Kvdb} containing info about the Kvdb
+   * @returns {Kvdb} containing info about the KVDB
    */
   async getKvdb(kvdbId: string): Promise<Kvdb> {
     return this.native.getKvdb(this.servicePtr, [kvdbId]);
@@ -149,7 +149,7 @@ export class KvdbApi extends BaseApi {
     return this.native.hasEntry(this.servicePtr, [kvdbId, key]);
   }
   /**
-   * Gets a list of KVDB entries keys from a Kvdb.
+   * Gets a list of KVDB entries keys from a KVDB.
    *
    * @param {string} kvdbId ID of the KVDB to list KVDB entries from
    * @param {PagingQuery} pagingQuery with list query parameters
@@ -163,7 +163,7 @@ export class KvdbApi extends BaseApi {
   }
 
   /**
-   * Gets a list of KVDB entries from a Kvdb.
+   * Gets a list of KVDB entries from a KVDB.
    *
    * @param {string} kvdbId ID of the KVDB to list KVDB entries from
    * @param {PagingQuery} pagingQuery with list query parameters
@@ -177,7 +177,7 @@ export class KvdbApi extends BaseApi {
   }
 
   /**
-   * Sets a KVDB entry in the given Kvdb.
+   * Sets a KVDB entry in the given KVDB.
    * @param {string} kvdbId ID of the KVDB to set the entry to
    * @param {string} key KVDB entry key
    * @param {Uint8Array} publicMeta public KVDB entry metadata
@@ -246,7 +246,7 @@ export class KvdbApi extends BaseApi {
   }
 
   /**
-   * Subscribes for events in given Kvdb.
+   * Subscribes for events in given KVDB.
    * @param {string} kvdbId ID of the KVDB to subscribe
    */
   async subscribeForEntryEvents(kvdbId: string): Promise<void> {
@@ -254,7 +254,7 @@ export class KvdbApi extends BaseApi {
   }
 
   /**
-   * Unsubscribes from events in given Kvdb.
+   * Unsubscribes from events in given KVDB.
    * @param {string} kvdbId ID of the KVDB to unsubscribe
    */
   async unsubscribeFromEntryEvents(kvdbId: string): Promise<void> {
