@@ -2,12 +2,18 @@
 #include <emscripten.h>
 #include <emscripten/val.h>
 #include <emscripten/bind.h>
+#include <emscripten/threading.h>
+#include <emscripten/proxying.h>
+#include "privmx/endpoint/stream/Types.hpp"
+#include "privmx/endpoint/stream/StreamVarSerializer.hpp"
 
 using namespace privmx::webendpoint::stream;
+using namespace privmx::endpoint::stream;
+using namespace privmx::endpoint;
 using namespace emscripten;
+using SdpWithTypeModel = privmx::endpoint::stream::SdpWithTypeModel;
 
-
-EM_JS(emscripten::EM_VAL, print_error_main, (const char* msg), {
+EM_JS(emscripten::EM_VAL, print_error_webrtc, (const char* msg), {
     console.error(UTF8ToString(msg));
 });
 
@@ -29,7 +35,7 @@ EM_ASYNC_JS(emscripten::EM_VAL, webRtcJsHandler, (emscripten::EM_VAL name_handle
 
 
 void WebRtcInterfaceImpl::printErrorInJS(const std::string& msg) {
-    print_error_main(msg.c_str());
+    print_error_webrtc(msg.c_str());
 }
 
 emscripten::val WebRtcInterfaceImpl::callWebRtcJSHandler(emscripten::EM_VAL name, emscripten::EM_VAL params) {
@@ -57,7 +63,7 @@ emscripten::val WebRtcInterfaceImpl::mapToVal(const T& value) {
 }
 
 std::shared_ptr<WebRtcInterfaceImpl> WebRtcInterfaceHolder::getInstance() {
-    if (!_verifierInterface) {
+    if (!_webRtcInterface) {
         _webRtcInterface = std::make_shared<WebRtcInterfaceImpl>();
     }
     return _webRtcInterface;
@@ -72,61 +78,61 @@ void WebRtcInterfaceImpl::assertStatus(const std::string& method, const emscript
 }
 
 std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription() {
-    std::promise<std::vector<bool>> prms;
+    std::promise<std::string> prms;
     std::future<std::string> ftr = prms.get_future();
-    runTaskAsync([&, request]{
+    runTaskAsync([&]{
         auto methodName {"createOfferAndSetLocalDescription"};
         emscripten::val name = emscripten::val::u8string(methodName);
         emscripten::val params = val::object();
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
-        assertStatus(methodName, jsReult);
+        assertStatus(methodName, jsResult);
         prms.set_value(jsResult["buff"].as<std::string>());
     });
     return ftr.get();
 }
 
 std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::string& sdp, const std::string& type) {
-    std::promise<std::vector<bool>> prms;
+    std::promise<std::string> prms;
     std::future<std::string> ftr = prms.get_future();
-    runTaskAsync([&, request]{
+    runTaskAsync([&]{
         auto methodName {"createOfferAndSetLocalDescription"};
         emscripten::val name = emscripten::val::u8string(methodName);
         SdpWithTypeModel paramsModel = {.sdp = sdp, .type = type};
         emscripten::val params = mapToVal(paramsModel);
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
-        assertStatus(methodName, jsReult);
+        assertStatus(methodName, jsResult);
         prms.set_value(jsResult["buff"].as<std::string>());
     });
     return ftr.get();
 }
 
 void WebRtcInterfaceImpl::setAnswerAndSetRemoteDescription(const std::string& sdp, const std::string& type) {
-    runTaskAsync([&, request]{
+    runTaskAsync([&]{
         auto methodName {"setAnswerAndSetRemoteDescription"};
         emscripten::val name = emscripten::val::u8string(methodName);
         SdpWithTypeModel paramsModel = {.sdp = sdp, .type = type};
         emscripten::val params = val::object();
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
-        assertStatus(methodName, jsReult);
+        assertStatus(methodName, jsResult);
     });
 }
 
 void WebRtcInterfaceImpl::close() {
-    runTaskAsync([&, request]{
+    runTaskAsync([&]{
         auto methodName {"close"};
         emscripten::val name = emscripten::val::u8string(methodName);
         emscripten::val params = val::object();
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
-        assertStatus(methodName, jsReult);
+        assertStatus(methodName, jsResult);
     });
 }
 
 void WebRtcInterfaceImpl::updateKeys(const std::vector<Key>& keys) {
-    runTaskAsync([&, request]{
+    runTaskAsync([&]{
         auto methodName {"updateKeys"};
         emscripten::val name = emscripten::val::u8string(methodName);
         emscripten::val params = mapToVal(keys);
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
-        assertStatus(methodName, jsReult);
+        assertStatus(methodName, jsResult);
     });
 }

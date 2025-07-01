@@ -7,8 +7,9 @@ import { WebRtcConfig } from "../webStreams/WebRtcConfig";
 import { DataChannelMeta, StreamCreateMeta, StreamId } from "../webStreams/types/ApiTypes";
 import { StreamDataTrackAddRequest } from "../webStreams/types/StreamsApiTypes";
 import { BaseApi } from "./BaseApi";
-import { StreamsPmxApiNative } from "../api/StreamsPmxApiNative";
+// import { StreamApiNative } from "../api/StreamApiNative";
 import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamRoom, UserWithPubKey } from "../Types";
+import { StreamApiNative } from "../api/StreamApiNative";
 
 
 
@@ -31,7 +32,7 @@ export class StreamApi extends BaseApi {
     //     return Api.instance;
     // }
     // constructor(private client: WebRtcClient, private serverChannel: AppServerChannel) {}
-    constructor(private native: StreamsPmxApiNative, ptr: number) {
+    constructor(private native: StreamApiNative, ptr: number) {
         super(ptr);
         this.client = new WebRtcClient();
     }
@@ -156,7 +157,7 @@ export class StreamApi extends BaseApi {
 
     }
 
-    public async getStream(streamRoomId: Types.StreamRoomId, streamId: Types.StreamId): Promise<Stream> {
+    public async getStream(_streamRoomId: Types.StreamRoomId, _streamId: Types.StreamId): Promise<Stream> {
         // orig - oryginalnie funkcja zwraacala Types.Stream a nastepnie mapowala streamy remote i zwracala zdalne ids
         // console.log("streamGet", streamRoomId,"|", streamId, " ]");
         // await this.client.provideSession();
@@ -241,7 +242,7 @@ export class StreamApi extends BaseApi {
         return streamTrackId;
     }
 
-    public async streamTrackRemove(streamTrackId: Types.StreamTrackId): Promise<void> {
+    public async streamTrackRemove(_streamTrackId: Types.StreamTrackId): Promise<void> {
         // await this.client.provideSession();
         // const track = Array.from(this.streamTracks.values()).find(x => x.id === streamTrackId);
         // if (!track) {
@@ -261,7 +262,7 @@ export class StreamApi extends BaseApi {
         throw new Error("not implemented");
     }
 
-    public async streamTrackList(streamRoomId: Types.StreamRoomId, streamId: Types.StreamId): Promise<Types.StreamTrackList> {
+    public async streamTrackList(_streamRoomId: Types.StreamRoomId, _streamId: Types.StreamId): Promise<Types.StreamTrackList> {
         // await this.client.provideSession();
         // return this.serverChannel.call<StreamsApi.StreamTrackListRequest, Types.StreamTrackList>({kind: "streams.streamTrackList", data: {
         //     streamRoomId, streamId
@@ -269,7 +270,7 @@ export class StreamApi extends BaseApi {
         throw new Error("not implemented");
     }
 
-    public async streamTrackSendData(streamTrackId: Types.StreamTrackId, data: Buffer): Promise<void> {
+    public async streamTrackSendData(_streamTrackId: Types.StreamTrackId, _data: Buffer): Promise<void> {
         // if (! this.dataChannels.has(streamTrackId)) {
         //     throw new Error("No data channel with given id");
         // }
@@ -281,7 +282,7 @@ export class StreamApi extends BaseApi {
                 throw new Error("not implemented");
     }
 
-    public async streamTrackRecvData(streamTrackId: Types.StreamTrackId, onData: (data: Buffer) => void): Promise<void> {
+    public async streamTrackRecvData(_streamTrackId: Types.StreamTrackId, _onData: (data: Buffer) => void): Promise<void> {
         // if (! this.dataChannels.has(streamTrackId)) {
         //     throw new Error("No data channel with given id");
         // }
@@ -393,7 +394,7 @@ export class StreamApi extends BaseApi {
         return this.native.joinStream(this.servicePtr, [streamRoomId, streamsIds]);
     }
 
-    public async streamLeave(streamId: Types.StreamId): Promise<void> {
+    public async streamLeave(_streamId: Types.StreamId): Promise<void> {
         // const _stream = this.streams.get(streamId.toString());
         // if (!_stream) {
         //     throw new Error ("No stream with given id to leave");

@@ -295,7 +295,7 @@ function createSenderTransform(key: string, iv: string) {
     });
 }
 
-onmessage = async event => {
+export async function onmessage(event: any) {
     const { operation } = event.data;
 
     if (operation === 'initialize') {

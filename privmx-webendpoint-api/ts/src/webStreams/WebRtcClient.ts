@@ -1,7 +1,7 @@
 
 import { AppServerChannel, Message } from "./AppServerChannel";
 import { MediaServerApiTypes, SignalingFromServer } from "../ServerTypes";
-import { SignalingApi } from "./AppServerSignaling";
+// import { SignalingApi } from "./AppServerSignaling";
 import { EncKey, InitOptions, PeerCredentials, RemoteStreamListener, VideoStream } from "./WebRtcClientTypes";
 import { WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
@@ -17,7 +17,7 @@ export class WebRtcClient {
     private peerConnection: RTCPeerConnection|undefined;
 
     private appServerChannel: AppServerChannel|undefined;
-    private signalingApi: SignalingApi | undefined;
+    // private signalingApi: SignalingApi | undefined;
 
     private iceCandidates: RTCIceCandidate[] = [];
     private e2eeWorker: Worker | undefined;
@@ -40,13 +40,13 @@ export class WebRtcClient {
 
     
     public async provideSession(): Promise<MediaServerApiTypes.SessionId> {
-        if (!this.currentMediaSessionId) {
-            const sessionId = await (await this.getSignalingApi()).createSession();
-            if (!sessionId) {
-                throw new Error("Cannot create media session.");
-            }
-            this.currentMediaSessionId = sessionId;
-        }
+        // if (!this.currentMediaSessionId) {
+        //     const sessionId = await (await this.getSignalingApi()).createSession();
+        //     if (!sessionId) {
+        //         throw new Error("Cannot create media session.");
+        //     }
+        //     this.currentMediaSessionId = sessionId;
+        // }
         return this.currentMediaSessionId;
     }
 
@@ -57,12 +57,12 @@ export class WebRtcClient {
         return this.appServerChannel;
     }
     
-    public async getSignalingApi(): Promise<SignalingApi> {
-        if (!this.signalingApi) {
-            this.signalingApi = new SignalingApi(await this.getAppServerChannel());
-        }
-        return this.signalingApi;
-    }
+    // public async getSignalingApi(): Promise<SignalingApi> {
+    //     // if (!this.signalingApi) {
+    //     //     this.signalingApi = new SignalingApi(await this.getAppServerChannel());
+    //     // }
+    //     // return this.signalingApi;
+    // }
 
     public setEncKey(key: string, iv: string) {
         this.encKey = {key, iv};
@@ -183,7 +183,7 @@ export class WebRtcClient {
 
         this.peerConnection = peerConnection;
 
-        await this.signalingApi?.acceptOffer(eventData.session_id, eventData.handle, answer);
+        // await this.signalingApi?.acceptOffer(eventData.session_id, eventData.handle, answer);
     }
 
     private async createAppServerChannel(): Promise<AppServerChannel> {
@@ -309,7 +309,7 @@ export class WebRtcClient {
         console.log("Message sent!");
     }
 
-    async updateKeys(model: UpdateKeysModel) {
+    async updateKeys(_model: UpdateKeysModel) {
         console.warn("updateKeys in webRtcClient.. missing implementation");
     }
 

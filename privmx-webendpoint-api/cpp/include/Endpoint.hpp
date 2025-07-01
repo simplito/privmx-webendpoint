@@ -173,22 +173,22 @@ namespace api {
     API_FUNCTION_HEADER(ExtKey, verifyCompactSignatureWithHash)
     API_FUNCTION_HEADER(ExtKey, isPrivate)
 
-    void StreamsPmxApi_newStreamsPmxApi(int taskId, int connectionPtr);
-    void StreamsPmxApi_deleteStreamsPmxApi(int taskId, int ptr);
-    API_FUNCTION_HEADER(StreamsPmxApi, create)
-    API_FUNCTION_HEADER(StreamsPmxApi, createStreamRoom)
-    API_FUNCTION_HEADER(StreamsPmxApi, updateStreamRoom)
-    API_FUNCTION_HEADER(StreamsPmxApi, deleteStreamRoom)
-    API_FUNCTION_HEADER(StreamsPmxApi, getStreamRoom)
-    API_FUNCTION_HEADER(StreamsPmxApi, listStreamRooms)
-    API_FUNCTION_HEADER(StreamsPmxApi, createStream)
-    API_FUNCTION_HEADER(StreamsPmxApi, publishStream)
-    API_FUNCTION_HEADER(StreamsPmxApi, unpublishStream)
-    API_FUNCTION_HEADER(StreamsPmxApi, joinStream)
-    API_FUNCTION_HEADER(StreamsPmxApi, listStreams)
-    API_FUNCTION_HEADER(StreamsPmxApi, leaveStream)
-    API_FUNCTION_HEADER(StreamsPmxApi, keyManagement)
-    API_FUNCTION_HEADER(StreamsPmxApi, getTurnCredentials)
+    void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr);
+    void StreamApi_deleteStreamApi(int taskId, int ptr);
+    API_FUNCTION_HEADER(StreamApi, create)
+    API_FUNCTION_HEADER(StreamApi, createStreamRoom)
+    API_FUNCTION_HEADER(StreamApi, updateStreamRoom)
+    API_FUNCTION_HEADER(StreamApi, deleteStreamRoom)
+    API_FUNCTION_HEADER(StreamApi, getStreamRoom)
+    API_FUNCTION_HEADER(StreamApi, listStreamRooms)
+    API_FUNCTION_HEADER(StreamApi, createStream)
+    API_FUNCTION_HEADER(StreamApi, publishStream)
+    API_FUNCTION_HEADER(StreamApi, unpublishStream)
+    API_FUNCTION_HEADER(StreamApi, joinStream)
+    API_FUNCTION_HEADER(StreamApi, listStreams)
+    API_FUNCTION_HEADER(StreamApi, leaveStream)
+    API_FUNCTION_HEADER(StreamApi, keyManagement)
+    API_FUNCTION_HEADER(StreamApi, getTurnCredentials)
 
 
 } // namespace api

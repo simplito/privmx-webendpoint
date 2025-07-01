@@ -25,7 +25,8 @@ limitations under the License.
 #include <privmx/endpoint/core/UserVerifierInterface.hpp>
 
 #include "CustomUserVerifierInterface.hpp"
-#include <privmx/endpoint/stream/varinterface/StreamApiVarInterface.hpp>
+#include "privmx/endpoint/stream/varinterface/StreamApiLowVarInterface.hpp"
+#include "WebRtcInterfaceImpl.hpp"
 
 #include "Macros.hpp"
 #include "Mapper.hpp"
@@ -48,7 +49,7 @@ using KvdbApiVar = privmx::endpoint::kvdb::KvdbApiVarInterface;
 using CryptoApiVar = privmx::endpoint::crypto::CryptoApiVarInterface;
 using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
 using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
-using StreamApiVar = privmx::endpoint::stream::StreamApiVarInterface;
+using StreamApiVar = privmx::endpoint::stream::StreamApiLowVarInterface;
 
 using UserVerifierInterface = privmx::endpoint::core::UserVerifierInterface;
 using VerificationRequest = privmx::endpoint::core::VerificationRequest;
@@ -326,47 +327,49 @@ namespace api {
     API_FUNCTION(EventApi, subscribeForCustomEvents)
     API_FUNCTION(EventApi, unsubscribeFromCustomEvents)
 
-    void StreamsPmxApi_newWebRtcInterface(int taskId, int streamsApiPtr) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
-            auto streamsApi = (StreamsApiVar*)streamsApiPtr;
-            auto webRtcInterfaceImplRawPtr = new WebRtcInterfaceHolder();
-            streamsApi->getApi().setWebRtcInterface(webRtcInterfaceImplRawPtr->getInstance());
+    void StreamApi_newWebRtcInterface(int taskId ) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&]{
+            // auto streamsApi = (StreamApiVar*)streamsApiPtr;
+            auto webRtcInterfaceImplRawPtr = new stream::WebRtcInterfaceHolder();
+            // streamsApi->setWebRtcInterface(webRtcInterfaceImplRawPtr->getInstance());
             return (int)webRtcInterfaceImplRawPtr;
         });
     }
 
-    void StreamsPmxApi_deleteWebRtcInterface(int taskId, int ptr) {
+    void StreamApi_deleteWebRtcInterface(int taskId, int ptr) {
         ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
-            delete (WebRtcInterfaceHolder*)ptr;
+            delete (stream::WebRtcInterfaceHolder*)ptr;
         });
     }
 
-    void StreamsPmxApi_newStreamsPmxApi(int taskId, int connectionPtr) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+    void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr, eventsPtr]{
             auto connection = (ConnectionVar*)connectionPtr;
-            auto api = new StreamsApiVar(connection->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            auto eventApi = (EventApiVar*)eventsPtr;
+
+            auto api = new StreamApiVar(connection->getApi(), eventApi->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
             return (int)api;
         });
     }
-    void StreamsPmxApi_deleteStreamsPmxApi(int taskId, int ptr) {
+    void StreamApi_deleteStreamApi(int taskId, int ptr) {
         ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
-            delete (StreamsApiVar*)ptr;
+            delete (StreamApiVar*)ptr;
         });
     }
-    API_FUNCTION(StreamsPmxApi, create)
-    API_FUNCTION(StreamsPmxApi, createStreamRoom)
-    API_FUNCTION(StreamsPmxApi, updateStreamRoom)
-    API_FUNCTION(StreamsPmxApi, deleteStreamRoom)
-    API_FUNCTION(StreamsPmxApi, getStreamRoom)
-    API_FUNCTION(StreamsPmxApi, listStreamRooms)
-    API_FUNCTION(StreamsPmxApi, createStream)
-    API_FUNCTION(StreamsPmxApi, publishStream)
-    API_FUNCTION(StreamsPmxApi, unpublishStream)
-    API_FUNCTION(StreamsPmxApi, joinStream)
-    API_FUNCTION(StreamsPmxApi, listStreams)
-    API_FUNCTION(StreamsPmxApi, leaveStream)
-    API_FUNCTION(StreamsPmxApi, keyManagement)
-    API_FUNCTION(StreamsPmxApi, getTurnCredentials)
+    API_FUNCTION(StreamApi, create)
+    API_FUNCTION(StreamApi, createStreamRoom)
+    API_FUNCTION(StreamApi, updateStreamRoom)
+    API_FUNCTION(StreamApi, deleteStreamRoom)
+    API_FUNCTION(StreamApi, getStreamRoom)
+    API_FUNCTION(StreamApi, listStreamRooms)
+    API_FUNCTION(StreamApi, createStream)
+    API_FUNCTION(StreamApi, publishStream)
+    API_FUNCTION(StreamApi, unpublishStream)
+    API_FUNCTION(StreamApi, joinStream)
+    API_FUNCTION(StreamApi, listStreams)
+    API_FUNCTION(StreamApi, leaveStream)
+    API_FUNCTION(StreamApi, keyManagement)
+    API_FUNCTION(StreamApi, getTurnCredentials)
 
 } // namespace api
 } // namespace webendpoint

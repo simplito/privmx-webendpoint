@@ -18,32 +18,49 @@ limitations under the License.
 #include <emscripten.h>
 #include <emscripten/val.h>
 
+
+#include <emscripten/bind.h>
+#include <emscripten/proxying.h>
+#include <emscripten/emscripten.h>
+#include "Macros.hpp"
+#include "Mapper.hpp"
+
+#include <memory>
+#include <future>
+
 #include "privmx/endpoint/stream/WebRTCInterface.hpp"
+#include "privmx/endpoint/core/VarDeserializer.hpp"
+#include "privmx/endpoint/core/VarSerializer.hpp"
+#include "privmx/endpoint/stream/Types.hpp"
+
 
 namespace privmx {
 namespace webendpoint {
 namespace stream {
 
-struct SdpWithTypeModel {
-    std::string sdp;
-    std::string type;
-};
+// struct SdpWithTypeModel {
+//     std::string sdp;
+//     std::string type;
+// };
 
 class WebRtcInterfaceImpl : public endpoint::stream::WebRTCInterface
 {
 public:
     WebRtcInterfaceImpl();
-    ~WebRtcInterfaceImpl();
-    std::string createOfferAndSetLocalDescription() override;
-    std::string createAnswerAndSetDescriptions(const std::string& sdp, const std::string& type) override;
-    void setAnswerAndSetRemoteDescription(const std::string& sdp, const std::string& type) override;
-    void close() override;
-    void updateKeys(const std::vector<Key>& keys) override;
+    ~WebRtcInterfaceImpl() = default;
+    std::string createOfferAndSetLocalDescription();
+    std::string createAnswerAndSetDescriptions(const std::string& sdp, const std::string& type);
+    void setAnswerAndSetRemoteDescription(const std::string& sdp, const std::string& type);
+    void close();
+    void updateKeys(const std::vector<privmx::endpoint::stream::Key>& keys);
 
 private:
+    void setRemoteDescription(const std::string& sdp, const std::string& type);
+
+
     // copy of verifier methods - to modify
     void printErrorInJS(const std::string& msg);
-    emscripten::val callVerifierOnJS(emscripten::EM_VAL name, emscripten::EM_VAL params);
+    emscripten::val callWebRtcJSHandler(emscripten::EM_VAL name, emscripten::EM_VAL params);
     void runTaskAsync(const std::function<void(void)>& func);
 
     template<typename T>

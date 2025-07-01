@@ -1,6 +1,6 @@
 {
   "name": "@simplito/privmx-webendpoint",
-  "version": "2.5.1",
+  "version": "2.7.0-alpha2",
   "description": "PrivMX Web Endpoint library",
   "author": "Simplito",
   "license": "PrivMX Free License",
@@ -50,7 +50,6 @@
     "node": ">=4"
   },
   "devDependencies": {
-    "@types/webrtc": "^0.0.43",
     "@types/node": "^20.9.0",
     "@types/webpack": "^5.28.5",
     "assert": "^2.1.0",

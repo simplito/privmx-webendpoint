@@ -18,7 +18,7 @@ import { EventQueueNative } from "../api/EventQueueNative";
 import { InboxApiNative } from "../api/InboxApiNative";
 import { KvdbApiNative } from "../api/KvdbApiNative";
 import { StoreApiNative } from "../api/StoreApiNative";
-import { StreamsPmxApiNative } from "../api/StreamsPmxApiNative";
+import { StreamApiNative } from "../api/StreamApiNative";
 import { ThreadApiNative } from "../api/ThreadApiNative";
 import { FinalizationHelper } from "../FinalizationHelper";
 import { PKIVerificationOptions } from "../Types";
@@ -275,7 +275,7 @@ export class EndpointFactory {
         if ("streams" in connection.apisRefs) {
             throw new Error("StreamApi already registered for given connection.");
         }
-        const nativeApi = new StreamsPmxApiNative(this.api);
+        const nativeApi = new StreamApiNative(this.api);
         const webRtcImplPtr = await nativeApi.newWebRtcInterfaceImpl(); 
         const ptr = await nativeApi.newApi(
             connection.servicePtr,
