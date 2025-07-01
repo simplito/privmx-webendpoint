@@ -6,7 +6,7 @@ add_executable(endpoint-wasm-module main.cpp ${SRC_FILES})
 target_include_directories(endpoint-wasm-module PUBLIC ${PROJECT_SOURCE_DIR}/include)
 find_package(Threads REQUIRED)
 find_package(Poco REQUIRED COMPONENTS Foundation JSON)
-target_link_libraries(endpoint-wasm-module Threads::Threads Poco::Foundation Poco::JSON Pson gmp privmx privmxendpointcore privmxendpointcrypto privmxendpointthread privmxendpointstore privmxendpointinbox privmxendpointkvdb privmxendpointevent embind privmxdrvcrypto privmxdrvecc privmxdrvnet)
+target_link_libraries(endpoint-wasm-module Threads::Threads Poco::Foundation Poco::JSON Pson gmp privmx privmxendpointcore privmxendpointcrypto privmxendpointthread privmxendpointstore privmxendpointinbox privmxendpointkvdb privmxendpointevent embind privmxdrvcrypto privmxdrvecc privmxdrvnet privmxendpointstream)
 set(CMAKE_CXX_FLAGS "-std=c++17 -fexceptions -pthread")
 target_link_options(endpoint-wasm-module PUBLIC
     -L $ENV{SDK_DIR}/upstream/emscripten/cache/sysroot/lib
