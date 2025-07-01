@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { PagingQuery, PagingList, UserWithPubKey, Kvdb, KvdbEntry, ContainerPolicy, KvdbKeysPagingQuery, KvdbEntryPagingQuery } from "../Types";
+import { PagingQuery, PagingList, UserWithPubKey, Kvdb, KvdbEntry, ContainerPolicy, DeleteEntriesResult } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class KvdbApiNative extends BaseNative {
@@ -38,13 +38,16 @@ export class KvdbApiNative extends BaseNative {
     async listKvdbs(ptr: number, args: [string, PagingQuery]): Promise<PagingList<Kvdb>> {
         return this.runAsync<PagingList<Kvdb>>((taskId)=>this.api.lib.KvdbApi_listKvdbs(taskId, ptr, args));
     }
+    async hasEntry(ptr: number, args: [string, string]): Promise<boolean> {
+        return this.runAsync<boolean>((taskId)=>this.api.lib.KvdbApi_hasEntry(taskId, ptr, args));
+    }
     async getEntry(ptr: number, args: [string, string]): Promise<KvdbEntry> {
         return this.runAsync<KvdbEntry>((taskId)=>this.api.lib.KvdbApi_getEntry(taskId, ptr, args));
     }
-    async listEntriesKeys(ptr: number, args: [string, KvdbKeysPagingQuery]): Promise<PagingList<string>> {
+    async listEntriesKeys(ptr: number, args: [string, PagingQuery]): Promise<PagingList<string>> {
         return this.runAsync<PagingList<string>>((taskId)=>this.api.lib.KvdbApi_listEntriesKeys(taskId, ptr, args));
     }
-    async listEntries(ptr: number, args: [string, KvdbEntryPagingQuery]): Promise<PagingList<KvdbEntry>> {
+    async listEntries(ptr: number, args: [string, PagingQuery]): Promise<PagingList<KvdbEntry>> {
         return this.runAsync<PagingList<KvdbEntry>>((taskId)=>this.api.lib.KvdbApi_listEntries(taskId, ptr, args));
     }
     async setEntry(ptr: number, args: [string, string, Uint8Array, Uint8Array, Uint8Array, number]): Promise<void> {
@@ -53,8 +56,8 @@ export class KvdbApiNative extends BaseNative {
     async deleteEntry(ptr: number, args: [string, string]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_deleteEntry(taskId, ptr, args));
     }
-    async deleteEntries(ptr: number, args: [string, string[]]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_deleteEntries(taskId, ptr, args));
+    async deleteEntries(ptr: number, args: [string, string[]]): Promise<DeleteEntriesResult> {
+        return this.runAsync<DeleteEntriesResult>((taskId)=>this.api.lib.KvdbApi_deleteEntries(taskId, ptr, args));
     }
     async subscribeForKvdbEvents(ptr: number, args: []): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_subscribeForKvdbEvents(taskId, ptr, args));

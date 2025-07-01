@@ -21,6 +21,7 @@ import { StoreApiNative } from "../api/StoreApiNative";
 import { StreamsPmxApiNative } from "../api/StreamsPmxApiNative";
 import { ThreadApiNative } from "../api/ThreadApiNative";
 import { FinalizationHelper } from "../FinalizationHelper";
+import { PKIVerificationOptions } from "../Types";
 import { Connection } from "./Connection";
 import { CryptoApi } from "./CryptoApi";
 import { EventApi } from "./EventApi";
@@ -95,22 +96,31 @@ export class EndpointFactory {
         return this.eventQueueInstance;
     }
 
+    private static generateDefaultPKIVerificationOptions(): PKIVerificationOptions {
+        return {
+            bridgeInstanceId: undefined,
+            bridgePubKey: undefined
+        }
+    }
+
     /**
      * Connects to the platform backend.
      *
      * @param {string} userPrivKey user's private key
      * @param {string} solutionId ID of the Solution
      * @param {string} bridgeUrl the Bridge Server URL
+     * @param {PKIVerificationOptions} [verificationOptions] PrivMX Bridge server instance verification options using a PKI server
      * @returns {Connection} instance of Connection
      */
     static async connect(
         userPrivKey: string,
         solutionId: string,
-        bridgeUrl: string
+        bridgeUrl: string,
+        verificationOptions?: PKIVerificationOptions
     ): Promise<Connection> {
         const nativeApi = new ConnectionNative(this.api);
         const ptr = await nativeApi.newConnection();
-        await nativeApi.connect(ptr, [userPrivKey, solutionId, bridgeUrl]);
+        await nativeApi.connect(ptr, [userPrivKey, solutionId, bridgeUrl, verificationOptions || this.generateDefaultPKIVerificationOptions()]);
 
         return new Connection(nativeApi, ptr);
     }
@@ -120,16 +130,17 @@ export class EndpointFactory {
      *
      * @param {string} solutionId ID of the Solution
      * @param {string} bridgeUrl the Bridge Server URL
-     *
+     * @param {PKIVerificationOptions} [verificationOptions] PrivMX Bridge server instance verification options using a PKI server
      * @returns {Connection} instance of Connection
      */
     static async connectPublic(
         solutionId: string,
-        bridgeUrl: string
+        bridgeUrl: string,
+        verificationOptions?: PKIVerificationOptions
     ): Promise<Connection> {
         const nativeApi = new ConnectionNative(this.api);
         const ptr = await nativeApi.newConnection();
-        await nativeApi.connectPublic(ptr, [solutionId, bridgeUrl]);
+        await nativeApi.connectPublic(ptr, [solutionId, bridgeUrl, verificationOptions || this.generateDefaultPKIVerificationOptions()]);
         return new Connection(nativeApi, ptr);
     }
 
