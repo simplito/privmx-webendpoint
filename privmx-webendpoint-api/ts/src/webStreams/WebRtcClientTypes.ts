@@ -37,4 +37,4 @@ export interface VideoStream {
     id: string;
 }
 
-export type RemoteStreamListener = (stream: VideoStream) => void;
+export type RemoteStreamListener = (stream: RTCTrackEvent) => void;

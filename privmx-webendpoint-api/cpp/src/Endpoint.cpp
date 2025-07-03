@@ -327,7 +327,7 @@ namespace api {
     API_FUNCTION(EventApi, subscribeForCustomEvents)
     API_FUNCTION(EventApi, unsubscribeFromCustomEvents)
 
-    void StreamApi_newWebRtcInterface(int taskId ) {
+    void StreamApi_newWebRtcInterface(int taskId) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&]{
             // auto streamsApi = (StreamApiVar*)streamsApiPtr;
             auto webRtcInterfaceImplRawPtr = new stream::WebRtcInterfaceHolder();
@@ -356,13 +356,33 @@ namespace api {
             delete (StreamApiVar*)ptr;
         });
     }
+
     API_FUNCTION(StreamApi, create)
     API_FUNCTION(StreamApi, createStreamRoom)
     API_FUNCTION(StreamApi, updateStreamRoom)
     API_FUNCTION(StreamApi, deleteStreamRoom)
     API_FUNCTION(StreamApi, getStreamRoom)
     API_FUNCTION(StreamApi, listStreamRooms)
-    API_FUNCTION(StreamApi, createStream)
+    // API_FUNCTION(StreamApi, createStream)
+    void StreamApi_createStream(int taskId, int ptr, emscripten::val args) {
+        Poco::Dynamic::Var argsVar = Mapper::map(args);
+
+        auto vec = argsVar.extract<std::vector<Poco::Dynamic::Var>>();
+        int64_t holderPtr;
+        if (!vec.empty()) {
+            holderPtr = vec.back();
+            vec.pop_back();
+        }
+        auto holder = (stream::WebRtcInterfaceHolder*)holderPtr;
+        auto webRtcInterfaceImplRawPtr = (int64_t) holder->getRawPtr();
+        vec.push_back(webRtcInterfaceImplRawPtr);
+        argsVar = vec;
+
+        ProxyedTaskRunner::getInstance()->runTask(taskId,[&, ptr, argsVar] {
+            return ((StreamApiVar*)ptr)->createStream(argsVar);
+        });
+    }
+ 
     API_FUNCTION(StreamApi, publishStream)
     API_FUNCTION(StreamApi, unpublishStream)
     API_FUNCTION(StreamApi, joinStream)

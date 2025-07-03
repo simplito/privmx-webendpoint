@@ -166,6 +166,8 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(ExtKey, verifyCompactSignatureWithHash)
     BINDING_FUNCTION(ExtKey, isPrivate)
 
+    BINDING_FUNCTION(StreamApi, newWebRtcInterface)
+    BINDING_FUNCTION(StreamApi, deleteWebRtcInterface)
     BINDING_FUNCTION(StreamApi, newStreamApi)
     BINDING_FUNCTION(StreamApi, deleteStreamApi)
     BINDING_FUNCTION(StreamApi, create)

@@ -18,16 +18,17 @@ export class StreamApiNative extends BaseNative {
     protected webRtcInterfacePtr: number = -1;
     protected webRtcInterfaceImpl: WebRtcInterfaceImpl | null;
 
-    async newWebRtcInterfaceImpl(): Promise<number> {
+    private async createWebRtcInterfaceImpl(): Promise<void> {
          // - init webRtcInterface po stronie CPP i zwrot wskaznika
-        return this.runAsync<number>((taskId)=>this.api.lib.StreamApi_newStreamsWebRtcInterfaceImpl(taskId));
+        this.webRtcInterfacePtr = await this.runAsync<number>((taskId)=>this.api.lib.StreamApi_newWebRtcInterface(taskId));
     }
-    async newApi(connectionPtr: number, eventApiPtr: number, webRtcInterfaceImplPtr: number): Promise<number> {
+    async newApi(connectionPtr: number, eventApiPtr: number): Promise<number> {
         // TODO: tutaj jeszcze kilka rzeczy:
         // - init em_webrtc po stronie JS
 
         // po przekazaniu tutaj wskaznika do webrtc, mozemy go pozniej juz nie przekazywac w pozostalych funkcjach
-        return this.runAsync<number>((taskId)=>this.api.lib.StreamApi_newStreamApi(taskId, connectionPtr, eventApiPtr, webRtcInterfaceImplPtr));
+        await this.createWebRtcInterfaceImpl();
+        return this.runAsync<number>((taskId)=>this.api.lib.StreamApi_newStreamApi(taskId, connectionPtr, eventApiPtr));
     }
     async deleteApi(ptr: number): Promise<void> {
         await this.runAsync<void>((taskId)=>this.api.lib.StreamApi_deleteStreamApi(taskId, ptr));
@@ -53,7 +54,10 @@ export class StreamApiNative extends BaseNative {
         return this.runAsync<PagingList<StreamRoom>>((taskId)=>this.api.lib.StreamApi_listStreamRooms(taskId, ptr, args));
     }
     async createStream(ptr: number, args: [string, number]): Promise<number> {
-        return this.runAsync<number>((taskId)=>this.api.lib.StreamApi_createStream(taskId, ptr, args));
+        // params from api: streamRoomId, streamId
+        // params to lib: streamRoomId, streamId, webrtcInterfacePtr
+        const libArgs: [string, number, number] = [...args, this.webRtcInterfacePtr];
+        return this.runAsync<number>((taskId)=>this.api.lib.StreamApi_createStream(taskId, ptr, libArgs));
     }
     async publishStream(ptr: number, args: [number]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_publishStream(taskId, ptr, args));
@@ -62,8 +66,11 @@ export class StreamApiNative extends BaseNative {
         return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_unpublishStream(taskId, ptr, args));
     }
 
-    async joinStream(ptr: number, args: [string, number[]]): Promise<number> {
-        return this.runAsync<number>((taskId)=>this.api.lib.StreamApi_joinStream(taskId, ptr, args));
+    async joinStream(ptr: number, args: [string, number[], any]): Promise<number> {
+        // params from api: streamRoomId, streamIds[], settings:any
+        // params to lib: streamRoomId, streamsIds[], settings:any, webrtcInterfacePtr
+        const libArgs: [string, number[], any, number] = [...args, this.webRtcInterfacePtr];
+        return this.runAsync<number>((taskId)=>this.api.lib.StreamApi_joinStream(taskId, ptr, libArgs));
     }
     async listStreams(ptr: number, args: [string]): Promise<Stream[]> {
         return this.runAsync<Stream[]>((taskId)=>this.api.lib.StreamApi_listStreams(taskId, ptr, args));

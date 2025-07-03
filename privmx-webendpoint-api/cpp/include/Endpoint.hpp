@@ -173,6 +173,8 @@ namespace api {
     API_FUNCTION_HEADER(ExtKey, verifyCompactSignatureWithHash)
     API_FUNCTION_HEADER(ExtKey, isPrivate)
 
+    void StreamApi_newWebRtcInterface(int taskId);
+    void StreamApi_deleteWebRtcInterface(int taskId, int ptr);
     void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr);
     void StreamApi_deleteStreamApi(int taskId, int ptr);
     API_FUNCTION_HEADER(StreamApi, create)

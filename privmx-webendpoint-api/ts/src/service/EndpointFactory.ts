@@ -276,14 +276,11 @@ export class EndpointFactory {
             throw new Error("StreamApi already registered for given connection.");
         }
         const nativeApi = new StreamApiNative(this.api);
-        const webRtcImplPtr = await nativeApi.newWebRtcInterfaceImpl(); 
         const ptr = await nativeApi.newApi(
             connection.servicePtr,
-            eventApi.servicePtr,
-            webRtcImplPtr
+            eventApi.servicePtr
         );
         connection.apisRefs["streams"] = { _apiServicePtr: ptr };
-        connection.apisRefs["streams_webrtcimpl"] = { _apiServicePtr: webRtcImplPtr };
         connection.nativeApisDeps["streams"] = nativeApi;
         await nativeApi.create(ptr, []);
         return new StreamApi(nativeApi, ptr);

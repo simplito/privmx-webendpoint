@@ -628,6 +628,11 @@ export interface TurnCredentials {
     expirationTime: number;
 }
 
+export interface StreamJoinSettings {
+    settings: any;
+    onRemoteTrack: (track: RTCTrackEvent) => void;
+}
+
 /**
  * PKI Verification options
  * 

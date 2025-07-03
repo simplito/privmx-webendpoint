@@ -69,6 +69,8 @@ std::shared_ptr<WebRtcInterfaceImpl> WebRtcInterfaceHolder::getInstance() {
     return _webRtcInterface;
 }
 
+WebRtcInterfaceImpl* WebRtcInterfaceHolder::getRawPtr() { return _webRtcInterface.get(); }
+
 void WebRtcInterfaceImpl::assertStatus(const std::string& method, const emscripten::val& jsResult) {
     int status = jsResult["status"].as<int>();
     if (status < 0) {
@@ -136,3 +138,7 @@ void WebRtcInterfaceImpl::updateKeys(const std::vector<Key>& keys) {
         assertStatus(methodName, jsResult);
     });
 }
+
+    std::shared_ptr<WebRtcInterfaceImpl> WebRtcInterfaceImpl::getSelf() {
+        return shared_from_this();
+    }

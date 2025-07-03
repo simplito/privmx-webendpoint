@@ -342,15 +342,19 @@ export class WebRtcClient {
         }
 
         // orig code
-        const videoStream: VideoStream = {
-            stream: event.streams[0],
-            isLocal: false,
-            id: event.streams[0].id
-        }
+        // const videoStream: VideoStream = {
+        //     stream: event.streams[0],
+        //     isLocal: false,
+        //     id: event.streams[0].id
+        // }
+        // for (const listener of this.remoteStreamListeners) {
+        //     listener(videoStream);
+        // }
+
         for (const listener of this.remoteStreamListeners) {
-            listener(videoStream);
-        }
-        // this.uiInterface.addVideoStream(videoStream);
+            listener(event);
+        }  
+
     }
 
 }

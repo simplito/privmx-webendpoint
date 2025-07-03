@@ -8,7 +8,7 @@ import { DataChannelMeta, StreamCreateMeta, StreamId } from "../webStreams/types
 import { StreamDataTrackAddRequest } from "../webStreams/types/StreamsApiTypes";
 import { BaseApi } from "./BaseApi";
 // import { StreamApiNative } from "../api/StreamApiNative";
-import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamRoom, UserWithPubKey } from "../Types";
+import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamJoinSettings, StreamRoom, UserWithPubKey } from "../Types";
 import { StreamApiNative } from "../api/StreamApiNative";
 
 
@@ -170,7 +170,7 @@ export class StreamApi extends BaseApi {
     }
 
 
-    public async streamTrackAdd(streamId: Types.StreamId, meta: Types.StreamTrackMeta): Promise<Types.StreamTrackId> {
+    public async addStreamTrack(streamId: Types.StreamId, meta: Types.StreamTrackMeta): Promise<Types.StreamTrackId> {
         //// orig
         //// tutaj byly tez wysylane dane dataChannela na serwer aplikacyjny i tam trzymane w mapie
 
@@ -242,7 +242,7 @@ export class StreamApi extends BaseApi {
         return streamTrackId;
     }
 
-    public async streamTrackRemove(_streamTrackId: Types.StreamTrackId): Promise<void> {
+    public async removeStreamTrack(_streamTrackId: Types.StreamTrackId): Promise<void> {
         // await this.client.provideSession();
         // const track = Array.from(this.streamTracks.values()).find(x => x.id === streamTrackId);
         // if (!track) {
@@ -262,7 +262,7 @@ export class StreamApi extends BaseApi {
         throw new Error("not implemented");
     }
 
-    public async streamTrackList(_streamRoomId: Types.StreamRoomId, _streamId: Types.StreamId): Promise<Types.StreamTrackList> {
+    public async listStreamTracks(_streamRoomId: Types.StreamRoomId, _streamId: Types.StreamId): Promise<Types.StreamTrackList> {
         // await this.client.provideSession();
         // return this.serverChannel.call<StreamsApi.StreamTrackListRequest, Types.StreamTrackList>({kind: "streams.streamTrackList", data: {
         //     streamRoomId, streamId
@@ -381,7 +381,7 @@ export class StreamApi extends BaseApi {
 
     // PART DONE
     // public async streamJoin(streamRoomId: Types.StreamRoomId, streamToJoin: Types.StreamAndTracksSelector): Promise<void> {
-    public async streamJoin(streamRoomId: Types.StreamRoomId, streamsIds: StreamId[]): Promise<number> {
+    public async joinStream(streamRoomId: Types.StreamRoomId, streamsIds: StreamId[], settings: StreamJoinSettings): Promise<number> {
         // int64_t joinStream(const std::string& streamRoomId, const std::vector<int64_t>& streamsId, const Settings& settings, int64_t localStreamId, std::shared_ptr<WebRTCInterface> webRtc);
         //// orig - ciekawe, ze nie ma operacji na connection tutaj?
         //// oryginalnie funkcja przyjmowala streamToJoin typu StreamAndTrackSelector gdzie podawany byl jeden stream i ew lista tracks jako opcja...
@@ -391,10 +391,11 @@ export class StreamApi extends BaseApi {
         //     streamToJoin: streamToJoin
         // }});
 
-        return this.native.joinStream(this.servicePtr, [streamRoomId, streamsIds]);
+        this.client.addRemoteStreamListener(settings.onRemoteTrack);
+        return this.native.joinStream(this.servicePtr, [streamRoomId, streamsIds, settings.settings]);
     }
 
-    public async streamLeave(_streamId: Types.StreamId): Promise<void> {
+    public async leaveStream(_streamId: Types.StreamId): Promise<void> {
         // const _stream = this.streams.get(streamId.toString());
         // if (!_stream) {
         //     throw new Error ("No stream with given id to leave");
@@ -411,12 +412,12 @@ export class StreamApi extends BaseApi {
         throw new Error("Not implemented");
     }
 
-    public async addRemoteStreamListener(listener: RemoteStreamListener) {
-        this.client.addRemoteStreamListener(listener);
-    }
+    // public async addRemoteStreamListener(listener: RemoteStreamListener) {
+    //     this.client.addRemoteStreamListener(listener);
+    // }
 
-    public async testSetStreamEncKey(key: EncKey) {
-        console.log("setting key: ", key)
-        this.client.setEncKey(key.key, key.iv);
-    }
+    // public async testSetStreamEncKey(key: EncKey) {
+    //     console.log("setting key: ", key)
+    //     this.client.setEncKey(key.key, key.iv);
+    // }
 }

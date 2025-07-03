@@ -14,6 +14,7 @@ limitations under the License.
 
 #include <string>
 #include <vector>
+#include <memory>
 #include <functional>
 #include <emscripten.h>
 #include <emscripten/val.h>
@@ -43,7 +44,7 @@ namespace stream {
 //     std::string type;
 // };
 
-class WebRtcInterfaceImpl : public endpoint::stream::WebRTCInterface
+class WebRtcInterfaceImpl : public endpoint::stream::WebRTCInterface, public std::enable_shared_from_this<WebRtcInterfaceImpl>
 {
 public:
     WebRtcInterfaceImpl();
@@ -53,9 +54,9 @@ public:
     void setAnswerAndSetRemoteDescription(const std::string& sdp, const std::string& type);
     void close();
     void updateKeys(const std::vector<privmx::endpoint::stream::Key>& keys);
-
+    std::shared_ptr<WebRtcInterfaceImpl> getSelf();
 private:
-    void setRemoteDescription(const std::string& sdp, const std::string& type);
+    // void setRemoteDescription(const std::string& sdp, const std::string& type);
 
 
     // copy of verifier methods - to modify
@@ -73,6 +74,7 @@ private:
 class WebRtcInterfaceHolder {
     public:
         std::shared_ptr<WebRtcInterfaceImpl> getInstance();
+        WebRtcInterfaceImpl* getRawPtr();
 
     private:
         std::shared_ptr<WebRtcInterfaceImpl> _webRtcInterface;
