@@ -18,7 +18,7 @@ interface SdpModel {
 }
 
 export class WebRtcInterfaceImpl implements WebRtcInterface {
-    constructor(private client: WebRtcClient) {}
+    private client: WebRtcClient;
 
     private methodsMap: { [K: string]: Function } = {
         createOfferAndSetLocalDescription: this.createOfferAndSetLocalDescription,
@@ -28,9 +28,28 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         updateKeys: this.updateKeys
     };
 
+    isMainThread() {
+        return (typeof window !== 'undefined');
+    }
+
+    ensureClientInitialized() {
+        if (!this.client) {
+            this.client = new WebRtcClient();
+            console.log("Initializing webRtcClient. Is main thread?", this.isMainThread());
+        }
+    }
+
+    getClient(): WebRtcClient {
+        this.ensureClientInitialized();
+        return this.client;
+    }
+
     async methodCall(name: string, params: any): Promise<any> {
         if (this.methodsMap[name]) {
-            return this.methodsMap[name](params);
+            const method = this.methodsMap[name];
+            if (typeof method === 'function') {
+                return Reflect.apply(method, this, params);
+            }
         }        
         throw new Error(`Method '${name}' is not implemented.`);        
     }
@@ -74,30 +93,34 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
 
         // createPeerConnectionWithLocalStream powinno byc zawolane w kliencie jak ustawiamy strumien z kamery
         // const peerConnection = await this.client.createPeerConnectionWithLocalStream(mediaStream);
-        const peerConnection = this.client.getActivePeerConnection();
+        const peerConnection = this.getClient().getActivePeerConnection();
         const offer = await peerConnection.createOffer();
         peerConnection.setLocalDescription(offer);
         return offer.sdp; // sdp 
     }
 
     async createAnswerAndSetDescriptions(model: SdpModel): Promise<string> {
-        const peerConnection = this.client.getActivePeerConnection();
+        const peerConnection = this.getClient().getActivePeerConnection();
         await peerConnection.setLocalDescription(new RTCSessionDescription({sdp: model.sdp, type: model.type as RTCSdpType}));
         const answer = await peerConnection.createAnswer();
         return answer.sdp;
     }
 
     async setAnswerAndSetRemoteDescription(model: SetAnswerAndSetRemoteDescriptionModel) {   
-        const peerConnection = this.client.getActivePeerConnection();
+        const peerConnection = this.getClient().getActivePeerConnection();
         await peerConnection.setRemoteDescription(new RTCSessionDescription({sdp: model.sdp, type: model.type as RTCSdpType}));
     }
 
     async close() {
-        const peerConnection = this.client.getActivePeerConnection();
+        const peerConnection = this.getClient().getActivePeerConnection();
         peerConnection.close();
     }
 
     async updateKeys(model: UpdateKeysModel) {
-        return this.client.updateKeys(model);
+        try {
+            return this.getClient().updateKeys(model);
+        } catch(e) {
+            console.warn("error on update keys", e);
+        }
     }
 }

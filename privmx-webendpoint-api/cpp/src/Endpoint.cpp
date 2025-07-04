@@ -327,6 +327,9 @@ namespace api {
     API_FUNCTION(EventApi, subscribeForCustomEvents)
     API_FUNCTION(EventApi, unsubscribeFromCustomEvents)
 
+
+    /*
+    // old copy
     void StreamApi_newWebRtcInterface(int taskId) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&]{
             // auto streamsApi = (StreamApiVar*)streamsApiPtr;
@@ -335,20 +338,34 @@ namespace api {
             return (int)webRtcInterfaceImplRawPtr;
         });
     }
+    */
 
-    void StreamApi_deleteWebRtcInterface(int taskId, int ptr) {
-        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
-            delete (stream::WebRtcInterfaceHolder*)ptr;
-        });
-    }
+    // void StreamApi_newWebRtcInterface(int taskId, int streamsApiPtr) {
+    //     ProxyedTaskRunner::getInstance()->runTask(taskId, [&]{
+    //         auto streamsApi = (StreamApiVar*)streamsApiPtr;
+    //         auto webRtcInterface = std::make_shared<stream::WebRtcInterfaceImpl>();
+    //         streamsApi->setWebRtcInterface(webRtcInterface);
+    //         return streamsApi->getWebRtcInterfaceRawPtr();
+    //     });
+    // }
+
+    // void StreamApi_deleteWebRtcInterface(int taskId, int ptr) {
+    //     ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+    //         delete (stream::WebRtcInterfaceHolder*)ptr;
+    //     });
+    // }
 
     void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr, eventsPtr]{
             auto connection = (ConnectionVar*)connectionPtr;
             auto eventApi = (EventApiVar*)eventsPtr;
 
-            auto api = new StreamApiVar(connection->getApi(), eventApi->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
-            return (int)api;
+            auto streamsApi = new StreamApiVar(connection->getApi(), eventApi->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+            
+            auto webRtcInterface = std::make_shared<stream::WebRtcInterfaceImpl>();
+            streamsApi->setWebRtcInterface(webRtcInterface);
+            
+            return (int)streamsApi;
         });
     }
     void StreamApi_deleteStreamApi(int taskId, int ptr) {
@@ -363,25 +380,25 @@ namespace api {
     API_FUNCTION(StreamApi, deleteStreamRoom)
     API_FUNCTION(StreamApi, getStreamRoom)
     API_FUNCTION(StreamApi, listStreamRooms)
-    // API_FUNCTION(StreamApi, createStream)
-    void StreamApi_createStream(int taskId, int ptr, emscripten::val args) {
-        Poco::Dynamic::Var argsVar = Mapper::map(args);
+    API_FUNCTION(StreamApi, createStream)
+    // void StreamApi_createStream(int taskId, int ptr, emscripten::val args) {
+    //     Poco::Dynamic::Var argsVar = Mapper::map(args);
 
-        auto vec = argsVar.extract<std::vector<Poco::Dynamic::Var>>();
-        int64_t holderPtr;
-        if (!vec.empty()) {
-            holderPtr = vec.back();
-            vec.pop_back();
-        }
-        auto holder = (stream::WebRtcInterfaceHolder*)holderPtr;
-        auto webRtcInterfaceImplRawPtr = (int64_t) holder->getRawPtr();
-        vec.push_back(webRtcInterfaceImplRawPtr);
-        argsVar = vec;
+    //     auto vec = argsVar.extract<std::vector<Poco::Dynamic::Var>>();
+    //     int64_t holderPtr;
+    //     if (!vec.empty()) {
+    //         holderPtr = vec.back();
+    //         vec.pop_back();
+    //     }
+    //     auto holder = (stream::WebRtcInterfaceHolder*)holderPtr;
+    //     auto webRtcInterfaceImplRawPtr = (int64_t) holder->getRawPtr();
+    //     vec.push_back(webRtcInterfaceImplRawPtr);
+    //     argsVar = vec;
 
-        ProxyedTaskRunner::getInstance()->runTask(taskId,[&, ptr, argsVar] {
-            return ((StreamApiVar*)ptr)->createStream(argsVar);
-        });
-    }
+    //     ProxyedTaskRunner::getInstance()->runTask(taskId,[&, ptr, argsVar] {
+    //         return ((StreamApiVar*)ptr)->createStream(argsVar);
+    //     });
+    // }
  
     API_FUNCTION(StreamApi, publishStream)
     API_FUNCTION(StreamApi, unpublishStream)

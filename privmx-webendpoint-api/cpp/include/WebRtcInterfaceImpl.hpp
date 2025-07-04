@@ -44,7 +44,7 @@ namespace stream {
 //     std::string type;
 // };
 
-class WebRtcInterfaceImpl : public endpoint::stream::WebRTCInterface, public std::enable_shared_from_this<WebRtcInterfaceImpl>
+class WebRtcInterfaceImpl : public endpoint::stream::WebRTCInterface
 {
 public:
     WebRtcInterfaceImpl();
@@ -54,7 +54,6 @@ public:
     void setAnswerAndSetRemoteDescription(const std::string& sdp, const std::string& type);
     void close();
     void updateKeys(const std::vector<privmx::endpoint::stream::Key>& keys);
-    std::shared_ptr<WebRtcInterfaceImpl> getSelf();
 private:
     // void setRemoteDescription(const std::string& sdp, const std::string& type);
 

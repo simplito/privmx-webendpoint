@@ -36,7 +36,9 @@ export class WebRtcClient {
     // =============================================================
     private currentMediaSessionId: MediaServerApiTypes.SessionId | undefined;
     private remoteStreamListeners: RemoteStreamListener[] = [];
-    constructor(/*private userMedia: UserMediaInterface, private uiInterface: UIAccess*/) {}
+    constructor(/*private userMedia: UserMediaInterface, private uiInterface: UIAccess*/) {
+        console.log("WebRtcClient constructor");
+    }
 
     
     public async provideSession(): Promise<MediaServerApiTypes.SessionId> {
@@ -310,6 +312,7 @@ export class WebRtcClient {
     }
 
     async updateKeys(_model: UpdateKeysModel) {
+        console.log("Recv keys: ", _model);
         console.warn("updateKeys in webRtcClient.. missing implementation");
     }
 

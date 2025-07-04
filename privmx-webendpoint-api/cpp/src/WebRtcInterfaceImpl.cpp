@@ -6,6 +6,7 @@
 #include <emscripten/proxying.h>
 #include "privmx/endpoint/stream/Types.hpp"
 #include "privmx/endpoint/stream/StreamVarSerializer.hpp"
+#include "privmx/utils/Utils.hpp"
 
 using namespace privmx::webendpoint::stream;
 using namespace privmx::endpoint::stream;
@@ -24,6 +25,7 @@ EM_ASYNC_JS(emscripten::EM_VAL, webRtcJsHandler, (emscripten::EM_VAL name_handle
 
     try {
         response = await window.webRtcInterfaceToNativeHandler.methodCall(name, params);
+        console.log("after methodCall in WebRtcInterfaceImpl..", response);
     } catch (error) {
         console.error("Error on webRtcInterfaceToNativeHandler call from C for", name, params, error);
         let ret = { status: -1, buff: "", error: error.toString()};
@@ -33,6 +35,8 @@ EM_ASYNC_JS(emscripten::EM_VAL, webRtcJsHandler, (emscripten::EM_VAL name_handle
     return Emval.toHandle(ret);
 });
 
+WebRtcInterfaceImpl::WebRtcInterfaceImpl() {
+}
 
 void WebRtcInterfaceImpl::printErrorInJS(const std::string& msg) {
     print_error_webrtc(msg.c_str());
@@ -96,7 +100,7 @@ std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription() {
 std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::string& sdp, const std::string& type) {
     std::promise<std::string> prms;
     std::future<std::string> ftr = prms.get_future();
-    runTaskAsync([&]{
+    runTaskAsync([&, sdp, type]{
         auto methodName {"createOfferAndSetLocalDescription"};
         emscripten::val name = emscripten::val::u8string(methodName);
         SdpWithTypeModel paramsModel = {.sdp = sdp, .type = type};
@@ -109,7 +113,7 @@ std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::strin
 }
 
 void WebRtcInterfaceImpl::setAnswerAndSetRemoteDescription(const std::string& sdp, const std::string& type) {
-    runTaskAsync([&]{
+    runTaskAsync([&, sdp, type]{
         auto methodName {"setAnswerAndSetRemoteDescription"};
         emscripten::val name = emscripten::val::u8string(methodName);
         SdpWithTypeModel paramsModel = {.sdp = sdp, .type = type};
@@ -130,7 +134,7 @@ void WebRtcInterfaceImpl::close() {
 }
 
 void WebRtcInterfaceImpl::updateKeys(const std::vector<Key>& keys) {
-    runTaskAsync([&]{
+    runTaskAsync([&, keys]{
         auto methodName {"updateKeys"};
         emscripten::val name = emscripten::val::u8string(methodName);
         emscripten::val params = mapToVal(keys);
@@ -139,6 +143,3 @@ void WebRtcInterfaceImpl::updateKeys(const std::vector<Key>& keys) {
     });
 }
 
-    std::shared_ptr<WebRtcInterfaceImpl> WebRtcInterfaceImpl::getSelf() {
-        return shared_from_this();
-    }
