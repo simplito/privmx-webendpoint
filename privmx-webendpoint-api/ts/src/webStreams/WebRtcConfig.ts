@@ -1,3 +1,4 @@
+import { TurnCredentials } from "../Types";
 import { PeerCredentials } from "./WebRtcClientTypes";
 
 export class WebRtcConfig {
@@ -28,16 +29,29 @@ export class WebRtcConfig {
         return this.iceTransportPolicy;
     }
 
-    public static generateTurnConfiguration(credentials: PeerCredentials|undefined) {
-        const servers: RTCIceServer[] = this.getTurnServers().map(x => (
-            {
-                urls: x, 
-                username: credentials && credentials.username ? credentials.username : undefined, 
-                credential: credentials && credentials.password ? credentials.password : undefined
-            }
-        ));
+    // public static generateTurnConfiguration(credentials: PeerCredentials|undefined) {
+    //     const servers: RTCIceServer[] = this.getTurnServers().map(x => (
+    //         {
+    //             urls: x, 
+    //             username: credentials && credentials.username ? credentials.username : undefined, 
+    //             credential: credentials && credentials.password ? credentials.password : undefined
+    //         }
+    //     ));
+    //     return {
+    //         iceServers: servers,
+    //         iceTransportPolicy: this.iceTransportPolicy
+    //     }
+    // }
+
+    public static generateTurnConfiguration(credentials: TurnCredentials[]) {
         return {
-            iceServers: servers,
+            iceServers: credentials.map(x => {
+                return {
+                    urls: x.url,
+                    username: x.username,
+                    credential: x.password
+                }
+            }),
             iceTransportPolicy: this.iceTransportPolicy
         }
     }

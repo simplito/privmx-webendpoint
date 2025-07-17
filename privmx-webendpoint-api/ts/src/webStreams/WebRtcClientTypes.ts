@@ -13,8 +13,8 @@ export interface PeerCredentials {
 }
 
 export interface EncKey {
-    key: string;
-    iv: string;
+    key: Buffer;
+    iv: Buffer;
 }
 
 export interface InitOptions {

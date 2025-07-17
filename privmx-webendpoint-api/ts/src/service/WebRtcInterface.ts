@@ -2,7 +2,6 @@ import { Key } from "../Types";
 
 export class UpdateKeysModel {
   keys: Key[]; 
-  type: string;
 }
 
 export interface CreateAnswerAndSetDescriptionsModel {

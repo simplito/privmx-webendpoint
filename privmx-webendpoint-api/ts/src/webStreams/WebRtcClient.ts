@@ -6,7 +6,8 @@ import { EncKey, InitOptions, PeerCredentials, RemoteStreamListener, VideoStream
 import { WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
 import { UpdateKeysModel } from "../service/WebRtcInterface";
-import { TurnCredentials } from "../Types";
+import { Key, TurnCredentials } from "../Types";
+import { KeyStore } from "./KeyStore";
 
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
@@ -14,6 +15,7 @@ export declare class RTCRtpScriptTransform {
 }
 
 export class WebRtcClient {
+    public uniqId: string;
     private peerConnection: RTCPeerConnection|undefined;
 
     private appServerChannel: AppServerChannel|undefined;
@@ -21,23 +23,26 @@ export class WebRtcClient {
 
     private iceCandidates: RTCIceCandidate[] = [];
     private e2eeWorker: Worker | undefined;
+    private webWorkerApi: WebWorker;
 
     private dataChannels: RTCDataChannel[] = [];
 
     private configuration: RTCConfiguration|undefined;
+    private keyStore: KeyStore = new KeyStore();
     
     // to moze byc uzyte kiedy wymagany jest update credentials (jak straca waznosc)
     private clientId: string | undefined;
-    private peerCredentials: PeerCredentials|undefined;
+    private peerCredentials: TurnCredentials[]|undefined;
     private initOptions: InitOptions | undefined;
-    private encKey: EncKey | undefined;
+    // private encKey: EncKey | undefined;
 
     // nowo dodane =================================================
     // =============================================================
     private currentMediaSessionId: MediaServerApiTypes.SessionId | undefined;
     private remoteStreamListeners: RemoteStreamListener[] = [];
-    constructor(/*private userMedia: UserMediaInterface, private uiInterface: UIAccess*/) {
-        console.log("WebRtcClient constructor");
+    constructor(private assetsDir: string) {
+        this.uniqId = "" + Math.random() + "-" + Math.random();
+        console.log("WebRtcClient constructor ("+this.uniqId+")", "assetsDir: ", this.assetsDir);
     }
 
     
@@ -66,9 +71,9 @@ export class WebRtcClient {
     //     // return this.signalingApi;
     // }
 
-    public setEncKey(key: string, iv: string) {
-        this.encKey = {key, iv};
-    }
+    // public setEncKey(key: string, iv: string) {
+    //     this.encKey = {key, iv};
+    // }
 
     private async onAppServerSignalingEvent(event: any) {
         console.log("onAppServerSignalingEvent event", event);
@@ -101,22 +106,27 @@ export class WebRtcClient {
     }
     // nowo dodane END ==================================================================
 
-
-
-
-    protected getEncKey() : EncKey {
-        return this.encKey || {key: "", iv: ""}
+    protected getEncKey() : Key {
+        return this.keyStore.getEncriptionKey();
     }
 
-    protected getWorker(): Worker {
+    protected async getWorker(): Promise<Worker> {
         if (!this.e2eeWorker) {
-            const key = this.getEncKey();
-            this.e2eeWorker = new WebWorker(this.getEncKey()).getWorker();
+            const workerApi = await this.getWorkerApi();
+            this.e2eeWorker = workerApi.getWorker();
         }
         if (!this.e2eeWorker) {
             throw new Error("Worker not initialized.");
         }
         return this.e2eeWorker;
+    }
+
+    protected async getWorkerApi(): Promise<WebWorker> {
+        if (!this.webWorkerApi) {
+            this.webWorkerApi = new WebWorker(this.assetsDir);
+            await this.webWorkerApi.init_e2ee();
+        }
+        return this.webWorkerApi;
     }
 
     protected getPeerConnectionConfiguration(): RTCConfiguration {
@@ -127,18 +137,19 @@ export class WebRtcClient {
         return this.configuration;
     }
 
-    async createPeerConnectionWithLocalStream(stream: MediaStream, peerCredentials: TurnCredentials): Promise<RTCPeerConnection> {
+    async createPeerConnectionWithLocalStream(stream: MediaStream, peerCredentials: TurnCredentials[]): Promise<RTCPeerConnection> {
         // this.peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
-        this.peerCredentials = {username: peerCredentials.username, password: peerCredentials.password, expirationTime: peerCredentials.expirationTime};
+        this.peerCredentials = peerCredentials;
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
 
         this.peerConnection = this.createPeerConnectionMulti(this.configuration);
-
-        console.log("=========> peerConnection multi created.");
+        console.log("created peerConnection: ", this.peerConnection);
+        console.log("=========> peerConnection multi created.", this.uniqId);
         if (stream.getTracks().length > 0) {
             const [track] = stream.getTracks();
+            console.log("adding track to peerConnection...");
             const videoSender = this.peerConnection.addTrack(track, stream);
-            this.e2eeWorker = this.getWorker();
+            this.e2eeWorker = await this.getWorker();
     
             if ((window as any).RTCRtpScriptTransform) {
                 const options = {
@@ -162,11 +173,17 @@ export class WebRtcClient {
         return this.peerConnection;
     }
 
+    public async createPeerConnectionOnJoin(peerCredentials: TurnCredentials[]) {
+        const configuration = WebRtcConfig.generateTurnConfiguration(peerCredentials);
+        const peerConnection = this.createPeerConnectionMulti(configuration);
+        this.peerConnection = peerConnection;
+    }
+
     private async onSubscriberAttached(eventData: SignalingFromServer.SubscriberAttached) {
         console.log("============> onSubscriberAttached",eventData);
         const peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
 
-        const configuration = WebRtcConfig.generateTurnConfiguration(peerCredentials);
+        const configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
 
         console.log("-----> onSubscriberAttached", {room: eventData.room, streams: eventData.streams});
         const peerConnection = this.createPeerConnectionMulti(configuration);
@@ -202,11 +219,11 @@ export class WebRtcClient {
         return appServerChannel;
     }
 
-    private async updatePeerConnectionCredentialsOnEvent(credentials: PeerCredentials) {
+    private async updatePeerConnectionCredentialsOnEvent(credentials: TurnCredentials[]) {
         this.peerCredentials = credentials;
         const peerConnection = this.getActivePeerConnection();
         if (peerConnection) {
-            const newConfiguration = WebRtcConfig.generateTurnConfiguration(credentials);
+            const newConfiguration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
             peerConnection.setConfiguration(newConfiguration);
             this.startNegotiationMulti(true);
         }
@@ -270,7 +287,7 @@ export class WebRtcClient {
 
     public getActivePeerConnection(): RTCPeerConnection {
         if (!this.peerConnection) {
-            throw new Error("PeerConnection not initialized!");
+            throw new Error("PeerConnection not initialized! " + this.uniqId);
         }
         return this.peerConnection;
     }
@@ -311,14 +328,17 @@ export class WebRtcClient {
         console.log("Message sent!");
     }
 
-    async updateKeys(_model: UpdateKeysModel) {
-        console.log("Recv keys: ", _model);
-        console.warn("updateKeys in webRtcClient.. missing implementation");
+    async updateKeys(keys: Key[]) {
+        console.log("webrtcClient - updateKeys", keys);
+        this.keyStore.setKeys(keys);
+
+        // propagate keys to the worker
+        (await this.getWorkerApi()).setKeys(keys);
     }
 
-    private addRemoteTrack(event: RTCTrackEvent) {
+    private async addRemoteTrack(event: RTCTrackEvent) {
         console.log("===================== REMOTE TRACK ADDED ========================");
-        const worker = this.getWorker();
+        const worker = await this.getWorker();
         const track = event.track;
         const receiver = event.receiver;
         const key = this.getEncKey();

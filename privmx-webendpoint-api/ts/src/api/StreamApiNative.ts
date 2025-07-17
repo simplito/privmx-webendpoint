@@ -12,12 +12,15 @@ limitations under the License.
 import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamRoom, StreamSettings, TurnCredentials, UserWithPubKey } from "../Types";
 import { WebRtcClient } from "../webStreams/WebRtcClient";
 import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
+import { Api } from "./Api";
 import { BaseNative } from "./BaseNative";
 
 export class StreamApiNative extends BaseNative {
     protected webRtcInterfacePtr: number = -1;
     protected webRtcInterfaceImpl: WebRtcInterfaceImpl | null;
-
+    constructor(api: Api, protected webRtcClient: WebRtcClient) {
+        super(api);
+    }
     // private async createWebRtcInterfaceImpl(): Promise<void> {
     //      // - init webRtcInterface po stronie CPP i zwrot wskaznika
     //     this.webRtcInterfacePtr = await this.runAsync<number>((taskId)=>this.api.lib.StreamApi_newWebRtcInterface(taskId));
@@ -67,7 +70,7 @@ export class StreamApiNative extends BaseNative {
         return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_unpublishStream(taskId, ptr, args));
     }
 
-    async joinStream(ptr: number, args: [string, number[], any]): Promise<number> {
+    async joinStream(ptr: number, args: [string, number[], any, number]): Promise<number> {
         // params from api: streamRoomId, streamIds[], settings:any
         // params to lib: streamRoomId, streamsIds[], settings:any, webrtcInterfacePtr
         // const libArgs: [string, number[], any, number] = [...args, this.webRtcInterfacePtr];
@@ -82,8 +85,8 @@ export class StreamApiNative extends BaseNative {
     async keyManagement(ptr: number, args: [boolean]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_keyManagement(taskId, ptr, args));
     }
-    async getTurnCredentials(ptr: number, args: []): Promise<TurnCredentials> {
-        return this.runAsync<TurnCredentials>((taskId)=>this.api.lib.StreamApi_getTurnCredentials(taskId, ptr, args));
+    async getTurnCredentials(ptr: number, args: []): Promise<TurnCredentials[]> {
+        return this.runAsync<TurnCredentials[]>((taskId)=>this.api.lib.StreamApi_getTurnCredentials(taskId, ptr, args));
     }
     protected bindWebRtcInterfaceAsHandler(): void {
         // if (this.webRtcInterfacePtr > -1) {
@@ -93,7 +96,8 @@ export class StreamApiNative extends BaseNative {
         // }
 
         // const [client] = args;
-        this.webRtcInterfaceImpl = new WebRtcInterfaceImpl();
+
+        this.webRtcInterfaceImpl = new WebRtcInterfaceImpl(this.webRtcClient);
         console.log("webRtcInterfaceImpl(JS) created", this.webRtcInterfaceImpl);
         (window as any).webRtcInterfaceToNativeHandler = this.webRtcInterfaceImpl;
         console.log("... and binded to window", (window as any).webRtcInterfaceToNativeHandler);

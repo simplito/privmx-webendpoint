@@ -37,6 +37,24 @@ export class Utils {
             iv: iv
         });
     }
+     
+    static async decryptSymmetricBuffer(ciphertext: Buffer, iv: Buffer, key: Buffer) {
+        // prepare the secret key
+        const secretKey = await crypto.subtle.importKey(
+            'raw',
+            key, 
+            {
+            name: 'AES-GCM',
+            length: 256
+        }, true, ['encrypt', 'decrypt']);
+        // decrypt the encrypted text "ciphertext" with the secret key and IV
+        const cleartext = await crypto.subtle.decrypt({
+            name: 'AES-GCM',
+            iv: iv,
+        }, secretKey, ciphertext);
+        // decode the text and return it
+        return Buffer.from(cleartext);
+    }
 
     static async decryptSymmetric(ciphertext: string, iv: string, key: string) {
         // prepare the secret key
@@ -66,6 +84,10 @@ export class Utils {
         return Buffer.from(
             crypto.getRandomValues(new Uint8Array(12))
           ).toString('base64');
+    }
+
+    static genIvAsBuffer() {
+        return crypto.getRandomValues(new Uint8Array(12)); 
     }
 
     static base64abc = [
@@ -121,27 +143,43 @@ export class Utils {
     }
 
 
-    static numToUint8Array(num: number) {
-        let arr = new Uint8Array(8);
+    // static numToUint8Array(num: number) {
+    //     let arr = new Uint8Array(8);
       
-        for (let i = 0; i < 8; i++) {
-          arr[i] = num % 256;
-          num = Math.floor(num / 256);
+    //     for (let i = 0; i < 8; i++) {
+    //       arr[i] = num % 256;
+    //       num = Math.floor(num / 256);
+    //     }
+      
+    //     return arr;
+    //   }
+      
+      
+    //   static uint8ArrayToNum(arr: Uint8Array) {
+    //     let num = 0;
+      
+    //     for (let i = 7; i >= 0; i--) {
+    //       num = num * 256 + arr[i];
+    //     }
+      
+    //     return num;
+    //   }
+
+    static numAsOneByteUint(num: number) {
+        if (num > 255) {
+            throw new Error("Out of bounds value");
         }
-      
+        const arr = new Uint8Array(1);
+        arr[0] = num;
         return arr;
-      }
+    }
       
-      
-      static uint8ArrayToNum(arr: Uint8Array) {
-        let num = 0;
-      
-        for (let i = 7; i >= 0; i--) {
-          num = num * 256 + arr[i];
+    static oneByteUint8AsNum(arr: Uint8Array) {
+        if (arr[0] > 255) {
+            throw new Error("Out of bounds value");
         }
-      
-        return num;
-      }
+        return arr[0];
+    }
 
 }
 

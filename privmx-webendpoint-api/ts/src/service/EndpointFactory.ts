@@ -22,6 +22,7 @@ import { StreamApiNative } from "../api/StreamApiNative";
 import { ThreadApiNative } from "../api/ThreadApiNative";
 import { FinalizationHelper } from "../FinalizationHelper";
 import { PKIVerificationOptions } from "../Types";
+import { WebRtcClient } from "../webStreams/WebRtcClient";
 import { Connection } from "./Connection";
 import { CryptoApi } from "./CryptoApi";
 import { EventApi } from "./EventApi";
@@ -43,6 +44,7 @@ declare function endpointWasmModule(): Promise<any>; // Provided by emscripten j
 export class EndpointFactory {
     private static api: Api;
     private static eventQueueInstance: EventQueue;
+    private static assetsBasePath: string;
 
     /**
      * Load the Endpoint's WASM assets and initialize the Endpoint library.
@@ -51,6 +53,8 @@ export class EndpointFactory {
      */
     public static async setup(assetsBasePath?: string): Promise<void> {
         const basePath = assetsBasePath || (document.currentScript as HTMLScriptElement).src.split("/").slice(0, -1).join("/");
+        this.assetsBasePath = basePath;
+        console.log("DEBUG assetsPath (1)", this.assetsBasePath);
         const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
         for (const asset of assets) {
             await this.loadScript(basePath + "/" + asset);
@@ -275,14 +279,18 @@ export class EndpointFactory {
         if ("streams" in connection.apisRefs) {
             throw new Error("StreamApi already registered for given connection.");
         }
-        const nativeApi = new StreamApiNative(this.api);
+        const webRtcClient = new WebRtcClient(this.assetsBasePath);
+        const nativeApi = new StreamApiNative(this.api, webRtcClient);
+                      
         const ptr = await nativeApi.newApi(
             connection.servicePtr,
             eventApi.servicePtr
         );
         connection.apisRefs["streams"] = { _apiServicePtr: ptr };
         connection.nativeApisDeps["streams"] = nativeApi;
+  
+
         await nativeApi.create(ptr, []);
-        return new StreamApi(nativeApi, ptr);
+        return new StreamApi(nativeApi, ptr, webRtcClient);
     }
 }

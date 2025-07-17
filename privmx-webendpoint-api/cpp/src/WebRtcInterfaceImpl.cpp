@@ -92,7 +92,8 @@ std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription() {
         emscripten::val params = val::object();
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
         assertStatus(methodName, jsResult);
-        prms.set_value(jsResult["buff"].as<std::string>());
+        std::string response {jsResult["buff"].as<std::string>()};
+        prms.set_value(response);
     });
     return ftr.get();
 }
@@ -101,7 +102,7 @@ std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::strin
     std::promise<std::string> prms;
     std::future<std::string> ftr = prms.get_future();
     runTaskAsync([&, sdp, type]{
-        auto methodName {"createOfferAndSetLocalDescription"};
+        auto methodName {"createAnswerAndSetDescriptions"};
         emscripten::val name = emscripten::val::u8string(methodName);
         SdpWithTypeModel paramsModel = {.sdp = sdp, .type = type};
         emscripten::val params = mapToVal(paramsModel);
@@ -117,7 +118,7 @@ void WebRtcInterfaceImpl::setAnswerAndSetRemoteDescription(const std::string& sd
         auto methodName {"setAnswerAndSetRemoteDescription"};
         emscripten::val name = emscripten::val::u8string(methodName);
         SdpWithTypeModel paramsModel = {.sdp = sdp, .type = type};
-        emscripten::val params = val::object();
+        emscripten::val params = mapToVal(paramsModel);
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
         assertStatus(methodName, jsResult);
     });
@@ -133,11 +134,24 @@ void WebRtcInterfaceImpl::close() {
     });
 }
 
-void WebRtcInterfaceImpl::updateKeys(const std::vector<Key>& keys) {
+void WebRtcInterfaceImpl::updateKeys(const std::vector<privmx::endpoint::stream::Key>& keys) {
     runTaskAsync([&, keys]{
         auto methodName {"updateKeys"};
         emscripten::val name = emscripten::val::u8string(methodName);
-        emscripten::val params = mapToVal(keys);
+        emscripten::val keysArrayVal = emscripten::val::array();
+        for (auto key: keys) {
+            emscripten::val keyObj = emscripten::val::object();
+            keyObj.set("keyId", mapToVal(key.keyId));
+
+            emscripten::val view{emscripten::typed_memory_view(key.key.size(), key.key.data())};
+            auto keyView = emscripten::val::global("Uint8Array").new_(key.key.size());
+            keyView.call<void>("set", view);
+            keyObj.set("key", keyView);
+            keyObj.set("type", mapToVal(key.type));    
+            keysArrayVal.call<emscripten::val>("push", keyObj);
+        }
+        emscripten::val params = val::object();
+        params.set("keys", keysArrayVal);
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
         assertStatus(methodName, jsResult);
     });

@@ -18,7 +18,7 @@ interface SdpModel {
 }
 
 export class WebRtcInterfaceImpl implements WebRtcInterface {
-    private client: WebRtcClient;
+    constructor(private webRtcClient: WebRtcClient) {}
 
     private methodsMap: { [K: string]: Function } = {
         createOfferAndSetLocalDescription: this.createOfferAndSetLocalDescription,
@@ -32,23 +32,19 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         return (typeof window !== 'undefined');
     }
 
-    ensureClientInitialized() {
-        if (!this.client) {
-            this.client = new WebRtcClient();
-            console.log("Initializing webRtcClient. Is main thread?", this.isMainThread());
-        }
-    }
-
     getClient(): WebRtcClient {
-        this.ensureClientInitialized();
-        return this.client;
+        if(!this.webRtcClient) {
+            throw new Error("WebRtcClient not initialized. Aborting...");
+        }
+        return this.webRtcClient;
     }
 
     async methodCall(name: string, params: any): Promise<any> {
+        console.log("WebRtcInterfaceImpl methodCall:", name, params);
         if (this.methodsMap[name]) {
             const method = this.methodsMap[name];
             if (typeof method === 'function') {
-                return Reflect.apply(method, this, params);
+                return this.methodsMap[name].call(this, params);
             }
         }        
         throw new Error(`Method '${name}' is not implemented.`);        
@@ -101,12 +97,13 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
 
     async createAnswerAndSetDescriptions(model: SdpModel): Promise<string> {
         const peerConnection = this.getClient().getActivePeerConnection();
-        await peerConnection.setLocalDescription(new RTCSessionDescription({sdp: model.sdp, type: model.type as RTCSdpType}));
+        await peerConnection.setRemoteDescription(new RTCSessionDescription({sdp: model.sdp, type: model.type as RTCSdpType}));
         const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
         return answer.sdp;
     }
 
-    async setAnswerAndSetRemoteDescription(model: SetAnswerAndSetRemoteDescriptionModel) {   
+    async setAnswerAndSetRemoteDescription(model: SetAnswerAndSetRemoteDescriptionModel) {  
         const peerConnection = this.getClient().getActivePeerConnection();
         await peerConnection.setRemoteDescription(new RTCSessionDescription({sdp: model.sdp, type: model.type as RTCSdpType}));
     }
@@ -117,8 +114,9 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     }
 
     async updateKeys(model: UpdateKeysModel) {
+        console.log("WebRtcInterfaceImpl.ts - updateKeys model: ", model);
         try {
-            return this.getClient().updateKeys(model);
+            return this.getClient().updateKeys(model.keys);
         } catch(e) {
             console.warn("error on update keys", e);
         }
