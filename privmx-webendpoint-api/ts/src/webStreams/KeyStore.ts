@@ -6,7 +6,6 @@ export class KeyStore {
     
     setKeys(keys: Key[]) {
         this._keys.clear();
-        console.log("[web] keyStore.setKeys", keys);
         for (const k of keys) {
             this._keys.set(k.keyId, k);
             if (k.type === 0) {
@@ -17,6 +16,10 @@ export class KeyStore {
 
     getKey(keyId: string): Key {
         return this._keys.get(keyId);
+    }
+
+    hasKey(keyId: string) {
+        return this._keys.has(keyId);
     }
 
     getEncriptionKey(): Key {

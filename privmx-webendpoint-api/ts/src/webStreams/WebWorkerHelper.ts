@@ -17,12 +17,38 @@ import { InitializeEvent, SetKeysEvent } from "./worker/WorkerEvents";
 //     }
 // }
 
+interface WorkerLogEvent {
+    data: {
+        data: Object|String;
+        type: "error"|"debug"
+    }
+}
+
 export class WebWorker {
     worker: Worker | undefined;
     constructor(private assetsDir: string) {}
 
     async init_e2ee() {
-        this.worker = await this.createWorkerFromScript(this.assetsDir + "/e2ee-worker.js");
+        // this.worker = await this.createWorkerFromScript(this.assetsDir + "/e2ee-worker.js");
+        this.worker = new Worker(this.assetsDir + "/e2ee-worker.js");
+        this.worker.onmessage = (event: WorkerLogEvent) => {
+            // console.log("worker: ", event);
+
+            try {
+                if (event.data.type === "debug") {
+                        console.log("[Worker-LOG/debug]", event.data.data);
+                }
+                else
+                if (event.data.type === "error") {
+                    console.error("[Worker-LOG/error]", event.data.data);
+                }
+                else {
+                    console.log(event.data);
+                }
+            } catch (e) {
+                console.error("[Worker]: invalid event");
+            }
+        };
         this.worker.onerror = e => console.error(e);
 
         this.worker.postMessage(<InitializeEvent>{
@@ -35,6 +61,7 @@ export class WebWorker {
     }
 
     setKeys(keys: Key[]) {
+        console.log("trying to send keys to the worker...", {keys});
         if (!this.worker) {
             console.warn("Cannot pass keys to e2ee worker as it is not initialized yet.");
             return;
@@ -43,6 +70,7 @@ export class WebWorker {
             operation: "setKeys",
             keys
         });
+        console.log("Keys sent to Worker: ", keys);
     }
 
     createWorkerFromFunction(workerFunction: Function) {
@@ -57,6 +85,7 @@ export class WebWorker {
         const blob = new Blob([scriptContent], { type: 'application/javascript' });
         const workerUrl = URL.createObjectURL(blob);
         const worker = new Worker(workerUrl);
+
         return worker;
     }
 }

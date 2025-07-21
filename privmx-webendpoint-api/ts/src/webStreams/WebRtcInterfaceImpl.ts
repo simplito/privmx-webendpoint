@@ -40,7 +40,6 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     }
 
     async methodCall(name: string, params: any): Promise<any> {
-        console.log("WebRtcInterfaceImpl methodCall:", name, params);
         if (this.methodsMap[name]) {
             const method = this.methodsMap[name];
             if (typeof method === 'function') {
@@ -114,7 +113,6 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     }
 
     async updateKeys(model: UpdateKeysModel) {
-        console.log("WebRtcInterfaceImpl.ts - updateKeys model: ", model);
         try {
             return this.getClient().updateKeys(model.keys);
         } catch(e) {

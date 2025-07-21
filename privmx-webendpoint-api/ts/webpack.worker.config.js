@@ -3,6 +3,7 @@ const path = require('path');
 
 module.exports = {
   entry: './src/webStreams/worker/worker.ts',
+        mode: 'production',
   output: {
     filename: 'e2ee-worker.js',
     path: path.resolve(__dirname, 'dist')

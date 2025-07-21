@@ -124,6 +124,7 @@ export class WebRtcClient {
     protected async getWorkerApi(): Promise<WebWorker> {
         if (!this.webWorkerApi) {
             this.webWorkerApi = new WebWorker(this.assetsDir);
+            console.log("Init e2ee worker ...");
             await this.webWorkerApi.init_e2ee();
         }
         return this.webWorkerApi;
@@ -151,15 +152,18 @@ export class WebRtcClient {
             const videoSender = this.peerConnection.addTrack(track, stream);
             this.e2eeWorker = await this.getWorker();
     
+            console.log("this.e2eeWorker", this.e2eeWorker);
+
             if ((window as any).RTCRtpScriptTransform) {
                 const options = {
                     operation: 'encode',
                 };
-    
+                console.log("======> set e2ee worker for frame encoding (RTCRtpScriptTransform).");
                 (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
             } else {
+
                 const senderStreams = (videoSender as any).createEncodedStreams();
-    
+                console.log("post 'encode' frame to the e2ee worker..");
                 this.e2eeWorker.postMessage({
                     operation: 'encode',
                     readableStream: senderStreams.readable,
@@ -329,7 +333,6 @@ export class WebRtcClient {
     }
 
     async updateKeys(keys: Key[]) {
-        console.log("webrtcClient - updateKeys", keys);
         this.keyStore.setKeys(keys);
 
         // propagate keys to the worker

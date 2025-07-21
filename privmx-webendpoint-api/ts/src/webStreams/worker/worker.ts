@@ -12,7 +12,9 @@ import {
 import * as events from "./WorkerEvents";
 import { KeyStore } from "../KeyStore";
 
-const NUM_AS_UINT8_SIZE = 8;
+const NUM_AS_UINT8_SIZE = 1;
+const DEBUG = false;
+
 
 export interface TransformContext {
     keyStore: KeyStore;
@@ -34,7 +36,7 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
         const frameBody = new Uint8Array(encodedFrame.data, headerLen);
 
         const iv = Utils.genIvAsBuffer();
-        console.log("IV on encrypt: ", iv);
+        logDebug("IV on encrypt: " + JSON.stringify(iv));
 
         const keyEntry = this.keyStore.getEncriptionKey();
         
@@ -60,7 +62,7 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
         resultUint8.set(iv, posOfIv);
         resultUint8.set(Utils.numAsOneByteUint(iv.byteLength), posOfIvSize);
         resultUint8.set(keyIdAsUint8, posOfKeyId);
-        console.log("keyId to payload: ", keyIdAsUint8);
+        logDebug("keyId to payload: " + JSON.stringify(keyIdAsUint8));
         resultUint8.set(Utils.numAsOneByteUint(keyIdAsUint8.byteLength), posOfKeyIdSize);
         
         encodedFrame.data = result;
@@ -74,13 +76,13 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
         // const bodySize = encodedFrame.data.byteLength - headerSize - 8;
         
         const keyIdLenData = new Uint8Array(data, data.byteLength - NUM_AS_UINT8_SIZE, NUM_AS_UINT8_SIZE);
-        console.log("keyIdLenData", keyIdLenData);
+
         const keyIdLen = Utils.oneByteUint8AsNum(keyIdLenData);
-        console.log("keyIdLen", keyIdLen);
+
         const ivLenData = new Uint8Array(data, data.byteLength - NUM_AS_UINT8_SIZE*2 - keyIdLen, NUM_AS_UINT8_SIZE);
-        console.log("ivLenData", ivLenData);
+
         const ivLen = Utils.oneByteUint8AsNum(ivLenData);
-        console.log("ivLen", ivLen);
+
 
         const complementLen = headerLen + keyIdLen + ivLen + 2;
         const payloadLen = data.byteLength - complementLen;
@@ -93,7 +95,7 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
         // payloadBuf.set(new Uint8Array(data, data.byteLength));
         // let cursor = data.byteLength;
 
-        console.log({
+        logDebug({
             dataLength: data.byteLength,
             // payloadBufLen: payloadBuf.byteLength,
             payloadLen: payloadLen,
@@ -108,54 +110,80 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
         // // cursor += NUM_AS_UINT8_SIZE;
         // cursor += 1;
 
-        const keyId = new TextDecoder('utf-8').decode(
-            data.slice(headerLen + payloadLen + ivLen + 1, headerLen + payloadLen + ivLen + 1 + keyIdLen)
-        );
-        console.log("extracted keyId", keyId);
-        const keyEntry = this.keyStore.getKey(keyId);
-   
-        const iv = data.slice(headerLen + payloadLen, headerLen + payloadLen + ivLen);
-        console.log("extraced iv: ", iv, "(len: ", iv.byteLength, ")");
-        // const plain = await decryptSymmetric(Buffer.from(payload), Buffer.from(iv), Buffer.from(key.key));
-        const decryptionResult = await decryptWithAES256GCM(keyEntry.key, iv, payload, frameHeader);
-        if (!isDecryptionSuccess(decryptionResult)) {
-            throw new Error("Cannot decrypt frame");
-        }
-        const plain = decryptionResult.data;
-        console.log("plain", plain);
-        const result = new ArrayBuffer(frameHeader.byteLength + plain.byteLength);
-        const writableResult = new Uint8Array(result);
-        writableResult.set(frameHeader);
-        writableResult.set(new Uint8Array(plain), frameHeader.byteLength);
+        // const sub = new Uint8Array(data, headerLen + payloadLen + ivLen, keyIdLen);
+        // const subStr = new TextDecoder().decode(sub);
+        // logError("sub.length: " +sub.byteLength + " / sub_as_str.length: " + subStr.length + " / subStr: " + subStr )
+        const keyIdPos = headerLen + payloadLen + ivLen + 1;
+        const keyIdArray = data.slice(keyIdPos, keyIdPos + keyIdLen);
+        logError({keyIdArray});
+        const keyId = new TextDecoder().decode(keyIdArray);
 
-        encodedFrame.data = result;
-        controller.enqueue(encodedFrame);      
+        // logError("calculated keyId - from: " + (headerLen + payloadLen + ivLen + 1) + " to: " + (headerLen + payloadLen + ivLen + 1 + keyIdLen) + ". KeyIdLen: " +keyIdLen + ". Extracted key len: " + keyId.length);
+        // logDebug("extracted keyId", keyId);
+        logDebug("Trying to get key with Id: " + keyId + " from store: " + JSON.stringify(this.keyStore) );
+        try {
+            if (!this.keyStore.hasKey(keyId)) {
+                logError({msg: "Decryption failed. Cannot find key", keyId, store: this.keyStore});
+                controller.enqueue(encodedFrame);
+                return;
+            }
+            const keyEntry = this.keyStore.getKey(keyId);
+            const iv = data.slice(headerLen + payloadLen, headerLen + payloadLen + ivLen);
+            // logDebug("extraced iv: ", iv, "(len: ", iv.byteLength, ")");
+            // const plain = await decryptSymmetric(Buffer.from(payload), Buffer.from(iv), Buffer.from(key.key));
+            const decryptionResult = await decryptWithAES256GCM(keyEntry.key, iv, payload, frameHeader);
+            if (!isDecryptionSuccess(decryptionResult)) {
+                logError({msg: "Decryption failed. Cannot decrypt frame"});
+                controller.enqueue(encodedFrame);
+                return;
+            }
+            const plain = decryptionResult.data;
+            // logDebug("plain", plain);
+            const result = new ArrayBuffer(frameHeader.byteLength + plain.byteLength);
+            const writableResult = new Uint8Array(result);
+            writableResult.set(frameHeader);
+            writableResult.set(new Uint8Array(plain), frameHeader.byteLength);
+
+            encodedFrame.data = result;
+            controller.enqueue(encodedFrame);   
+        }
+        catch (e) {
+            logError(e);
+            controller.enqueue(encodedFrame);
+        }
     }
 
 }
 
+(self as any).keyStore = new KeyStore();
 
-let keyStore: KeyStore;
+const getKeyStore = () => {
+    return (self as any).keyStore as KeyStore;
+}
 
-export async function onmessage(message: {data: events.WorkerBaseEvent}) {
+
+
+// export async function onmessage(message: {data: events.WorkerBaseEvent}) {
+self.onmessage = (message: any) => {
+    logDebug("[e2ee-worker] onmessage: " + message);
     const { operation } = message.data;
 
     if (operation === 'initialize') {
-        keyStore = new KeyStore();
-        console.log("worker initialized")
+        logDebug("worker initialize call")
     } 
     else 
     if (operation === 'encode' || operation === 'decode') {
-        const context: TransformContext = {keyStore};
-        const { readableStream, writableStream, participantId } = (message.data as any).data;
+        const context: TransformContext = {keyStore: getKeyStore()};
+        const { readableStream, writableStream, participantId } = message.data;
         // const context = getParticipantContext(participantId);
 
         handleTransform(context, operation, readableStream, writableStream);
     } 
     else 
     if (operation === 'setKeys') {
+        logDebug("Worker: setting keys...");
         const event = message.data as events.SetKeysEvent;
-        keyStore.setKeys(event.keys);
+        getKeyStore().setKeys(event.keys);
     } 
 };
 
@@ -163,6 +191,7 @@ export async function onmessage(message: {data: events.WorkerBaseEvent}) {
 export declare interface RTCTransformEvent {}
 
 function createSenderTransform(_keyStore: KeyStore) {
+    logDebug("create sender transform...");
     const encrypter = new EncryptTransform(_keyStore);
 
     return new TransformStream({
@@ -190,8 +219,10 @@ function createReceiverTransform(_keyStore: KeyStore) {
 
 function handleTransform(context: TransformContext, operation: string, readableStream: any, writableStream: any) {
     let transformStream: TransformStream;
-    // console.log("on handleTransform", {key, operation, readableStream, writableStream})
+    // logDebug("on handleTransform", {key, operation, readableStream, writableStream})
+    logDebug("handleTransform: " + JSON.stringify({operation, context}));
     if (operation == "encode") {
+        
         transformStream = createSenderTransform(context.keyStore);
         readableStream
             .pipeThrough(transformStream)
@@ -203,14 +234,28 @@ function handleTransform(context: TransformContext, operation: string, readableS
             .pipeThrough(transformStream)
             .pipeTo(writableStream);
     } else {
-        console.error(`Invalid operation: ${operation}`);
+        logError(`Invalid operation: ${operation}`);
     }
+}
+
+function logDebug(msg: any) {
+    if (!DEBUG) {
+        return;
+    }
+    postMessage({type: "debug", data: msg});
+}
+function logError(msg: any) {
+    postMessage({type: "error", data: msg});
 }
 
 if ((self as any).RTCTransformEvent) {
     (self as any).onrtctransform = (event: any) => {
         const transformer = event.transformer;
         const { operation } = transformer.options;
-        handleTransform({keyStore}, operation, transformer.readable, transformer.writable);
+        logDebug("onrtctransfrom: "+JSON.stringify(event));
+        handleTransform({keyStore: getKeyStore()}, operation, transformer.readable, transformer.writable);
     };
-}    
+}
+
+// self.postMessage({type:"debug", data:"Initialized!!!"});
+logDebug("Initialized");
