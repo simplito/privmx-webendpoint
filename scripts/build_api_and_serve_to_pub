@@ -1,4 +1,4 @@
 #!/bin/bash
 SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 cd $SCRIPT_PATH
-./build_api vcurrent && ./add_assets_to_npm && ./prepare_npm 1.0.0-devel "$SCRIPT_PATH"
+./build_api vcurrent $1 && ./add_assets_to_npm && ./prepare_npm 1.0.0-devel "$SCRIPT_PATH"

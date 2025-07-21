@@ -6,20 +6,27 @@ if [ -z "$1" ]; then
     echo "$0: Parameter missing. Pass privmx-endpoint version used in build process"
     exit -1;
 fi
+
 PRIVMX_ENDPOINT_VERSION=$1
 
 source "$SCRIPT_PATH/config.sh"
 source "$EMSDK_DIR/emsdk_env.sh"
 
-cd "$PRIVMX_WEBENDPOINT_API_SRC/cpp"
-cp "$PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC/out/loader.js" "$PRIVMX_WEBENDPOINT_API_SRC/cpp/js/"
-cp "$PRIVMX_ENDPOINT_SRC-$PRIVMX_ENDPOINT_VERSION/emscripten/jslibrary/websocket.js" "$PRIVMX_WEBENDPOINT_API_SRC/cpp/js/"
-rm -rf ./build-emscripten
-mkdir -p build-emscripten && cd build-emscripten
-echo "EMSDK_DIR PASSED TO CMAKE: $EMSDK_DIR"
-echo "====================================="
-SDK_DIR=$EMSDK_DIR emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
-SDK_DIR=$EMSDK_DIR emmake make -j20
+if [ "$2" == "--skip-wasm" ]; then
+    echo "Skip WASM rebuild";
+else
+    cd "$PRIVMX_WEBENDPOINT_API_SRC/cpp"
+    cp "$PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC/out/loader.js" "$PRIVMX_WEBENDPOINT_API_SRC/cpp/js/"
+    cp "$PRIVMX_ENDPOINT_SRC-$PRIVMX_ENDPOINT_VERSION/emscripten/jslibrary/websocket.js" "$PRIVMX_WEBENDPOINT_API_SRC/cpp/js/"
+    rm -rf ./build-emscripten
+    mkdir -p build-emscripten && cd build-emscripten
+    echo "EMSDK_DIR PASSED TO CMAKE: $EMSDK_DIR"
+    echo "====================================="
+    SDK_DIR=$EMSDK_DIR emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
+    SDK_DIR=$EMSDK_DIR emmake make -j20
+fi
+
+
 
 cd "$PRIVMX_WEBENDPOINT_API_SRC/ts"
 npm ci --registry=https://npmregistry.privmx.com
