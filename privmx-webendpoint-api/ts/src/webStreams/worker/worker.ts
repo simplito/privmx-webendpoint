@@ -5,9 +5,6 @@ import {
     decryptWithAES256GCM,
     isEncryptionSuccess,
     isDecryptionSuccess,
-    EncryptionResponse,
-    DecryptionResponse,
-    BufferLike
 } from "../CryptoUtils";
 import * as events from "./WorkerEvents";
 import { KeyStore } from "../KeyStore";
@@ -36,12 +33,9 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
         const frameBody = new Uint8Array(encodedFrame.data, headerLen);
 
         const iv = Utils.genIvAsBuffer();
-        logDebug("IV on encrypt: " + JSON.stringify(iv));
-
         const keyEntry = this.keyStore.getEncriptionKey();
         
 
-        // const cryptoResult = await Utils.encryptSymmetric(frameBody, Buffer.from(keyEntry.key), Buffer.from(iv));
         const cryptoResult = await encryptWithAES256GCM(keyEntry.key, iv,  frameBody, frameHeader);
         if (!isEncryptionSuccess(cryptoResult)) {
             throw new Error("Cannot encrypt frame");
@@ -73,8 +67,7 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
         const headerLen = this.getHeaderSizeByType((encodedFrame as any).type);
         const data = encodedFrame.data;
         const frameHeader = new Uint8Array(data, 0, headerLen);
-        // const bodySize = encodedFrame.data.byteLength - headerSize - 8;
-        
+
         const keyIdLenData = new Uint8Array(data, data.byteLength - NUM_AS_UINT8_SIZE, NUM_AS_UINT8_SIZE);
 
         const keyIdLen = Utils.oneByteUint8AsNum(keyIdLenData);
@@ -83,44 +76,13 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
 
         const ivLen = Utils.oneByteUint8AsNum(ivLenData);
 
-
         const complementLen = headerLen + keyIdLen + ivLen + 2;
         const payloadLen = data.byteLength - complementLen;
-
-        // const payload = new ArrayBuffer(payloadLen);
-        // const payloadBuf = new Uint8Array(payload);
-        const payload = data.slice(headerLen + 1, headerLen + 1 + payloadLen);
-
-
-        // payloadBuf.set(new Uint8Array(data, data.byteLength));
-        // let cursor = data.byteLength;
-
-        logDebug({
-            dataLength: data.byteLength,
-            // payloadBufLen: payloadBuf.byteLength,
-            payloadLen: payloadLen,
-            complementLen: complementLen,
-            keyIdLen: keyIdLen,
-            ivLen: ivLen,
-            payload: payload.byteLength,
-            // cursor: cursor,
-            headerLen: headerLen
-        })
-        // payloadBuf.set(Utils.numAsOneByteUint(headerLen), cursor);
-        // // cursor += NUM_AS_UINT8_SIZE;
-        // cursor += 1;
-
-        // const sub = new Uint8Array(data, headerLen + payloadLen + ivLen, keyIdLen);
-        // const subStr = new TextDecoder().decode(sub);
-        // logError("sub.length: " +sub.byteLength + " / sub_as_str.length: " + subStr.length + " / subStr: " + subStr )
+        const payload = data.slice(headerLen, headerLen + payloadLen);
         const keyIdPos = headerLen + payloadLen + ivLen + 1;
         const keyIdArray = data.slice(keyIdPos, keyIdPos + keyIdLen);
-        logError({keyIdArray});
         const keyId = new TextDecoder().decode(keyIdArray);
 
-        // logError("calculated keyId - from: " + (headerLen + payloadLen + ivLen + 1) + " to: " + (headerLen + payloadLen + ivLen + 1 + keyIdLen) + ". KeyIdLen: " +keyIdLen + ". Extracted key len: " + keyId.length);
-        // logDebug("extracted keyId", keyId);
-        logDebug("Trying to get key with Id: " + keyId + " from store: " + JSON.stringify(this.keyStore) );
         try {
             if (!this.keyStore.hasKey(keyId)) {
                 logError({msg: "Decryption failed. Cannot find key", keyId, store: this.keyStore});
@@ -128,9 +90,7 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
                 return;
             }
             const keyEntry = this.keyStore.getKey(keyId);
-            const iv = data.slice(headerLen + payloadLen, headerLen + payloadLen + ivLen);
-            // logDebug("extraced iv: ", iv, "(len: ", iv.byteLength, ")");
-            // const plain = await decryptSymmetric(Buffer.from(payload), Buffer.from(iv), Buffer.from(key.key));
+            const iv = new Uint8Array(data.slice(headerLen + payloadLen, headerLen + payloadLen + ivLen));
             const decryptionResult = await decryptWithAES256GCM(keyEntry.key, iv, payload, frameHeader);
             if (!isDecryptionSuccess(decryptionResult)) {
                 logError({msg: "Decryption failed. Cannot decrypt frame"});
@@ -161,11 +121,7 @@ const getKeyStore = () => {
     return (self as any).keyStore as KeyStore;
 }
 
-
-
-// export async function onmessage(message: {data: events.WorkerBaseEvent}) {
 self.onmessage = (message: any) => {
-    logDebug("[e2ee-worker] onmessage: " + message);
     const { operation } = message.data;
 
     if (operation === 'initialize') {
