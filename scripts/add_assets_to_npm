@@ -14,6 +14,6 @@ cd "$NPM_ASSETS_DIR"
 cp "$PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC/dist/driver-web-context.js" "$NPM_ASSETS_DIR"
 cp "$PRIVMX_WEBENDPOINT_API_SRC/cpp/build-emscripten/endpoint-wasm-module.js" "$NPM_ASSETS_DIR"
 cp "$PRIVMX_WEBENDPOINT_API_SRC/cpp/build-emscripten/endpoint-wasm-module.wasm" "$NPM_ASSETS_DIR"
-cp "$PRIVMX_WEBENDPOINT_API_SRC/cpp/build-emscripten/endpoint-wasm-module.worker.js" "$NPM_ASSETS_DIR"
+# cp "$PRIVMX_WEBENDPOINT_API_SRC/cpp/build-emscripten/endpoint-wasm-module.worker.js" "$NPM_ASSETS_DIR"
 cp "$PRIVMX_WEBENDPOINT_API_SRC/ts/dist/e2ee-worker.js" "$NPM_ASSETS_DIR"
 
