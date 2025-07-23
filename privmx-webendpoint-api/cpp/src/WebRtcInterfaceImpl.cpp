@@ -44,7 +44,7 @@ void WebRtcInterfaceImpl::printErrorInJS(const std::string& msg) {
 
 emscripten::val WebRtcInterfaceImpl::callWebRtcJSHandler(emscripten::EM_VAL name, emscripten::EM_VAL params) {
     auto ret = emscripten::val::take_ownership(webRtcJsHandler(name, params));
-    emscripten_sleep(0);
+    // emscripten_sleep(0); // <-- this line caused ASYNCIFY_STACK overflow when webRtcJsHandler code was called in parallel
     return ret;
 }
 
@@ -89,11 +89,10 @@ std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription() {
     runTaskAsync([&]{
         auto methodName {"createOfferAndSetLocalDescription"};
         emscripten::val name = emscripten::val::u8string(methodName);
-        emscripten::val params = val::object();
+        emscripten::val params = val::undefined();
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
         assertStatus(methodName, jsResult);
-        std::string response {jsResult["buff"].as<std::string>()};
-        prms.set_value(response);
+        prms.set_value(jsResult["buff"].as<std::string>());
     });
     return ftr.get();
 }
@@ -128,7 +127,7 @@ void WebRtcInterfaceImpl::close() {
     runTaskAsync([&]{
         auto methodName {"close"};
         emscripten::val name = emscripten::val::u8string(methodName);
-        emscripten::val params = val::object();
+        emscripten::val params = val::undefined();
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
         assertStatus(methodName, jsResult);
     });

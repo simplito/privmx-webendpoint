@@ -90,7 +90,7 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         // const peerConnection = await this.client.createPeerConnectionWithLocalStream(mediaStream);
         const peerConnection = this.getClient().getActivePeerConnection();
         const offer = await peerConnection.createOffer();
-        peerConnection.setLocalDescription(offer);
+        await peerConnection.setLocalDescription(offer);
         return offer.sdp; // sdp 
     }
 
@@ -113,10 +113,6 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     }
 
     async updateKeys(model: UpdateKeysModel) {
-        try {
-            return this.getClient().updateKeys(model.keys);
-        } catch(e) {
-            console.warn("error on update keys", e);
-        }
+        return this.getClient().updateKeys(model.keys);
     }
 }
