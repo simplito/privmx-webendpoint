@@ -14,10 +14,14 @@ import { assertIsNumber, assertIsUint8Array, assertArgsValid, assertIsString } f
 import * as Types from "./Types";
 import * as Utils from "./Utils";
 import BN = require("bn.js");
+import { secp256k1 } from "@noble/curves/secp256k1.js";
 const EC = new elliptic.ec("secp256k1");
 const {subtle} = globalThis.crypto;
 const crypto = require('crypto');
 
+interface Noble {
+    eccVerify(sig: Uint8Array, msg: Uint8Array, pub: Uint8Array): Promise<boolean>;
+}
 export class EmCrypto {
     static HASH_ALGORITHM_MAP: {[name: string]: string} = {
         sha1: "SHA-1",
@@ -27,6 +31,26 @@ export class EmCrypto {
         SHA256: "SHA-256",
         SHA512: "SHA-512"
     };
+
+    private nobleCurves: typeof secp256k1 = null;
+    // import { secp256k1 } from '@noble/curves/secp256k1.js';
+    // const isValid = secp256k1.verify(sig, msg, pub) === true;
+    constructor() {
+
+    }
+
+    async loadESMModule() {
+        const { secp256k1, default: defaultExport } = await import('@noble/curves/secp256k1.js');
+        this.nobleCurves = secp256k1;
+        return { secp256k1, defaultExport };
+    }
+
+    async getNoble(): Promise<Noble> {
+        if (!this.nobleCurves) {
+            await this.loadESMModule();
+        }
+        return {eccVerify: this.nobleCurves.verify}
+    }
 
     private methodsMap: { [K: string]: Function } = {
         randomBytes: this.randomBytes,
@@ -56,6 +80,7 @@ export class EmCrypto {
         ecc_fromPrivateKey: this.eccFromPrivateKey,
         ecc_sign: this.eccSign,
         ecc_verify: this.eccVerify,
+        ecc_verify_test: this.eccVerifyTest,
         ecc_verify2: this.eccVerify2,
         ecc_derive: this.eccDerive,
         ecc_getOrder: this.eccGetOrder,
@@ -412,6 +437,10 @@ export class EmCrypto {
         Buffer.from(params.r).copy(buffer, 1);
         Buffer.from(params.s).copy(buffer, 33);
         return this.eccVerify({publicKey: params.publicKey, data: buffer, signature: params.data});
+    }
+
+    private async eccVerifyTest(params: Types.Verify_PARAMS) {
+
     }
 
     private async eccDerive(params: Types.Derive_PARAMS) {

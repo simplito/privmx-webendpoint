@@ -28,10 +28,11 @@
     "webpack-cli": "^5.0.1"
   },
   "dependencies": {
+    "@noble/curves": "^1.9.4",
     "bn.js": "^5.2.1",
     "elliptic": "^6.6.1"
   },
-  "engines" : { 
-    "node" : ">=20.0.0"
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
