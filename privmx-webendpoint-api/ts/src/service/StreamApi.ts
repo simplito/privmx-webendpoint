@@ -36,7 +36,7 @@ export class StreamApi extends BaseApi {
     }
 
     // local data
-    private streams: Map<string, Types.Stream> = new Map();
+    private streams: Map<StreamId, Types.Stream> = new Map();
     private streamTracks: Map<string, StreamTrack> = new Map();
     private dataChannels: Map<string, RTCDataChannel> = new Map();
  
@@ -126,11 +126,12 @@ export class StreamApi extends BaseApi {
         // return streamId;
 
         const streamId = Utils.generateNumericId() as StreamId;
-        const key = streamId.toString();
         const meta: StreamCreateMeta = {};
         // tutaj uzupelniajac opcjonalne pola obiektu meta mozemy ustawiac w Janusie dodatkowe rzeczy
-        this.streams.set(key, {streamId, streamRoomId, createStreamMeta: meta, remote: false});
-        return await this.native.createStream(this.servicePtr, [streamRoomId, streamId]) as Types.StreamId;
+
+        const localStreamId = await this.native.createStream(this.servicePtr, [streamRoomId, streamId]) as Types.StreamId;
+        this.streams.set(localStreamId, {streamId, streamRoomId, createStreamMeta: meta, remote: false});
+        return localStreamId;
     }
 
     // public async updateStream(streamRoomId: Types.StreamRoomId, localStreamId: Types.StreamId): Promise<Types.StreamId> {
@@ -213,17 +214,16 @@ export class StreamApi extends BaseApi {
         // }
 
 
-        const key = streamId.toString();
-        if (! this.streams.has(key)) {
+        if (! this.streams.has(streamId)) {
             console.log("LOG: ", this.streams);
-            throw new Error("[addStreamTrack]: there is no Stream with given Id: "+key);
+            throw new Error("[addStreamTrack]: there is no Stream with given Id: "+streamId);
         }
         for (const [key, streamTrack] of this.streamTracks.entries()) {
             if (streamTrack.track && streamTrack.track?.id === meta.track?.id) {
                 throw new Error("[addStreamTrack] StreamTrack with given browser's track already added.");
             }
         }
-        const stream = this.streams.get(key);
+        const stream = this.streams.get(streamId);
         if (! stream) {
             throw new Error("Cannot find stream by id");
         }
@@ -303,9 +303,8 @@ export class StreamApi extends BaseApi {
                 mediaTracks.push(value.track);
             }
         }
-        const key = streamId.toString(); // jakis klucz bierzemy
 
-        const _stream = this.streams.get(key);
+        const _stream = this.streams.get(streamId);
         if (!_stream) {
             throw new Error("No stream defined to publish");
         }
@@ -355,11 +354,10 @@ export class StreamApi extends BaseApi {
 
     // PART DONE
     public async unpublishStream(streamId: Types.StreamId): Promise<void> {
-        const key = streamId.toString();
-        const _stream = this.streams.get(key);
-        if (!_stream) {
-            throw new Error ("No local stream with given id to unpublish");
+        if (!this.streams.has(streamId)) {
+            throw new Error ("No local stream with given id to unpublish"); 
         }
+        const _stream = this.streams.get(streamId);
 
         // orig
         // await this.client.provideSession();
@@ -380,7 +378,8 @@ export class StreamApi extends BaseApi {
         // }});
 
 
-        return this.native.unpublishStream(this.servicePtr, [streamId]);
+        await this.native.unpublishStream(this.servicePtr, [streamId]);
+        this.streams.delete(streamId);
     }
 
     // PART DONE
@@ -405,16 +404,18 @@ export class StreamApi extends BaseApi {
         await this.client.createPeerConnectionOnJoin(overridenCreds);
 
         this.client.addRemoteStreamListener(settings.onRemoteTrack);
-        const localStreamIdTmp = 0;
-        return this.native.joinStream(this.servicePtr, [streamRoomId, streamsIds, settings.settings, 0]);
+        const localStreamId = Utils.generateNumericId() as StreamId;
+        const res = await this.native.joinStream(this.servicePtr, [streamRoomId, streamsIds, settings.settings, localStreamId]);
+        this.streams.set(localStreamId, {streamId: res as StreamId, streamRoomId, createStreamMeta: {}, remote: true});
+        return res;
     }
 
     public async leaveStream(_streamId: Types.StreamId): Promise<void> {
-        // const _stream = this.streams.get(streamId.toString());
-        // if (!_stream) {
-        //     throw new Error ("No stream with given id to leave");
-        // }
-
+        
+        if (!this.streams.has(_streamId)) {
+            throw new Error ("No stream with given id to leave");
+        }
+        const _stream = this.streams.get(_streamId);
         // await this.client.provideSession();
 
         // return this.serverChannel.call<StreamsApi.StreamLeaveRequest, void>({kind: "streams.streamLeave", data: {
@@ -423,7 +424,8 @@ export class StreamApi extends BaseApi {
         //         streamRoomId: _stream.streamRoomId
         //     }
         // }});
-        throw new Error("Not implemented");
+        await this.native.leaveStream(this.servicePtr, [_stream.streamId]);
+        this.streams.delete(_streamId);
     }
 
     // public async addRemoteStreamListener(listener: RemoteStreamListener) {
