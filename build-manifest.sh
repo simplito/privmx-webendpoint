@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PRIVMX_ENDPOINT="v2.5.3"
+PRIVMX_ENDPOINT="v2.6.0-rc1"
 PSON_CPP="v1.0.7"
 GMP="6.2.1"
 POCO="1.10.1"
