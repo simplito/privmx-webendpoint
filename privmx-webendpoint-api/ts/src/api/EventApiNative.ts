@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { UserWithPubKey } from "../Types";
+import { EventsEventSelectorType, UserWithPubKey } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class EventApiNative extends BaseNative {
@@ -26,10 +26,13 @@ export class EventApiNative extends BaseNative {
     async emitEvent(ptr: number, args: [string, string, Uint8Array, UserWithPubKey[]]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.EventApi_emitEvent(taskId, ptr, args));
     }
-    async subscribeForCustomEvents(ptr: number, args: [string, string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.EventApi_subscribeForCustomEvents(taskId, ptr, args));
+    async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
+        return this.runAsync<string[]>((taskId)=>this.api.lib.EventApi_subscribeFor(taskId, ptr, args));
     }
-    async unsubscribeFromCustomEvents(ptr: number, args: [string, string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.EventApi_unsubscribeFromCustomEvents(taskId, ptr, args));
-    }    
+    async unsubscribeFrom(ptr: number, args: [string[]]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.EventApi_unsubscribeFrom(taskId, ptr, args));
+    }
+    async buildSubscriptionQuery(ptr: number, args: [string, EventsEventSelectorType, string]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.EventApi_buildSubscriptionQuery(taskId, ptr, args));
+    }  
 }
