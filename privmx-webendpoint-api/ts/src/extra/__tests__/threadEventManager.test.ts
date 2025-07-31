@@ -8,14 +8,16 @@ import {
 
 describe('Thread event manager', () => {
     let { q, manager } = createTestSetup();
+    const TEST_CONTEXT_ID = 'test-context-id';
     let mockEventsManager: ThreadEventsManager = manager.getThreadEventManager(
-        new MockThreadEventApi(q)
+        new MockThreadEventApi(q),
+        TEST_CONTEXT_ID
     );
 
     beforeEach(() => {
         let { q: _q, manager } = createTestSetup();
         q = _q;
-        mockEventsManager = manager.getThreadEventManager(new MockThreadEventApi(q));
+        mockEventsManager = manager.getThreadEventManager(new MockThreadEventApi(q), TEST_CONTEXT_ID);
     });
 
     it('should create manager', async () => {

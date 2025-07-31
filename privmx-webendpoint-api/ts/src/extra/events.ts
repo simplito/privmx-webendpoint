@@ -1,5 +1,5 @@
 import { Types } from "..";
-import { ThreadEventType, ThreadEventSelectorType, InboxEventType, InboxEventSelectorType } from "../Types";
+import { ThreadEventType, ThreadEventSelectorType, InboxEventType, InboxEventSelectorType, StoreEventType, StoreEventSelectorType, KvdbEventType, KvdbEventSelectorType, EventsEventSelectorType } from "../Types";
 
 export type Channel =
     | 'inbox'
@@ -8,6 +8,8 @@ export type Channel =
     | `store/${string}/files`
     | 'thread'
     | `thread/${string}/messages`
+    | 'kvdb'
+    | `kvdb/${string}/entries`
     | `connection/${string}`;
 
 /**
@@ -74,6 +76,22 @@ export interface EventPayload {
         inboxId: string;
         entryId: string;
     };
+    kvdbCreated: Types.Kvdb;
+    kvdbUpdated: Types.Kvdb;
+    kvdbDeleted: { kvdbId: string };
+    kvdbStatsChanged: {
+        contextId: string;
+        kvdbId: string;
+        lastEntryDate: number;
+        entriesCount: number;
+    };
+    kvdbEntryCreated: Types.KvdbEntry;
+    kvdbEntryUpdated: Types.KvdbEntry;
+    kvdbEntryDeleted: {
+        contextId: string;
+        kvdbId: string;
+        entryId: string;
+    };
     libConnected: undefined;
     libDisconnected: undefined;
     libPlatformDisconnected: undefined;
@@ -118,6 +136,17 @@ export type OnEntryEventHandler =
     | EventHandler<'inboxEntryCreated'>
     | EventHandler<'inboxEntryDeleted'>
 
+export type OnKvdbEventHandler =
+    | EventHandler<'kvdbCreated'>
+    | EventHandler<'kvdbUpdated'>
+    | EventHandler<'kvdbDeleted'>
+    | EventHandler<'kvdbStatsChanged'>;
+
+export type OnKvdbEntryEventHandler =
+    | EventHandler<'kvdbEntryCreated'>
+    | EventHandler<'kvdbEntryUpdated'>
+    | EventHandler<'kvdbEntryDeleted'>;
+
 export type OnConnectionHandler =
     | EventHandler<'libConnected'>
     | EventHandler<'libDisconnected'>
@@ -131,11 +160,11 @@ export abstract class BaseEventManager {
     }
 
     protected channels: Set<Channel>;
+    protected subscriptionIds: string[] = [];
+    protected isSubscribed: boolean = false;
 
-    protected abstract subscribeForModuleEvents(contextId: string): Promise<void>;
-    protected abstract subscribeForModuleElementsEvents(containerId: string): Promise<void>;
-    protected abstract unsubscribeFromModuleEvents(): Promise<void>;
-    protected abstract unsubscribeFromModuleElementsEvents(containerId: string): Promise<void>;
+    protected abstract subscribe(): Promise<void>;
+    protected abstract unsubscribe(): Promise<void>;
 
     constructor() {
         this._listeners = new Map();
@@ -249,32 +278,35 @@ export abstract class BaseEventManager {
         eventType: EventType,
         callback: Function
     ) => {
-        if (!this.isSubscribedToChannel(channel)) {
-            await this.subscribeForModuleEvents();
+        if (!this.isSubscribed) {
+            await this.subscribe();
+            this.isSubscribed = true;
         }
         const removeListener = this.addEventListener(channel, eventType, callback);
         return async () => {
             removeListener();
-            if (!this.hasEventsOnChannel(channel)) {
-                await this.unsubscribeFromModuleEvents();
+            if (this._listeners.size === 0) {
+                await this.unsubscribe();
+                this.isSubscribed = false;
             }
         };
     };
 
     protected addContainerElementListener = async (
-        containerId: string,
         channel: Channel,
         eventType: EventType,
         callback: Function
     ) => {
-        if (!this.isSubscribedToChannel(channel)) {
-            await this.subscribeForModuleElementsEvents(containerId);
+        if (!this.isSubscribed) {
+            await this.subscribe();
+            this.isSubscribed = true;
         }
         const removeListener = this.addEventListener(channel, eventType, callback);
         return async () => {
             removeListener();
-            if (!this.hasEventsOnChannel(channel)) {
-                await this.unsubscribeFromModuleElementsEvents(containerId);
+            if (this._listeners.size === 0) {
+                await this.unsubscribe();
+                this.isSubscribed = false;
             }
         };
     };
@@ -301,21 +333,30 @@ export interface SubscriberForThreadsEvents {
 
 
 export class ThreadEventsManager extends BaseEventManager {
-    constructor(private threadApi: SubscriberForThreadsEvents) {
+    constructor(private threadApi: SubscriberForThreadsEvents, private contextId: string) {
         super();
     }
 
-    subscribeForModuleEvents() {
-        return this.threadApi.subscribeForThreadEvents();
+    async subscribe(): Promise<void> {
+        const queries = await Promise.all([
+            this.threadApi.buildSubscriptionQuery(ThreadEventType.THREAD_CREATE, ThreadEventSelectorType.CONTEXT_ID, this.contextId),
+            this.threadApi.buildSubscriptionQuery(ThreadEventType.THREAD_UPDATE, ThreadEventSelectorType.CONTEXT_ID, this.contextId),
+            this.threadApi.buildSubscriptionQuery(ThreadEventType.THREAD_DELETE, ThreadEventSelectorType.CONTEXT_ID, this.contextId),
+            this.threadApi.buildSubscriptionQuery(ThreadEventType.THREAD_STATS, ThreadEventSelectorType.CONTEXT_ID, this.contextId),
+
+            this.threadApi.buildSubscriptionQuery(ThreadEventType.MESSAGE_CREATE, ThreadEventSelectorType.CONTEXT_ID, this.contextId),
+            this.threadApi.buildSubscriptionQuery(ThreadEventType.MESSAGE_UPDATE, ThreadEventSelectorType.CONTEXT_ID, this.contextId),
+            this.threadApi.buildSubscriptionQuery(ThreadEventType.MESSAGE_DELETE, ThreadEventSelectorType.CONTEXT_ID, this.contextId)
+        ]);
+        
+        this.subscriptionIds = await this.threadApi.subscribeFor(queries);
     }
-    subscribeForModuleElementsEvents(id: string) {
-        return this.threadApi.subscribeForMessageEvents(id);
-    }
-    unsubscribeFromModuleEvents() {
-        return this.threadApi.unsubscribeFromThreadEvents();
-    }
-    unsubscribeFromModuleElementsEvents(id: string) {
-        return this.threadApi.unsubscribeFromMessageEvents(id);
+
+    async unsubscribe(): Promise<void> {
+        if (this.subscriptionIds.length > 0) {
+            await this.threadApi.unsubscribeFrom(this.subscriptionIds);
+            this.subscriptionIds = [];
+        }
     }
 
     async onThreadEvent(handler: OnThreadEventHandler) {
@@ -325,7 +366,7 @@ export class ThreadEventsManager extends BaseEventManager {
 
     async onMessageEvent(threadId: string, handler: OnMessageEventHandler) {
         const channel: Channel = `thread/${threadId}/messages`;
-        return this.addContainerElementListener(threadId, channel, handler.event, handler.callback);
+        return this.addContainerElementListener(channel, handler.event, handler.callback);
     }
 }
 
@@ -352,13 +393,31 @@ export interface SubscriberForStoreEvents {
 
 
 export class StoreEventsManager extends BaseEventManager {
-    constructor(private storeApi: SubscriberForStoreEvents) {
+    constructor(private storeApi: SubscriberForStoreEvents, private contextId: string) {
         super();
     }
-    subscribeForModuleEvents() {return this.storeApi.subscribeForStoreEvents()}
-    subscribeForModuleElementsEvents(id:string){return this.storeApi.subscribeForFileEvents(id)}
-    unsubscribeFromModuleEvents(){return this.storeApi.unsubscribeFromStoreEvents()}
-    unsubscribeFromModuleElementsEvents(id:string){return this.storeApi.unsubscribeFromFileEvents(id)}
+
+    async subscribe(): Promise<void> {
+        const queries = await Promise.all([
+            this.storeApi.buildSubscriptionQuery(StoreEventType.STORE_CREATE, StoreEventSelectorType.CONTEXT_ID, this.contextId),
+            this.storeApi.buildSubscriptionQuery(StoreEventType.STORE_UPDATE, StoreEventSelectorType.CONTEXT_ID, this.contextId),
+            this.storeApi.buildSubscriptionQuery(StoreEventType.STORE_DELETE, StoreEventSelectorType.CONTEXT_ID, this.contextId),
+            this.storeApi.buildSubscriptionQuery(StoreEventType.STORE_STATS, StoreEventSelectorType.CONTEXT_ID, this.contextId),
+
+            this.storeApi.buildSubscriptionQuery(StoreEventType.FILE_CREATE, StoreEventSelectorType.CONTEXT_ID, this.contextId),
+            this.storeApi.buildSubscriptionQuery(StoreEventType.FILE_UPDATE, StoreEventSelectorType.CONTEXT_ID, this.contextId),
+            this.storeApi.buildSubscriptionQuery(StoreEventType.FILE_DELETE, StoreEventSelectorType.CONTEXT_ID, this.contextId)
+        ]);
+
+        this.subscriptionIds = await this.storeApi.subscribeFor(queries);
+    }
+
+    async unsubscribe(): Promise<void> {
+        if (this.subscriptionIds.length > 0) {
+            await this.storeApi.unsubscribeFrom(this.subscriptionIds);
+            this.subscriptionIds = [];
+        }
+    }
 
     async onStoreEvent(handler: OnStoreEventHandler) {
         const channel: Channel = 'store';
@@ -367,7 +426,7 @@ export class StoreEventsManager extends BaseEventManager {
 
     async onFileEvent(storeId: string, handler: OnFileEventHandler) {
         const channel: Channel = `store/${storeId}/files`;
-        return this.addContainerElementListener(storeId, channel, handler.event, handler.callback);
+        return this.addContainerElementListener(channel, handler.event, handler.callback);
     }
 }
 
@@ -391,33 +450,29 @@ export interface SubscriberForInboxEvents {
 }
 
 export class InboxEventsManager extends BaseEventManager {
-    private moduleSubscriptions: string[] = [];
-    private elementsSubscriptions: string[] = [];
-    constructor(private inboxApi:SubscriberForInboxEvents) {
+    constructor(private inboxApi: SubscriberForInboxEvents, private contextId: string) {
         super();
     }
 
-    subscribeForModuleEvents(contextId: string): Promise<void> {
-        return Promise.all([
-            this.inboxApi.buildSubscriptionQuery(InboxEventType.INBOX_CREATE, InboxEventSelectorType.CONTEXT_ID, contextId),
-            this.inboxApi.buildSubscriptionQuery(InboxEventType.INBOX_UPDATE, InboxEventSelectorType.CONTEXT_ID, contextId),
-            this.inboxApi.buildSubscriptionQuery(InboxEventType.INBOX_DELETE, InboxEventSelectorType.CONTEXT_ID, contextId),
-        ]).then(async queries => {
-            this.moduleSubscriptions = this.moduleSubscriptions.concat(await this.inboxApi.subscribeFor(queries));
-        })
+    async subscribe(): Promise<void> {
+        const queries = await Promise.all([
+            this.inboxApi.buildSubscriptionQuery(InboxEventType.INBOX_CREATE, InboxEventSelectorType.CONTEXT_ID, this.contextId),
+            this.inboxApi.buildSubscriptionQuery(InboxEventType.INBOX_UPDATE, InboxEventSelectorType.CONTEXT_ID, this.contextId),
+            this.inboxApi.buildSubscriptionQuery(InboxEventType.INBOX_DELETE, InboxEventSelectorType.CONTEXT_ID, this.contextId),
+
+            this.inboxApi.buildSubscriptionQuery(InboxEventType.ENTRY_CREATE, InboxEventSelectorType.CONTEXT_ID, this.contextId),
+            this.inboxApi.buildSubscriptionQuery(InboxEventType.ENTRY_DELETE, InboxEventSelectorType.CONTEXT_ID, this.contextId)
+        ]);
+
+        this.subscriptionIds = await this.inboxApi.subscribeFor(queries);
     }
-    subscribeForModuleElementsEvents(id: string){
-        return Promise.all([
-            this.inboxApi.buildSubscriptionQuery(InboxEventType.ENTRY_CREATE, InboxEventSelectorType.INBOX_ID, id),
-            this.inboxApi.buildSubscriptionQuery(InboxEventType.ENTRY_DELETE, InboxEventSelectorType.INBOX_ID, id),
-        ]).then(async queries => {
-            this.elementsSubscriptions = this.elementsSubscriptions.concat(await this.inboxApi.subscribeFor(queries)); 
-        })
+
+    async unsubscribe(): Promise<void> {
+        if (this.subscriptionIds.length > 0) {
+            await this.inboxApi.unsubscribeFrom(this.subscriptionIds);
+            this.subscriptionIds = [];
+        }
     }
-    unsubscribeFromModuleEvents(contextId: string){
-        return this.inboxApi.unsubscribeFrom(this.moduleSubscriptions);
-    }
-    unsubscribeFromModuleElementsEvents(id: string){return this.inboxApi.unsubscribeFromEntryEvents(id)}
 
     async onInboxEvent(handler: OnInboxEventHandler) {
         const channel: Channel = 'inbox';
@@ -426,23 +481,74 @@ export class InboxEventsManager extends BaseEventManager {
 
     async onEntryEvent(inboxId: string, handler: OnEntryEventHandler) {
         const channel: Channel = `inbox/${inboxId}/entries`;
-        return this.addContainerElementListener(inboxId, channel, handler.event, handler.callback);
+        return this.addContainerElementListener(channel, handler.event, handler.callback);
+    }
+}
+
+export interface SubscriberForKvdbEvents {
+    /**
+     * Subscribe for the KVDB events on the given subscription query.
+     * @param {string[]} subscriptionQueries list of queries
+     */
+    subscribeFor(subscriptionQueries: string[]): Promise<string[]>;
+    /**
+     * Unsubscribes from events for the given subscriptionId.
+     */
+    unsubscribeFrom(subscriptionIds: string[]): Promise<void>;
+    /**
+     * Generate subscription Query for the KVDB events.
+     * @param {EventType} eventType type of event which you listen for
+     * @param {EventSelectorType} selectorType scope on which you listen for events  
+     * @param {string} selectorId ID of the selector
+     */
+    buildSubscriptionQuery(eventType: KvdbEventType, selectorType: KvdbEventSelectorType, selectorId: string): Promise<string>;
+}
+
+export class KvdbEventsManager extends BaseEventManager {
+    constructor(private kvdbApi: SubscriberForKvdbEvents, private contextId: string) {
+        super();
+    }
+
+    async subscribe(): Promise<void> {
+        const queries = await Promise.all([
+            this.kvdbApi.buildSubscriptionQuery(KvdbEventType.KVDB_CREATE, KvdbEventSelectorType.CONTEXT_ID, this.contextId),
+            this.kvdbApi.buildSubscriptionQuery(KvdbEventType.KVDB_UPDATE, KvdbEventSelectorType.CONTEXT_ID, this.contextId),
+            this.kvdbApi.buildSubscriptionQuery(KvdbEventType.KVDB_DELETE, KvdbEventSelectorType.CONTEXT_ID, this.contextId),
+            this.kvdbApi.buildSubscriptionQuery(KvdbEventType.KVDB_STATS, KvdbEventSelectorType.CONTEXT_ID, this.contextId),
+
+            this.kvdbApi.buildSubscriptionQuery(KvdbEventType.ENTRY_CREATE, KvdbEventSelectorType.CONTEXT_ID, this.contextId),
+            this.kvdbApi.buildSubscriptionQuery(KvdbEventType.ENTRY_UPDATE, KvdbEventSelectorType.CONTEXT_ID, this.contextId),
+            this.kvdbApi.buildSubscriptionQuery(KvdbEventType.ENTRY_DELETE, KvdbEventSelectorType.CONTEXT_ID, this.contextId)
+        ]);
+
+        this.subscriptionIds = await this.kvdbApi.subscribeFor(queries);
+    }
+
+    async unsubscribe(): Promise<void> {
+        if (this.subscriptionIds.length > 0) {
+            await this.kvdbApi.unsubscribeFrom(this.subscriptionIds);
+            this.subscriptionIds = [];
+        }
+    }
+
+    async onKvdbEvent(handler: OnKvdbEventHandler) {
+        const channel: Channel = 'kvdb';
+        return this.addContainerListener(channel, handler.event, handler.callback);
+    }
+
+    async onKvdbEntryEvent(kvdbId: string, handler: OnKvdbEntryEventHandler) {
+        const channel: Channel = `kvdb/${kvdbId}/entries`;
+        return this.addContainerElementListener(channel, handler.event, handler.callback);
     }
 }
 
 export class ConnectionEventsManager extends BaseEventManager {
-    //Connection events don't have subscribe functions
-    protected subscribeForModuleEvents() {
-        return new Promise<void>((resolve) => resolve());
+    protected subscribe(): Promise<void> {
+        return Promise.resolve();
     }
-    protected subscribeForModuleElementsEvents() {
-        return new Promise<void>((resolve) => resolve());
-    }
-    protected unsubscribeFromModuleEvents() {
-        return new Promise<void>((resolve) => resolve());
-    }
-    protected unsubscribeFromModuleElementsEvents() {
-        return new Promise<void>((resolve) => resolve());
+
+    protected unsubscribe(): Promise<void> {
+        return Promise.resolve();
     }
 
     constructor(private connectionId: string) {
@@ -504,20 +610,26 @@ export class EventManager {
         this.dispatchers.push((e) => manager.dispatchEvent(e));
     }
 
-    getThreadEventManager(threadApi: SubscriberForThreadsEvents) {
-        const manager = new ThreadEventsManager(threadApi);
+    getThreadEventManager(threadApi: SubscriberForThreadsEvents, contextId: string) {
+        const manager = new ThreadEventsManager(threadApi, contextId);
         this.registerDispatcher(manager);
         return manager;
     }
 
-    getStoreEventManager(storeApi: SubscriberForStoreEvents) {
-        const manager = new StoreEventsManager(storeApi);
+    getStoreEventManager(storeApi: SubscriberForStoreEvents, contextId: string) {
+        const manager = new StoreEventsManager(storeApi, contextId);
         this.registerDispatcher(manager);
         return manager;
     }
 
-    getInboxEventManager(inboxApi: SubscriberForInboxEvents) {
-        const manager = new InboxEventsManager(inboxApi);
+    getInboxEventManager(inboxApi: SubscriberForInboxEvents, contextId: string) {
+        const manager = new InboxEventsManager(inboxApi, contextId);
+        this.registerDispatcher(manager);
+        return manager;
+    }
+
+    getKvdbEventManager(kvdbApi: SubscriberForKvdbEvents, contextId: string) {
+        const manager = new KvdbEventsManager(kvdbApi, contextId);
         this.registerDispatcher(manager);
         return manager;
     }

@@ -8,14 +8,15 @@ import {createTestSetup} from "./__mocks__/utils";
 
 describe('Events Helpers', () => {
     let { q, manager } = createTestSetup();
-    let mockEventsManager = new ThreadEventsManager(new MockThreadEventApi(q));
+    const TEST_CONTEXT_ID = 'test-context-id';
+    let mockEventsManager = new ThreadEventsManager(new MockThreadEventApi(q), TEST_CONTEXT_ID);
     manager.registerDispatcher(mockEventsManager);
 
     beforeEach(() => {
         let { q:_q, manager:_m } = createTestSetup();
         q = _q
         manager = _m
-        mockEventsManager = new ThreadEventsManager(new MockThreadEventApi(q));
+        mockEventsManager = new ThreadEventsManager(new MockThreadEventApi(q), TEST_CONTEXT_ID);
         manager.registerDispatcher(mockEventsManager);
     });
 

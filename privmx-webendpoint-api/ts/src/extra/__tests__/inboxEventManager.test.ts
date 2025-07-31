@@ -4,14 +4,16 @@ import {MOCK_INBOX_CREATED_EVENT, MOCK_INBOX_ENTRY_DELETED_EVENT} from "./__mock
 
 describe('Inbox event manager', () => {
     let { q, manager } = createTestSetup();
+    const TEST_CONTEXT_ID = 'test-context-id';
     let mockEventsManager = manager.getInboxEventManager(
-        new MockInboxEventApi(q)
+        new MockInboxEventApi(q),
+        TEST_CONTEXT_ID
     );
 
     beforeEach(() => {
         let { q: _q, manager } = createTestSetup();
         q = _q;
-        mockEventsManager = manager.getInboxEventManager(new MockInboxEventApi(q));
+        mockEventsManager = manager.getInboxEventManager(new MockInboxEventApi(q), TEST_CONTEXT_ID);
     });
 
     it('should add callback for event', async () => {

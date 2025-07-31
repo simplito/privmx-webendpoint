@@ -5,15 +5,18 @@ import {MOCK_STORE_CREATED_EVENT, MOCK_STORE_FILE_DELETED_EVENT} from "./__mocks
 
 describe('Store event manager', () => {
     let { q, manager } = createTestSetup();
+    const TEST_CONTEXT_ID = 'test-context-id';
     let mockEventsManager: StoreEventsManager = manager.getStoreEventManager(
-        new MockStoreEventApi(q)
+        new MockStoreEventApi(q),
+        TEST_CONTEXT_ID
     );
 
     beforeEach(() => {
         let { q: _q, manager } = createTestSetup();
         q = _q;
         mockEventsManager = manager.getStoreEventManager(
-            new MockStoreEventApi(q)
+            new MockStoreEventApi(q),
+            TEST_CONTEXT_ID
         );
     });
 

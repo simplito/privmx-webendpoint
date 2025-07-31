@@ -10,12 +10,10 @@ export class MockEventQueue {
     constructor() {}
 
     dispatchEvent(event: Types.Event) {
-        if (this.registeredChannels.has(event.channel as Channel)) {
-            this.queue.push(event);
-            if (this.resolveCommand) {
-                this.resolveCommand.resolver();
-                this.resolveCommand = null;
-            }
+        this.queue.push(event);
+        if (this.resolveCommand) {
+            this.resolveCommand.resolver();
+            this.resolveCommand = null;
         }
     }
 

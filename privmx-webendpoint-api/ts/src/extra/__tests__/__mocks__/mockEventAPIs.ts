@@ -1,81 +1,63 @@
-import {MockContainerSubscriber} from './mockContainerSubscriber';
 import {MockEventQueue} from "./mockEventQueue";
-import {Channel, SubscriberForInboxEvents, SubscriberForStoreEvents, SubscriberForThreadsEvents} from "../../events";
+import {Channel, SubscriberForInboxEvents, SubscriberForStoreEvents, SubscriberForThreadsEvents, SubscriberForKvdbEvents} from "../../events";
+import {ThreadEventType, ThreadEventSelectorType, StoreEventType, StoreEventSelectorType, InboxEventType, InboxEventSelectorType, KvdbEventType, KvdbEventSelectorType} from "../../../Types";
 
-export class MockThreadEventApi extends MockContainerSubscriber implements SubscriberForThreadsEvents {
-    containerChannel: Channel = 'thread';
+export class MockThreadEventApi implements SubscriberForThreadsEvents {
+    constructor(private queue: MockEventQueue) {}
 
-    containerElementChannel(id: string): Channel {
-        return `thread/${id}/messages`;
+    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+        return subscriptionQueries.map((_, index) => `sub_${Date.now()}_${index}`);
     }
 
-    constructor(queue: MockEventQueue) {
-        super(queue);
+    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
     }
 
-    subscribeForThreadEvents(): Promise<void> {
-        return this.subscribeForContainerEvents();
-    }
-
-    unsubscribeFromThreadEvents(): Promise<void> {
-        return this.unsubscribeFromContainerEvents();
-    }
-
-    subscribeForMessageEvents(threadId: string): Promise<void> {
-        return this.subscribeForContainerItemEvents(threadId);
-    }
-
-    unsubscribeFromMessageEvents(threadId: string): Promise<void> {
-        return this.unsubscribeFromContainerItemEvents(threadId);
+    async buildSubscriptionQuery(eventType: ThreadEventType, selectorType: ThreadEventSelectorType, selectorId: string): Promise<string> {
+        return `thread_${eventType}_${selectorType}_${selectorId}`;
     }
 }
 
-export class MockStoreEventApi extends MockContainerSubscriber implements SubscriberForStoreEvents {
-    containerChannel: Channel = 'store';
+export class MockStoreEventApi implements SubscriberForStoreEvents {
+    constructor(private queue: MockEventQueue) {}
 
-    containerElementChannel(id: string): Channel {
-        return `store/${id}/files`;
-    }
-
-    constructor(queue: MockEventQueue) {
-        super(queue);
+    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+        return subscriptionQueries.map((_, index) => `sub_${Date.now()}_${index}`);
     }
 
-    subscribeForStoreEvents(): Promise<void> {
-        return this.subscribeForContainerEvents();
+    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
     }
-    unsubscribeFromStoreEvents(): Promise<void> {
-        return this.unsubscribeFromContainerEvents();
-    }
-    subscribeForFileEvents(storeId: string): Promise<void> {
-        return this.subscribeForContainerItemEvents(storeId);
-    }
-    unsubscribeFromFileEvents(storeId: string): Promise<void> {
-        return this.unsubscribeFromContainerItemEvents(storeId);
+
+    async buildSubscriptionQuery(eventType: StoreEventType, selectorType: StoreEventSelectorType, selectorId: string): Promise<string> {
+        return `store_${eventType}_${selectorType}_${selectorId}`;
     }
 }
 
-export class MockInboxEventApi extends MockContainerSubscriber implements SubscriberForInboxEvents {
-    containerChannel: Channel = 'inbox';
+export class MockInboxEventApi implements SubscriberForInboxEvents {
+    constructor(private queue: MockEventQueue) {}
 
-    containerElementChannel(id: string): Channel {
-        return `inbox/${id}/entries`;
-    }
-
-    constructor(queue: MockEventQueue) {
-        super(queue);
+    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+        return subscriptionQueries.map((_, index) => `sub_${Date.now()}_${index}`);
     }
 
-    subscribeForInboxEvents(): Promise<void> {
-        return this.subscribeForContainerEvents();
+    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
     }
-    unsubscribeFromInboxEvents(): Promise<void> {
-        return this.unsubscribeFromContainerEvents();
+
+    async buildSubscriptionQuery(eventType: InboxEventType, selectorType: InboxEventSelectorType, selectorId: string): Promise<string> {
+        return `inbox_${eventType}_${selectorType}_${selectorId}`;
     }
-    subscribeForEntryEvents(storeId: string): Promise<void> {
-        return this.subscribeForContainerItemEvents(storeId);
+}
+
+export class MockKvdbEventApi implements SubscriberForKvdbEvents {
+    constructor(private queue: MockEventQueue) {}
+
+    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+        return subscriptionQueries.map((_, index) => `sub_${Date.now()}_${index}`);
     }
-    unsubscribeFromEntryEvents(storeId: string): Promise<void> {
-        return this.unsubscribeFromContainerItemEvents(storeId);
+
+    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
+    }
+
+    async buildSubscriptionQuery(eventType: KvdbEventType, selectorType: KvdbEventSelectorType, selectorId: string): Promise<string> {
+        return `kvdb_${eventType}_${selectorType}_${selectorId}`;
     }
 }
