@@ -250,7 +250,7 @@ export abstract class BaseEventManager {
         callback: Function
     ) => {
         if (!this.isSubscribedToChannel(channel)) {
-            await this.subscribeForModuleEvents();
+            await this.subscribeForModuleEvents("");
         }
         const removeListener = this.addEventListener(channel, eventType, callback);
         return async () => {
@@ -305,17 +305,17 @@ export class ThreadEventsManager extends BaseEventManager {
         super();
     }
 
-    subscribeForModuleEvents() {
-        return this.threadApi.subscribeForThreadEvents();
+    async subscribeForModuleEvents() {
+        // return this.threadApi.subscribeForThreadEvents();
     }
-    subscribeForModuleElementsEvents(id: string) {
-        return this.threadApi.subscribeForMessageEvents(id);
+    async subscribeForModuleElementsEvents(_id: string) {
+        // return this.threadApi.subscribeForMessageEvents(id);
     }
-    unsubscribeFromModuleEvents() {
-        return this.threadApi.unsubscribeFromThreadEvents();
+    async unsubscribeFromModuleEvents() {
+        // return this.threadApi.unsubscribeFromThreadEvents();
     }
-    unsubscribeFromModuleElementsEvents(id: string) {
-        return this.threadApi.unsubscribeFromMessageEvents(id);
+    async unsubscribeFromModuleElementsEvents(_id: string) {
+        // return this.threadApi.unsubscribeFromMessageEvents(id);
     }
 
     async onThreadEvent(handler: OnThreadEventHandler) {
@@ -347,7 +347,7 @@ export interface SubscriberForStoreEvents {
      * @param {EventSelectorType} selectorType scope on which you listen for events  
      * @param {string} selectorId ID of the selector
      */
-    buildSubscriptionQuery(eventType: StoreEventType, selectorType: StoreEventSelectorType, selectorId: string): Promise<string>;
+    buildSubscriptionQuery(eventType: Types.StoreEventType, selectorType: Types.StoreEventSelectorType, selectorId: string): Promise<string>;
 }
 
 
@@ -355,10 +355,19 @@ export class StoreEventsManager extends BaseEventManager {
     constructor(private storeApi: SubscriberForStoreEvents) {
         super();
     }
-    subscribeForModuleEvents() {return this.storeApi.subscribeForStoreEvents()}
-    subscribeForModuleElementsEvents(id:string){return this.storeApi.subscribeForFileEvents(id)}
-    unsubscribeFromModuleEvents(){return this.storeApi.unsubscribeFromStoreEvents()}
-    unsubscribeFromModuleElementsEvents(id:string){return this.storeApi.unsubscribeFromFileEvents(id)}
+    async subscribeForModuleEvents() {
+        
+        // return this.storeApi.subscribeForStoreEvents()
+    }
+    async subscribeForModuleElementsEvents(_id:string){
+        // return this.storeApi.subscribeForFileEvents(id)
+    }
+    async unsubscribeFromModuleEvents(){
+        // return this.storeApi.unsubscribeFromStoreEvents()
+    }
+    async unsubscribeFromModuleElementsEvents(_id:string){
+        // return this.storeApi.unsubscribeFromFileEvents(id)
+    }
 
     async onStoreEvent(handler: OnStoreEventHandler) {
         const channel: Channel = 'store';
@@ -388,6 +397,7 @@ export interface SubscriberForInboxEvents {
      * @param {string} selectorId ID of the selector
      */
     buildSubscriptionQuery(eventType: InboxEventType, selectorType: InboxEventSelectorType, selectorId: string): Promise<string>;
+
 }
 
 export class InboxEventsManager extends BaseEventManager {
@@ -414,10 +424,10 @@ export class InboxEventsManager extends BaseEventManager {
             this.elementsSubscriptions = this.elementsSubscriptions.concat(await this.inboxApi.subscribeFor(queries)); 
         })
     }
-    unsubscribeFromModuleEvents(contextId: string){
+    unsubscribeFromModuleEvents(){
         return this.inboxApi.unsubscribeFrom(this.moduleSubscriptions);
     }
-    unsubscribeFromModuleElementsEvents(id: string){return this.inboxApi.unsubscribeFromEntryEvents(id)}
+    unsubscribeFromModuleElementsEvents(id: string){return this.inboxApi.unsubscribeFrom([id])}
 
     async onInboxEvent(handler: OnInboxEventHandler) {
         const channel: Channel = 'inbox';
