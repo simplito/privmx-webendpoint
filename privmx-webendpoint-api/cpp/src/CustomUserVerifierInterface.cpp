@@ -35,7 +35,6 @@ void CustomUserVerifierInterface::printErrorInJS(const std::string& msg) {
 
 emscripten::val CustomUserVerifierInterface::callVerifierOnJS(emscripten::EM_VAL name, emscripten::EM_VAL params) {
     auto ret = emscripten::val::take_ownership(verifier_caller(name, params));
-    emscripten_sleep(0);
     return ret;
 }
 

@@ -48,6 +48,7 @@ string BNImpl::toBuffer() const {
 
 std::size_t BNImpl::getBitsLength() const {
     validate();
+    // return 256; speedup
     emscripten::val name { emscripten::val::u8string("bn_getBitsLength") };
     emscripten::val params { emscripten::val::object() };
     params.set("bn", emscripten::typed_memory_view(_bn.size(), _bn.data())); 
@@ -60,7 +61,8 @@ std::size_t BNImpl::getBitsLength() const {
         throw std::runtime_error("Error: on sign");
     }
 
-    return result["buff"].as<int>();
+    auto e = result["buff"].as<int>();
+    return e;
 }
 
 BNImpl::Ptr BNImpl::umod(const BNImpl& bn) const {

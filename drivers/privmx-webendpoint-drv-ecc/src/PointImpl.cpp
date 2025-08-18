@@ -45,6 +45,7 @@ PointImpl& PointImpl::operator=(PointImpl&& obj) {
 }
 
 string PointImpl::encode(bool compact) const {
+    return _point;
     validate();
     emscripten::val name { emscripten::val::u8string("point_encode") };
     emscripten::val params { emscripten::val::object() };

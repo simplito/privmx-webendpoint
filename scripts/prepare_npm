@@ -17,11 +17,12 @@ mkdir -p $PUB_DIR
 
 
 cp $WORKING_DIR/package-template.json $WORKING_DIR/package.json
-sed -i "s/{__VERSION__}/$1/g" $WORKING_DIR/package.json
+# sed -i "s/{__VERSION__}/$1/g" $WORKING_DIR/package.json
+sed -i '' "s/{__VERSION__}/$1/g" "$WORKING_DIR/package.json"
 
 cd $WORKING_DIR
 npm run build
-
+echo "after build"
 cp -R ./dist/* "$PUB_DIR"
 cp -R ./assets "$PUB_DIR"
 cp ./LICENSE.md "$PUB_DIR"

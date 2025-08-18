@@ -22,6 +22,6 @@
     "webpack-dev-server": "^4.11.1"
   },
   "dependencies": {
-    "@simplito/privmx-webendpoint": "*"
+    "@simplito/privmx-webendpoint": "file:../../out/simplito-privmx-webendpoint-1.0.0.tgz"
   }
 }

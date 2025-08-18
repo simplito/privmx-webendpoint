@@ -420,9 +420,15 @@ export class EmCrypto {
         assertIsUint8Array(params.publicKey);
         const keyPairPub = EC.keyFromPublic(Buffer.from(params.publicKey));
         const keyPairPriv = EC.keyFromPrivate(Buffer.from(params.privateKey));
+        console.log("JS PUB", keyPairPub.getPublic("hex"))
+        console.log("JS PRIV", keyPairPriv.getPrivate("hex"))
         const val = keyPairPriv.derive(keyPairPub.getPublic());
         const keyPair = EC.keyFromPrivate(val.toArray());
-        return Utils.toArrayBuffer(this.fillWithZeroesTo32(Buffer.from(keyPair.getPrivate("hex"), "hex")));
+        const hash = await this.sha256({
+            data: val.toArrayLike(Buffer),
+        })
+        console.log("no hash", this.fillWithZeroesTo32(Buffer.from(keyPair.getPrivate("hex"), "hex")));
+        return hash;
     }
 
     private async eccGetOrder(params: undefined) {        

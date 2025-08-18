@@ -51,7 +51,7 @@ private:
     static pthread_t _mainThread;
     emscripten::val _callback;
     emscripten::ProxyingQueue _proxingQueue;
-    std::array<std::pair<bool, std::future<void>>, 8> _slots;
+    std::array<std::pair<bool, std::future<void>>, 2> _slots;
     std::mutex _slotsMutex;
     std::condition_variable _slotsNotifier;
     std::thread _taskManagerThread;

@@ -16,6 +16,9 @@ sep "build_poco"
 sep "build_pson"
 "$SCRIPT_PATH/scripts/build_pson" $PSON_CPP
 
+sep "build_secp"
+"$SCRIPT_PATH/scripts/build_secp"
+
 sep "build_webdrivers"
 "$SCRIPT_PATH/scripts/build_webdrivers"
 sep "build_privmx_endpoint"

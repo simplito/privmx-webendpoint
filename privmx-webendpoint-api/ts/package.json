@@ -1,6 +1,6 @@
 {
   "name": "@simplito/privmx-webendpoint",
-  "version": "2.5.2",
+  "version": "1.0.0",
   "description": "PrivMX Web Endpoint library",
   "author": "Simplito",
   "license": "PrivMX Free License",
@@ -39,7 +39,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "compile": "tsc",
-    "build": "npm run clean && npm run build:bundle && npm run build:mjs && npm run build:fixup",
+    "build": "npm run clean && npm run build:bundle && npm run build:mjs",
     "clean": "rm -rf ./dist",
     "build:bundle": "webpack",
     "build:mjs": "tsc -p tsconfig.mjs.json",

@@ -27,7 +27,6 @@ EM_ASYNC_JS(EM_VAL, em_method_caller2, (EM_VAL name_handle, EM_VAL val_handle), 
     let name = Emval.toValue(name_handle);
     let params = Emval.toValue(val_handle);
     let response = {};
-
     try {
         response = await em_crypto.methodCaller(name, params);
     } catch (error) {
@@ -48,6 +47,5 @@ void Bindings::printErrorInJS2(std::string& msg) {
 
 val Bindings::callJSRawSync2(val& name, val& params) {
     auto ret = val::take_ownership(em_method_caller2(name.as_handle(), params.as_handle()));
-    emscripten_sleep(0);
     return ret;
 }

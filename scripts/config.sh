@@ -2,7 +2,7 @@
 
 BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )/.."
 
-EMSDK_VERSION="3.1.45"
+EMSDK_VERSION="4.0.12"
 
 EMSDK_DIR="$BASE_DIR/emsdk"
 SCRIPTS_DIR="$BASE_DIR/scripts"
