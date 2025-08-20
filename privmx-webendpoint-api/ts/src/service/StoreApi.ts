@@ -11,7 +11,7 @@ limitations under the License.
 
 import { BaseApi } from "./BaseApi";
 import { StoreApiNative } from "../api/StoreApiNative";
-import { PagingQuery, PagingList, UserWithPubKey, Store, File, ContainerPolicy } from "../Types";
+import { PagingQuery, PagingList, UserWithPubKey, Store, File, ContainerPolicy, StoreEventSelectorType, StoreEventType } from "../Types";
 
 export class StoreApi extends BaseApi {
   constructor(private native: StoreApiNative, ptr: number) {
@@ -126,19 +126,22 @@ export class StoreApi extends BaseApi {
    * @param {Uint8Array} publicMeta public file metadata
    * @param {Uint8Array} privateMeta private file metadata
    * @param {number} size size of the file
+   * @param {boolean} randomWriteSupport enable random write support for file
    * @returns {number} handle to write data
    */
   async createFile(
     storeId: string,
     publicMeta: Uint8Array,
     privateMeta: Uint8Array,
-    size: number
+    size: number,
+    randomWriteSupport?: boolean
   ): Promise<number> {
     return this.native.createFile(this.servicePtr, [
       storeId,
       publicMeta,
       privateMeta,
       size,
+      randomWriteSupport
     ]);
   }
 
@@ -189,9 +192,10 @@ export class StoreApi extends BaseApi {
    *
    * @param {number} fileHandle handle to write file data
    * @param {Uint8Array} dataChunk file data chunk
+   * @param {boolean} [truncate] truncate the file from: current pos + dataChunk size
    */
-  async writeToFile(fileHandle: number, dataChunk: Uint8Array): Promise<void> {
-    return this.native.writeToFile(this.servicePtr, [fileHandle, dataChunk]);
+  async writeToFile(fileHandle: number, dataChunk: Uint8Array, truncate?: boolean): Promise<void> {
+    return this.native.writeToFile(this.servicePtr, [fileHandle, dataChunk, truncate]);
   }
 
   /**
@@ -269,33 +273,61 @@ export class StoreApi extends BaseApi {
     return this.native.closeFile(this.servicePtr, [fileHandle]);
   }
 
-  /**
-   * Subscribes for the Store module main events.
-   */
-  async subscribeForStoreEvents(): Promise<void> {
-    return this.native.subscribeForStoreEvents(this.servicePtr, []);
-  }
+  // /**
+  //  * Subscribes for the Store module main events.
+  //  */
+  // async subscribeForStoreEvents(): Promise<void> {
+  //   return this.native.subscribeForStoreEvents(this.servicePtr, []);
+  // }
+
+  // /**
+  //  * Unsubscribes from the Store module main events.
+  //  */
+  // async unsubscribeFromStoreEvents(): Promise<void> {
+  //   return this.native.unsubscribeFromStoreEvents(this.servicePtr, []);
+  // }
+
+  // /**
+  //  * Subscribes for events in given Store.
+  //  * @param {string} storeId ID of the Store to subscribe
+  //  */
+  // async subscribeForFileEvents(storeId: string): Promise<void> {
+  //   return this.native.subscribeForFileEvents(this.servicePtr, [storeId]);
+  // }
+
+  // /**
+  //  * Unsubscribes from events in given Store.
+  //  * @param {string} storeId ID of the Store to unsubscribe
+  //  */
+  // async unsubscribeFromFileEvents(storeId: string): Promise<void> {
+  //   return this.native.unsubscribeFromFileEvents(this.servicePtr, [storeId]);
+  // }
 
   /**
-   * Unsubscribes from the Store module main events.
+   * Subscribe for the Store events on the given subscription query.
+   * 
+   * @param {string[]} subscriptionQueries list of queries
+   * @return list of subscriptionIds in maching order to subscriptionQueries
    */
-  async unsubscribeFromStoreEvents(): Promise<void> {
-    return this.native.unsubscribeFromStoreEvents(this.servicePtr, []);
-  }
+    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+      return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
+    }
 
-  /**
-   * Subscribes for events in given Store.
-   * @param {string} storeId ID of the Store to subscribe
-   */
-  async subscribeForFileEvents(storeId: string): Promise<void> {
-    return this.native.subscribeForFileEvents(this.servicePtr, [storeId]);
-  }
+    /**
+     * Unsubscribe from events for the given subscriptionId.
+     * @param {string[]} subscriptionIds list of subscriptionId
+     */
+    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
+      return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
+    }
 
-  /**
-   * Unsubscribes from events in given Store.
-   * @param {string} storeId ID of the Store to unsubscribe
-   */
-  async unsubscribeFromFileEvents(storeId: string): Promise<void> {
-    return this.native.unsubscribeFromFileEvents(this.servicePtr, [storeId]);
-  }
+    /**
+     * Generate subscription Query for the Store events.
+     * @param {EventType} eventType type of event which you listen for
+     * @param {EventSelectorType} selectorType scope on which you listen for events  
+     * @param {string} selectorId ID of the selector
+     */
+    async buildSubscriptionQuery(eventType: StoreEventType, selectorType: StoreEventSelectorType, selectorId: string): Promise<string> {
+      return this.native.buildSubscriptionQuery(this.servicePtr, [eventType, selectorType, selectorId]);
+    }  
 }

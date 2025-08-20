@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { PagingQuery, PagingList, UserWithPubKey, Store, File, ContainerPolicy } from "../Types";
+import { PagingQuery, PagingList, UserWithPubKey, Store, File, ContainerPolicy, StoreEventSelectorType, StoreEventType } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class StoreApiNative extends BaseNative {
@@ -38,7 +38,7 @@ export class StoreApiNative extends BaseNative {
     async listStores(ptr: number, args: [string, PagingQuery]): Promise<PagingList<Store>> {
         return this.runAsync<PagingList<Store>>((taskId)=>this.api.lib.StoreApi_listStores(taskId, ptr, args));
     }
-    async createFile(ptr: number, args: [string, Uint8Array, Uint8Array, number]): Promise<number> {
+    async createFile(ptr: number, args: [string, Uint8Array, Uint8Array, number, boolean]): Promise<number> {
         return this.runAsync<number>((taskId)=>this.api.lib.StoreApi_createFile(taskId, ptr, args));
     }
     async updateFile(ptr: number, args: [string, Uint8Array, Uint8Array, number]): Promise<number> {
@@ -47,7 +47,7 @@ export class StoreApiNative extends BaseNative {
     async updateFileMeta(ptr: number, args: [string, Uint8Array, Uint8Array]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.StoreApi_updateFileMeta(taskId, ptr, args));
     }
-    async writeToFile(ptr: number, args: [number, Uint8Array]): Promise<void> {
+    async writeToFile(ptr: number, args: [number, Uint8Array, boolean]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.StoreApi_writeToFile(taskId, ptr, args));
     }
     async deleteFile(ptr: number, args: [string]): Promise<void> {
@@ -71,16 +71,13 @@ export class StoreApiNative extends BaseNative {
     async closeFile(ptr: number, args: [number]): Promise<string> {
         return this.runAsync<string>((taskId)=>this.api.lib.StoreApi_closeFile(taskId, ptr, args));
     }
-    async subscribeForStoreEvents(ptr: number, args: []): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.StoreApi_subscribeForStoreEvents(taskId, ptr, args));
+    async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
+        return this.runAsync<string[]>((taskId)=>this.api.lib.ThreadApi_subscribeFor(taskId, ptr, args));
     }
-    async unsubscribeFromStoreEvents(ptr: number, args: []): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.StoreApi_unsubscribeFromStoreEvents(taskId, ptr, args));
+    async unsubscribeFrom(ptr: number, args: [string[]]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.ThreadApi_unsubscribeFrom(taskId, ptr, args));
     }
-    async subscribeForFileEvents(ptr: number, args: [string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.StoreApi_subscribeForFileEvents(taskId, ptr, args));
-    }
-    async unsubscribeFromFileEvents(ptr: number, args: [string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.StoreApi_unsubscribeFromFileEvents(taskId, ptr, args));
+    async buildSubscriptionQuery(ptr: number, args: [StoreEventType, StoreEventSelectorType, string]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.ThreadApi_buildSubscriptionQuery(taskId, ptr, args));
     }
 }

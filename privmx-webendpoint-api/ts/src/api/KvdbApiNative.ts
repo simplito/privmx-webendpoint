@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { PagingQuery, PagingList, UserWithPubKey, Kvdb, KvdbEntry, ContainerPolicy, DeleteEntriesResult } from "../Types";
+import { PagingQuery, PagingList, UserWithPubKey, Kvdb, KvdbEntry, ContainerPolicy, DeleteEntriesResult, KvdbEventSelectorType, KvdbEventType } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class KvdbApiNative extends BaseNative {
@@ -59,16 +59,13 @@ export class KvdbApiNative extends BaseNative {
     async deleteEntries(ptr: number, args: [string, string[]]): Promise<DeleteEntriesResult> {
         return this.runAsync<DeleteEntriesResult>((taskId)=>this.api.lib.KvdbApi_deleteEntries(taskId, ptr, args));
     }
-    async subscribeForKvdbEvents(ptr: number, args: []): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_subscribeForKvdbEvents(taskId, ptr, args));
+    async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
+        return this.runAsync<string[]>((taskId)=>this.api.lib.KvdbApi_subscribeFor(taskId, ptr, args));
     }
-    async unsubscribeFromKvdbEvents(ptr: number, args: []): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_unsubscribeFromKvdbEvents(taskId, ptr, args));
+    async unsubscribeFrom(ptr: number, args: [string[]]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_unsubscribeFrom(taskId, ptr, args));
     }
-    async subscribeForEntryEvents(ptr: number, args: [string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_subscribeForEntryEvents(taskId, ptr, args));
-    }
-    async unsubscribeFromEntryEvents(ptr: number, args: [string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.KvdbApi_unsubscribeFromEntryEvents(taskId, ptr, args));
+    async buildSubscriptionQuery(ptr: number, args: [KvdbEventType, KvdbEventSelectorType, string]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.KvdbApi_buildSubscriptionQuery(taskId, ptr, args));
     }
 }

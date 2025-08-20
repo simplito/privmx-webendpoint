@@ -55,10 +55,9 @@ namespace api {
     API_FUNCTION_HEADER(ThreadApi, sendMessage)
     API_FUNCTION_HEADER(ThreadApi, deleteMessage)
     API_FUNCTION_HEADER(ThreadApi, updateMessage)
-    API_FUNCTION_HEADER(ThreadApi, subscribeForThreadEvents)
-    API_FUNCTION_HEADER(ThreadApi, unsubscribeFromThreadEvents)
-    API_FUNCTION_HEADER(ThreadApi, subscribeForMessageEvents)
-    API_FUNCTION_HEADER(ThreadApi, unsubscribeFromMessageEvents)
+    API_FUNCTION_HEADER(ThreadApi, subscribeFor)
+    API_FUNCTION_HEADER(ThreadApi, unsubscribeFrom)
+    API_FUNCTION_HEADER(ThreadApi, buildSubscriptionQuery)
 
     void StoreApi_newStoreApi(int taskId, int connectionPtr);
     void StoreApi_deleteStoreApi(int taskId, int ptr);
@@ -79,10 +78,9 @@ namespace api {
     API_FUNCTION_HEADER(StoreApi, readFromFile)
     API_FUNCTION_HEADER(StoreApi, seekInFile)
     API_FUNCTION_HEADER(StoreApi, closeFile)
-    API_FUNCTION_HEADER(StoreApi, subscribeForStoreEvents)
-    API_FUNCTION_HEADER(StoreApi, unsubscribeFromStoreEvents)
-    API_FUNCTION_HEADER(StoreApi, subscribeForFileEvents)
-    API_FUNCTION_HEADER(StoreApi, unsubscribeFromFileEvents)
+    API_FUNCTION_HEADER(StoreApi, subscribeFor)
+    API_FUNCTION_HEADER(StoreApi, unsubscribeFrom)
+    API_FUNCTION_HEADER(StoreApi, buildSubscriptionQuery)
 
     void InboxApi_newInboxApi(int taskId, int connectionPtr, int threadApiPtr, int storeApiPtr);
     void InboxApi_deleteInboxApi(int taskId, int ptr);
@@ -104,10 +102,9 @@ namespace api {
     API_FUNCTION_HEADER(InboxApi, readFromFile)
     API_FUNCTION_HEADER(InboxApi, seekInFile)
     API_FUNCTION_HEADER(InboxApi, closeFile)
-    API_FUNCTION_HEADER(InboxApi, subscribeForInboxEvents)
-    API_FUNCTION_HEADER(InboxApi, unsubscribeFromInboxEvents)
-    API_FUNCTION_HEADER(InboxApi, subscribeForEntryEvents)
-    API_FUNCTION_HEADER(InboxApi, unsubscribeFromEntryEvents)
+    API_FUNCTION_HEADER(InboxApi, subscribeFor)
+    API_FUNCTION_HEADER(InboxApi, unsubscribeFrom)
+    API_FUNCTION_HEADER(InboxApi, buildSubscriptionQuery)
 
     void KvdbApi_newKvdbApi(int taskId, int connectionPtr);
     void KvdbApi_deleteKvdbApi(int taskId, int ptr);
@@ -124,10 +121,9 @@ namespace api {
     API_FUNCTION_HEADER(KvdbApi, setEntry)
     API_FUNCTION_HEADER(KvdbApi, deleteEntry)
     API_FUNCTION_HEADER(KvdbApi, deleteEntries)
-    API_FUNCTION_HEADER(KvdbApi, subscribeForKvdbEvents)
-    API_FUNCTION_HEADER(KvdbApi, unsubscribeFromKvdbEvents)
-    API_FUNCTION_HEADER(KvdbApi, subscribeForEntryEvents)
-    API_FUNCTION_HEADER(KvdbApi, unsubscribeFromEntryEvents)
+    API_FUNCTION_HEADER(KvdbApi, subscribeFor)
+    API_FUNCTION_HEADER(KvdbApi, unsubscribeFrom)
+    API_FUNCTION_HEADER(KvdbApi, buildSubscriptionQuery)
 
 
     void CryptoApi_newCryptoApi(int taskId);
@@ -154,8 +150,9 @@ namespace api {
     void EventApi_deleteEventApi(int taskId, int ptr);
     API_FUNCTION_HEADER(EventApi, create)
     API_FUNCTION_HEADER(EventApi, emitEvent)
-    API_FUNCTION_HEADER(EventApi, subscribeForCustomEvents)
-    API_FUNCTION_HEADER(EventApi, unsubscribeFromCustomEvents)
+    API_FUNCTION_HEADER(EventApi, subscribeFor)
+    API_FUNCTION_HEADER(EventApi, unsubscribeFrom)
+    API_FUNCTION_HEADER(EventApi, buildSubscriptionQuery)
 
     void ExtKey_deleteExtKey(int taskId, int ptr);
     void ExtKey_fromSeed(int taskId, emscripten::val args);

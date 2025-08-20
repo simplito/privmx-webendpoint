@@ -129,10 +129,9 @@ namespace api {
     API_FUNCTION(ThreadApi, sendMessage)
     API_FUNCTION(ThreadApi, deleteMessage)
     API_FUNCTION(ThreadApi, updateMessage)
-    API_FUNCTION(ThreadApi, subscribeForThreadEvents)
-    API_FUNCTION(ThreadApi, unsubscribeFromThreadEvents)
-    API_FUNCTION(ThreadApi, subscribeForMessageEvents)
-    API_FUNCTION(ThreadApi, unsubscribeFromMessageEvents)
+    API_FUNCTION(ThreadApi, subscribeFor)
+    API_FUNCTION(ThreadApi, unsubscribeFrom)
+    API_FUNCTION(ThreadApi, buildSubscriptionQuery)
 
     void StoreApi_newStoreApi(int taskId, int connectionPtr) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
@@ -163,10 +162,9 @@ namespace api {
     API_FUNCTION(StoreApi, readFromFile)
     API_FUNCTION(StoreApi, seekInFile)
     API_FUNCTION(StoreApi, closeFile)
-    API_FUNCTION(StoreApi, subscribeForStoreEvents)
-    API_FUNCTION(StoreApi, unsubscribeFromStoreEvents)
-    API_FUNCTION(StoreApi, subscribeForFileEvents)
-    API_FUNCTION(StoreApi, unsubscribeFromFileEvents)
+    API_FUNCTION(StoreApi, subscribeFor)
+    API_FUNCTION(StoreApi, unsubscribeFrom)
+    API_FUNCTION(StoreApi, buildSubscriptionQuery)
 
     void InboxApi_newInboxApi(int taskId, int connectionPtr, int threadApiPtr, int storeApiPtr) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr, threadApiPtr, storeApiPtr]{
@@ -200,10 +198,9 @@ namespace api {
     API_FUNCTION(InboxApi, readFromFile)
     API_FUNCTION(InboxApi, seekInFile)
     API_FUNCTION(InboxApi, closeFile)
-    API_FUNCTION(InboxApi, subscribeForInboxEvents)
-    API_FUNCTION(InboxApi, unsubscribeFromInboxEvents)
-    API_FUNCTION(InboxApi, subscribeForEntryEvents)
-    API_FUNCTION(InboxApi, unsubscribeFromEntryEvents)
+    API_FUNCTION(InboxApi, subscribeFor)
+    API_FUNCTION(InboxApi, unsubscribeFrom)
+    API_FUNCTION(InboxApi, buildSubscriptionQuery)
 
     void KvdbApi_newKvdbApi(int taskId, int connectionPtr) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
@@ -230,10 +227,9 @@ namespace api {
     API_FUNCTION(KvdbApi, setEntry)
     API_FUNCTION(KvdbApi, deleteEntry)
     API_FUNCTION(KvdbApi, deleteEntries)
-    API_FUNCTION(KvdbApi, subscribeForKvdbEvents)
-    API_FUNCTION(KvdbApi, unsubscribeFromKvdbEvents)
-    API_FUNCTION(KvdbApi, subscribeForEntryEvents)
-    API_FUNCTION(KvdbApi, unsubscribeFromEntryEvents)
+    API_FUNCTION(KvdbApi, subscribeFor)
+    API_FUNCTION(KvdbApi, unsubscribeFrom)
+    API_FUNCTION(KvdbApi, buildSubscriptionQuery)
 
     void CryptoApi_newCryptoApi(int taskId) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&]{
@@ -321,8 +317,9 @@ namespace api {
     }
     API_FUNCTION(EventApi, create)
     API_FUNCTION(EventApi, emitEvent)
-    API_FUNCTION(EventApi, subscribeForCustomEvents)
-    API_FUNCTION(EventApi, unsubscribeFromCustomEvents)
+    API_FUNCTION(EventApi, subscribeFor)
+    API_FUNCTION(EventApi, unsubscribeFrom)
+    API_FUNCTION(EventApi, buildSubscriptionQuery)
 
 
 } // namespace api

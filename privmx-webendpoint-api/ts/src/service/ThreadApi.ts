@@ -18,6 +18,8 @@ import {
   Thread,
   Message,
   ContainerPolicy,
+  ThreadEventType,
+  ThreadEventSelectorType,
 } from "../Types";
 
 export class ThreadApi extends BaseApi {
@@ -204,35 +206,63 @@ export class ThreadApi extends BaseApi {
     ]);
   }
 
-  /**
-   * Subscribes for the Thread module main events.
-   */
-  async subscribeForThreadEvents(): Promise<void> {
-    return this.native.subscribeForThreadEvents(this.servicePtr, []);
-  }
+  // /**
+  //  * Subscribes for the Thread module main events.
+  //  */
+  // async subscribeForThreadEvents(): Promise<void> {
+  //   return this.native.subscribeForThreadEvents(this.servicePtr, []);
+  // }
+
+  // /**
+  //  * Unsubscribes from the Thread module main events.
+  //  */
+  // async unsubscribeFromThreadEvents(): Promise<void> {
+  //   return this.native.unsubscribeFromThreadEvents(this.servicePtr, []);
+  // }
+
+  // /**
+  //  * Subscribes for events in given Thread.
+  //  * @param {string} threadId ID of the Thread to subscribe
+  //  */
+  // async subscribeForMessageEvents(threadId: string): Promise<void> {
+  //   return this.native.subscribeForMessageEvents(this.servicePtr, [threadId]);
+  // }
+
+  // /**
+  //  * Unsubscribes from events in given Thread.
+  //  * @param {string} threadId ID of the Thread to unsubscribe
+  //  */
+  // async unsubscribeFromMessageEvents(threadId: string): Promise<void> {
+  //   return this.native.unsubscribeFromMessageEvents(this.servicePtr, [
+  //     threadId,
+  //   ]);
+  // }
 
   /**
-   * Unsubscribes from the Thread module main events.
+   * Subscribe for the Thread events on the given subscription query.
+   * 
+   * @param {string[]} subscriptionQueries list of queries
+   * @return list of subscriptionIds in maching order to subscriptionQueries
    */
-  async unsubscribeFromThreadEvents(): Promise<void> {
-    return this.native.unsubscribeFromThreadEvents(this.servicePtr, []);
-  }
+    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+      return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
+    }
 
-  /**
-   * Subscribes for events in given Thread.
-   * @param {string} threadId ID of the Thread to subscribe
-   */
-  async subscribeForMessageEvents(threadId: string): Promise<void> {
-    return this.native.subscribeForMessageEvents(this.servicePtr, [threadId]);
-  }
+    /**
+     * Unsubscribe from events for the given subscriptionId.
+     * @param {string[]} subscriptionIds list of subscriptionId
+     */
+    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
+      return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
+    }
 
-  /**
-   * Unsubscribes from events in given Thread.
-   * @param {string} threadId ID of the Thread to unsubscribe
-   */
-  async unsubscribeFromMessageEvents(threadId: string): Promise<void> {
-    return this.native.unsubscribeFromMessageEvents(this.servicePtr, [
-      threadId,
-    ]);
-  }
+    /**
+     * Generate subscription Query for the Thread events.
+     * @param {EventType} eventType type of event which you listen for
+     * @param {EventSelectorType} selectorType scope on which you listen for events  
+     * @param {string} selectorId ID of the selector
+     */
+    async buildSubscriptionQuery(eventType: ThreadEventType, selectorType: ThreadEventSelectorType, selectorId: string): Promise<string> {
+      return this.native.buildSubscriptionQuery(this.servicePtr, [eventType, selectorType, selectorId]);
+    }
 }

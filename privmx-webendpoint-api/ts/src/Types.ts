@@ -602,3 +602,73 @@ export interface PKIVerificationOptions {
     bridgePubKey?: string;
     bridgeInstanceId?: string;
 };
+
+
+// Enums
+export enum StoreEventType {
+    STORE_CREATE = 0,
+    STORE_UPDATE = 1,
+    STORE_DELETE = 2,
+    STORE_STATS = 3,
+    FILE_CREATE = 4,
+    FILE_UPDATE = 5,
+    FILE_DELETE = 6,
+}
+
+export enum StoreEventSelectorType {
+    CONTEXT_ID = 0,
+    STORE_ID = 1,
+    FILE_ID = 2,
+}
+
+export enum ThreadEventType {
+    THREAD_CREATE = 0,
+    THREAD_UPDATE = 1,
+    THREAD_DELETE = 2,
+    THREAD_STATS = 3,
+    MESSAGE_CREATE = 4,
+    MESSAGE_UPDATE = 5,
+    MESSAGE_DELETE = 6,
+}
+
+export enum ThreadEventSelectorType {
+    CONTEXT_ID = 0,
+    THREAD_ID = 1,
+    MESSAGE_ID = 2,
+}
+
+export enum InboxEventType {
+    INBOX_CREATE = 0,
+    INBOX_UPDATE = 1,
+    INBOX_DELETE = 2,
+    ENTRY_CREATE = 3,
+    ENTRY_DELETE = 4,
+
+};
+
+export enum InboxEventSelectorType {
+    CONTEXT_ID = 0,
+    INBOX_ID = 1,
+    ENTRY_ID = 2,
+};
+
+export enum KvdbEventType {
+    KVDB_CREATE = 0,
+    KVDB_UPDATE = 1,
+    KVDB_DELETE = 2,
+    KVDB_STATS = 3,
+    ENTRY_CREATE = 4,
+    ENTRY_UPDATE = 5,
+    ENTRY_DELETE = 6,
+
+};
+
+export enum KvdbEventSelectorType {
+    CONTEXT_ID = 0,
+    KVDB_ID = 1,
+    ENTRY_ID = 2,
+};
+
+export enum EventsEventSelectorType {
+    CONTEXT_ID = 0,
+};

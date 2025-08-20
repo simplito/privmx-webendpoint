@@ -18,7 +18,9 @@ import {
   Kvdb,
   ContainerPolicy,
   KvdbEntry,
-  DeleteEntriesResult
+  DeleteEntriesResult,
+  KvdbEventSelectorType,
+  KvdbEventType
 } from "../Types";
 
 export class KvdbApi extends BaseApi {
@@ -231,35 +233,63 @@ export class KvdbApi extends BaseApi {
     ]);
   }
 
-  /**
-   * Subscribes for the KVDB module main events.
-   */
-  async subscribeForKvdbEvents(): Promise<void> {
-    return this.native.subscribeForKvdbEvents(this.servicePtr, []);
-  }
+  // /**
+  //  * Subscribes for the KVDB module main events.
+  //  */
+  // async subscribeForKvdbEvents(): Promise<void> {
+  //   return this.native.subscribeForKvdbEvents(this.servicePtr, []);
+  // }
+
+  // /**
+  //  * Unsubscribes from the KVDB module main events.
+  //  */
+  // async unsubscribeFromKvdbEvents(): Promise<void> {
+  //   return this.native.unsubscribeFromKvdbEvents(this.servicePtr, []);
+  // }
+
+  // /**
+  //  * Subscribes for events in given KVDB.
+  //  * @param {string} kvdbId ID of the KVDB to subscribe
+  //  */
+  // async subscribeForEntryEvents(kvdbId: string): Promise<void> {
+  //   return this.native.subscribeForEntryEvents(this.servicePtr, [kvdbId]);
+  // }
+
+  // /**
+  //  * Unsubscribes from events in given KVDB.
+  //  * @param {string} kvdbId ID of the KVDB to unsubscribe
+  //  */
+  // async unsubscribeFromEntryEvents(kvdbId: string): Promise<void> {
+  //   return this.native.unsubscribeFromEntryEvents(this.servicePtr, [
+  //     kvdbId,
+  //   ]);
+  // }
 
   /**
-   * Unsubscribes from the KVDB module main events.
+   * Subscribe for the KVDB events on the given subscription query.
+   * 
+   * @param {string[]} subscriptionQueries list of queries
+   * @return list of subscriptionIds in maching order to subscriptionQueries
    */
-  async unsubscribeFromKvdbEvents(): Promise<void> {
-    return this.native.unsubscribeFromKvdbEvents(this.servicePtr, []);
-  }
+    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+      return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
+    }
 
-  /**
-   * Subscribes for events in given KVDB.
-   * @param {string} kvdbId ID of the KVDB to subscribe
-   */
-  async subscribeForEntryEvents(kvdbId: string): Promise<void> {
-    return this.native.subscribeForEntryEvents(this.servicePtr, [kvdbId]);
-  }
+    /**
+     * Unsubscribe from events for the given subscriptionId.
+     * @param {string[]} subscriptionIds list of subscriptionId
+     */
+    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
+      return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
+    }
 
-  /**
-   * Unsubscribes from events in given KVDB.
-   * @param {string} kvdbId ID of the KVDB to unsubscribe
-   */
-  async unsubscribeFromEntryEvents(kvdbId: string): Promise<void> {
-    return this.native.unsubscribeFromEntryEvents(this.servicePtr, [
-      kvdbId,
-    ]);
-  }
+    /**
+     * Generate subscription Query for the KVDB events.
+     * @param {EventType} eventType type of event which you listen for
+     * @param {EventSelectorType} selectorType scope on which you listen for events  
+     * @param {string} selectorId ID of the selector
+     */
+    async buildSubscriptionQuery(eventType: KvdbEventType, selectorType: KvdbEventSelectorType, selectorId: string): Promise<string> {
+      return this.native.buildSubscriptionQuery(this.servicePtr, [eventType, selectorType, selectorId]);
+    }  
 }

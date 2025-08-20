@@ -1,4 +1,5 @@
 import { Types } from "..";
+import { ThreadEventType, ThreadEventSelectorType, InboxEventType, InboxEventSelectorType } from "../Types";
 
 export type Channel =
     | 'inbox'
@@ -131,7 +132,7 @@ export abstract class BaseEventManager {
 
     protected channels: Set<Channel>;
 
-    protected abstract subscribeForModuleEvents(): Promise<void>;
+    protected abstract subscribeForModuleEvents(contextId: string): Promise<void>;
     protected abstract subscribeForModuleElementsEvents(containerId: string): Promise<void>;
     protected abstract unsubscribeFromModuleEvents(): Promise<void>;
     protected abstract unsubscribeFromModuleElementsEvents(containerId: string): Promise<void>;
@@ -249,7 +250,7 @@ export abstract class BaseEventManager {
         callback: Function
     ) => {
         if (!this.isSubscribedToChannel(channel)) {
-            await this.subscribeForModuleEvents();
+            await this.subscribeForModuleEvents("");
         }
         const removeListener = this.addEventListener(channel, eventType, callback);
         return async () => {
@@ -280,21 +281,22 @@ export abstract class BaseEventManager {
 }
 
 export interface SubscriberForThreadsEvents {
-    subscribeForThreadEvents(): Promise<void>;
     /**
-     * Unsubscribes from the Thread module main events.
+     * Subscribe for the Thread events on the given subscription query.
+     * @param {string[]} subscriptionQueries list of queries
      */
-    unsubscribeFromThreadEvents(): Promise<void>;
+    subscribeFor(subscriptionQueries: string[]): Promise<string[]>;
     /**
-     * Subscribes for events in given Thread.
-     * @param {string} threadId ID of the Thread to subscribe
+     * Unsubscribes from events for the given subscriptionId.
      */
-    subscribeForMessageEvents(threadId: string): Promise<void>;
+    unsubscribeFrom(subscriptionIds: string[]): Promise<void>;
     /**
-     * Unsubscribes from events in given Thread.
-     * @param {string} threadId ID of the Thread to unsubscribe
+     * Generate subscription Query for the Thread events.
+     * @param {EventType} eventType type of event which you listen for
+     * @param {EventSelectorType} selectorType scope on which you listen for events  
+     * @param {string} selectorId ID of the selector
      */
-    unsubscribeFromMessageEvents(threadId: string): Promise<void>;
+    buildSubscriptionQuery(eventType: ThreadEventType, selectorType: ThreadEventSelectorType, selectorId: string): Promise<string>;
 }
 
 
@@ -303,17 +305,17 @@ export class ThreadEventsManager extends BaseEventManager {
         super();
     }
 
-    subscribeForModuleEvents() {
-        return this.threadApi.subscribeForThreadEvents();
+    async subscribeForModuleEvents() {
+        // return this.threadApi.subscribeForThreadEvents();
     }
-    subscribeForModuleElementsEvents(id: string) {
-        return this.threadApi.subscribeForMessageEvents(id);
+    async subscribeForModuleElementsEvents(_id: string) {
+        // return this.threadApi.subscribeForMessageEvents(id);
     }
-    unsubscribeFromModuleEvents() {
-        return this.threadApi.unsubscribeFromThreadEvents();
+    async unsubscribeFromModuleEvents() {
+        // return this.threadApi.unsubscribeFromThreadEvents();
     }
-    unsubscribeFromModuleElementsEvents(id: string) {
-        return this.threadApi.unsubscribeFromMessageEvents(id);
+    async unsubscribeFromModuleElementsEvents(_id: string) {
+        // return this.threadApi.unsubscribeFromMessageEvents(id);
     }
 
     async onThreadEvent(handler: OnThreadEventHandler) {
@@ -330,22 +332,22 @@ export class ThreadEventsManager extends BaseEventManager {
 
 
 export interface SubscriberForStoreEvents {
-    subscribeForStoreEvents(): Promise<void>;
     /**
-     * Unsubscribes from the Store module main events.
+     * Subscribe for the Store events on the given subscription query.
+     * @param {string[]} subscriptionQueries list of queries
      */
-    unsubscribeFromStoreEvents(): Promise<void>;
+    subscribeFor(subscriptionQueries: string[]): Promise<string[]>;
     /**
-     * Subscribes for events in given Store.
-     * @param {string} storeId ID of the Store to subscribe
+     * Unsubscribes from events for the given subscriptionId.
      */
-    subscribeForFileEvents(storeId: string): Promise<void>;
+    unsubscribeFrom(subscriptionIds: string[]): Promise<void>;
     /**
-     * Unsubscribes from events in given Store.
-     * @param {string} storeId ID of the Store to unsubscribe
+     * Generate subscription Query for the Store events.
+     * @param {EventType} eventType type of event which you listen for
+     * @param {EventSelectorType} selectorType scope on which you listen for events  
+     * @param {string} selectorId ID of the selector
      */
-    unsubscribeFromFileEvents(storeId: string): Promise<void>;
-
+    buildSubscriptionQuery(eventType: Types.StoreEventType, selectorType: Types.StoreEventSelectorType, selectorId: string): Promise<string>;
 }
 
 
@@ -353,10 +355,19 @@ export class StoreEventsManager extends BaseEventManager {
     constructor(private storeApi: SubscriberForStoreEvents) {
         super();
     }
-    subscribeForModuleEvents() {return this.storeApi.subscribeForStoreEvents()}
-    subscribeForModuleElementsEvents(id:string){return this.storeApi.subscribeForFileEvents(id)}
-    unsubscribeFromModuleEvents(){return this.storeApi.unsubscribeFromStoreEvents()}
-    unsubscribeFromModuleElementsEvents(id:string){return this.storeApi.unsubscribeFromFileEvents(id)}
+    async subscribeForModuleEvents() {
+        
+        // return this.storeApi.subscribeForStoreEvents()
+    }
+    async subscribeForModuleElementsEvents(_id:string){
+        // return this.storeApi.subscribeForFileEvents(id)
+    }
+    async unsubscribeFromModuleEvents(){
+        // return this.storeApi.unsubscribeFromStoreEvents()
+    }
+    async unsubscribeFromModuleElementsEvents(_id:string){
+        // return this.storeApi.unsubscribeFromFileEvents(id)
+    }
 
     async onStoreEvent(handler: OnStoreEventHandler) {
         const channel: Channel = 'store';
@@ -370,32 +381,53 @@ export class StoreEventsManager extends BaseEventManager {
 }
 
 export interface SubscriberForInboxEvents {
-    subscribeForInboxEvents(): Promise<void>;
     /**
-     * Unsubscribes from the Inbox module main events.
+     * Subscribe for the Inbox events on the given subscription query.
+     * @param {string[]} subscriptionQueries list of queries
      */
-    unsubscribeFromInboxEvents(): Promise<void>;
+    subscribeFor(subscriptionQueries: string[]): Promise<string[]>;
     /**
-     * Subscribes for events in given Inbox.
-     * @param {string} inboxId ID of the Inbox to subscribe
+     * Unsubscribes from events for the given subscriptionId.
      */
-    subscribeForEntryEvents(inboxId: string): Promise<void>;
+    unsubscribeFrom(subscriptionIds: string[]): Promise<void>;
     /**
-     * Unsubscribes from events in given Inbox.
-     * @param {string} inboxId ID of the Inbox to unsubscribe
+     * Generate subscription Query for the Inbox events.
+     * @param {EventType} eventType type of event which you listen for
+     * @param {EventSelectorType} selectorType scope on which you listen for events  
+     * @param {string} selectorId ID of the selector
      */
-    unsubscribeFromEntryEvents(inboxId: string): Promise<void>;
+    buildSubscriptionQuery(eventType: InboxEventType, selectorType: InboxEventSelectorType, selectorId: string): Promise<string>;
+
 }
 
 export class InboxEventsManager extends BaseEventManager {
+    private moduleSubscriptions: string[] = [];
+    private elementsSubscriptions: string[] = [];
     constructor(private inboxApi:SubscriberForInboxEvents) {
         super();
     }
 
-    subscribeForModuleEvents(){return this.inboxApi.subscribeForInboxEvents()}
-    subscribeForModuleElementsEvents(id:string){return this.inboxApi.subscribeForEntryEvents(id)}
-    unsubscribeFromModuleEvents(){return this.inboxApi.unsubscribeFromInboxEvents()}
-    unsubscribeFromModuleElementsEvents(id:string){return this.inboxApi.unsubscribeFromEntryEvents(id)}
+    subscribeForModuleEvents(contextId: string): Promise<void> {
+        return Promise.all([
+            this.inboxApi.buildSubscriptionQuery(InboxEventType.INBOX_CREATE, InboxEventSelectorType.CONTEXT_ID, contextId),
+            this.inboxApi.buildSubscriptionQuery(InboxEventType.INBOX_UPDATE, InboxEventSelectorType.CONTEXT_ID, contextId),
+            this.inboxApi.buildSubscriptionQuery(InboxEventType.INBOX_DELETE, InboxEventSelectorType.CONTEXT_ID, contextId),
+        ]).then(async queries => {
+            this.moduleSubscriptions = this.moduleSubscriptions.concat(await this.inboxApi.subscribeFor(queries));
+        })
+    }
+    subscribeForModuleElementsEvents(id: string){
+        return Promise.all([
+            this.inboxApi.buildSubscriptionQuery(InboxEventType.ENTRY_CREATE, InboxEventSelectorType.INBOX_ID, id),
+            this.inboxApi.buildSubscriptionQuery(InboxEventType.ENTRY_DELETE, InboxEventSelectorType.INBOX_ID, id),
+        ]).then(async queries => {
+            this.elementsSubscriptions = this.elementsSubscriptions.concat(await this.inboxApi.subscribeFor(queries)); 
+        })
+    }
+    unsubscribeFromModuleEvents(){
+        return this.inboxApi.unsubscribeFrom(this.moduleSubscriptions);
+    }
+    unsubscribeFromModuleElementsEvents(id: string){return this.inboxApi.unsubscribeFrom([id])}
 
     async onInboxEvent(handler: OnInboxEventHandler) {
         const channel: Channel = 'inbox';
