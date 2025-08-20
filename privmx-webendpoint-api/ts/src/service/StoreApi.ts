@@ -126,7 +126,7 @@ export class StoreApi extends BaseApi {
    * @param {Uint8Array} publicMeta public file metadata
    * @param {Uint8Array} privateMeta private file metadata
    * @param {number} size size of the file
-   * @param {boolean} randomWriteSupport enable random write support for file
+   * @param {boolean} [randomWriteSupport] enable random write support for file
    * @returns {number} handle to write data
    */
   async createFile(
@@ -134,7 +134,7 @@ export class StoreApi extends BaseApi {
     publicMeta: Uint8Array,
     privateMeta: Uint8Array,
     size: number,
-    randomWriteSupport?: boolean
+    randomWriteSupport: boolean = false
   ): Promise<number> {
     return this.native.createFile(this.servicePtr, [
       storeId,
@@ -194,7 +194,7 @@ export class StoreApi extends BaseApi {
    * @param {Uint8Array} dataChunk file data chunk
    * @param {boolean} [truncate] truncate the file from: current pos + dataChunk size
    */
-  async writeToFile(fileHandle: number, dataChunk: Uint8Array, truncate?: boolean): Promise<void> {
+  async writeToFile(fileHandle: number, dataChunk: Uint8Array, truncate: boolean = false): Promise<void> {
     return this.native.writeToFile(this.servicePtr, [fileHandle, dataChunk, truncate]);
   }
 
