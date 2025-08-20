@@ -351,6 +351,7 @@ export class WebRtcClient {
         if ((window as any).RTCRtpScriptTransform) {
             const options = {
                 operation: 'decode',
+                kind: track.kind
             };
 
             (receiver as any).transform = new RTCRtpScriptTransform(worker, options);

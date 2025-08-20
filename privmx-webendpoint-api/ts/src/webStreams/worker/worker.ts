@@ -27,8 +27,8 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
         return 0;
     }
 
-    async encryptFrame(encodedFrame: RTCEncodedAudioFrame|RTCEncodedVideoFrame, controller: TransformStreamDefaultController<any>) {
-        const headerLen = this.getHeaderSizeByType((encodedFrame as any).type);
+    async encryptFrame(encodedFrame: RTCEncodedAudioFrame|RTCEncodedVideoFrame, kind: string, controller: TransformStreamDefaultController<any>) {
+        const headerLen = kind === "video" ? this.getHeaderSizeByType((encodedFrame as any).type) : 1;
         const frameHeader = new Uint8Array(encodedFrame.data, 0, headerLen);
         const frameBody = new Uint8Array(encodedFrame.data, headerLen);
 
@@ -63,8 +63,8 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
         controller.enqueue(encodedFrame);
     }
 
-    async decryptFrame(encodedFrame: RTCEncodedVideoFrame|RTCEncodedAudioFrame, controller: TransformStreamDefaultController<any>) {
-        const headerLen = this.getHeaderSizeByType((encodedFrame as any).type);
+    async decryptFrame(encodedFrame: RTCEncodedVideoFrame|RTCEncodedAudioFrame, kind: string, controller: TransformStreamDefaultController<any>) {
+        const headerLen = kind === "video" ? this.getHeaderSizeByType((encodedFrame as any).type) : 1;
         const data = encodedFrame.data;
         const frameHeader = new Uint8Array(data, 0, headerLen);
 
@@ -122,18 +122,18 @@ const getKeyStore = () => {
 }
 
 self.onmessage = (message: any) => {
-    const { operation } = message.data;
+    logError("message: "+ JSON.stringify(message));
+    const { operation, kind } = message.data;
 
     if (operation === 'initialize') {
         logDebug("worker initialize call")
     } 
-    else 
+    else  {}
     if (operation === 'encode' || operation === 'decode') {
         const context: TransformContext = {keyStore: getKeyStore()};
         const { readableStream, writableStream, participantId } = message.data;
         // const context = getParticipantContext(participantId);
-
-        handleTransform(context, operation, readableStream, writableStream);
+        handleTransform(context, operation, kind, readableStream, writableStream);
     } 
     else 
     if (operation === 'setKeys') {
@@ -146,7 +146,7 @@ self.onmessage = (message: any) => {
 
 export declare interface RTCTransformEvent {}
 
-function createSenderTransform(_keyStore: KeyStore) {
+function createSenderTransform(_keyStore: KeyStore, kind: string) {
     logDebug("create sender transform...");
     const encrypter = new EncryptTransform(_keyStore);
 
@@ -154,7 +154,7 @@ function createSenderTransform(_keyStore: KeyStore) {
         start() {},
     
         async transform(encodedFrame, controller) {
-            encrypter.encryptFrame(encodedFrame, controller);
+            encrypter.encryptFrame(encodedFrame, kind, controller);
         },
     
         flush() {}
@@ -162,30 +162,30 @@ function createSenderTransform(_keyStore: KeyStore) {
 }
     
 // Receiver transform
-function createReceiverTransform(_keyStore: KeyStore) {
+function createReceiverTransform(_keyStore: KeyStore, kind: string) {
     const encrypter = new EncryptTransform(_keyStore);
     return new TransformStream({
         start() {},
         flush() {},
         async transform(encodedFrame, controller) {
-            encrypter.decryptFrame(encodedFrame, controller);
+            encrypter.decryptFrame(encodedFrame, kind, controller);
         }
     });
 }
 
-function handleTransform(context: TransformContext, operation: string, readableStream: any, writableStream: any) {
+function handleTransform(context: TransformContext, operation: string, kind: string, readableStream: any, writableStream: any) {
     let transformStream: TransformStream;
     // logDebug("on handleTransform", {key, operation, readableStream, writableStream})
     logDebug("handleTransform: " + JSON.stringify({operation, context}));
     if (operation == "encode") {
         
-        transformStream = createSenderTransform(context.keyStore);
+        transformStream = createSenderTransform(context.keyStore, kind);
         readableStream
             .pipeThrough(transformStream)
             .pipeTo(writableStream);
     } else
     if (operation == "decode") {
-        transformStream = createReceiverTransform(context.keyStore);
+        transformStream = createReceiverTransform(context.keyStore, kind);
         readableStream
             .pipeThrough(transformStream)
             .pipeTo(writableStream);
@@ -200,6 +200,10 @@ function logDebug(msg: any) {
     }
     postMessage({type: "debug", data: msg});
 }
+function logger(msg: any) {
+    postMessage({type: "debug", data: msg});
+}
+
 function logError(msg: any) {
     postMessage({type: "error", data: msg});
 }
@@ -207,9 +211,10 @@ function logError(msg: any) {
 if ((self as any).RTCTransformEvent) {
     (self as any).onrtctransform = (event: any) => {
         const transformer = event.transformer;
-        const { operation } = transformer.options;
+        const { operation, kind } = transformer.options;
+        // logger("operation: " + operation + " / kind: " + kind);
         logDebug("onrtctransfrom: "+JSON.stringify(event));
-        handleTransform({keyStore: getKeyStore()}, operation, transformer.readable, transformer.writable);
+        handleTransform({keyStore: getKeyStore()}, operation, kind, transformer.readable, transformer.writable);
     };
 }
 

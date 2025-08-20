@@ -61,7 +61,6 @@ export class WebWorker {
     }
 
     setKeys(keys: Key[]) {
-        console.log("trying to send keys to the worker...", {keys});
         if (!this.worker) {
             console.warn("Cannot pass keys to e2ee worker as it is not initialized yet.");
             return;
@@ -70,7 +69,6 @@ export class WebWorker {
             operation: "setKeys",
             keys
         });
-        console.log("Keys sent to Worker: ", keys);
     }
 
     createWorkerFromFunction(workerFunction: Function) {

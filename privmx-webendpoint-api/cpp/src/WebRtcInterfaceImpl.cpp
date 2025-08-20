@@ -25,7 +25,6 @@ EM_ASYNC_JS(emscripten::EM_VAL, webRtcJsHandler, (emscripten::EM_VAL name_handle
 
     try {
         response = await window.webRtcInterfaceToNativeHandler.methodCall(name, params);
-        console.log("after methodCall in WebRtcInterfaceImpl..", response);
     } catch (error) {
         console.error("Error on webRtcInterfaceToNativeHandler call from C for", name, params, error);
         let ret = { status: -1, buff: "", error: error.toString()};
