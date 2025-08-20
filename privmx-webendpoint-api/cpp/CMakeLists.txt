@@ -17,6 +17,7 @@ target_link_options(endpoint-wasm-module PUBLIC
     -sTEXTDECODER=0
     -sINITIAL_MEMORY=260046848 # 128MB + 12 * 10MB
     -sASYNCIFY_STACK_SIZE=10485760 # 10MB
+    -sEXPORTED_RUNTIME_METHODS=HEAPU8
     "SHELL:--js-library=${PROJECT_SOURCE_DIR}/js/websocket.js"
     "SHELL:--pre-js=${PROJECT_SOURCE_DIR}/js/loader.js"
     "SHELL:--extern-post-js=${PROJECT_SOURCE_DIR}/js/extern-post.js"
