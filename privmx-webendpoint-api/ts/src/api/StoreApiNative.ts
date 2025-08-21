@@ -72,12 +72,12 @@ export class StoreApiNative extends BaseNative {
         return this.runAsync<string>((taskId)=>this.api.lib.StoreApi_closeFile(taskId, ptr, args));
     }
     async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
-        return this.runAsync<string[]>((taskId)=>this.api.lib.ThreadApi_subscribeFor(taskId, ptr, args));
+        return this.runAsync<string[]>((taskId)=>this.api.lib.StoreApi_subscribeFor(taskId, ptr, args));
     }
     async unsubscribeFrom(ptr: number, args: [string[]]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.ThreadApi_unsubscribeFrom(taskId, ptr, args));
+        return this.runAsync<void>((taskId)=>this.api.lib.StoreApi_unsubscribeFrom(taskId, ptr, args));
     }
     async buildSubscriptionQuery(ptr: number, args: [StoreEventType, StoreEventSelectorType, string]): Promise<string> {
-        return this.runAsync<string>((taskId)=>this.api.lib.ThreadApi_buildSubscriptionQuery(taskId, ptr, args));
+        return this.runAsync<string>((taskId)=>this.api.lib.StoreApi_buildSubscriptionQuery(taskId, ptr, args));
     }
 }
