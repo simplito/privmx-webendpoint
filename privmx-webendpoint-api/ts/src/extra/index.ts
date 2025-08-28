@@ -9,7 +9,7 @@ import {
   ConnectionEventsManager,
   Channel,
   EventPayload,
-  GenericEvent,
+  GenericEvent_old,
 } from './events';
 import * as Utils from './utils';
 import * as Generics from './generics';
@@ -38,5 +38,5 @@ export {
   Channel,
   ConnectionEventsManager,
   EventPayload,
-  GenericEvent,
+  GenericEvent_old as GenericEvent,
 };
