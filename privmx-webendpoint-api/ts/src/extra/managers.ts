@@ -1,5 +1,4 @@
 import { Types } from "..";
-import { InboxEventType, InboxEventSelectorType } from "../Types";
 import {
     ConnectionEventType,
     EventCallback,
@@ -11,6 +10,9 @@ import {
 } from "./subscriptions";
 
 /**
+ *
+ * General usage
+ *
  * const fn1 = () =>{}
  * const fn2 = () =>{}
  *
@@ -34,12 +36,10 @@ import {
  * await manager.subscribeFor([subscriptionA,subscriptionB])
  *
  *
- * //wykonuje unsubscribeFrom + usuwa callbacki (jeśli są jakieś)
  * await manager.unsubscribeFrom(subscriptionB)
  *
  * --- or ---
  *
- * //usuwa callback, czyści subskybcje tylko jeśli nie zostały żadne callbacki
  * await manager.removeCallback(subscriptionA.callbacks[0])
  */
 
