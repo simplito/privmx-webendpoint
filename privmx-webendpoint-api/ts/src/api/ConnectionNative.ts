@@ -51,13 +51,13 @@ export class ConnectionNative extends BaseNative {
         return this.runAsync<PagingList<UserInfo>>((taskId)=>this.api.lib.Connection_listContextUsers(taskId, ptr, args));
     }
     async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
-        return this.runAsync<string[]>((taskId)=>this.api.lib.ThreadApi_subscribeFor(taskId, ptr, args));
+        return this.runAsync<string[]>((taskId)=>this.api.lib.Connection_subscribeFor(taskId, ptr, args));
     }
     async unsubscribeFrom(ptr: number, args: [string[]]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.ThreadApi_unsubscribeFrom(taskId, ptr, args));
+        return this.runAsync<void>((taskId)=>this.api.lib.Connection_unsubscribeFrom(taskId, ptr, args));
     }
     async buildSubscriptionQuery(ptr: number, args: [ConnectionEventType, ConnectionEventSelectorType, string]): Promise<string> {
-        return this.runAsync<string>((taskId)=>this.api.lib.ThreadApi_buildSubscriptionQuery(taskId, ptr, args));
+        return this.runAsync<string>((taskId)=>this.api.lib.Connection_buildSubscriptionQuery(taskId, ptr, args));
     }
     async disconnect(ptr: number, args: []): Promise<void> {
         await this.runAsync<void>((taskId)=>this.api.lib.Connection_disconnect(taskId, ptr, args));
