@@ -88,7 +88,10 @@ namespace api {
     API_FUNCTION(Connection, connectPublic)
     API_FUNCTION(Connection, getConnectionId)
     API_FUNCTION(Connection, listContexts)
-    API_FUNCTION(Connection, getContextUsers)
+    API_FUNCTION(Connection, listContextUsers)
+    API_FUNCTION(Connection, subscribeFor)
+    API_FUNCTION(Connection, unsubscribeFrom)
+    API_FUNCTION(Connection, buildSubscriptionQuery)
     API_FUNCTION(Connection, disconnect)
 
     void Connection_newUserVerifierInterface(int taskId, int connectionPtr) {
