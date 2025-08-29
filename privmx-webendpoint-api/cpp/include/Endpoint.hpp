@@ -175,7 +175,7 @@ namespace api {
 
     // void StreamApi_newWebRtcInterface(int taskId, int apiPtr);
     // void StreamApi_deleteWebRtcInterface(int taskId, int ptr);
-    void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr);
+    void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr, int interfaceBindId);
     void StreamApi_deleteStreamApi(int taskId, int ptr);
     API_FUNCTION_HEADER(StreamApi, create)
     API_FUNCTION_HEADER(StreamApi, createStreamRoom)

@@ -18,13 +18,14 @@ EM_JS(emscripten::EM_VAL, print_error_webrtc, (const char* msg), {
     console.error(UTF8ToString(msg));
 });
 
-EM_ASYNC_JS(emscripten::EM_VAL, webRtcJsHandler, (emscripten::EM_VAL name_handle, emscripten::EM_VAL val_handle), {
+EM_ASYNC_JS(emscripten::EM_VAL, webRtcJsHandler, (emscripten::EM_VAL name_handle, emscripten::EM_VAL val_handle, emscripten::EM_VAL val_bindId), {
     let name = Emval.toValue(name_handle);
     let params = Emval.toValue(val_handle);
+    let bindId = Emval.toValue(val_bindId);
     let response = {};
 
     try {
-        response = await window.webRtcInterfaceToNativeHandler.methodCall(name, params);
+        response = await window.webRtcInterfaceToNativeHandler[bindId].methodCall(name, params);
     } catch (error) {
         console.error("Error on webRtcInterfaceToNativeHandler call from C for", name, params, error);
         let ret = { status: -1, buff: "", error: error.toString()};
@@ -34,7 +35,8 @@ EM_ASYNC_JS(emscripten::EM_VAL, webRtcJsHandler, (emscripten::EM_VAL name_handle
     return Emval.toHandle(ret);
 });
 
-WebRtcInterfaceImpl::WebRtcInterfaceImpl() {
+WebRtcInterfaceImpl::WebRtcInterfaceImpl(int interfaceBindId): _interfaceBindId(interfaceBindId) {
+    printErrorInJS("created WebRtcInterfaceImpl(cpp) with bindId: " + std::to_string(_interfaceBindId));
 }
 
 void WebRtcInterfaceImpl::printErrorInJS(const std::string& msg) {
@@ -42,7 +44,8 @@ void WebRtcInterfaceImpl::printErrorInJS(const std::string& msg) {
 }
 
 emscripten::val WebRtcInterfaceImpl::callWebRtcJSHandler(emscripten::EM_VAL name, emscripten::EM_VAL params) {
-    auto ret = emscripten::val::take_ownership(webRtcJsHandler(name, params));
+    emscripten::val bindId = emscripten::val(_interfaceBindId);
+    auto ret = emscripten::val::take_ownership(webRtcJsHandler(name, params, bindId.as_handle()));
     // emscripten_sleep(0); // <-- this line caused ASYNCIFY_STACK overflow when webRtcJsHandler code was called in parallel
     return ret;
 }
@@ -65,9 +68,9 @@ emscripten::val WebRtcInterfaceImpl::mapToVal(const T& value) {
     return out;
 }
 
-std::shared_ptr<WebRtcInterfaceImpl> WebRtcInterfaceHolder::getInstance() {
+std::shared_ptr<WebRtcInterfaceImpl> WebRtcInterfaceHolder::getInstance(int interfaceBindId) {
     if (!_webRtcInterface) {
-        _webRtcInterface = std::make_shared<WebRtcInterfaceImpl>();
+        _webRtcInterface = std::make_shared<WebRtcInterfaceImpl>(interfaceBindId);
     }
     return _webRtcInterface;
 }
@@ -134,6 +137,7 @@ void WebRtcInterfaceImpl::close() {
 
 void WebRtcInterfaceImpl::updateKeys(const std::vector<privmx::endpoint::stream::Key>& keys) {
     runTaskAsync([&, keys]{
+        printErrorInJS("on updateKeys - bindId: " + std::to_string(_interfaceBindId));
         auto methodName {"updateKeys"};
         emscripten::val name = emscripten::val::u8string(methodName);
         emscripten::val keysArrayVal = emscripten::val::array();

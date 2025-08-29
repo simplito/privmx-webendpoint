@@ -47,7 +47,7 @@ namespace stream {
 class WebRtcInterfaceImpl : public endpoint::stream::WebRTCInterface
 {
 public:
-    WebRtcInterfaceImpl();
+    WebRtcInterfaceImpl(int interfaceBindId);
     ~WebRtcInterfaceImpl() = default;
     std::string createOfferAndSetLocalDescription();
     std::string createAnswerAndSetDescriptions(const std::string& sdp, const std::string& type);
@@ -67,12 +67,12 @@ private:
     emscripten::val mapToVal(const T& value);
 
     void assertStatus(const std::string& method, const emscripten::val& jsResult);
-
+    int _interfaceBindId;
 };
 
 class WebRtcInterfaceHolder {
     public:
-        std::shared_ptr<WebRtcInterfaceImpl> getInstance();
+        std::shared_ptr<WebRtcInterfaceImpl> getInstance(int interfaceBindId);
         WebRtcInterfaceImpl* getRawPtr();
 
     private:

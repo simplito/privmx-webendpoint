@@ -16,6 +16,10 @@ import { Api } from "./Api";
 import { BaseNative } from "./BaseNative";
 
 export class StreamApiNative extends BaseNative {
+    protected static bindingId: number = -1;
+    public static getBindingId() {
+        return ++this.bindingId;
+    }
     protected webRtcInterfacePtr: number = -1;
     protected webRtcInterfaceImpl: WebRtcInterfaceImpl | null;
     constructor(api: Api, protected webRtcClient: WebRtcClient) {
@@ -31,8 +35,9 @@ export class StreamApiNative extends BaseNative {
 
         // po przekazaniu tutaj wskaznika do webrtc, mozemy go pozniej juz nie przekazywac w pozostalych funkcjach
         // await this.createWebRtcInterfaceImpl();
-        this.bindWebRtcInterfaceAsHandler();
-        return this.runAsync<number>((taskId)=>this.api.lib.StreamApi_newStreamApi(taskId, connectionPtr, eventApiPtr));
+        const bindingId = StreamApiNative.getBindingId();
+        this.bindWebRtcInterfaceAsHandler(bindingId);
+        return this.runAsync<number>((taskId)=>this.api.lib.StreamApi_newStreamApi(taskId, connectionPtr, eventApiPtr, bindingId));
     }
     async deleteApi(ptr: number): Promise<void> {
         await this.runAsync<void>((taskId)=>this.api.lib.StreamApi_deleteStreamApi(taskId, ptr));
@@ -88,7 +93,7 @@ export class StreamApiNative extends BaseNative {
     async getTurnCredentials(ptr: number, args: []): Promise<TurnCredentials[]> {
         return this.runAsync<TurnCredentials[]>((taskId)=>this.api.lib.StreamApi_getTurnCredentials(taskId, ptr, args));
     }
-    protected bindWebRtcInterfaceAsHandler(): void {
+    protected bindWebRtcInterfaceAsHandler(bindingId: number): void {
         // if (this.webRtcInterfacePtr > -1) {
         //     await this.deleteWebRtcInterface(this.webRtcInterfacePtr);
         //     this.webRtcInterfacePtr = -1;
@@ -98,9 +103,14 @@ export class StreamApiNative extends BaseNative {
         // const [client] = args;
 
         this.webRtcInterfaceImpl = new WebRtcInterfaceImpl(this.webRtcClient);
-        console.log("webRtcInterfaceImpl(JS) created", this.webRtcInterfaceImpl);
-        (window as any).webRtcInterfaceToNativeHandler = this.webRtcInterfaceImpl;
-        console.log("... and binded to window", (window as any).webRtcInterfaceToNativeHandler);
+        console.log("webRtcInterfaceImpl(JS) created", this.webRtcInterfaceImpl, "with bindingId: ", bindingId);
+        let windowBinder = (window as any).webRtcInterfaceToNativeHandler;
+        if (!windowBinder) {
+            windowBinder = {};
+        }
+        windowBinder[bindingId] = this.webRtcInterfaceImpl;
+        (window as any).webRtcInterfaceToNativeHandler = windowBinder;
+        console.log("... and binded to window", (window as any).webRtcInterfaceToNativeHandler[bindingId]);
         // this.webRtcInterfacePtr = await this.newWebRtcInterface(connectionPtr);
     }
 

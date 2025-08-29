@@ -214,6 +214,7 @@ export class WebRtcClient {
             serverAddress: WebRtcConfig.getAppServerAddress(),
             onResponse: async (data: Message) => {
                 if (data.kind === "credentials") {
+                    console.log("on data in crate AppServerChannel(): creadentials", data);
                     await this.updatePeerConnectionCredentialsOnEvent(data.data);
                 }
             },
@@ -224,6 +225,7 @@ export class WebRtcClient {
     }
 
     private async updatePeerConnectionCredentialsOnEvent(credentials: TurnCredentials[]) {
+        console.log("updatePeerConnectionCredentialsOnEvent...");
         this.peerCredentials = credentials;
         const peerConnection = this.getActivePeerConnection();
         if (peerConnection) {
@@ -235,7 +237,7 @@ export class WebRtcClient {
     }
 
     private createPeerConnectionMulti(configuration: RTCConfiguration & {encodedInsertableStreams?: boolean}): RTCPeerConnection {
-        console.log("1");
+        console.log("createPeerConnectionMulti...");
         const extConf = configuration;
         (extConf as any).encodedInsertableStreams = true;
         console.log("extConf", extConf);

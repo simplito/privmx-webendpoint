@@ -355,14 +355,14 @@ namespace api {
     //     });
     // }
 
-    void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr, eventsPtr]{
+    void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr, int webRtcInterfaceBindId) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr, eventsPtr, webRtcInterfaceBindId]{
             auto connection = (ConnectionVar*)connectionPtr;
             auto eventApi = (EventApiVar*)eventsPtr;
 
             auto streamsApi = new StreamApiVar(connection->getApi(), eventApi->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
             
-            auto webRtcInterface = std::make_shared<stream::WebRtcInterfaceImpl>();
+            auto webRtcInterface = std::make_shared<stream::WebRtcInterfaceImpl>(webRtcInterfaceBindId);
             streamsApi->setWebRtcInterface(webRtcInterface);
             
             return (int)streamsApi;
