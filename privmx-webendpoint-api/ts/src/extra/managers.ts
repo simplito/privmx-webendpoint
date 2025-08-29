@@ -19,21 +19,21 @@ import {
  * const fn3 = () =>{}
  *
  *
- * const subscribtionA = createSubscription({
+ * const subscriptionA = createSubscription({
  *  type: Types.ThreadEventType.THREAD_CREATE,
  *  selector: Types.ThreadEventSelectorType.THREAD_CONTAINER,
  *  selectorId: "s0dvos0div0smidvmsd"
  *  callbacks: [fn1,fn2]
  * })
  *
- * const subscribtionB = createThreadSubscribtion({
+ * const subscriptionB = createThreadSubscribtion({
  *  type: Types.ThreadEventType.MESSAGE_CREATED,
  *  selector: Types.ThreadEventSelectorType.CONTEXT_CONTAINER,
  *  selectorId: "s0dvos0div0smidvmsd"
  *  callbacks: [fn3]
  * })
  *
- * await manager.subscribeFor([subscriptionA,subscriptionB])
+ * await manager.subscribeFor([subscriptionA, subscriptionB])
  *
  *
  * await manager.unsubscribeFrom(subscriptionB)
@@ -57,12 +57,8 @@ export interface GenericEvent<K> extends Types.Event {
    * Data associated with the event.
    */
   data: K;
-
-  /**
-   * ID of connection to which the event was sent.
-   */
-  connectionId: number;
 }
+
 
 export abstract class BaseEventDispatcherManager {
   private _listenersSymbols = new Map<Symbol, string>();
