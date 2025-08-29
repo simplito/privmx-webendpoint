@@ -95,17 +95,32 @@ import { ExtKey } from "./service/ExtKey";
     };
 
     /**
-     * Contains Information about user
+     * Contains information about the change of user status.
+     * 
+     * @type {UserStatusChange}
+     * 
+     * @param {string} action User status change action, which can be "login" or "logout"
+     * @param {string} timestamp Timestamp of the change
+     */
+    export interface UserStatusChange {
+        action: string;
+        timestamp: number;
+    }
+
+    /**
+     * Contains Information about user, their status, and the last status change.
      *
      * @type {UserInfo}
      * 
      * @param {UserWithPubKey} user User publicKey and userId
      * @param {boolean} isActive is user connected to the Bridge
+     * @param {UserStatusChange} lastStatusChange User last status change or no value if they have never logged in
      * 
      */
     export interface UserInfo {
         user: UserWithPubKey;
         isActive: boolean;
+        lastStatusChange?: UserStatusChange;
     };
 // }
 
@@ -605,6 +620,16 @@ export interface PKIVerificationOptions {
 
 
 // Enums
+export enum ConnectionEventType {
+    USER_ADD = 0,
+    USER_REMOVE = 1,
+    USER_STATUS = 2,
+}
+
+export enum ConnectionEventSelectorType {
+    CONTEXT_ID = 0,
+}
+
 export enum StoreEventType {
     STORE_CREATE = 0,
     STORE_UPDATE = 1,

@@ -36,7 +36,10 @@ namespace api {
     API_FUNCTION_HEADER(Connection, connectPublic)
     API_FUNCTION_HEADER(Connection, getConnectionId)
     API_FUNCTION_HEADER(Connection, listContexts)
-    API_FUNCTION_HEADER(Connection, getContextUsers)
+    API_FUNCTION_HEADER(Connection, listContextUsers)
+    API_FUNCTION_HEADER(Connection, subscribeFor)
+    API_FUNCTION_HEADER(Connection, unsubscribeFrom)
+    API_FUNCTION_HEADER(Connection, buildSubscriptionQuery)
     API_FUNCTION_HEADER(Connection, disconnect)
     void Connection_newUserVerifierInterface(int taskId, int connectionPtr);
     void Connection_deleteUserVerifierInterface(int taskId, int ptr);
