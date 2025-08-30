@@ -29,6 +29,9 @@ import { ExtKey } from "./service/ExtKey";
         channel: string;
         connectionId: number;
         data?: unknown;
+        subscriptions:string[];
+        version: number;
+        timestamp:number
     };
     
     /**

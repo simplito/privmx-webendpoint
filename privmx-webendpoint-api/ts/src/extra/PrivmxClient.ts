@@ -9,14 +9,10 @@ import {
   KvdbApi,
   EventApi,
 } from '../service';
-import {
-  ConnectionEventsManager,
-  EventManager,
-  InboxEventsManager,
-  StoreEventsManager,
-  ThreadEventsManager,
-} from './events';
+
 import { PublicConnection } from './PublicConnection';
+import {ConnectionEventsManager, InboxEventsManager, StoreEventsManager, ThreadEventsManager} from "./managers";
+import {EventManager} from "./events";
 
 /**
  * @class PrivmxClient
