@@ -68,7 +68,7 @@ export class App {
 
         events.then(event => {
             console.log("onEvent", event);
-            events = eventQueue.waitEvent();
+            this.listenForEvents(eventQueue);
         })
     }
 
