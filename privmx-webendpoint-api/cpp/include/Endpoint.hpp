@@ -127,6 +127,7 @@ namespace api {
     API_FUNCTION_HEADER(KvdbApi, subscribeFor)
     API_FUNCTION_HEADER(KvdbApi, unsubscribeFrom)
     API_FUNCTION_HEADER(KvdbApi, buildSubscriptionQuery)
+    API_FUNCTION_HEADER(KvdbApi, buildSubscriptionQueryForSelectedEntry)
 
 
     void CryptoApi_newCryptoApi(int taskId);

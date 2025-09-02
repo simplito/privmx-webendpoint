@@ -120,6 +120,7 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(KvdbApi, subscribeFor)
     BINDING_FUNCTION(KvdbApi, unsubscribeFrom)
     BINDING_FUNCTION(KvdbApi, buildSubscriptionQuery)
+    BINDING_FUNCTION(KvdbApi, buildSubscriptionQueryForSelectedEntry)
 
     BINDING_FUNCTION(CryptoApi, newCryptoApi)
     BINDING_FUNCTION(CryptoApi, deleteCryptoApi)
