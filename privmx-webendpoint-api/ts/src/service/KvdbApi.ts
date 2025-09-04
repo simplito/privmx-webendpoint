@@ -291,5 +291,15 @@ export class KvdbApi extends BaseApi {
      */
     async buildSubscriptionQuery(eventType: KvdbEventType, selectorType: KvdbEventSelectorType, selectorId: string): Promise<string> {
       return this.native.buildSubscriptionQuery(this.servicePtr, [eventType, selectorType, selectorId]);
-    }  
+    }
+
+    /**
+     * Generate subscription Query for the KVDB events for single KvdbEntry.
+     * @param {EventType} eventType type of event which you listen for
+     * @param {string} kvdbId ID of the KVDB  
+     * @param {string} kvdbEntryKey Key of Kvdb Entry
+     */
+    async buildSubscriptionQueryForSelectedEntry(eventType: KvdbEventType, kvdbId: string, kvdbEntryKey: string): Promise<string> {
+      return this.native.buildSubscriptionQueryForSelectedEntry(this.servicePtr, [eventType, kvdbId, kvdbEntryKey]);
+    }
 }

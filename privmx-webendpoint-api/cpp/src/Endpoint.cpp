@@ -233,6 +233,7 @@ namespace api {
     API_FUNCTION(KvdbApi, subscribeFor)
     API_FUNCTION(KvdbApi, unsubscribeFrom)
     API_FUNCTION(KvdbApi, buildSubscriptionQuery)
+    API_FUNCTION(KvdbApi, buildSubscriptionQueryForSelectedEntry)
 
     void CryptoApi_newCryptoApi(int taskId) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&]{

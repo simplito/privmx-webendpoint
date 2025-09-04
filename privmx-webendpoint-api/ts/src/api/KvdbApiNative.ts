@@ -68,4 +68,7 @@ export class KvdbApiNative extends BaseNative {
     async buildSubscriptionQuery(ptr: number, args: [KvdbEventType, KvdbEventSelectorType, string]): Promise<string> {
         return this.runAsync<string>((taskId)=>this.api.lib.KvdbApi_buildSubscriptionQuery(taskId, ptr, args));
     }
+    async buildSubscriptionQueryForSelectedEntry(ptr: number, args: [KvdbEventType, string, string]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.KvdbApi_buildSubscriptionQueryForSelectedEntry(taskId, ptr, args));
+    }
 }
