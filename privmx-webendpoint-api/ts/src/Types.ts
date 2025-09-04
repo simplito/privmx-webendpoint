@@ -641,6 +641,7 @@ export enum StoreEventType {
     FILE_CREATE = 4,
     FILE_UPDATE = 5,
     FILE_DELETE = 6,
+    COLLECTION_CHANGE = 7,
 }
 
 export enum StoreEventSelectorType {
@@ -657,6 +658,7 @@ export enum ThreadEventType {
     MESSAGE_CREATE = 4,
     MESSAGE_UPDATE = 5,
     MESSAGE_DELETE = 6,
+    COLLECTION_CHANGE = 7,
 }
 
 export enum ThreadEventSelectorType {
@@ -671,7 +673,7 @@ export enum InboxEventType {
     INBOX_DELETE = 2,
     ENTRY_CREATE = 3,
     ENTRY_DELETE = 4,
-
+    COLLECTION_CHANGE = 5,
 };
 
 export enum InboxEventSelectorType {
@@ -688,7 +690,7 @@ export enum KvdbEventType {
     ENTRY_CREATE = 4,
     ENTRY_UPDATE = 5,
     ENTRY_DELETE = 6,
-
+    COLLECTION_CHANGE = 7,
 };
 
 export enum KvdbEventSelectorType {
