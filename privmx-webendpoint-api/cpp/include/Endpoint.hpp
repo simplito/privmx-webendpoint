@@ -191,7 +191,8 @@ namespace api {
     API_FUNCTION_HEADER(StreamApi, leaveStream)
     API_FUNCTION_HEADER(StreamApi, keyManagement)
     API_FUNCTION_HEADER(StreamApi, getTurnCredentials)
-
+    API_FUNCTION_HEADER(StreamApi, subscribeForStreamEvents)
+    API_FUNCTION_HEADER(StreamApi, unsubscribeFromStreamEvents)
 
 } // namespace api
 } // namespace webendpoint

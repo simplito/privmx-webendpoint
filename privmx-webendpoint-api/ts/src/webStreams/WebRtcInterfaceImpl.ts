@@ -88,28 +88,33 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
 
         // createPeerConnectionWithLocalStream powinno byc zawolane w kliencie jak ustawiamy strumien z kamery
         // const peerConnection = await this.client.createPeerConnectionWithLocalStream(mediaStream);
-        const peerConnection = this.getClient().getActivePeerConnection();
+        console.log("[WebrtcInterfaceImpl]: createOfferAndSetLocalDescription call..");
+        const peerConnection = this.getClient().getSenderActivePeerConnection();
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
         return offer.sdp; // sdp 
     }
 
     async createAnswerAndSetDescriptions(model: SdpModel): Promise<string> {
-        const peerConnection = this.getClient().getActivePeerConnection();
+        console.log("[WebrtcInterfaceImpl]: createAnswerAndSetDescriptions call..");
+
+        // const peerConnection = this.getClient().getReceiverActivePeerConnection();
+        const peerConnection = await this.getClient().recreateAndGetReceiverPeerConnection();
         await peerConnection.setRemoteDescription(new RTCSessionDescription({sdp: model.sdp, type: model.type as RTCSdpType}));
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
         return answer.sdp;
     }
 
-    async setAnswerAndSetRemoteDescription(model: SetAnswerAndSetRemoteDescriptionModel) {  
-        const peerConnection = this.getClient().getActivePeerConnection();
+    async setAnswerAndSetRemoteDescription(model: SetAnswerAndSetRemoteDescriptionModel) {
+        console.log("[WebrtcInterfaceImpl]: setAnswerAndSetRemoteDescription call..");
+        const peerConnection = this.getClient().getSenderActivePeerConnection();
         await peerConnection.setRemoteDescription(new RTCSessionDescription({sdp: model.sdp, type: model.type as RTCSdpType}));
     }
 
     async close() {
-        const peerConnection = this.getClient().getActivePeerConnection();
-        peerConnection.close();
+        this.getClient().getSenderActivePeerConnection().close();
+        this.getClient().getReceiverActivePeerConnection().close();
     }
 
     async updateKeys(model: UpdateKeysModel) {

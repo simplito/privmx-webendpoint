@@ -407,6 +407,8 @@ namespace api {
     API_FUNCTION(StreamApi, leaveStream)
     API_FUNCTION(StreamApi, keyManagement)
     API_FUNCTION(StreamApi, getTurnCredentials)
+    API_FUNCTION(StreamApi, subscribeForStreamEvents)
+    API_FUNCTION(StreamApi, unsubscribeFromStreamEvents)
 
 } // namespace api
 } // namespace webendpoint

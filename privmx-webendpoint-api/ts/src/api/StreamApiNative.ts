@@ -93,6 +93,13 @@ export class StreamApiNative extends BaseNative {
     async getTurnCredentials(ptr: number, args: []): Promise<TurnCredentials[]> {
         return this.runAsync<TurnCredentials[]>((taskId)=>this.api.lib.StreamApi_getTurnCredentials(taskId, ptr, args));
     }
+    async subscribeForStreamEvents(ptr: number, args: []): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_subscribeForStreamEvents(taskId, ptr, args));
+    }
+    async unsubscribeFromStreamEvents(ptr: number, args: []): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_unsubscribeFromStreamEvents(taskId, ptr, args));
+    }
+
     protected bindWebRtcInterfaceAsHandler(bindingId: number): void {
         // if (this.webRtcInterfacePtr > -1) {
         //     await this.deleteWebRtcInterface(this.webRtcInterfacePtr);

@@ -148,11 +148,12 @@ export class StreamApi extends BaseApi {
         //     streamRoomId, query
         // }});
         // return {list: [...localStreams, ...remoteStreams]};
-        const localStreams: Stream[] = Array.from(this.streams.values()).map(x => {
-            return {streamId: x.streamId, userId: ""};
-        });
+        // const localStreams: Stream[] = Array.from(this.streams.values()).map(x => {
+        //     return {streamId: x.streamId, userId: ""};
+        // });
         const remoteStreams = await this.native.listStreams(this.servicePtr, [streamRoomId]);
-        return [...localStreams, ...remoteStreams];
+        // return [...localStreams, ...remoteStreams];
+        return remoteStreams;
 
     }
 
@@ -341,14 +342,16 @@ export class StreamApi extends BaseApi {
 
         const mediaStream = new MediaStream(mediaTracks);
         // tutaj createPeerConnectionWithLocalStream przypisuje w ostatnim kroku utworzone PeerConnection do this wiec nie trzeba go zwracac
-        const peerCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
-        console.log("peerCredentials: ", peerCredentials);
-        const overrideUrl = "turn:webrtc1.s24.simplito.com:3478";
-        const overridenCreds = peerCredentials.map(x => {
-            return {...x, url: overrideUrl}
-        });
-        console.log("override peerCredentials url with: ", overrideUrl);
-        await this.client.createPeerConnectionWithLocalStream(mediaStream, overridenCreds);
+        // const turnCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
+        // console.log("peerCredentials: ", peerCredentials);
+        // const overrideUrl = "turn:webrtc1.s24.simplito.com:3478";
+        // const overridenCreds = peerCredentials.map(x => {
+        //     return {...x, url: overrideUrl}
+        // });
+        // console.log("override peerCredentials url with: ", overrideUrl);
+        const turnCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
+        await this.client.setTurnCredentials(turnCredentials);
+        await this.client.createPeerConnectionWithLocalStream(mediaStream);
         return this.native.publishStream(this.servicePtr, [streamId]);
     }
 
@@ -395,13 +398,13 @@ export class StreamApi extends BaseApi {
         // }});
 
         const peerCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
-        console.log("peerCredentials: ", peerCredentials);
-        const overrideUrl = "turn:webrtc1.s24.simplito.com:3478";
-        const overridenCreds = peerCredentials.map(x => {
-            return {...x, url: overrideUrl}
-        });
-        
-        await this.client.createPeerConnectionOnJoin(overridenCreds);
+        // console.log("peerCredentials: ", peerCredentials);
+        // const overrideUrl = "turn:webrtc1.s24.simplito.com:3478";
+        // const overridenCreds = peerCredentials.map(x => {
+        //     return {...x, url: overrideUrl}
+        // });
+        await this.client.setTurnCredentials(peerCredentials);
+        await this.client.createPeerConnectionOnJoin(peerCredentials);
 
         this.client.addRemoteStreamListener(settings.onRemoteTrack);
         const localStreamId = Utils.generateNumericId() as StreamId;
@@ -436,4 +439,11 @@ export class StreamApi extends BaseApi {
     //     console.log("setting key: ", key)
     //     this.client.setEncKey(key.key, key.iv);
     // }
+
+    public async subscribeForStreamEvents(): Promise<void> {
+        this.native.subscribeForStreamEvents(this.servicePtr, []);
+    }
+    public async unsubscribeFromStreamEvents(): Promise<void> {
+        this.native.subscribeForStreamEvents(this.servicePtr, []);
+    }
 }

@@ -1,7 +1,6 @@
 
 import { AppServerChannel, Message } from "./AppServerChannel";
 import { MediaServerApiTypes, SignalingFromServer } from "../ServerTypes";
-// import { SignalingApi } from "./AppServerSignaling";
 import { EncKey, InitOptions, PeerCredentials, RemoteStreamListener, VideoStream } from "./WebRtcClientTypes";
 import { WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
@@ -16,7 +15,8 @@ export declare class RTCRtpScriptTransform {
 
 export class WebRtcClient {
     public uniqId: string;
-    private peerConnection: RTCPeerConnection|undefined;
+    private senderPeerConnection: RTCPeerConnection|undefined;
+    private receiverPeerConnection: RTCPeerConnection|undefined;
 
     private appServerChannel: AppServerChannel|undefined;
     // private signalingApi: SignalingApi | undefined;
@@ -82,6 +82,7 @@ export class WebRtcClient {
 
         if (baseEvent.kind === "media-event" && baseEvent.type === "subscriberAttached") {
             this.onSubscriberAttached(<SignalingFromServer.SubscriberAttached>event.data);
+            return;
         }
 
         // on streamConfigured
@@ -94,7 +95,7 @@ export class WebRtcClient {
         console.log("-----> onStreamConfigured call with eventData", eventData);
         try {
             console.log("-----> setting up the answer...");
-            await this.getActivePeerConnection().setRemoteDescription(new RTCSessionDescription(eventData.answer));
+            await this.getSenderActivePeerConnection().setRemoteDescription(new RTCSessionDescription(eventData.answer));
         } catch (e) {
             console.error("Cannot set remote description from answer", e);
         }
@@ -138,18 +139,26 @@ export class WebRtcClient {
         return this.configuration;
     }
 
-    async createPeerConnectionWithLocalStream(stream: MediaStream, peerCredentials: TurnCredentials[]): Promise<RTCPeerConnection> {
+    async recreateAndGetReceiverPeerConnection() {
+        this.receiverPeerConnection = this.createPeerConnectionMulti(this.configuration);
+        return this.receiverPeerConnection;
+    }
+
+    async setTurnCredentials(turnCredentials: TurnCredentials[]) {
+        this.peerCredentials = turnCredentials;
+    }
+
+    async createPeerConnectionWithLocalStream(stream: MediaStream): Promise<RTCPeerConnection> {
         // this.peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
-        this.peerCredentials = peerCredentials;
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
 
-        this.peerConnection = this.createPeerConnectionMulti(this.configuration);
-        console.log("created peerConnection: ", this.peerConnection);
+        this.senderPeerConnection = this.createPeerConnectionMulti(this.configuration);
+        this.receiverPeerConnection = this.createPeerConnectionMulti(this.configuration);
         console.log("=========> peerConnection multi created.", this.uniqId);
         if (stream.getTracks().length > 0) {
             const [track] = stream.getTracks();
             console.log("adding track to peerConnection...");
-            const videoSender = this.peerConnection.addTrack(track, stream);
+            const videoSender = this.senderPeerConnection.addTrack(track, stream);
             this.e2eeWorker = await this.getWorker();
     
             console.log("this.e2eeWorker", this.e2eeWorker);
@@ -173,24 +182,27 @@ export class WebRtcClient {
     
             console.log("Transform streams added.")
         }
-        console.log("Created peerConnection with configuration: ", this.peerConnection.getConfiguration(), "and clientId: ", this.clientId);
-        return this.peerConnection;
+        console.log("Created peerConnection with configuration: ", this.senderPeerConnection.getConfiguration(), "and clientId: ", this.clientId);
+        return this.senderPeerConnection;
     }
 
     public async createPeerConnectionOnJoin(peerCredentials: TurnCredentials[]) {
         const configuration = WebRtcConfig.generateTurnConfiguration(peerCredentials);
-        const peerConnection = this.createPeerConnectionMulti(configuration);
-        this.peerConnection = peerConnection;
+        this.receiverPeerConnection = this.createPeerConnectionMulti(configuration);
     }
 
     private async onSubscriberAttached(eventData: SignalingFromServer.SubscriberAttached) {
         console.log("============> onSubscriberAttached",eventData);
-        const peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
+        // const peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
 
-        const configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
-
+        // const configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
+        if (!this.configuration) {
+            throw new Error("Configuration missing.");
+        }
         console.log("-----> onSubscriberAttached", {room: eventData.room, streams: eventData.streams});
-        const peerConnection = this.createPeerConnectionMulti(configuration);
+        this.receiverPeerConnection = this.createPeerConnectionMulti(this.configuration);
+        const peerConnection = this.receiverPeerConnection;
+
         console.log("-----> setting up remote subscriber offer as remoteDescription", eventData.offer);
         await peerConnection.setRemoteDescription(new RTCSessionDescription(eventData.offer));
         console.log("----------> creating answer for remote offer..");
@@ -203,8 +215,6 @@ export class WebRtcClient {
         const answer = await peerConnection.createAnswer();
 
         await peerConnection.setLocalDescription(answer);
-
-        this.peerConnection = peerConnection;
 
         // await this.signalingApi?.acceptOffer(eventData.session_id, eventData.handle, answer);
     }
@@ -224,21 +234,24 @@ export class WebRtcClient {
         return appServerChannel;
     }
 
-    private async updatePeerConnectionCredentialsOnEvent(credentials: TurnCredentials[]) {
-        console.log("updatePeerConnectionCredentialsOnEvent...");
-        this.peerCredentials = credentials;
-        const peerConnection = this.getActivePeerConnection();
-        if (peerConnection) {
-            const newConfiguration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
-            peerConnection.setConfiguration(newConfiguration);
-            this.startNegotiationMulti(true);
-        }
-        console.log("PeerConnection and peerCredentials after update", this.peerConnection, this.peerCredentials);
+    private async updatePeerConnectionCredentialsOnEvent(_credentials: TurnCredentials[]) {
+        // console.log("updatePeerConnectionCredentialsOnEvent...");
+        // this.peerCredentials = credentials;
+        // const peerConnection = this.getActivePeerConnection();
+        // if (peerConnection) {
+        //     const newConfiguration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
+        //     peerConnection.setConfiguration(newConfiguration);
+        //     this.startNegotiationMulti(true);
+        // }
+        // console.log("PeerConnection and peerCredentials after update", this.peerConnection, this.peerCredentials);
     }
 
     private createPeerConnectionMulti(configuration: RTCConfiguration & {encodedInsertableStreams?: boolean}): RTCPeerConnection {
         console.log("createPeerConnectionMulti...");
-        const extConf = configuration;
+        const extConf = configuration || this.getPeerConnectionConfiguration();
+        if (!extConf) {
+            throw new Error("No configuration available!");
+        }
         (extConf as any).encodedInsertableStreams = true;
         console.log("extConf", extConf);
         const connection = new RTCPeerConnection(extConf);
@@ -277,7 +290,7 @@ export class WebRtcClient {
         });
         connection.addEventListener('negotiationneeded', event => {
             console.log("negotiationneeded: ", event);
-            // this.startNegotiationMulti();
+            this.startNegotiationMulti(connection);
             console.warn("negotiationneeded call... ignored for now but has to be implemented.")
         });
         connection.addEventListener('signalingstatechange', event => {
@@ -291,22 +304,32 @@ export class WebRtcClient {
         return connection;
     }
 
-    public getActivePeerConnection(): RTCPeerConnection {
-        if (!this.peerConnection) {
+    public getSenderActivePeerConnection(): RTCPeerConnection {
+        if (!this.senderPeerConnection) {
             throw new Error("PeerConnection not initialized! " + this.uniqId);
         }
-        return this.peerConnection;
+        return this.senderPeerConnection;
+    }
+    public getReceiverActivePeerConnection(): RTCPeerConnection {
+        if (!this.receiverPeerConnection) {
+            throw new Error("Receiver PeerConnection not initialized!");
+        }
+        return this.receiverPeerConnection;
     }
 
-    private async startNegotiationMulti(withIceRestart?: boolean) {
-        console.log("-----> Start negotiation multi - creating offer");
-        const offer = await this.getActivePeerConnection().createOffer({iceRestart: withIceRestart});
-        console.log("-----> Setting up the offer...", offer);
-        await this.getActivePeerConnection().setLocalDescription(offer);
+    private async startNegotiationMulti(rtcPeerConnection: RTCPeerConnection, withIceRestart?: boolean) {
+        try {
+            console.log("[startNegotiationMulti]","Create offer...");
+            const offer = await rtcPeerConnection.createOffer({iceRestart: withIceRestart});
+            console.log("setLocalDescription on startNegotiationMulti");
+            await rtcPeerConnection.setLocalDescription(offer);
+        } catch(e) {
+            console.error("Error on startNegotiationMulti", e);
+        }
     }
 
     createDataChannel(name: string) {
-        const channel = this.getActivePeerConnection().createDataChannel(name);
+        const channel = this.getSenderActivePeerConnection().createDataChannel(name);
         this.addDataChannel(channel);
     }
 
