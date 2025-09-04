@@ -20,18 +20,19 @@ namespace webendpoint {
 
 class CustomUserVerifierInterface: public virtual endpoint::core::UserVerifierInterface {
 public:
-    CustomUserVerifierInterface() : endpoint::core::UserVerifierInterface() {}
+    CustomUserVerifierInterface(int interfaceBindId) : endpoint::core::UserVerifierInterface(), _interfaceBindId(interfaceBindId) {}
     std::vector<bool> verify(const std::vector<endpoint::core::VerificationRequest>& request) override;
 private:
     void printErrorInJS(const std::string& msg);
     emscripten::val callVerifierOnJS(emscripten::EM_VAL name, emscripten::EM_VAL params);
     void runTaskAsync(const std::function<void(void)>& func);
     emscripten::val mapToVal(const std::vector<endpoint::core::VerificationRequest>& request);
+    int _interfaceBindId;
 };
 
 class UserVerifierHolder {
     public:
-        std::shared_ptr<CustomUserVerifierInterface> getInstance();
+        std::shared_ptr<CustomUserVerifierInterface> getInstance(int interfaceBindId);
 
     private:
         std::shared_ptr<CustomUserVerifierInterface> _verifierInterface;

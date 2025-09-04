@@ -17,6 +17,11 @@ export class ConnectionNative extends BaseNative {
     protected lastConnectionId: number = -1;
     protected userVerifierPtr: number = -1;
 
+    protected static verifierBindingId: number = -1;
+    protected static getVerifierBindingId() {
+        return ++this.verifierBindingId;
+    }
+
     protected async newApi(_connectionPtr: number): Promise<number> { 
         throw new Error("Use the newConnection() - specialized version of method instead.");
     }
@@ -69,13 +74,20 @@ export class ConnectionNative extends BaseNative {
         }
 
         const [connectionPtr, verifierInterface] = args;
-        (window as any).userVierifier_verify = async (request: VerificationRequest[]) => {
+        const bindingId = ConnectionNative.getVerifierBindingId();
+
+        let windowBinder = (window as any).userVerifierBinder;
+        if (!windowBinder) {
+            windowBinder = {};
+        }
+
+        windowBinder[bindingId].userVierifier_verify = async (request: VerificationRequest[]) => {
             if (verifierInterface && typeof verifierInterface.verify === "function") {
                 return verifierInterface.verify(request)
             }
             throw new Error("Call on UserVerifierInterface with missing implementation");
         }
-        this.userVerifierPtr = await this.runAsync<number>((taskId) => this.api.lib.Connection_newUserVerifierInterface(taskId, connectionPtr));
+        this.userVerifierPtr = await this.runAsync<number>((taskId) => this.api.lib.Connection_newUserVerifierInterface(taskId, connectionPtr, bindingId));
     }
 
     protected async newUserVerifierInterface(connectionPtr: number): Promise<number> {

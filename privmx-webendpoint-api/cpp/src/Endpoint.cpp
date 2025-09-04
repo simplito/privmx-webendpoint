@@ -94,11 +94,11 @@ namespace api {
     API_FUNCTION(Connection, buildSubscriptionQuery)
     API_FUNCTION(Connection, disconnect)
 
-    void Connection_newUserVerifierInterface(int taskId, int connectionPtr) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+    void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int interfaceBindId) {
+        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr, interfaceBindId]{
             auto connection = (ConnectionVar*)connectionPtr;
             auto customInterfaceRawPtr = new UserVerifierHolder();
-            connection->getApi().setUserVerifier(customInterfaceRawPtr->getInstance());
+            connection->getApi().setUserVerifier(customInterfaceRawPtr->getInstance(interfaceBindId));
             return (int)customInterfaceRawPtr;
         });
     }

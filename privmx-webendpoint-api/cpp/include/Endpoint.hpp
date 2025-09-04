@@ -41,7 +41,7 @@ namespace api {
     API_FUNCTION_HEADER(Connection, unsubscribeFrom)
     API_FUNCTION_HEADER(Connection, buildSubscriptionQuery)
     API_FUNCTION_HEADER(Connection, disconnect)
-    void Connection_newUserVerifierInterface(int taskId, int connectionPtr);
+    void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int interfaceBindId);
     void Connection_deleteUserVerifierInterface(int taskId, int ptr);
     emscripten::val callVerifierOnJS(emscripten::val& name, emscripten::val& params);
 
