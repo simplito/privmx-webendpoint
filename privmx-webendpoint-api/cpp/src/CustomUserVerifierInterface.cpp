@@ -84,9 +84,11 @@ std::vector<bool> CustomUserVerifierInterface::verify(const std::vector<core::Ve
         return out;
     }
 
-    std::shared_ptr<CustomUserVerifierInterface> UserVerifierHolder::getInstance(int interfaceBindId) {
+    UserVerifierHolder::UserVerifierHolder(int bindId): _bindId(bindId) {}
+
+    std::shared_ptr<CustomUserVerifierInterface> UserVerifierHolder::getInstance() {
         if (!_verifierInterface) {
-            _verifierInterface = std::make_shared<CustomUserVerifierInterface>(interfaceBindId);
+            _verifierInterface = std::make_shared<CustomUserVerifierInterface>(_bindId);
         }
         return _verifierInterface;
     }

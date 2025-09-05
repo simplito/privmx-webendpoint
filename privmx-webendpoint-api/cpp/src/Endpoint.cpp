@@ -97,8 +97,8 @@ namespace api {
     void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int interfaceBindId) {
         ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr, interfaceBindId]{
             auto connection = (ConnectionVar*)connectionPtr;
-            auto customInterfaceRawPtr = new UserVerifierHolder();
-            connection->getApi().setUserVerifier(customInterfaceRawPtr->getInstance(interfaceBindId));
+            auto customInterfaceRawPtr = new UserVerifierHolder(interfaceBindId);
+            connection->getApi().setUserVerifier(customInterfaceRawPtr->getInstance());
             return (int)customInterfaceRawPtr;
         });
     }

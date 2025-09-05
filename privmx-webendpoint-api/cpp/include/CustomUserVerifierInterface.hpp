@@ -32,10 +32,12 @@ private:
 
 class UserVerifierHolder {
     public:
-        std::shared_ptr<CustomUserVerifierInterface> getInstance(int interfaceBindId);
+        UserVerifierHolder(int bindId);
+        std::shared_ptr<CustomUserVerifierInterface> getInstance();
 
     private:
         std::shared_ptr<CustomUserVerifierInterface> _verifierInterface;
+        int _bindId;
 };
 
 
