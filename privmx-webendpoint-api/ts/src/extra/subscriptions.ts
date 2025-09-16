@@ -5,18 +5,6 @@ import {
 } from "../Types";
 import {GenericEvent} from "./managers";
 
-export type CollectionItemChange = {
-    itemId: string;
-    action: string;
-};
-
-export type CollectionChangedEventData = {
-    moduleType: string;
-    moduleId: string;
-    affectedItemsCount: number;
-    items: CollectionItemChange;
-};
-
 export type ThreadCallbackPayload = {
     // Thread events
     [Types.ThreadEventType.THREAD_CREATE]: Types.Thread;
@@ -33,7 +21,7 @@ export type ThreadCallbackPayload = {
         threadId: string;
         messageId: string;
     };
-    [Types.ThreadEventType.COLLECTION_CHANGE]: CollectionChangedEventData;
+    [Types.ThreadEventType.COLLECTION_CHANGE]: Types.CollectionChangedEventData;
 };
 export type StoreCallbackPayload = {
     // Store events
@@ -53,7 +41,7 @@ export type StoreCallbackPayload = {
         storeId: string;
         fileId: string;
     };
-    [Types.StoreEventType.COLLECTION_CHANGE]: CollectionChangedEventData;
+    [Types.StoreEventType.COLLECTION_CHANGE]: Types.CollectionChangedEventData;
 };
 
 
@@ -67,7 +55,7 @@ export type InboxCallbackPayload = {
         inboxId: string;
         entryId: string;
     };
-    [Types.InboxEventType.COLLECTION_CHANGE]: CollectionChangedEventData;
+    [Types.InboxEventType.COLLECTION_CHANGE]: Types.CollectionChangedEventData;
 };
 
 export type KvdbCallbackPayload = {
@@ -86,7 +74,7 @@ export type KvdbCallbackPayload = {
         kvdbId: string;
         entryId: string;
     };
-    [Types.KvdbEventType.COLLECTION_CHANGE]: CollectionChangedEventData;
+    [Types.KvdbEventType.COLLECTION_CHANGE]: Types.CollectionChangedEventData;
 };
 
 
