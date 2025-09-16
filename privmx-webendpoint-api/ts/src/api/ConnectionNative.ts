@@ -13,9 +13,21 @@ import { UserVerifierInterface } from "../service/UserVerifierInterface";
 import { PagingQuery, PagingList, Context, UserInfo, VerificationRequest, PKIVerificationOptions, ConnectionEventType, ConnectionEventSelectorType } from "../Types";
 import { BaseNative } from "./BaseNative";
 
+type UserVierifierVerifyFunc = (request: VerificationRequest[]) => Promise<boolean[]>;
+
+declare global {
+  interface Window {
+    userVerifierBinder?: {[id: number]: {userVierifier_verify: UserVierifierVerifyFunc}};
+  }
+}
 export class ConnectionNative extends BaseNative {
     protected lastConnectionId: number = -1;
     protected userVerifierPtr: number = -1;
+
+    protected static verifierBindingId: number = -1;
+    protected static getVerifierBindingId() {
+        return ++this.verifierBindingId;
+    }
 
     protected async newApi(_connectionPtr: number): Promise<number> { 
         throw new Error("Use the newConnection() - specialized version of method instead.");
@@ -69,13 +81,20 @@ export class ConnectionNative extends BaseNative {
         }
 
         const [connectionPtr, verifierInterface] = args;
-        (window as any).userVierifier_verify = async (request: VerificationRequest[]) => {
-            if (verifierInterface && typeof verifierInterface.verify === "function") {
-                return verifierInterface.verify(request)
-            }
-            throw new Error("Call on UserVerifierInterface with missing implementation");
+        const bindingId = ConnectionNative.getVerifierBindingId();
+
+        if (!window.userVerifierBinder) {
+            window.userVerifierBinder = {};
         }
-        this.userVerifierPtr = await this.runAsync<number>((taskId) => this.api.lib.Connection_newUserVerifierInterface(taskId, connectionPtr));
+        window.userVerifierBinder[bindingId] = {
+            userVierifier_verify: async (request: VerificationRequest[]) => {
+                if (verifierInterface && typeof verifierInterface.verify === "function") {
+                    return verifierInterface.verify(request)
+                }
+                throw new Error("Call on UserVerifierInterface with missing implementation");
+            }
+        };
+        this.userVerifierPtr = await this.runAsync<number>((taskId) => this.api.lib.Connection_newUserVerifierInterface(taskId, connectionPtr, bindingId));
     }
 
     protected async newUserVerifierInterface(connectionPtr: number): Promise<number> {
