@@ -20,6 +20,8 @@ import {
   InboxEntry,
   FilesConfig,
   ContainerWithoutItemPolicy,
+  InboxEventType,
+  InboxEventSelectorType,
 } from "../Types";
 
 export class InboxApi extends BaseApi {
@@ -297,33 +299,61 @@ export class InboxApi extends BaseApi {
     return this.native.closeFile(this.servicePtr, [fileHandle]);
   }
 
-  /**
-   * Subscribes for the Inbox module main events.
-   */
-  async subscribeForInboxEvents(): Promise<void> {
-    return this.native.subscribeForInboxEvents(this.servicePtr, []);
-  }
+  // /**
+  //  * Subscribes for the Inbox module main events.
+  //  */
+  // async subscribeForInboxEvents(): Promise<void> {
+  //   return this.native.subscribeForInboxEvents(this.servicePtr, []);
+  // }
 
-  /**
-   * Unsubscribes from the Inbox module main events.
-   */
-  async unsubscribeFromInboxEvents(): Promise<void> {
-    return this.native.unsubscribeFromInboxEvents(this.servicePtr, []);
-  }
+  // /**
+  //  * Unsubscribes from the Inbox module main events.
+  //  */
+  // async unsubscribeFromInboxEvents(): Promise<void> {
+  //   return this.native.unsubscribeFromInboxEvents(this.servicePtr, []);
+  // }
 
-  /**
-   * Subscribes for events in given Inbox.
-   * @param {string} inboxId ID of the Inbox to subscribe
-   */
-  async subscribeForEntryEvents(inboxId: string): Promise<void> {
-    return this.native.subscribeForEntryEvents(this.servicePtr, [inboxId]);
-  }
+  // /**
+  //  * Subscribes for events in given Inbox.
+  //  * @param {string} inboxId ID of the Inbox to subscribe
+  //  */
+  // async subscribeForEntryEvents(inboxId: string): Promise<void> {
+  //   return this.native.subscribeForEntryEvents(this.servicePtr, [inboxId]);
+  // }
 
-  /**
-   * Unsubscribes from events in given Inbox.
-   * @param {string} inboxId ID of the Inbox to unsubscribe
-   */
-  async unsubscribeFromEntryEvents(inboxId: string): Promise<void> {
-    return this.native.unsubscribeFromEntryEvents(this.servicePtr, [inboxId]);
-  }
+  // /**
+  //  * Unsubscribes from events in given Inbox.
+  //  * @param {string} inboxId ID of the Inbox to unsubscribe
+  //  */
+  // async unsubscribeFromEntryEvents(inboxId: string): Promise<void> {
+  //   return this.native.unsubscribeFromEntryEvents(this.servicePtr, [inboxId]);
+  // }
+
+    /**
+     * Subscribe for the Inbox events on the given subscription query.
+     * 
+     * @param {string[]} subscriptionQueries list of queries
+     * @return list of subscriptionIds in maching order to subscriptionQueries
+     */
+    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+      return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
+    }
+
+    /**
+     * Unsubscribe from events for the given subscriptionId.
+     * @param {string[]} subscriptionIds list of subscriptionId
+     */
+    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
+      return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
+    }
+
+    /**
+     * Generate subscription Query for the Inbox events.
+     * @param {EventType} eventType type of event which you listen for
+     * @param {EventSelectorType} selectorType scope on which you listen for events  
+     * @param {string} selectorId ID of the selector
+     */
+    async buildSubscriptionQuery(eventType: InboxEventType, selectorType: InboxEventSelectorType, selectorId: string): Promise<string> {
+      return this.native.buildSubscriptionQuery(this.servicePtr, [eventType, selectorType, selectorId]);
+    }
 }

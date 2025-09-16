@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { UserVerifierInterface } from "../service/UserVerifierInterface";
-import { PagingQuery, PagingList, Context, UserInfo, VerificationRequest, PKIVerificationOptions } from "../Types";
+import { PagingQuery, PagingList, Context, UserInfo, VerificationRequest, PKIVerificationOptions, ConnectionEventType, ConnectionEventSelectorType } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class ConnectionNative extends BaseNative {
@@ -47,8 +47,17 @@ export class ConnectionNative extends BaseNative {
     async listContexts(ptr: number, args: [PagingQuery]): Promise<PagingList<Context>> {
         return this.runAsync<PagingList<Context>>((taskId)=>this.api.lib.Connection_listContexts(taskId, ptr, args));
     }
-    async getContextUsers(ptr: number, args: [string]): Promise<UserInfo[]> {
-        return this.runAsync<UserInfo[]>((taskId)=>this.api.lib.Connection_getContextUsers(taskId, ptr, args));
+    async listContextUsers(ptr: number, args: [string, PagingQuery]): Promise<PagingList<UserInfo>> {
+        return this.runAsync<PagingList<UserInfo>>((taskId)=>this.api.lib.Connection_listContextUsers(taskId, ptr, args));
+    }
+    async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
+        return this.runAsync<string[]>((taskId)=>this.api.lib.Connection_subscribeFor(taskId, ptr, args));
+    }
+    async unsubscribeFrom(ptr: number, args: [string[]]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.Connection_unsubscribeFrom(taskId, ptr, args));
+    }
+    async buildSubscriptionQuery(ptr: number, args: [ConnectionEventType, ConnectionEventSelectorType, string]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.Connection_buildSubscriptionQuery(taskId, ptr, args));
     }
     async disconnect(ptr: number, args: []): Promise<void> {
         await this.runAsync<void>((taskId)=>this.api.lib.Connection_disconnect(taskId, ptr, args));

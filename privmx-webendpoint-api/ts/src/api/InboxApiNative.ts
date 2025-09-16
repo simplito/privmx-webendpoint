@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { PagingQuery, PagingList, UserWithPubKey, Inbox, InboxPublicView, InboxEntry, FilesConfig, ContainerWithoutItemPolicy } from "../Types";
+import { PagingQuery, PagingList, UserWithPubKey, Inbox, InboxPublicView, InboxEntry, FilesConfig, ContainerWithoutItemPolicy, InboxEventType, InboxEventSelectorType } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class InboxApiNative extends BaseNative {
@@ -74,16 +74,13 @@ export class InboxApiNative extends BaseNative {
     async closeFile(ptr: number, args: [number]): Promise<string> {
         return this.runAsync<string>((taskId)=>this.api.lib.InboxApi_closeFile(taskId, ptr, args));
     }
-    async subscribeForInboxEvents(ptr: number, args: []): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.InboxApi_subscribeForInboxEvents(taskId, ptr, args));
+    async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
+        return this.runAsync<string[]>((taskId)=>this.api.lib.InboxApi_subscribeFor(taskId, ptr, args));
     }
-    async unsubscribeFromInboxEvents(ptr: number, args: []): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.InboxApi_unsubscribeFromInboxEvents(taskId, ptr, args));
+    async unsubscribeFrom(ptr: number, args: [string[]]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.InboxApi_unsubscribeFrom(taskId, ptr, args));
     }
-    async subscribeForEntryEvents(ptr: number, args: [string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.InboxApi_subscribeForEntryEvents(taskId, ptr, args));
-    }
-    async unsubscribeFromEntryEvents(ptr: number, args: [string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.InboxApi_unsubscribeFromEntryEvents(taskId, ptr, args));
+    async buildSubscriptionQuery(ptr: number, args: [InboxEventType, InboxEventSelectorType, string]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.InboxApi_buildSubscriptionQuery(taskId, ptr, args));
     }
 }
