@@ -38,3 +38,14 @@ export interface VideoStream {
 }
 
 export type RemoteStreamListener = (stream: RTCTrackEvent) => void;
+
+export type PluginHandleId = number & {_pluginHandleId: never};
+export type PluginId = string & {_pluginId: never};
+export type SessionId = string & {_sessionId: never};
+export interface JanusPluginHandle {
+    id: PluginHandleId;
+    pluginId: PluginId;
+}
+export interface JanusSession {
+    id: SessionId;
+}

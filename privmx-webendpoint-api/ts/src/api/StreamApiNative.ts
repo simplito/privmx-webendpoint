@@ -100,6 +100,10 @@ export class StreamApiNative extends BaseNative {
         return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_unsubscribeFromStreamEvents(taskId, ptr, args));
     }
 
+    async trickle(ptr: number, args: [string, RTCIceCandidate]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_trickle(taskId, ptr, args));
+    }
+
     protected bindWebRtcInterfaceAsHandler(bindingId: number): void {
         // if (this.webRtcInterfacePtr > -1) {
         //     await this.deleteWebRtcInterface(this.webRtcInterfacePtr);

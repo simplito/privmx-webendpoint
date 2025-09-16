@@ -11,7 +11,8 @@ import { KeyStore } from "../KeyStore";
 
 const NUM_AS_UINT8_SIZE = 1;
 const DEBUG = false;
-
+const sessions = new Map();
+const pipelines = new Map();
 
 export interface TransformContext {
     keyStore: KeyStore;
@@ -121,25 +122,33 @@ const getKeyStore = () => {
     return (self as any).keyStore as KeyStore;
 }
 
-self.onmessage = (message: any) => {
-    logError("message: "+ JSON.stringify(message));
-    const { operation, kind } = message.data;
+self.onmessage = async event  => {
+    logError("message: "+ JSON.stringify(event));
+    const { operation, kind } = event.data;
 
     if (operation === 'initialize') {
         logDebug("worker initialize call")
     } 
-    else  {}
+    else if (operation === 'init-pipeline') {
+        console.log("in worker: 1");
+        // zarejestruj pusty pipeline
+        pipelines.set(event.data.id, { ready: false });
+        // odeślij potwierdzenie
+        self.postMessage({ operation: 'init-pipeline', id: event.data.id });
+        return;
+    }    
+    else
     if (operation === 'encode' || operation === 'decode') {
         const context: TransformContext = {keyStore: getKeyStore()};
-        const { readableStream, writableStream, participantId } = message.data;
+        const { readableStream, writableStream, id } = event.data;
         // const context = getParticipantContext(participantId);
-        handleTransform(context, operation, kind, readableStream, writableStream);
+        handleTransform(context, operation, kind, readableStream, writableStream, id);
     } 
     else 
     if (operation === 'setKeys') {
         logDebug("Worker: setting keys...");
-        const event = message.data as events.SetKeysEvent;
-        getKeyStore().setKeys(event.keys);
+        const data = event.data as events.SetKeysEvent;
+        getKeyStore().setKeys(data.keys);
     } 
 };
 
@@ -173,7 +182,7 @@ function createReceiverTransform(_keyStore: KeyStore, kind: string) {
     });
 }
 
-function handleTransform(context: TransformContext, operation: string, kind: string, readableStream: any, writableStream: any) {
+function handleTransform(context: TransformContext, operation: string, kind: string, readableStream: any, writableStream: any, id: number) {
     let transformStream: TransformStream;
     // logDebug("on handleTransform", {key, operation, readableStream, writableStream})
     logDebug("handleTransform: " + JSON.stringify({operation, context}));
@@ -186,9 +195,27 @@ function handleTransform(context: TransformContext, operation: string, kind: str
     } else
     if (operation == "decode") {
         transformStream = createReceiverTransform(context.keyStore, kind);
-        readableStream
+        const reader = readableStream
             .pipeThrough(transformStream)
-            .pipeTo(writableStream);
+            .pipeTo(writableStream)
+            .catch((err: any) => {
+                // Chrome przy renegocjacji/leave zamyka writable → "Destination stream closed"
+                if (!String(err).includes("Destination stream closed")) {
+                    console.error("pipeline error", err);
+                }
+            })
+
+        sessions.set(id, { pipeline: reader })
+    }
+    else if (operation === "stop") {
+        const s = sessions.get(id);
+        if (s) {
+            try {
+                // abort pipeline if working
+                s.pipeline.abort && s.pipeline.abort();
+            } catch {}
+            sessions.delete(id);
+        }
     } else {
         logError(`Invalid operation: ${operation}`);
     }
@@ -214,7 +241,7 @@ if ((self as any).RTCTransformEvent) {
         const { operation, kind } = transformer.options;
         // logger("operation: " + operation + " / kind: " + kind);
         logDebug("onrtctransfrom: "+JSON.stringify(event));
-        handleTransform({keyStore: getKeyStore()}, operation, kind, transformer.readable, transformer.writable);
+        handleTransform({keyStore: getKeyStore()}, operation, kind, transformer.readable, transformer.writable, 0);
     };
 }
 

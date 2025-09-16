@@ -2,7 +2,7 @@
 import {StreamsApi, Types} from "../ServerTypes";
 import { Utils } from "../webStreams/Utils";
 import { WebRtcClient } from "../webStreams/WebRtcClient";
-import { EncKey, RemoteStreamListener, VideoStream } from "../webStreams/WebRtcClientTypes";
+import { EncKey, RemoteStreamListener, SessionId, VideoStream } from "../webStreams/WebRtcClientTypes";
 import { WebRtcConfig } from "../webStreams/WebRtcConfig";
 import { DataChannelMeta, StreamCreateMeta, StreamId } from "../webStreams/types/ApiTypes";
 import { StreamDataTrackAddRequest } from "../webStreams/types/StreamsApiTypes";
@@ -441,9 +441,13 @@ export class StreamApi extends BaseApi {
     // }
 
     public async subscribeForStreamEvents(): Promise<void> {
-        this.native.subscribeForStreamEvents(this.servicePtr, []);
+        return this.native.subscribeForStreamEvents(this.servicePtr, []);
     }
     public async unsubscribeFromStreamEvents(): Promise<void> {
-        this.native.subscribeForStreamEvents(this.servicePtr, []);
+        return this.native.subscribeForStreamEvents(this.servicePtr, []);
+    }
+
+    public async trickle(sessionId: SessionId, candidate: RTCIceCandidate) {
+        return this.native.trickle(this.servicePtr, [sessionId, candidate]);
     }
 }

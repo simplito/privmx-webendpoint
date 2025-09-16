@@ -13,6 +13,7 @@ using namespace privmx::endpoint::stream;
 using namespace privmx::endpoint;
 using namespace emscripten;
 using SdpWithTypeModel = privmx::endpoint::stream::SdpWithTypeModel;
+using SdpWithTypeAndSessionModel = privmx::endpoint::stream::SdpWithTypeAndSessionModel;
 
 EM_JS(emscripten::EM_VAL, print_error_webrtc, (const char* msg), {
     console.error(UTF8ToString(msg));
@@ -99,13 +100,13 @@ std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription() {
     return ftr.get();
 }
 
-std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::string& sdp, const std::string& type) {
+std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::string& streamRoomId, const int64_t sessionId, const std::string& sdp, const std::string& type) {
     std::promise<std::string> prms;
     std::future<std::string> ftr = prms.get_future();
     runTaskAsync([&, sdp, type]{
         auto methodName {"createAnswerAndSetDescriptions"};
         emscripten::val name = emscripten::val::u8string(methodName);
-        SdpWithTypeModel paramsModel = {.sdp = sdp, .type = type};
+        SdpWithTypeAndSessionModel paramsModel = {.roomId = streamRoomId, .sessionId = sessionId, .sdp = sdp, .type = type};
         emscripten::val params = mapToVal(paramsModel);
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
         assertStatus(methodName, jsResult);

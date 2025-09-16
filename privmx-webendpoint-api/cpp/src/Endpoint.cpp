@@ -409,6 +409,7 @@ namespace api {
     API_FUNCTION(StreamApi, getTurnCredentials)
     API_FUNCTION(StreamApi, subscribeForStreamEvents)
     API_FUNCTION(StreamApi, unsubscribeFromStreamEvents)
+    API_FUNCTION(StreamApi, trickle)
 
 } // namespace api
 } // namespace webendpoint

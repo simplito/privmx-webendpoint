@@ -1,25 +1,29 @@
 
 import { AppServerChannel, Message } from "./AppServerChannel";
 import { MediaServerApiTypes, SignalingFromServer } from "../ServerTypes";
-import { EncKey, InitOptions, PeerCredentials, RemoteStreamListener, VideoStream } from "./WebRtcClientTypes";
+import { EncKey, InitOptions, JanusPluginHandle, JanusSession, PeerCredentials, RemoteStreamListener, SessionId, VideoStream } from "./WebRtcClientTypes";
 import { WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
 import { UpdateKeysModel } from "../service/WebRtcInterface";
 import { Key, TurnCredentials } from "../Types";
 import { KeyStore } from "./KeyStore";
+import { VideoRoomId } from "./types/MediaServerWebSocketApiTypes";
+import { PeerConnectionManager } from "./PeerConnectionsManager";
 
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
     transform: (frame: any, controller: any) => void;
 }
 
+export interface StreamsCallbackInterface {
+    trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void>;
+} 
 export class WebRtcClient {
     public uniqId: string;
     private senderPeerConnection: RTCPeerConnection|undefined;
     private receiverPeerConnection: RTCPeerConnection|undefined;
 
     private appServerChannel: AppServerChannel|undefined;
-    // private signalingApi: SignalingApi | undefined;
 
     private iceCandidates: RTCIceCandidate[] = [];
     private e2eeWorker: Worker | undefined;
@@ -38,69 +42,22 @@ export class WebRtcClient {
 
     // nowo dodane =================================================
     // =============================================================
-    private currentMediaSessionId: MediaServerApiTypes.SessionId | undefined;
     private remoteStreamListeners: RemoteStreamListener[] = [];
-    constructor(private assetsDir: string) {
+    private peerConnectionsManager: PeerConnectionManager;
+
+    constructor(private assetsDir: string, private streamApiCallbacks: StreamsCallbackInterface) {
         this.uniqId = "" + Math.random() + "-" + Math.random();
         console.log("WebRtcClient constructor ("+this.uniqId+")", "assetsDir: ", this.assetsDir);
+        this.peerConnectionsManager = new PeerConnectionManager(
+            () => {
+                return this.createPeerConnectionMulti(this.getPeerConnectionConfiguration());
+            },
+            (sessionId: SessionId, candidate: RTCIceCandidate) => {
+                return this.streamApiCallbacks.trickle(sessionId, candidate);
+            }
+        )
     }
 
-    
-    public async provideSession(): Promise<MediaServerApiTypes.SessionId> {
-        // if (!this.currentMediaSessionId) {
-        //     const sessionId = await (await this.getSignalingApi()).createSession();
-        //     if (!sessionId) {
-        //         throw new Error("Cannot create media session.");
-        //     }
-        //     this.currentMediaSessionId = sessionId;
-        // }
-        return this.currentMediaSessionId;
-    }
-
-    public async getAppServerChannel(): Promise<AppServerChannel> {
-        if (!this.appServerChannel) {
-            this.appServerChannel = await this.createAppServerChannel();
-        }
-        return this.appServerChannel;
-    }
-    
-    // public async getSignalingApi(): Promise<SignalingApi> {
-    //     // if (!this.signalingApi) {
-    //     //     this.signalingApi = new SignalingApi(await this.getAppServerChannel());
-    //     // }
-    //     // return this.signalingApi;
-    // }
-
-    // public setEncKey(key: string, iv: string) {
-    //     this.encKey = {key, iv};
-    // }
-
-    private async onAppServerSignalingEvent(event: any) {
-        console.log("onAppServerSignalingEvent event", event);
-        // on subscriberAttached
-        const baseEvent = <SignalingFromServer.BaseEvent>event;
-
-        if (baseEvent.kind === "media-event" && baseEvent.type === "subscriberAttached") {
-            this.onSubscriberAttached(<SignalingFromServer.SubscriberAttached>event.data);
-            return;
-        }
-
-        // on streamConfigured
-        if (baseEvent.kind === "media-event" && baseEvent.type === "streamConfigured") {
-            this.onStreamConfigured(<SignalingFromServer.StreamConfigured>event.data);
-        }
-    }
-
-    protected async onStreamConfigured(eventData: SignalingFromServer.StreamConfigured) {
-        console.log("-----> onStreamConfigured call with eventData", eventData);
-        try {
-            console.log("-----> setting up the answer...");
-            await this.getSenderActivePeerConnection().setRemoteDescription(new RTCSessionDescription(eventData.answer));
-        } catch (e) {
-            console.error("Cannot set remote description from answer", e);
-        }
-
-    }
 
     public addRemoteStreamListener(listener: RemoteStreamListener) {
         this.remoteStreamListeners.push(listener);
@@ -120,6 +77,22 @@ export class WebRtcClient {
             throw new Error("Worker not initialized.");
         }
         return this.e2eeWorker;
+    }
+
+    protected async initPipeline(receiverTrackId: string): Promise<void> {
+        const worker = await this.getWorker();
+        const waitPromise = new Promise<void>(resolve => {
+            const listener = (ev: MessageEvent) => {
+                if (ev.data.operation === 'init-pipeline' && ev.data.id === receiverTrackId) {
+                    worker.removeEventListener('message', listener);
+                    resolve();
+                }
+            };
+            worker.addEventListener('message', listener);
+            worker.postMessage({operation: "init-pipeline", id: receiverTrackId});
+        });
+
+        return waitPromise;
     }
 
     protected async getWorkerApi(): Promise<WebWorker> {
@@ -219,20 +192,20 @@ export class WebRtcClient {
         // await this.signalingApi?.acceptOffer(eventData.session_id, eventData.handle, answer);
     }
 
-    private async createAppServerChannel(): Promise<AppServerChannel> {
-        const appServerChannel = new AppServerChannel({
-            serverAddress: WebRtcConfig.getAppServerAddress(),
-            onResponse: async (data: Message) => {
-                if (data.kind === "credentials") {
-                    console.log("on data in crate AppServerChannel(): creadentials", data);
-                    await this.updatePeerConnectionCredentialsOnEvent(data.data);
-                }
-            },
-            onEvent: async (data: any) => await this.onAppServerSignalingEvent(data)
-        });
-        this.clientId = await appServerChannel.connect();
-        return appServerChannel;
-    }
+    // private async createAppServerChannel(): Promise<AppServerChannel> {
+    //     const appServerChannel = new AppServerChannel({
+    //         serverAddress: WebRtcConfig.getAppServerAddress(),
+    //         onResponse: async (data: Message) => {
+    //             if (data.kind === "credentials") {
+    //                 console.log("on data in crate AppServerChannel(): creadentials", data);
+    //                 await this.updatePeerConnectionCredentialsOnEvent(data.data);
+    //             }
+    //         },
+    //         onEvent: async (data: any) => await this.onAppServerSignalingEvent(data)
+    //     });
+    //     this.clientId = await appServerChannel.connect();
+    //     return appServerChannel;
+    // }
 
     private async updatePeerConnectionCredentialsOnEvent(_credentials: TurnCredentials[]) {
         // console.log("updatePeerConnectionCredentialsOnEvent...");

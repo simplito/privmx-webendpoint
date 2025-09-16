@@ -50,7 +50,7 @@ public:
     WebRtcInterfaceImpl(int interfaceBindId);
     ~WebRtcInterfaceImpl() = default;
     std::string createOfferAndSetLocalDescription();
-    std::string createAnswerAndSetDescriptions(const std::string& sdp, const std::string& type);
+    std::string createAnswerAndSetDescriptions(const std::string& streamRoomId, const int64_t sessionId, const std::string& sdp, const std::string& type);
     void setAnswerAndSetRemoteDescription(const std::string& sdp, const std::string& type);
     void close();
     void updateKeys(const std::vector<privmx::endpoint::stream::Key>& keys);
