@@ -702,3 +702,15 @@ export enum KvdbEventSelectorType {
 export enum EventsEventSelectorType {
     CONTEXT_ID = 0,
 };
+
+export type CollectionItemChange = {
+    itemId: string;
+    action: string;
+};
+
+export type CollectionChangedEventData = {
+    moduleType: string;
+    moduleId: string;
+    affectedItemsCount: number;
+    items: CollectionItemChange;
+};
