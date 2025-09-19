@@ -150,7 +150,7 @@ export class CryptoApi extends BaseApi {
     /**
      * Generates ECC key using BIP-39 mnemonic.
      * 
-     * @param {string} mnemonic the BIP-39 entropy used to generate the Key
+     * @param {string} mnemonic the BIP-39 mnemonic used to generate the Key
      * @param {string} password the password used to generate the Key
      * @return BIP39_t object containing ECC Key and associated with it BIP-39 mnemonic and entropy
      */

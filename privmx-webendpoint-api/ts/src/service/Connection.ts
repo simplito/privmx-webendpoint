@@ -11,7 +11,7 @@ limitations under the License.
 
 import { BaseApi } from "./BaseApi";
 import { ConnectionNative } from "../api/ConnectionNative";
-import { PagingQuery, PagingList, Context, UserInfo, PKIVerificationOptions } from "../Types";
+import { PagingQuery, PagingList, Context, UserInfo, PKIVerificationOptions, ConnectionEventType, ConnectionEventSelectorType } from "../Types";
 import { BaseNative } from "../api/BaseNative";
 import { UserVerifierInterface } from "./UserVerifierInterface";
 
@@ -57,8 +57,36 @@ export class Connection extends BaseApi {
    * 
    * @returns a list of the UserInfo objects
    */
-  async getContextUsers(contextId: string): Promise<UserInfo[]> {
-    return this.native.getContextUsers(this.servicePtr, [contextId]);
+  async listContextUsers(contextId: string, pagingQuery: PagingQuery): Promise<PagingList<UserInfo>> {
+    return this.native.listContextUsers(this.servicePtr, [contextId, pagingQuery]);
+  }
+
+  /**
+   * Subscribe for the Context events on the given subscription query.
+   * 
+   * @param {string[]} subscriptionQueries list of queries
+   * @return list of subscriptionIds in matching order to subscriptionQueries
+   */
+  async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+    return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
+  }
+
+  /**
+   * Unsubscribe from events for the given subscriptionId.
+   * @param {string[]} subscriptionIds list of subscriptionId
+   */
+  async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
+    return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
+  }
+
+  /**
+   * Generate subscription Query for the Context events.
+   * @param {EventType} eventType type of event which you listen for
+   * @param {EventSelectorType} selectorType scope on which you listen for events  
+   * @param {string} selectorId ID of the selector
+   */
+  async buildSubscriptionQuery(eventType: ConnectionEventType, selectorType: ConnectionEventSelectorType, selectorId: string): Promise<string> {
+    return this.native.buildSubscriptionQuery(this.servicePtr, [eventType, selectorType, selectorId]);
   }
 
   /**

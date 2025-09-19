@@ -4,6 +4,8 @@ project(privmxdrv-ecc)
 
 include(GNUInstallDirs)
 
+add_compile_options(-pthread)
+
 file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 add_library(privmxdrvecc ${SOURCES})
 target_include_directories(privmxdrvecc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)

@@ -7,15 +7,12 @@ import {
   StoreApi,
   ThreadApi,
   KvdbApi,
+  EventApi,
 } from '../service';
-import {
-  ConnectionEventsManager,
-  EventManager,
-  InboxEventsManager,
-  StoreEventsManager,
-  ThreadEventsManager,
-} from './events';
+
 import { PublicConnection } from './PublicConnection';
+import {ConnectionEventsManager, InboxEventsManager, StoreEventsManager, ThreadEventsManager} from "./managers";
+import {EventManager} from "./events";
 
 /**
  * @class PrivmxClient
@@ -52,6 +49,7 @@ export class PrivmxClient {
   private storeApi: Promise<StoreApi> | null = null;
   private inboxApi: Promise<InboxApi> | null = null;
   private kvdbApi: Promise<KvdbApi> | null = null;
+  private eventApi: Promise<EventApi> | null = null;
 
   private connectionEventManager: Promise<ConnectionEventsManager> | null =
     null;
@@ -258,6 +256,21 @@ export class PrivmxClient {
       })();
     }
     return this.kvdbApi;
+  }
+
+
+  /**
+   * @description Gets the Event API.
+   * @returns {Promise<EventApi>}
+   */
+  public async getEventApi(): Promise<EventApi> {
+    if (!this.eventApi) {
+      this.eventApi = (async () => {
+        const connection = this.getConnection();
+        return EndpointFactory.createEventApi(connection);
+      })();
+    }
+    return this.eventApi;
   }
 
   /**

@@ -10,12 +10,24 @@ limitations under the License.
 */
 
 import { UserVerifierInterface } from "../service/UserVerifierInterface";
-import { PagingQuery, PagingList, Context, UserInfo, VerificationRequest, PKIVerificationOptions } from "../Types";
+import { PagingQuery, PagingList, Context, UserInfo, VerificationRequest, PKIVerificationOptions, ConnectionEventType, ConnectionEventSelectorType } from "../Types";
 import { BaseNative } from "./BaseNative";
 
+type UserVierifierVerifyFunc = (request: VerificationRequest[]) => Promise<boolean[]>;
+
+declare global {
+  interface Window {
+    userVerifierBinder?: {[id: number]: {userVierifier_verify: UserVierifierVerifyFunc}};
+  }
+}
 export class ConnectionNative extends BaseNative {
     protected lastConnectionId: number = -1;
     protected userVerifierPtr: number = -1;
+
+    protected static verifierBindingId: number = -1;
+    protected static getVerifierBindingId() {
+        return ++this.verifierBindingId;
+    }
 
     protected async newApi(_connectionPtr: number): Promise<number> { 
         throw new Error("Use the newConnection() - specialized version of method instead.");
@@ -47,8 +59,17 @@ export class ConnectionNative extends BaseNative {
     async listContexts(ptr: number, args: [PagingQuery]): Promise<PagingList<Context>> {
         return this.runAsync<PagingList<Context>>((taskId)=>this.api.lib.Connection_listContexts(taskId, ptr, args));
     }
-    async getContextUsers(ptr: number, args: [string]): Promise<UserInfo[]> {
-        return this.runAsync<UserInfo[]>((taskId)=>this.api.lib.Connection_getContextUsers(taskId, ptr, args));
+    async listContextUsers(ptr: number, args: [string, PagingQuery]): Promise<PagingList<UserInfo>> {
+        return this.runAsync<PagingList<UserInfo>>((taskId)=>this.api.lib.Connection_listContextUsers(taskId, ptr, args));
+    }
+    async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
+        return this.runAsync<string[]>((taskId)=>this.api.lib.Connection_subscribeFor(taskId, ptr, args));
+    }
+    async unsubscribeFrom(ptr: number, args: [string[]]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.Connection_unsubscribeFrom(taskId, ptr, args));
+    }
+    async buildSubscriptionQuery(ptr: number, args: [ConnectionEventType, ConnectionEventSelectorType, string]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.Connection_buildSubscriptionQuery(taskId, ptr, args));
     }
     async disconnect(ptr: number, args: []): Promise<void> {
         await this.runAsync<void>((taskId)=>this.api.lib.Connection_disconnect(taskId, ptr, args));
@@ -60,13 +81,20 @@ export class ConnectionNative extends BaseNative {
         }
 
         const [connectionPtr, verifierInterface] = args;
-        (window as any).userVierifier_verify = async (request: VerificationRequest[]) => {
-            if (verifierInterface && typeof verifierInterface.verify === "function") {
-                return verifierInterface.verify(request)
-            }
-            throw new Error("Call on UserVerifierInterface with missing implementation");
+        const bindingId = ConnectionNative.getVerifierBindingId();
+
+        if (!window.userVerifierBinder) {
+            window.userVerifierBinder = {};
         }
-        this.userVerifierPtr = await this.runAsync<number>((taskId) => this.api.lib.Connection_newUserVerifierInterface(taskId, connectionPtr));
+        window.userVerifierBinder[bindingId] = {
+            userVierifier_verify: async (request: VerificationRequest[]) => {
+                if (verifierInterface && typeof verifierInterface.verify === "function") {
+                    return verifierInterface.verify(request)
+                }
+                throw new Error("Call on UserVerifierInterface with missing implementation");
+            }
+        };
+        this.userVerifierPtr = await this.runAsync<number>((taskId) => this.api.lib.Connection_newUserVerifierInterface(taskId, connectionPtr, bindingId));
     }
 
     protected async newUserVerifierInterface(connectionPtr: number): Promise<number> {

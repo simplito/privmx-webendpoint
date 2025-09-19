@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { PagingQuery, PagingList, UserWithPubKey, Thread, Message, ContainerPolicy } from "../Types";
+import { PagingQuery, PagingList, UserWithPubKey, Thread, Message, ContainerPolicy, ThreadEventSelectorType, ThreadEventType } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class ThreadApiNative extends BaseNative {
@@ -53,16 +53,13 @@ export class ThreadApiNative extends BaseNative {
     async updateMessage(ptr: number, args: [string, Uint8Array, Uint8Array, Uint8Array]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.ThreadApi_updateMessage(taskId, ptr, args));
     }
-    async subscribeForThreadEvents(ptr: number, args: []): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.ThreadApi_subscribeForThreadEvents(taskId, ptr, args));
+    async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
+        return this.runAsync<string[]>((taskId)=>this.api.lib.ThreadApi_subscribeFor(taskId, ptr, args));
     }
-    async unsubscribeFromThreadEvents(ptr: number, args: []): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.ThreadApi_unsubscribeFromThreadEvents(taskId, ptr, args));
+    async unsubscribeFrom(ptr: number, args: [string[]]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.ThreadApi_unsubscribeFrom(taskId, ptr, args));
     }
-    async subscribeForMessageEvents(ptr: number, args: [string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.ThreadApi_subscribeForMessageEvents(taskId, ptr, args));
-    }
-    async unsubscribeFromMessageEvents(ptr: number, args: [string]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.ThreadApi_unsubscribeFromMessageEvents(taskId, ptr, args));
+    async buildSubscriptionQuery(ptr: number, args: [ThreadEventType, ThreadEventSelectorType, string]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.ThreadApi_buildSubscriptionQuery(taskId, ptr, args));
     }
 }

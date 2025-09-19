@@ -1,47 +1,48 @@
 import { createTestSetup, waitForNextTick } from "../__mocks__/utils";
 import {
-  MOCK_STORE_CREATED_EVENT,
-  MOCK_STORE_FILE_DELETED_EVENT,
+  MOCK_INBOX_CREATED_EVENT,
+  MOCK_INBOX_ENTRY_DELETED_EVENT,
 } from "../__mocks__/constants";
+import { createInboxSubscription } from "../subscriptions";
+import { InboxEventSelectorType, InboxEventType } from "../../Types";
 import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber";
-import { StoreEventsManager } from "../managers";
-import { createStoreSubscription } from "../subscriptions";
-import { StoreEventSelectorType, StoreEventType } from "../../Types";
 
-describe("Store event manager", () => {
+describe("Inbox event manager", () => {
   let { q, manager } = createTestSetup();
-  let mockEventsManager: StoreEventsManager = manager.getStoreEventManager(
+  let mockEventsManager = manager.getInboxEventManager(
     new MockContainerSubscriber(q),
   );
 
   beforeEach(() => {
     let { q: _q, manager } = createTestSetup();
     q = _q;
-    mockEventsManager = manager.getStoreEventManager(
+    mockEventsManager = manager.getInboxEventManager(
       new MockContainerSubscriber(q),
     );
   });
 
   it("should add callback for event", async () => {
-    const sub = createStoreSubscription({
-      type: StoreEventType.STORE_UPDATE,
+    const sub = createInboxSubscription({
+      type: InboxEventType.INBOX_UPDATE,
       id: "",
-      selector: StoreEventSelectorType.CONTEXT_ID,
+      selector: InboxEventSelectorType.CONTEXT_ID,
       callbacks: [() => {}],
     });
+
     await mockEventsManager.subscribeFor([sub]);
     expect(mockEventsManager.listeners.size).toBe(1);
   });
 
   it("should function to remove callback from event", async () => {
-    const sub = createStoreSubscription({
-      type: StoreEventType.STORE_UPDATE,
+    const sub = createInboxSubscription({
+      type: InboxEventType.INBOX_UPDATE,
       id: "",
-      selector: StoreEventSelectorType.CONTEXT_ID,
+      selector: InboxEventSelectorType.CONTEXT_ID,
       callbacks: [() => {}],
     });
 
     const [subId] = await mockEventsManager.subscribeFor([sub]);
+
     expect(mockEventsManager.listeners.size).toBe(1);
     await mockEventsManager.unsubscribeFrom([subId]);
     expect(mockEventsManager.listeners.size).toBe(0);
@@ -50,16 +51,16 @@ describe("Store event manager", () => {
   it("should register multiple callbacks for channel", async () => {
     const storeEventCb = jest.fn();
 
-    const sub = createStoreSubscription({
-      type: StoreEventType.STORE_UPDATE,
+    const sub = createInboxSubscription({
+      type: InboxEventType.INBOX_UPDATE,
       id: "",
-      selector: StoreEventSelectorType.CONTEXT_ID,
+      selector: InboxEventSelectorType.CONTEXT_ID,
       callbacks: [storeEventCb, storeEventCb],
     });
 
     const [subId] = await mockEventsManager.subscribeFor([sub]);
 
-    q.dispatchEvent(MOCK_STORE_CREATED_EVENT(subId));
+    q.dispatchEvent(MOCK_INBOX_CREATED_EVENT(subId));
 
     //adding task on end of js event loop
     await waitForNextTick();
@@ -67,33 +68,37 @@ describe("Store event manager", () => {
   });
 
   it("should handle subscription for two channels", async () => {
-    const storeEventCb = jest.fn();
-    const messageEventCb = jest.fn();
+    const inboxEventCb = jest.fn();
+    const entryEventCb = jest.fn();
 
-    const STORE_ID = "98dsyvs87dybv9a87dyvb98";
+    const inboxId = "98dsyvb8as7ybd0asydvb0as";
 
-    const subA = createStoreSubscription({
-      type: StoreEventType.STORE_CREATE,
+    const subA = createInboxSubscription({
+      type: InboxEventType.INBOX_CREATE,
       id: "",
-      selector: StoreEventSelectorType.CONTEXT_ID,
-      callbacks: [storeEventCb],
+      selector: InboxEventSelectorType.CONTEXT_ID,
+      callbacks: [inboxEventCb],
     });
 
-    const subB = createStoreSubscription({
-      type: StoreEventType.FILE_DELETE,
-      id: STORE_ID,
-      selector: StoreEventSelectorType.STORE_ID,
-      callbacks: [messageEventCb],
+    const subB = createInboxSubscription({
+      type: InboxEventType.ENTRY_DELETE,
+      id: inboxId,
+      selector: InboxEventSelectorType.INBOX_ID,
+      callbacks: [entryEventCb],
     });
 
     const [subIdA, subIdB] = await mockEventsManager.subscribeFor([subA, subB]);
 
-    q.dispatchEvent(MOCK_STORE_CREATED_EVENT(subIdA));
-    q.dispatchEvent(MOCK_STORE_FILE_DELETED_EVENT(STORE_ID, subIdB));
+    const event = MOCK_INBOX_ENTRY_DELETED_EVENT(inboxId, subIdB);
+    const eventCreated = MOCK_INBOX_CREATED_EVENT(subIdA);
+    q.dispatchEvent(eventCreated);
+
+    await waitForNextTick();
+    q.dispatchEvent(event);
 
     //adding task on end of js event loop
     await waitForNextTick();
-    expect(storeEventCb).toHaveBeenCalledTimes(1);
-    expect(messageEventCb).toHaveBeenCalledTimes(1);
+    expect(inboxEventCb).toHaveBeenCalledTimes(1);
+    expect(entryEventCb).toHaveBeenCalledTimes(1);
   });
 });
