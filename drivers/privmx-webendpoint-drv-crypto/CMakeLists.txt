@@ -4,6 +4,8 @@ project(privmxdrv-crypto)
 
 include(GNUInstallDirs)
 
+add_compile_options(-pthread)
+
 file(GLOB_RECURSE SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 add_library(privmxdrvcrypto ${SOURCES})
 target_include_directories(privmxdrvcrypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
