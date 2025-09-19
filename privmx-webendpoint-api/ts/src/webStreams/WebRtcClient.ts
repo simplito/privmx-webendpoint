@@ -44,8 +44,9 @@ export class WebRtcClient {
     // =============================================================
     private remoteStreamListeners: RemoteStreamListener[] = [];
     private peerConnectionsManager: PeerConnectionManager;
+    private streamsApiInterface: StreamsCallbackInterface;
 
-    constructor(private assetsDir: string, private streamApiCallbacks: StreamsCallbackInterface) {
+    constructor(private assetsDir: string) {
         this.uniqId = "" + Math.random() + "-" + Math.random();
         console.log("WebRtcClient constructor ("+this.uniqId+")", "assetsDir: ", this.assetsDir);
         this.peerConnectionsManager = new PeerConnectionManager(
@@ -53,9 +54,13 @@ export class WebRtcClient {
                 return this.createPeerConnectionMulti(this.getPeerConnectionConfiguration());
             },
             (sessionId: SessionId, candidate: RTCIceCandidate) => {
-                return this.streamApiCallbacks.trickle(sessionId, candidate);
+                return this.streamsApiInterface.trickle(sessionId, candidate);
             }
         )
+    }
+
+    public bindApiInterface(streamsApiInterface: StreamsCallbackInterface) {
+        this.streamsApiInterface = streamsApiInterface;
     }
 
 

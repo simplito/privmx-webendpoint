@@ -446,8 +446,4 @@ export class StreamApi extends BaseApi {
     public async unsubscribeFromStreamEvents(): Promise<void> {
         return this.native.subscribeForStreamEvents(this.servicePtr, []);
     }
-
-    public async trickle(sessionId: SessionId, candidate: RTCIceCandidate) {
-        return this.native.trickle(this.servicePtr, [sessionId, candidate]);
-    }
 }

@@ -11,6 +11,7 @@ limitations under the License.
 
 import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamRoom, StreamSettings, TurnCredentials, UserWithPubKey } from "../Types";
 import { WebRtcClient } from "../webStreams/WebRtcClient";
+import { SessionId } from "../webStreams/WebRtcClientTypes";
 import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
 import { Api } from "./Api";
 import { BaseNative } from "./BaseNative";
@@ -21,24 +22,25 @@ export class StreamApiNative extends BaseNative {
         return ++this.bindingId;
     }
     protected webRtcInterfacePtr: number = -1;
+    protected selfPtr: number = -1;
     protected webRtcInterfaceImpl: WebRtcInterfaceImpl | null;
+    
     constructor(api: Api, protected webRtcClient: WebRtcClient) {
         super(api);
+        webRtcClient.bindApiInterface({
+            trickle:(sessionId: SessionId, candidate: RTCIceCandidate) => {
+                return this.trickle(this.selfPtr, [sessionId, candidate]);
+            }
+        });
     }
-    // private async createWebRtcInterfaceImpl(): Promise<void> {
-    //      // - init webRtcInterface po stronie CPP i zwrot wskaznika
-    //     this.webRtcInterfacePtr = await this.runAsync<number>((taskId)=>this.api.lib.StreamApi_newWebRtcInterface(taskId));
-    // }
-    async newApi(connectionPtr: number, eventApiPtr: number): Promise<number> {
-        // TODO: tutaj jeszcze kilka rzeczy:
-        // - init em_webrtc po stronie JS
 
-        // po przekazaniu tutaj wskaznika do webrtc, mozemy go pozniej juz nie przekazywac w pozostalych funkcjach
-        // await this.createWebRtcInterfaceImpl();
+    async newApi(connectionPtr: number, eventApiPtr: number): Promise<number> {
         const bindingId = StreamApiNative.getBindingId();
         this.bindWebRtcInterfaceAsHandler(bindingId);
-        return this.runAsync<number>((taskId)=>this.api.lib.StreamApi_newStreamApi(taskId, connectionPtr, eventApiPtr, bindingId));
+        this.selfPtr = await this.runAsync<number>((taskId)=>this.api.lib.StreamApi_newStreamApi(taskId, connectionPtr, eventApiPtr, bindingId));
+        return this.selfPtr;
     }
+
     async deleteApi(ptr: number): Promise<void> {
         await this.runAsync<void>((taskId)=>this.api.lib.StreamApi_deleteStreamApi(taskId, ptr));
         this.deleteApiRef();
