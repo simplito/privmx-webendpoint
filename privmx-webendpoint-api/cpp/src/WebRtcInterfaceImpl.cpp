@@ -13,7 +13,9 @@ using namespace privmx::endpoint::stream;
 using namespace privmx::endpoint;
 using namespace emscripten;
 using SdpWithTypeModel = privmx::endpoint::stream::SdpWithTypeModel;
-using SdpWithTypeAndSessionModel = privmx::endpoint::stream::SdpWithTypeAndSessionModel;
+using SdpWithRoomModel = privmx::endpoint::stream::SdpWithRoomModel;
+using UpdateSessionIdModel = privmx::endpoint::stream::UpdateSessionIdModel;
+using RoomModel = privmx::endpoint::stream::RoomModel;
 
 EM_JS(emscripten::EM_VAL, print_error_webrtc, (const char* msg), {
     console.error(UTF8ToString(msg));
@@ -37,7 +39,7 @@ EM_ASYNC_JS(emscripten::EM_VAL, webRtcJsHandler, (emscripten::EM_VAL name_handle
 });
 
 WebRtcInterfaceImpl::WebRtcInterfaceImpl(int interfaceBindId): _interfaceBindId(interfaceBindId) {
-    printErrorInJS("created WebRtcInterfaceImpl(cpp) with bindId: " + std::to_string(_interfaceBindId));
+    printErrorInJS("created WebRtcInterfaceImpl(wersion for web) with bindId: " + std::to_string(_interfaceBindId));
 }
 
 void WebRtcInterfaceImpl::printErrorInJS(const std::string& msg) {
@@ -86,13 +88,14 @@ void WebRtcInterfaceImpl::assertStatus(const std::string& method, const emscript
     }
 }
 
-std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription() {
+std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription(const std::string& streamRoomId) {
     std::promise<std::string> prms;
     std::future<std::string> ftr = prms.get_future();
     runTaskAsync([&]{
         auto methodName {"createOfferAndSetLocalDescription"};
         emscripten::val name = emscripten::val::u8string(methodName);
-        emscripten::val params = val::undefined();
+        RoomModel paramsModel = {.roomId = streamRoomId};
+        emscripten::val params = mapToVal(paramsModel);
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
         assertStatus(methodName, jsResult);
         prms.set_value(jsResult["buff"].as<std::string>());
@@ -100,13 +103,13 @@ std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription() {
     return ftr.get();
 }
 
-std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::string& streamRoomId, const int64_t sessionId, const std::string& sdp, const std::string& type) {
+std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::string& streamRoomId, const std::string& sdp, const std::string& type) {
     std::promise<std::string> prms;
     std::future<std::string> ftr = prms.get_future();
-    runTaskAsync([&, sdp, type]{
+    runTaskAsync([&, sdp, type, streamRoomId]{
         auto methodName {"createAnswerAndSetDescriptions"};
         emscripten::val name = emscripten::val::u8string(methodName);
-        SdpWithTypeAndSessionModel paramsModel = {.roomId = streamRoomId, .sessionId = sessionId, .sdp = sdp, .type = type};
+        SdpWithRoomModel paramsModel = {.roomId = streamRoomId, .sdp = sdp, .type = type};
         emscripten::val params = mapToVal(paramsModel);
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
         assertStatus(methodName, jsResult);
@@ -115,22 +118,35 @@ std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::strin
     return ftr.get();
 }
 
-void WebRtcInterfaceImpl::setAnswerAndSetRemoteDescription(const std::string& sdp, const std::string& type) {
-    runTaskAsync([&, sdp, type]{
+void WebRtcInterfaceImpl::setAnswerAndSetRemoteDescription(const std::string& streamRoomId, const std::string& sdp, const std::string& type) {
+    runTaskAsync([&, sdp, type, streamRoomId]{
         auto methodName {"setAnswerAndSetRemoteDescription"};
         emscripten::val name = emscripten::val::u8string(methodName);
-        SdpWithTypeModel paramsModel = {.sdp = sdp, .type = type};
+        SdpWithRoomModel paramsModel = {.roomId = streamRoomId, .sdp = sdp, .type = type};
         emscripten::val params = mapToVal(paramsModel);
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
         assertStatus(methodName, jsResult);
     });
 }
 
-void WebRtcInterfaceImpl::close() {
-    runTaskAsync([&]{
+void WebRtcInterfaceImpl::updateSessionId(const std::string& streamRoomId, const int64_t sessionId, const std::string& connectionType) {
+    std::cerr << "WebRtcInterfaceImpl::updateSessionId() call (web impl)" << " room: " << streamRoomId << " / sessionId: " << sessionId << " / connectionType: " << connectionType << std::endl;
+    runTaskAsync([&, sessionId, connectionType, streamRoomId]{
+        auto methodName {"updateSessionId"};
+        emscripten::val name = emscripten::val::u8string(methodName);
+        UpdateSessionIdModel paramsModel = {.streamRoomId = streamRoomId, .connectionType = connectionType, .sessionId = sessionId};
+        emscripten::val params = mapToVal(paramsModel);
+        emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
+        assertStatus(methodName, jsResult);
+    });
+}
+
+void WebRtcInterfaceImpl::close(const std::string& streamRoomId) {
+    runTaskAsync([&, streamRoomId]{
         auto methodName {"close"};
         emscripten::val name = emscripten::val::u8string(methodName);
-        emscripten::val params = val::undefined();
+        RoomModel paramsModel = {.roomId = streamRoomId};
+        emscripten::val params = mapToVal(paramsModel);
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
         assertStatus(methodName, jsResult);
     });

@@ -9,13 +9,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { SetAnswerAndSetRemoteDescriptionModel, UpdateKeysModel, WebRtcInterface } from "../service/WebRtcInterface";
+import { CurrentPublishersData, Jsep, RoomModel, SdpWithRoomModel, SetAnswerAndSetRemoteDescriptionModel, StreamsUpdatedData, UpdateKeysModel, WebRtcInterface } from "../service/WebRtcInterface";
+import { ConnectionType } from "./PeerConnectionsManager";
+import { StreamRoomId } from "./types/ApiTypes";
 import { WebRtcClient } from "./WebRtcClient";
-
-interface SdpModel {
-  sdp: string; 
-  type: string;
-}
+import { SessionId } from "./WebRtcClientTypes";
 
 export class WebRtcInterfaceImpl implements WebRtcInterface {
     constructor(private webRtcClient: WebRtcClient) {}
@@ -24,6 +22,7 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         createOfferAndSetLocalDescription: this.createOfferAndSetLocalDescription,
         createAnswerAndSetDescriptions: this.createAnswerAndSetDescriptions,
         setAnswerAndSetRemoteDescription: this.setAnswerAndSetRemoteDescription,
+        updateSessionId: this.updateSessionId,
         close: this.close,
         updateKeys: this.updateKeys
     };
@@ -49,7 +48,7 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         throw new Error(`Method '${name}' is not implemented.`);        
     }
 
-    async createOfferAndSetLocalDescription() {
+    async createOfferAndSetLocalDescription(model: RoomModel) {
                 // ==== CODE BELOW MOVED TO WEBRTC IMPL ===========
         // 
         // // configure client
@@ -89,35 +88,58 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         // createPeerConnectionWithLocalStream powinno byc zawolane w kliencie jak ustawiamy strumien z kamery
         // const peerConnection = await this.client.createPeerConnectionWithLocalStream(mediaStream);
         console.log("[WebrtcInterfaceImpl]: createOfferAndSetLocalDescription call..");
-        const peerConnection = this.getClient().getSenderActivePeerConnection();
+        const peerConnection = this.getClient().getConnectionManager().getConnectionWithSession(model.roomId, "publisher").pc;
+
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
         return offer.sdp; // sdp 
     }
 
-    async createAnswerAndSetDescriptions(model: SdpModel): Promise<string> {
+    async createAnswerAndSetDescriptions(model: SdpWithRoomModel): Promise<string> {
         console.log("[WebrtcInterfaceImpl]: createAnswerAndSetDescriptions call..");
+        // const janusSession = this.getClient().getConnectionManager().getConnectionWithSession(model.roomId, "subscriber");
+        // if (!("pc" in janusSession)) {
+        //     throw new Error("WebRtcInterfaceImpl: No peerConnection available on createAnswerAndSetDescriptions");
+        // }
+        // const peerConnection = janusSession.pc;
 
-        // const peerConnection = this.getClient().getReceiverActivePeerConnection();
-        const peerConnection = await this.getClient().recreateAndGetReceiverPeerConnection();
-        await peerConnection.setRemoteDescription(new RTCSessionDescription({sdp: model.sdp, type: model.type as RTCSdpType}));
-        const answer = await peerConnection.createAnswer();
-        await peerConnection.setLocalDescription(answer);
+        // await peerConnection.setRemoteDescription(new RTCSessionDescription({sdp: model.sdp, type: model.type as RTCSdpType}));
+        // const answer = await peerConnection.createAnswer();
+        // await peerConnection.setLocalDescription(answer);
+        const offer: Jsep = {sdp: model.sdp, type: model.type};
+        const answer = await this.getClient().onSubscriptionUpdatedSingle(model.roomId, offer);
         return answer.sdp;
     }
 
     async setAnswerAndSetRemoteDescription(model: SetAnswerAndSetRemoteDescriptionModel) {
         console.log("[WebrtcInterfaceImpl]: setAnswerAndSetRemoteDescription call..");
-        const peerConnection = this.getClient().getSenderActivePeerConnection();
+        const janusSession = this.getClient().getConnectionManager().getConnectionWithSession(model.roomId, "publisher");
+        if (!("pc" in janusSession)) {
+            throw new Error("WebRtcInterfaceImpl: No peerConnection available on setAnswerAndSetRemoteDescription");
+        }
+        const peerConnection = janusSession.pc;
         await peerConnection.setRemoteDescription(new RTCSessionDescription({sdp: model.sdp, type: model.type as RTCSdpType}));
     }
 
-    async close() {
-        this.getClient().getSenderActivePeerConnection().close();
-        this.getClient().getReceiverActivePeerConnection().close();
+    async close(roomId: StreamRoomId) {
+        const subscriberSession = this.getClient().getConnectionManager().getConnectionWithSession(roomId, "subscriber");
+        if (!("pc" in subscriberSession)) {
+            throw new Error("WebRtcInterfaceImpl: No peerConnection available on close (subscriber)");
+        }
+        subscriberSession.pc.close();
+
+        const publisherSession = this.getClient().getConnectionManager().getConnectionWithSession(roomId, "publisher");
+        if (!("pc" in publisherSession)) {
+            throw new Error("WebRtcInterfaceImpl: No peerConnection available on close (publisher)");
+        }
+        publisherSession.pc.close();
     }
 
     async updateKeys(model: UpdateKeysModel) {
         return this.getClient().updateKeys(model.keys);
+    }
+
+    async updateSessionId(streamRoomId: StreamRoomId, sessionId: number, connectionType: ConnectionType): Promise<void> {
+        this.getClient().getConnectionManager().updateSessionForConnection(streamRoomId, connectionType, sessionId as SessionId);
     }
 }

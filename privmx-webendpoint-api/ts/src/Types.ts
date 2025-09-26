@@ -746,6 +746,23 @@ export enum EventsEventSelectorType {
     CONTEXT_ID = 0,
 };
 
+
+export enum StreamEventType {
+    STREAMROOM_CREATE = 0,
+    STREAMROOM_UPDATE = 1,
+    STREAMROOM_DELETE = 2,
+    STREAM_JOIN = 4,
+    STREAM_LEAVE = 5,
+    STREAM_PUBLISH = 6,
+    STREAM_UNPUBLISH = 7,
+}
+
+export enum StreamEventSelectorType {
+    CONTEXT_ID = 0,
+    STREAMROOM_ID = 1,
+    STREAM_ID = 2,
+}
+
 export type CollectionItemChange = {
     itemId: string;
     action: string;

@@ -8,8 +8,9 @@ import { DataChannelMeta, StreamCreateMeta, StreamId } from "../webStreams/types
 import { StreamDataTrackAddRequest } from "../webStreams/types/StreamsApiTypes";
 import { BaseApi } from "./BaseApi";
 // import { StreamApiNative } from "../api/StreamApiNative";
-import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamJoinSettings, StreamRoom, UserWithPubKey } from "../Types";
+import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamEventSelectorType, StreamEventType, StreamJoinSettings, StreamRoom, UserWithPubKey } from "../Types";
 import { StreamApiNative } from "../api/StreamApiNative";
+import { VideoRoomId } from "../webStreams/types/MediaServerWebSocketApiTypes";
 
 
 
@@ -304,7 +305,7 @@ export class StreamApi extends BaseApi {
                 mediaTracks.push(value.track);
             }
         }
-
+        console.log(1);
         const _stream = this.streams.get(streamId);
         if (!_stream) {
             throw new Error("No stream defined to publish");
@@ -351,7 +352,12 @@ export class StreamApi extends BaseApi {
         // console.log("override peerCredentials url with: ", overrideUrl);
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
         await this.client.setTurnCredentials(turnCredentials);
-        await this.client.createPeerConnectionWithLocalStream(mediaStream);
+        console.log(2);
+
+        
+        await this.client.createPeerConnectionWithLocalStream(_stream.streamRoomId, mediaStream);
+        console.log(3);
+
         return this.native.publishStream(this.servicePtr, [streamId]);
     }
 
@@ -404,11 +410,15 @@ export class StreamApi extends BaseApi {
         //     return {...x, url: overrideUrl}
         // });
         await this.client.setTurnCredentials(peerCredentials);
-        await this.client.createPeerConnectionOnJoin(peerCredentials);
+        // await this.client.createPeerConnectionOnJoin(peerCredentials);
 
         this.client.addRemoteStreamListener(settings.onRemoteTrack);
         const localStreamId = Utils.generateNumericId() as StreamId;
         const res = await this.native.joinStream(this.servicePtr, [streamRoomId, streamsIds, settings.settings, localStreamId]);
+
+        // TODO: to powinno sie zadziac dopiero w attached
+        this.client.getConnectionManager().initialize(streamRoomId, "publisher");
+
         this.streams.set(localStreamId, {streamId: res as StreamId, streamRoomId, createStreamMeta: {}, remote: true});
         return res;
     }
@@ -440,10 +450,31 @@ export class StreamApi extends BaseApi {
     //     this.client.setEncKey(key.key, key.iv);
     // }
 
-    public async subscribeForStreamEvents(): Promise<void> {
-        return this.native.subscribeForStreamEvents(this.servicePtr, []);
+  /**
+   * Subscribe for the Thread events on the given subscription query.
+   * 
+   * @param {string[]} subscriptionQueries list of queries
+   * @return list of subscriptionIds in maching order to subscriptionQueries
+   */
+    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+      return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
     }
-    public async unsubscribeFromStreamEvents(): Promise<void> {
-        return this.native.subscribeForStreamEvents(this.servicePtr, []);
+
+    /**
+     * Unsubscribe from events for the given subscriptionId.
+     * @param {string[]} subscriptionIds list of subscriptionId
+     */
+    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
+      return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
+    }
+
+    /**
+     * Generate subscription Query for the Stream events.
+     * @param {EventType} eventType type of event which you listen for
+     * @param {EventSelectorType} selectorType scope on which you listen for events  
+     * @param {string} selectorId ID of the selector
+     */
+    async buildSubscriptionQuery(eventType: StreamEventType, selectorType: StreamEventSelectorType, selectorId: string): Promise<string> {
+      return this.native.buildSubscriptionQuery(this.servicePtr, [eventType, selectorType, selectorId]);
     }
 }

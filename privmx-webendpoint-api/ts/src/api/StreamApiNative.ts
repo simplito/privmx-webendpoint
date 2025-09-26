@@ -9,7 +9,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamRoom, StreamSettings, TurnCredentials, UserWithPubKey } from "../Types";
+import { Jsep, SdpWithRoomModel } from "../service/WebRtcInterface";
+import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamEventSelectorType, StreamEventType, StreamRoom, StreamSettings, TurnCredentials, UserWithPubKey } from "../Types";
 import { WebRtcClient } from "../webStreams/WebRtcClient";
 import { SessionId } from "../webStreams/WebRtcClientTypes";
 import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
@@ -30,6 +31,9 @@ export class StreamApiNative extends BaseNative {
         webRtcClient.bindApiInterface({
             trickle:(sessionId: SessionId, candidate: RTCIceCandidate) => {
                 return this.trickle(this.selfPtr, [sessionId, candidate]);
+            },
+            acceptOffer:(sessionId: SessionId, sdp: Jsep) => {
+                return this.acceptOfferOnReconfigure(this.selfPtr, [sessionId, sdp]);
             }
         });
     }
@@ -95,15 +99,24 @@ export class StreamApiNative extends BaseNative {
     async getTurnCredentials(ptr: number, args: []): Promise<TurnCredentials[]> {
         return this.runAsync<TurnCredentials[]>((taskId)=>this.api.lib.StreamApi_getTurnCredentials(taskId, ptr, args));
     }
-    async subscribeForStreamEvents(ptr: number, args: []): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_subscribeForStreamEvents(taskId, ptr, args));
+    async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
+        return this.runAsync<string[]>((taskId)=>this.api.lib.StreamApi_subscribeFor(taskId, ptr, args));
     }
-    async unsubscribeFromStreamEvents(ptr: number, args: []): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_unsubscribeFromStreamEvents(taskId, ptr, args));
+    async unsubscribeFrom(ptr: number, args: [string[]]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_unsubscribeFrom(taskId, ptr, args));
+    }
+    async buildSubscriptionQuery(ptr: number, args: [StreamEventType, StreamEventSelectorType, string]): Promise<string> {
+        return this.runAsync<string>((taskId)=>this.api.lib.StreamApi_buildSubscriptionQuery(taskId, ptr, args));
     }
 
-    async trickle(ptr: number, args: [string, RTCIceCandidate]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_trickle(taskId, ptr, args));
+    async trickle(ptr: number, args: [number, RTCIceCandidate]): Promise<void> {
+        const [sessionId, candidate] = args;
+        const convertedArgs: [number, string] = [sessionId, JSON.stringify(candidate)];
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_trickle(taskId, ptr, convertedArgs));
+    }
+
+    async acceptOfferOnReconfigure(ptr: number, args: [number, Jsep]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_acceptOfferOnReconfigure(taskId, ptr, args));
     }
 
     protected bindWebRtcInterfaceAsHandler(bindingId: number): void {
