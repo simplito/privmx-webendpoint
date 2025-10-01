@@ -71,6 +71,9 @@ export class StoreApiNative extends BaseNative {
     async closeFile(ptr: number, args: [number]): Promise<string> {
         return this.runAsync<string>((taskId)=>this.api.lib.StoreApi_closeFile(taskId, ptr, args));
     }
+    async syncFile(ptr: number, args: [number]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StoreApi_syncFile(taskId, ptr, args));
+    }
     async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
         return this.runAsync<string[]>((taskId)=>this.api.lib.StoreApi_subscribeFor(taskId, ptr, args));
     }
