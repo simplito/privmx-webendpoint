@@ -273,6 +273,15 @@ export class StoreApi extends BaseApi {
     return this.native.closeFile(this.servicePtr, [fileHandle]);
   }
 
+  /**
+   * Synchronize file handle data with newest data on server
+   * 
+   * @param {number} fileHandle handle to read/write file data
+   */ 
+  async syncFile(fileHandle: number): Promise<void> {
+    return this.native.syncFile(this.servicePtr, [fileHandle]);
+  }
+
   // /**
   //  * Subscribes for the Store module main events.
   //  */

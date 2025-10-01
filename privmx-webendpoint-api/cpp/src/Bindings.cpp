@@ -74,6 +74,7 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(StoreApi, readFromFile)
     BINDING_FUNCTION(StoreApi, seekInFile)
     BINDING_FUNCTION(StoreApi, closeFile)
+    BINDING_FUNCTION(StoreApi, syncFile)
     BINDING_FUNCTION(StoreApi, subscribeFor)
     BINDING_FUNCTION(StoreApi, unsubscribeFrom)
     BINDING_FUNCTION(StoreApi, buildSubscriptionQuery)

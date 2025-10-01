@@ -81,6 +81,7 @@ namespace api {
     API_FUNCTION_HEADER(StoreApi, readFromFile)
     API_FUNCTION_HEADER(StoreApi, seekInFile)
     API_FUNCTION_HEADER(StoreApi, closeFile)
+    API_FUNCTION_HEADER(StoreApi, syncFile)
     API_FUNCTION_HEADER(StoreApi, subscribeFor)
     API_FUNCTION_HEADER(StoreApi, unsubscribeFrom)
     API_FUNCTION_HEADER(StoreApi, buildSubscriptionQuery)
