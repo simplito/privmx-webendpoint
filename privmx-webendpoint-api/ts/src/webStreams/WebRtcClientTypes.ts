@@ -1,7 +1,6 @@
 import { MediaServerApiTypes } from "../ServerTypes";
+import { NewPublisherEvent } from "../service/WebRtcInterface";
 import { StreamRoomId } from "./types/ApiTypes";
-import { NewPublisherEvent } from "./types/MediaServerWebSocketApiTypes";
-
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
     transform: (frame: any, controller: any) => void;

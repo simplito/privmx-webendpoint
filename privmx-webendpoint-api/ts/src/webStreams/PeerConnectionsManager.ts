@@ -8,18 +8,19 @@ export class PeerConnectionManager {
         publisher?: JanusConnection,
         subscriber?: JanusConnection
     }} = {};
-    constructor(private createPeerConnection: () => RTCPeerConnection, private onTrickle: (sessionId: SessionId, candidate: RTCIceCandidate) => void) {}
+    constructor(private createPeerConnection: (room: StreamRoomId) => RTCPeerConnection, private onTrickle: (sessionId: SessionId, candidate: RTCIceCandidate) => void) {}
 
     public initialize(room: StreamRoomId, connectionType: ConnectionType, sessionId: SessionId = -1 as SessionId) {
         if (room in this.connections && connectionType in this.connections[room]) {
-            throw new Error("JanusConnection with given parameters initialized already.");
+            // throw new Error("JanusConnection with given parameters initialized already.");
+            return;
         }
         if (!(room in this.connections)) {
             this.connections[room] = {};
         }
 
         // create a dedicated RTCPeerConnection for this subscriber handle
-        const pc = this.createPeerConnection();
+        const pc = this.createPeerConnection(room);
 
         // when creating, make sure ice candidates for this pc are trickled to server for this session/handle
         pc.addEventListener('icecandidate', event => {

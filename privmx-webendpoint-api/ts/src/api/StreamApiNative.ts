@@ -90,7 +90,7 @@ export class StreamApiNative extends BaseNative {
     async listStreams(ptr: number, args: [string]): Promise<Stream[]> {
         return this.runAsync<Stream[]>((taskId)=>this.api.lib.StreamApi_listStreams(taskId, ptr, args));
     }
-    async leaveStream(ptr: number, args: [number]): Promise<void> {
+    async leaveStream(ptr: number, args: [string, number[]]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_leaveStream(taskId, ptr, args));
     }
     async keyManagement(ptr: number, args: [boolean]): Promise<void> {

@@ -154,7 +154,6 @@ void WebRtcInterfaceImpl::close(const std::string& streamRoomId) {
 
 void WebRtcInterfaceImpl::updateKeys(const std::vector<privmx::endpoint::stream::Key>& keys) {
     runTaskAsync([&, keys]{
-        printErrorInJS("on updateKeys - bindId: " + std::to_string(_interfaceBindId));
         auto methodName {"updateKeys"};
         emscripten::val name = emscripten::val::u8string(methodName);
         emscripten::val keysArrayVal = emscripten::val::array();

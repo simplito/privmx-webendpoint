@@ -412,33 +412,26 @@ export class StreamApi extends BaseApi {
         await this.client.setTurnCredentials(peerCredentials);
         // await this.client.createPeerConnectionOnJoin(peerCredentials);
 
-        this.client.addRemoteStreamListener(settings.onRemoteTrack);
+        this.client.addRemoteStreamListener(streamRoomId, settings.onRemoteTrack);
         const localStreamId = Utils.generateNumericId() as StreamId;
         const res = await this.native.joinStream(this.servicePtr, [streamRoomId, streamsIds, settings.settings, localStreamId]);
 
         // TODO: to powinno sie zadziac dopiero w attached
-        this.client.getConnectionManager().initialize(streamRoomId, "publisher");
+        this.client.getConnectionManager().initialize(streamRoomId, "subscriber");
 
         this.streams.set(localStreamId, {streamId: res as StreamId, streamRoomId, createStreamMeta: {}, remote: true});
         return res;
     }
 
-    public async leaveStream(_streamId: Types.StreamId): Promise<void> {
+    public async leaveStream(streamRoomId: Types.StreamRoomId, streamsIds: StreamId[]): Promise<void> {
         
-        if (!this.streams.has(_streamId)) {
-            throw new Error ("No stream with given id to leave");
-        }
-        const _stream = this.streams.get(_streamId);
-        // await this.client.provideSession();
+        // if (!this.streams.has(_streamId)) {
+        //     throw new Error ("No stream with given id to leave");
+        // }
+        // const _stream = this.streams.get(_streamId);
 
-        // return this.serverChannel.call<StreamsApi.StreamLeaveRequest, void>({kind: "streams.streamLeave", data: {
-        //     streamToLeave: {
-        //         streamId: streamId,
-        //         streamRoomId: _stream.streamRoomId
-        //     }
-        // }});
-        await this.native.leaveStream(this.servicePtr, [_stream.streamId]);
-        this.streams.delete(_streamId);
+        await this.native.leaveStream(this.servicePtr, [streamRoomId, streamsIds]);
+        // this.streams.delete(_streamId);
     }
 
     // public async addRemoteStreamListener(listener: RemoteStreamListener) {
