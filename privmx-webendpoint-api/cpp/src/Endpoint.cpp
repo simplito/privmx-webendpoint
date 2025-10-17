@@ -168,6 +168,7 @@ namespace api {
     API_FUNCTION(StoreApi, readFromFile)
     API_FUNCTION(StoreApi, seekInFile)
     API_FUNCTION(StoreApi, closeFile)
+    API_FUNCTION(StoreApi, syncFile)
     API_FUNCTION(StoreApi, subscribeFor)
     API_FUNCTION(StoreApi, unsubscribeFrom)
     API_FUNCTION(StoreApi, buildSubscriptionQuery)
