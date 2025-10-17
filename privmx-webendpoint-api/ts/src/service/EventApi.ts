@@ -32,12 +32,12 @@ export class EventApi extends BaseApi {
      * Emits the custom event on the given Context and channel.
      * 
      * @param {string} contextId ID of the Context
+     * @param {UserWithPubKey[]} users list of UserWithPubKey objects which defines the recipients of the event
      * @param {string} channelName name of the Channel
      * @param {Uint8Array} eventData event's data
-     * @param {UserWithPubKey[]} users list of UserWithPubKey objects which defines the recipients of the event
      */
-    async emitEvent(contextId: string, channelName: string, eventData: Uint8Array, users: UserWithPubKey[]) {
-      return this.native.emitEvent(this.servicePtr, [contextId, channelName, eventData, users]);
+    async emitEvent(contextId: string, users: UserWithPubKey[], channelName: string, eventData: Uint8Array) {
+      return this.native.emitEvent(this.servicePtr, [contextId, users, channelName, eventData]);
     }
     
     // /**

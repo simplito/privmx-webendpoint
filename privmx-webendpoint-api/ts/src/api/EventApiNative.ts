@@ -23,7 +23,7 @@ export class EventApiNative extends BaseNative {
     async create(ptr: number, args: []): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.EventApi_create(taskId, ptr, args));
     }
-    async emitEvent(ptr: number, args: [string, string, Uint8Array, UserWithPubKey[]]): Promise<void> {
+    async emitEvent(ptr: number, args: [string, UserWithPubKey[], string, Uint8Array]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.EventApi_emitEvent(taskId, ptr, args));
     }
     async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
