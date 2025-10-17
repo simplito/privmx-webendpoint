@@ -37,7 +37,7 @@
     "./extra": "./extra/index.js"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "compile": "tsc",
     "build": "npm run clean && npm run build:bundle && npm run build:mjs && npm run build:fixup && npm run build:worker",
     "build:worker": "webpack --config ./webpack.worker.config.js",
