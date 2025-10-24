@@ -15,7 +15,8 @@ export {
   createKvdbSubscription,
   createStoreSubscription,
   EventCallback,
-  Subscription
+  Subscription,
+  ConnectionEventType
 } from "./subscriptions"
 
 export {

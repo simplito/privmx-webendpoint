@@ -41,7 +41,9 @@ export class EventManager {
             this.eventsQueue.waitEvent().then((event) => {
                 this.onEvent(event);
                 this.listenForEvents();
-            });
+            }).catch(() => {
+                this.listenForEvents();
+            })
         }
     }
 
@@ -56,7 +58,9 @@ export class EventManager {
             if (!manager._isEventLoopRunning) return;
             manager.onEvent(event);
             manager.listenForEvents();
-        });
+        }).catch(() =>{
+            manager.listenForEvents();
+        })
 
         return manager;
     }
