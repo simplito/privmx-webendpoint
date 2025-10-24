@@ -16,7 +16,7 @@ export {
   createStoreSubscription,
   EventCallback,
   Subscription,
-  ConnectionEventType
+  ConnectionStatusEventType
 } from "./subscriptions"
 
 export {

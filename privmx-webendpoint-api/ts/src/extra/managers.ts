@@ -1,6 +1,6 @@
 import { Types } from "..";
 import {
-  ConnectionEventType,
+  ConnectionStatusEventType,
   EventCallback,
   SubscriberForInboxEvents,
   SubscriberForKvdbEvents,
@@ -242,9 +242,9 @@ export class KvdbEventsManager extends BaseEventDispatcherManager {
 }
 
 export const ConnectionChannels = {
-  [ConnectionEventType.LIB_CONNECTED]: "channel/lib_connected",
-  [ConnectionEventType.LIB_DISCONNECTED]: "channel/lib_disconnected",
-  [ConnectionEventType.LIB_PLATFORM_DISCONNECTED]:
+  [ConnectionStatusEventType.LIB_CONNECTED]: "channel/lib_connected",
+  [ConnectionStatusEventType.LIB_DISCONNECTED]: "channel/lib_disconnected",
+  [ConnectionStatusEventType.LIB_PLATFORM_DISCONNECTED]:
     "channel/lib_platform_disconnected",
 };
 
@@ -262,10 +262,10 @@ export class ConnectionEventsManager extends BaseEventDispatcherManager {
   }
 
   async subscribeFor(
-    subscriptions: { type: ConnectionEventType; callbacks: EventCallback[] }[],
+    subscriptions: { type: ConnectionStatusEventType; callbacks: EventCallback[] }[],
   ) {
     const subscriptionChannels = subscriptions.map((x) => {
-      return `${this.connectionId}/${ConnectionEventType[x.type]}`;
+      return `${this.connectionId}/${ConnectionStatusEventType[x.type]}`;
     });
     return this.prepareSubscription(subscriptionChannels, subscriptions);
   }

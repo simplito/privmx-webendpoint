@@ -148,14 +148,15 @@ export function createInboxSubscription<T extends Types.InboxEventType, S extend
     }
 }
 
-export enum ConnectionEventType {
+
+export enum ConnectionStatusEventType {
     LIB_DISCONNECTED=0,
     LIB_PLATFORM_DISCONNECTED=1,
     LIB_CONNECTED=2,
 }
 
 export function createConnectionSubscription(s:{
-    type:ConnectionEventType;
+    type:ConnectionStatusEventType;
     callbacks:((arg: GenericEvent<undefined>) => void)[]
 }) {
     return {
