@@ -152,10 +152,11 @@ void WebRtcInterfaceImpl::close(const std::string& streamRoomId) {
     });
 }
 
-void WebRtcInterfaceImpl::updateKeys(const std::vector<privmx::endpoint::stream::Key>& keys) {
+void WebRtcInterfaceImpl::updateKeys(const std::string& streamRoomId, const std::vector<privmx::endpoint::stream::Key>& keys) {
     runTaskAsync([&, keys]{
         auto methodName {"updateKeys"};
         emscripten::val name = emscripten::val::u8string(methodName);
+        emscripten::val streamRoomIdVal = emscripten::val::u8string(streamRoomId.c_str());
         emscripten::val keysArrayVal = emscripten::val::array();
         for (auto key: keys) {
             emscripten::val keyObj = emscripten::val::object();
@@ -169,6 +170,7 @@ void WebRtcInterfaceImpl::updateKeys(const std::vector<privmx::endpoint::stream:
             keysArrayVal.call<emscripten::val>("push", keyObj);
         }
         emscripten::val params = val::object();
+        params.set("streamRoomId", streamRoomIdVal);
         params.set("keys", keysArrayVal);
         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
         assertStatus(methodName, jsResult);

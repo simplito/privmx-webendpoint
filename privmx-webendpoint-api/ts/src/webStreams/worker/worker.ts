@@ -86,7 +86,7 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
 
         try {
             if (!this.keyStore.hasKey(keyId)) {
-                logError({msg: "Decryption failed. Cannot find key", keyId, store: this.keyStore});
+                // logError({msg: "Decryption failed. Cannot find key", keyId, store: this.keyStore});
                 controller.enqueue(encodedFrame);
                 return;
             }
@@ -94,7 +94,7 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
             const iv = new Uint8Array(data.slice(headerLen + payloadLen, headerLen + payloadLen + ivLen));
             const decryptionResult = await decryptWithAES256GCM(keyEntry.key, iv, payload, frameHeader);
             if (!isDecryptionSuccess(decryptionResult)) {
-                logError({msg: "Decryption failed. Cannot decrypt frame"});
+                // logError({msg: "Decryption failed. Cannot decrypt frame"});
                 controller.enqueue(encodedFrame);
                 return;
             }
@@ -123,7 +123,6 @@ const getKeyStore = () => {
 }
 
 self.onmessage = async event  => {
-    logError("message: "+ JSON.stringify(event));
     const { operation, kind } = event.data;
 
     if (operation === 'initialize') {
@@ -236,6 +235,7 @@ function logError(msg: any) {
 }
 
 if ((self as any).RTCTransformEvent) {
+    logError("init RTCTransfrom");
     (self as any).onrtctransform = (event: any) => {
         const transformer = event.transformer;
         const { operation, kind } = transformer.options;

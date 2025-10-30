@@ -639,6 +639,11 @@ export interface Key {
     type: number; // 0 - local, 1 - remote
 };
 
+export interface StreamSubscription {
+    streamId: number;
+    streamTrackId: string;
+}
+
 export interface TurnCredentials {
     url: string;
     username: string;
@@ -646,10 +651,12 @@ export interface TurnCredentials {
     expirationTime: number;
 }
 
-export interface StreamJoinSettings {
+export interface StreamSettings {
     settings: any;
     onRemoteTrack: (track: RTCTrackEvent) => void;
 }
+
+export type StreamHandle = number & {_streamHandle: never};
 
 /**
  * PKI Verification options

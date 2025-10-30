@@ -1,3 +1,4 @@
+import { StreamHandle } from "../../Types";
 import * as MediaServerTypes from "./MediaServerWebSocketApiTypes";
 
 export interface UserWithPubKey {
@@ -40,7 +41,7 @@ export interface StreamAndTracksSelector {
 }
 
 export interface Stream {
-    streamId: StreamId;
+    handle: StreamHandle;
     streamRoomId: StreamRoomId;
     remote: boolean;
     createStreamMeta?: StreamCreateMeta;

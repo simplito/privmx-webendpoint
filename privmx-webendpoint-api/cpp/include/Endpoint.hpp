@@ -188,9 +188,14 @@ namespace api {
     API_FUNCTION_HEADER(StreamApi, createStream)
     API_FUNCTION_HEADER(StreamApi, publishStream)
     API_FUNCTION_HEADER(StreamApi, unpublishStream)
-    API_FUNCTION_HEADER(StreamApi, joinStream)
+    API_FUNCTION_HEADER(StreamApi, joinStreamRoom)
     API_FUNCTION_HEADER(StreamApi, listStreams)
-    API_FUNCTION_HEADER(StreamApi, leaveStream)
+    API_FUNCTION_HEADER(StreamApi, leaveStreamRoom)
+
+    API_FUNCTION_HEADER(StreamApi, subscribeToRemoteStreams)
+    API_FUNCTION_HEADER(StreamApi, modifyRemoteStreamsSubscriptions)
+    API_FUNCTION_HEADER(StreamApi, unsubscribeFromRemoteStreams)
+
     API_FUNCTION_HEADER(StreamApi, keyManagement)
     API_FUNCTION_HEADER(StreamApi, getTurnCredentials)
     API_FUNCTION_HEADER(StreamApi, subscribeFor)

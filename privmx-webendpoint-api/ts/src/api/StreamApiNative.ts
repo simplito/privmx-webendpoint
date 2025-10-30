@@ -10,12 +10,13 @@ limitations under the License.
 */
 
 import { Jsep, SdpWithRoomModel } from "../service/WebRtcInterface";
-import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamEventSelectorType, StreamEventType, StreamRoom, StreamSettings, TurnCredentials, UserWithPubKey } from "../Types";
+import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamEventSelectorType, StreamEventType, StreamRoom, TurnCredentials, UserWithPubKey } from "../Types";
 import { WebRtcClient } from "../webStreams/WebRtcClient";
 import { SessionId } from "../webStreams/WebRtcClientTypes";
 import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
 import { Api } from "./Api";
 import { BaseNative } from "./BaseNative";
+import * as Types from "../Types";
 
 export class StreamApiNative extends BaseNative {
     protected static bindingId: number = -1;
@@ -68,12 +69,21 @@ export class StreamApiNative extends BaseNative {
     async listStreamRooms(ptr: number, args: [string, PagingQuery]): Promise<PagingList<StreamRoom>> {
         return this.runAsync<PagingList<StreamRoom>>((taskId)=>this.api.lib.StreamApi_listStreamRooms(taskId, ptr, args));
     }
-    async createStream(ptr: number, args: [string, number]): Promise<number> {
+    async createStream(ptr: number, args: [string]): Promise<Types.StreamHandle> {
         // params from api: streamRoomId, streamId
         // params to lib: streamRoomId, streamId, webrtcInterfacePtr
         // const libArgs: [string, number, number] = [...args, this.webRtcInterfacePtr];
-        return this.runAsync<number>((taskId)=>this.api.lib.StreamApi_createStream(taskId, ptr, args));
+        return this.runAsync<Types.StreamHandle>((taskId)=>this.api.lib.StreamApi_createStream(taskId, ptr, args));
     }
+
+    async joinStreamRoom(ptr: number, args: [string]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_joinStreamRoom(taskId, ptr, args));
+    }
+
+    async leaveStreamRoom(ptr: number, args: [string]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_leaveStreamRoom(taskId, ptr, args));
+    }
+
     async publishStream(ptr: number, args: [number]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_publishStream(taskId, ptr, args));
     }
@@ -81,18 +91,26 @@ export class StreamApiNative extends BaseNative {
         return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_unpublishStream(taskId, ptr, args));
     }
 
-    async joinStream(ptr: number, args: [string, number[], any, number]): Promise<number> {
-        // params from api: streamRoomId, streamIds[], settings:any
-        // params to lib: streamRoomId, streamsIds[], settings:any, webrtcInterfacePtr
-        // const libArgs: [string, number[], any, number] = [...args, this.webRtcInterfacePtr];
-        return this.runAsync<number>((taskId)=>this.api.lib.StreamApi_joinStream(taskId, ptr, args));
-    }
     async listStreams(ptr: number, args: [string]): Promise<Stream[]> {
         return this.runAsync<Stream[]>((taskId)=>this.api.lib.StreamApi_listStreams(taskId, ptr, args));
     }
-    async leaveStream(ptr: number, args: [string, number[]]): Promise<void> {
-        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_leaveStream(taskId, ptr, args));
+
+    // void subscribeToRemoteStreams(const std::string& streamRoomId, const std::vector<StreamSubscription>& subscriptions, const StreamSettings& options);
+    // void modifyRemoteStreamsSubscriptions(const std::string& streamRoomId, const std::vector<StreamSubscription>& subscriptionsToAdd, const std::vector<StreamSubscription>& subscriptionsToRemove, const StreamSettings& options);
+    // void unsubscribeFromRemoteStreams(const std::string& streamRoomId, const std::vector<StreamSubscription>& subscriptionsToRemove);
+
+    async subscribeToRemoteStreams(ptr: number, args: [string, Types.StreamSubscription[], Types.StreamSettings]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_subscribeToRemoteStreams(taskId, ptr, args));
     }
+
+    async modifyRemoteStreamsSubscriptions(ptr: number, args: [string, Types.StreamSubscription[], Types.StreamSubscription[], Types.StreamSettings]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_modifyRemoteStreamsSubscriptions(taskId, ptr, args));
+    }
+
+    async unsubscribeFromRemoteStreams(ptr: number, args: [string, Types.StreamSubscription[], Types.StreamSettings]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_unsubscribeFromRemoteStreams(taskId, ptr, args));
+    }
+
     async keyManagement(ptr: number, args: [boolean]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_keyManagement(taskId, ptr, args));
     }

@@ -1,50 +1,32 @@
 
-import {StreamsApi, Types} from "../ServerTypes";
+import {Types} from "../ServerTypes";
 import { Utils } from "../webStreams/Utils";
 import { WebRtcClient } from "../webStreams/WebRtcClient";
-import { EncKey, RemoteStreamListener, SessionId, VideoStream } from "../webStreams/WebRtcClientTypes";
-import { WebRtcConfig } from "../webStreams/WebRtcConfig";
 import { DataChannelMeta, StreamCreateMeta, StreamId } from "../webStreams/types/ApiTypes";
-import { StreamDataTrackAddRequest } from "../webStreams/types/StreamsApiTypes";
 import { BaseApi } from "./BaseApi";
 // import { StreamApiNative } from "../api/StreamApiNative";
-import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamEventSelectorType, StreamEventType, StreamJoinSettings, StreamRoom, UserWithPubKey } from "../Types";
+import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamEventSelectorType, StreamEventType, StreamRoom, UserWithPubKey, StreamSettings, StreamHandle, StreamSubscription } from "../Types";
 import { StreamApiNative } from "../api/StreamApiNative";
-import { VideoRoomId } from "../webStreams/types/MediaServerWebSocketApiTypes";
 
 
 
 export interface StreamTrack {
     id: Types.StreamTrackId;
-    streamId: Types.StreamId;
+    streamId?: Types.StreamId;
+    streamHandle: StreamHandle;
     track?: MediaStreamTrack;
     dataChannelMeta?: DataChannelMeta;
 }
 
 export class StreamApi extends BaseApi {
-    // private static instance: Api;
-    // public static async get() {
-    //     if (!Api.instance) {
-    //         const client = new WebRtcClient();
-    //         const serverChannel = await client.getAppServerChannel();
-    //         Api.instance = new Api(client, serverChannel);
-    //     }
-    //     return Api.instance;
-    // }
-    // constructor(private client: WebRtcClient, private serverChannel: AppServerChannel) {}
     constructor(private native: StreamApiNative, ptr: number, private client: WebRtcClient) {
         super(ptr);
     }
 
     // local data
-    private streams: Map<StreamId, Types.Stream> = new Map();
+    private streams: Map<StreamHandle, Types.Stream> = new Map();
     private streamTracks: Map<string, StreamTrack> = new Map();
     private dataChannels: Map<string, RTCDataChannel> = new Map();
- 
-
-
-    // API
-    // ============ STREAMS ===================
 
     public async createStreamRoom(
         contextId: string, 
@@ -54,19 +36,13 @@ export class StreamApi extends BaseApi {
         privateMeta: Uint8Array, 
         policies?: ContainerPolicy
     ): Promise<Types.StreamRoomId> {
-        // await this.client.provideSession();
-        // orig
-        // const res = await this.serverChannel.call<StreamsApi.StreamRoomCreateRequest, Types.StreamRoomId>({kind: "streams.streamRoomCreate", data: {
-        //     contextId, users, managers, privateMeta, publicMeta
-        // }});
-
         const res = await this.native.createStreamRoom(this.servicePtr, [contextId, users, managers, publicMeta, privateMeta, policies]);
         return res as Types.StreamRoomId;
     }
 
     public async updateStreamRoom(
         streamRoomId: Types.StreamRoomId, 
-        users: UserWithPubKey[], 
+        users: UserWithPubKey[],
         managers: UserWithPubKey[], 
         publicMeta: Uint8Array, 
         privateMeta: Uint8Array, 
@@ -75,103 +51,45 @@ export class StreamApi extends BaseApi {
         forceGenerateNewKey: boolean, 
         policies?: ContainerPolicy
     ): Promise<void> {
-        // wewnetrznie jest to MediaServerApi.videoRoomEdit
-        // await this.client.provideSession();
-        // orig
-        // return this.serverChannel.call<StreamsApi.StreamRoomUpdateRequest, void>({kind: "streams.streamRoomUpdate", data: {
-        //     streamRoomId, users, managers, privateMeta, publicMeta
-        // }});
         return this.native.updateStreamRoom(this.servicePtr, [streamRoomId, users, managers, publicMeta, privateMeta, version, force, forceGenerateNewKey, policies]);
     }
 
     public async listStreamRooms(contextId: string, query: PagingQuery): Promise<PagingList<StreamRoom>> {
-        // wewnetrznie jest to MediaServerApi.videoRoomList  - oryginalnie funkcja zwracala VideoRoomList
-        // await this.client.provideSession();
-        // orig
-        // return this.serverChannel.call<StreamsApi.StreamRoomListRequest, Types.StreamRoomList>({kind: "streams.streamRoomList", data: {
-        //     contextId, query
-        // }});
         return this.native.listStreamRooms(this.servicePtr, [contextId, query]);
     }
 
+    public async joinStreamRoom(streamRoomId: Types.StreamRoomId): Promise<void> {
+        return this.native.joinStreamRoom(this.servicePtr, [streamRoomId]);
+    }
+
+    public async leaveStreamRoom(streamRoomId: Types.StreamRoomId): Promise<void> {
+        return this.native.leaveStreamRoom(this.servicePtr, [streamRoomId]);
+    }
+
     public async getStreamRoom(streamRoomId: Types.StreamRoomId): Promise<StreamRoom> {
-        // wewnetrznie jest to MediaServerApi.videoRoomList[streamId] - oryginalnie funkcja zwracala Types.StreamRoomInfo
-        // await this.client.provideSession();
-        
-        // orig
-        // return this.serverChannel.call<StreamsApi.StreamRoomGetRequest, Types.StreamRoomInfo>({kind: "streams.streamRoomGet", data: {
-        //     streamRoomId
-        // }});
         return this.native.getStreamRoom(this.servicePtr, [streamRoomId]);
     }
 
     public async deleteStreamRoom(streamRoomId: Types.StreamRoomId): Promise<void> {
-        // wewnetrznie jest to MediaServerApi.videoRoomDestroy
-        // await this.client.provideSession();
-        // orig
-        //     return this.serverChannel.call<StreamsApi.StreamRoomDeleteRequest, void>({kind: "streams.streamRoomDelete", data: {
-        //         streamRoomId
-        //     }});
         return this.native.deleteStreamRoom(this.servicePtr, [streamRoomId]);
     }
 
-    public async createStream(streamRoomId: Types.StreamRoomId): Promise<Types.StreamId> {
-    // definicja do call-a do native:
-    // public async createStream(streamRoomId: Types.StreamRoomId, localStreamId: Types.StreamId): Promise<Types.StreamId> {
-    
-        // await this.client.provideSession();
-        // orig - oryginalnie ta funkcja dzialala tylko lokalnie - teraz wysyla swoje dane do C++ a tam jest call na webrtcInterface.udpdateKeys()
-        // const streamId = Utils.generateNumericId() as StreamId;
-        // const key = streamId.toString();
-        // this.streams.set(key, {streamId, streamRoomId, createStreamMeta: meta, remote: false});
-        // return streamId;
-
-        const streamId = Utils.generateNumericId() as StreamId;
+    public async createStream(streamRoomId: Types.StreamRoomId): Promise<StreamHandle> {
         const meta: StreamCreateMeta = {};
         // tutaj uzupelniajac opcjonalne pola obiektu meta mozemy ustawiac w Janusie dodatkowe rzeczy
 
-        const localStreamId = await this.native.createStream(this.servicePtr, [streamRoomId, streamId]) as Types.StreamId;
-        this.streams.set(localStreamId, {streamId, streamRoomId, createStreamMeta: meta, remote: false});
-        return localStreamId;
+        const handle = await this.native.createStream(this.servicePtr, [streamRoomId]);
+        this.streams.set(handle, {handle, streamRoomId, createStreamMeta: meta, remote: false});
+        return handle;
     }
 
-    // public async updateStream(streamRoomId: Types.StreamRoomId, localStreamId: Types.StreamId): Promise<Types.StreamId> {
-    //     const webrtcInterfacePtr: number; // tutaj cos musimy przekazac do C++
-    //     return await this.native.updateStream(this.servicePtr, [streamRoomId, localStreamId, webrtcInterfacePtr]) as Types.StreamId;
-    // }
-
     public async listStreams(streamRoomId: Types.StreamRoomId): Promise<Stream[]> {
-        // orig - oryginalnie funkcja zwracala StreamList z lista Types.Stream[]
-        // // todo: powinno zwracac zarowno strumienie zdalne jak i lokalne nasze
-        // const localStreams = Array.from(this.streams.values());
-        // await this.client.provideSession();
-        // const remoteStreams = await this.serverChannel.call<StreamsApi.StreamListRequest, Types.Stream[]>({kind: "streams.streamList", data: {
-        //     streamRoomId, query
-        // }});
-        // return {list: [...localStreams, ...remoteStreams]};
-        // const localStreams: Stream[] = Array.from(this.streams.values()).map(x => {
-        //     return {streamId: x.streamId, userId: ""};
-        // });
         const remoteStreams = await this.native.listStreams(this.servicePtr, [streamRoomId]);
-        // return [...localStreams, ...remoteStreams];
         return remoteStreams;
 
     }
 
-    public async getStream(_streamRoomId: Types.StreamRoomId, _streamId: Types.StreamId): Promise<Stream> {
-        // orig - oryginalnie funkcja zwraacala Types.Stream a nastepnie mapowala streamy remote i zwracala zdalne ids
-        // console.log("streamGet", streamRoomId,"|", streamId, " ]");
-        // await this.client.provideSession();
-        // const remoteStream = await this.serverChannel.call<StreamsApi.StreamGetRequest, Types.Stream>({kind: "streams.streamGet", data: {
-        //     streamRoomId, streamId
-        // }});
-
-        // return remoteStream;
-        throw new Error("not supported");
-    }
-
-
-    public async addStreamTrack(streamId: Types.StreamId, meta: Types.StreamTrackMeta): Promise<Types.StreamTrackId> {
+    public async addStreamTrack(streamHandle: StreamHandle, meta: Types.StreamTrackMeta): Promise<Types.StreamTrackId> {
         //// orig
         //// tutaj byly tez wysylane dane dataChannela na serwer aplikacyjny i tam trzymane w mapie
 
@@ -216,16 +134,16 @@ export class StreamApi extends BaseApi {
         // }
 
 
-        if (! this.streams.has(streamId)) {
+        if (! this.streams.has(streamHandle)) {
             console.log("LOG: ", this.streams);
-            throw new Error("[addStreamTrack]: there is no Stream with given Id: "+streamId);
+            throw new Error("[addStreamTrack]: there is no Stream with given Id: "+streamHandle);
         }
         for (const [key, streamTrack] of this.streamTracks.entries()) {
             if (streamTrack.track && streamTrack.track?.id === meta.track?.id) {
                 throw new Error("[addStreamTrack] StreamTrack with given browser's track already added.");
             }
         }
-        const stream = this.streams.get(streamId);
+        const stream = this.streams.get(streamHandle);
         if (! stream) {
             throw new Error("Cannot find stream by id");
         }
@@ -233,7 +151,7 @@ export class StreamApi extends BaseApi {
         const streamTrackId = Utils.getRandomString(8) as Types.StreamTrackId;
         const streamTrack: StreamTrack = {
             id: streamTrackId,
-            streamId: streamId,
+            streamHandle: streamHandle,
             track: meta.track,
             dataChannelMeta: meta.dataChannel
         };
@@ -259,14 +177,6 @@ export class StreamApi extends BaseApi {
         //     streamTrackId, streamRoomId: streamEntry.streamRoomId, streamId: streamEntry.streamId
         // }});
 
-        throw new Error("not implemented");
-    }
-
-    public async listStreamTracks(_streamRoomId: Types.StreamRoomId, _streamId: Types.StreamId): Promise<Types.StreamTrackList> {
-        // await this.client.provideSession();
-        // return this.serverChannel.call<StreamsApi.StreamTrackListRequest, Types.StreamTrackList>({kind: "streams.streamTrackList", data: {
-        //     streamRoomId, streamId
-        // }});
         throw new Error("not implemented");
     }
 
@@ -297,16 +207,15 @@ export class StreamApi extends BaseApi {
     }
 
     // PART DONE
-    public async publishStream(streamId: Types.StreamId): Promise<void> {
+    public async publishStream(streamHandle: StreamHandle): Promise<void> {
         // configure client
         const mediaTracks: MediaStreamTrack[] = [];
         for (const value of this.streamTracks.values()) {
-            if (value.streamId === streamId && value.track) {
+            if (value.streamHandle === streamHandle && value.track) {
                 mediaTracks.push(value.track);
             }
         }
-        console.log(1);
-        const _stream = this.streams.get(streamId);
+        const _stream = this.streams.get(streamHandle);
         if (!_stream) {
             throw new Error("No stream defined to publish");
         }
@@ -352,21 +261,17 @@ export class StreamApi extends BaseApi {
         // console.log("override peerCredentials url with: ", overrideUrl);
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
         await this.client.setTurnCredentials(turnCredentials);
-        console.log(2);
-
-        
         await this.client.createPeerConnectionWithLocalStream(_stream.streamRoomId, mediaStream);
-        console.log(3);
 
-        return this.native.publishStream(this.servicePtr, [streamId]);
+        return this.native.publishStream(this.servicePtr, [streamHandle]);
     }
 
     // PART DONE
-    public async unpublishStream(streamId: Types.StreamId): Promise<void> {
-        if (!this.streams.has(streamId)) {
+    public async unpublishStream(streamHandle: StreamHandle): Promise<void> {
+        if (!this.streams.has(streamHandle)) {
             throw new Error ("No local stream with given id to unpublish"); 
         }
-        const _stream = this.streams.get(streamId);
+        const _stream = this.streams.get(streamHandle);
 
         // orig
         // await this.client.provideSession();
@@ -387,61 +292,61 @@ export class StreamApi extends BaseApi {
         // }});
 
 
-        await this.native.unpublishStream(this.servicePtr, [streamId]);
-        this.streams.delete(streamId);
+        await this.native.unpublishStream(this.servicePtr, [streamHandle]);
+        this.streams.delete(streamHandle);
     }
 
-    // PART DONE
-    // public async streamJoin(streamRoomId: Types.StreamRoomId, streamToJoin: Types.StreamAndTracksSelector): Promise<void> {
-    public async joinStream(streamRoomId: Types.StreamRoomId, streamsIds: StreamId[], settings: StreamJoinSettings): Promise<number> {
-        // int64_t joinStream(const std::string& streamRoomId, const std::vector<int64_t>& streamsId, const Settings& settings, int64_t localStreamId, std::shared_ptr<WebRTCInterface> webRtc);
-        //// orig - ciekawe, ze nie ma operacji na connection tutaj?
-        //// oryginalnie funkcja przyjmowala streamToJoin typu StreamAndTrackSelector gdzie podawany byl jeden stream i ew lista tracks jako opcja...
-        // await this.client.provideSession();
-        // return this.serverChannel.call<StreamsApi.StreamJoinRequest, void>({kind: "streams.streamJoin", data: {
-        //     streamRoomId: streamRoomId,
-        //     streamToJoin: streamToJoin
-        // }});
+    // public async joinStream(streamRoomId: Types.StreamRoomId, streamsIds: StreamId[], settings: StreamSettings): Promise<number> {
 
+
+    //     const peerCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
+    //     await this.client.setTurnCredentials(peerCredentials);
+    //     this.client.addRemoteStreamListener(streamRoomId, settings.onRemoteTrack);
+    //     const localStreamId = Utils.generateNumericId() as StreamId;
+    //     const res = await this.native.joinStream(this.servicePtr, [streamRoomId, streamsIds, settings.settings, localStreamId]);
+
+    //     // TODO: to powinno sie zadziac dopiero w attached
+    //     this.client.getConnectionManager().initialize(streamRoomId, "subscriber");
+
+    //     this.streams.set(localStreamId, {streamId: res as StreamId, streamRoomId, createStreamMeta: {}, remote: true});
+    //     return res;
+    // }
+
+    // public async leaveStream(streamRoomId: Types.StreamRoomId, streamsIds: StreamId[]): Promise<void> {
+        
+    //     // if (!this.streams.has(_streamId)) {
+    //     //     throw new Error ("No stream with given id to leave");
+    //     // }
+    //     // const _stream = this.streams.get(_streamId);
+
+    //     await this.native.leaveStream(this.servicePtr, [streamRoomId, streamsIds]);
+    //     // this.streams.delete(_streamId);
+    // }
+
+
+    async subscribeToRemoteStreams(streamRoomId: Types.StreamRoomId, subscriptions: StreamSubscription[], settings: StreamSettings): Promise<void> {
+        // native part
         const peerCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
-        // console.log("peerCredentials: ", peerCredentials);
-        // const overrideUrl = "turn:webrtc1.s24.simplito.com:3478";
-        // const overridenCreds = peerCredentials.map(x => {
-        //     return {...x, url: overrideUrl}
-        // });
         await this.client.setTurnCredentials(peerCredentials);
-        // await this.client.createPeerConnectionOnJoin(peerCredentials);
-
         this.client.addRemoteStreamListener(streamRoomId, settings.onRemoteTrack);
-        const localStreamId = Utils.generateNumericId() as StreamId;
-        const res = await this.native.joinStream(this.servicePtr, [streamRoomId, streamsIds, settings.settings, localStreamId]);
+
+        // server / core part
+        await this.native.subscribeToRemoteStreams(this.servicePtr, [streamRoomId, subscriptions, settings]);
 
         // TODO: to powinno sie zadziac dopiero w attached
         this.client.getConnectionManager().initialize(streamRoomId, "subscriber");
-
-        this.streams.set(localStreamId, {streamId: res as StreamId, streamRoomId, createStreamMeta: {}, remote: true});
-        return res;
+        // this.streams.set(localStreamId, {streamId: res as StreamId, streamRoomId, createStreamMeta: {}, remote: true});
     }
 
-    public async leaveStream(streamRoomId: Types.StreamRoomId, streamsIds: StreamId[]): Promise<void> {
-        
-        // if (!this.streams.has(_streamId)) {
-        //     throw new Error ("No stream with given id to leave");
-        // }
-        // const _stream = this.streams.get(_streamId);
+    async modifyRemoteStreamsSubscriptions(streamRoomId: Types.StreamRoomId, subscriptionsToAdd: StreamSubscription[], subscriptionsToRemove: StreamSubscription[], settings: StreamSettings): Promise<void> {
+        await this.native.modifyRemoteStreamsSubscriptions(this.servicePtr, [streamRoomId, subscriptionsToAdd, subscriptionsToRemove, settings]);
 
-        await this.native.leaveStream(this.servicePtr, [streamRoomId, streamsIds]);
-        // this.streams.delete(_streamId);
     }
 
-    // public async addRemoteStreamListener(listener: RemoteStreamListener) {
-    //     this.client.addRemoteStreamListener(listener);
-    // }
-
-    // public async testSetStreamEncKey(key: EncKey) {
-    //     console.log("setting key: ", key)
-    //     this.client.setEncKey(key.key, key.iv);
-    // }
+    async unsubscribeFromRemoteStreams(streamRoomId: Types.StreamRoomId, subscriptions: StreamSubscription[], settings: StreamSettings): Promise<void> {
+        await this.native.unsubscribeFromRemoteStreams(this.servicePtr, [streamRoomId, subscriptions, settings]);
+    }
+    
 
   /**
    * Subscribe for the Thread events on the given subscription query.

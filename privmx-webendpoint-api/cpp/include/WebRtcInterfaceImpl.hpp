@@ -54,7 +54,7 @@ public:
     void setAnswerAndSetRemoteDescription(const std::string& streamRoomId, const std::string& sdp, const std::string& type);
     void updateSessionId(const std::string& streamRoomId, const int64_t sessionId, const std::string& connectionType);
     void close(const std::string& streamRoomId);
-    void updateKeys(const std::vector<privmx::endpoint::stream::Key>& keys);
+    void updateKeys(const std::string& streamRoomId, const std::vector<privmx::endpoint::stream::Key>& keys);
 private:
     // void setRemoteDescription(const std::string& sdp, const std::string& type);
 

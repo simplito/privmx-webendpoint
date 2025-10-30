@@ -208,9 +208,10 @@ export class EndpointFactory {
             threadApi.servicePtr,
             storeApi.servicePtr
         );
+        await nativeApi.create(ptr, []);
         connection.apisRefs["inboxes"] = { _apiServicePtr: ptr };
         connection.nativeApisDeps["inboxes"] = nativeApi;
-        await nativeApi.create(ptr, []);
+
         return new InboxApi(nativeApi, ptr);
     }
 
@@ -258,9 +259,9 @@ export class EndpointFactory {
         }
         const nativeApi = new EventApiNative(this.api);
         const ptr = await nativeApi.newApi(connection.servicePtr);
+        await nativeApi.create(ptr, []);
         connection.apisRefs["events"] = { _apiServicePtr: ptr };
         connection.nativeApisDeps["events"] = nativeApi;
-        await nativeApi.create(ptr, []);
         return new EventApi(nativeApi, ptr);
     }
 
@@ -286,11 +287,9 @@ export class EndpointFactory {
             connection.servicePtr,
             eventApi.servicePtr
         );
+        await nativeApi.create(ptr, []);
         connection.apisRefs["streams"] = { _apiServicePtr: ptr };
         connection.nativeApisDeps["streams"] = nativeApi;
-  
-
-        await nativeApi.create(ptr, []);
         return new StreamApi(nativeApi, ptr, webRtcClient);
     }
 }

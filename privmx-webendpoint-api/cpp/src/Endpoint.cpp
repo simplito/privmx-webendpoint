@@ -385,9 +385,14 @@ namespace api {
     API_FUNCTION(StreamApi, createStream)
     API_FUNCTION(StreamApi, publishStream)
     API_FUNCTION(StreamApi, unpublishStream)
-    API_FUNCTION(StreamApi, joinStream)
+    API_FUNCTION(StreamApi, joinStreamRoom)
     API_FUNCTION(StreamApi, listStreams)
-    API_FUNCTION(StreamApi, leaveStream)
+    API_FUNCTION(StreamApi, leaveStreamRoom)
+
+    API_FUNCTION(StreamApi, subscribeToRemoteStreams)
+    API_FUNCTION(StreamApi, modifyRemoteStreamsSubscriptions)
+    API_FUNCTION(StreamApi, unsubscribeFromRemoteStreams)
+
     API_FUNCTION(StreamApi, keyManagement)
     API_FUNCTION(StreamApi, getTurnCredentials)
     API_FUNCTION(StreamApi, subscribeFor)
