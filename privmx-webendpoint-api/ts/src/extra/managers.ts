@@ -270,7 +270,7 @@ export class CustomEventsManager extends BaseEventDispatcherManager {
   }
 }
 
-export const ConnectionLibChannels: Record<ConnectionLibEventType, string> = {
+export const ConnectionChannels: Record<ConnectionLibEventType, string> = {
   [ConnectionLibEventType.LIB_CONNECTED]: "channel/lib_connected",
   [ConnectionLibEventType.LIB_DISCONNECTED]: "channel/lib_disconnected",
   [ConnectionLibEventType.LIB_PLATFORM_DISCONNECTED]:
@@ -379,7 +379,7 @@ export class ConnectionEventsManager extends BaseEventDispatcherManager {
 
     if (libSubscriptions.length) {
       const libChannels = libSubscriptions.map(
-        (x) => `${this.connectionId}/${ConnectionLibChannels[x.type]}`,
+        (x) => `${this.connectionId}/${ConnectionChannels[x.type]}`,
       );
       const libIds = await this.prepareSubscription(
         libChannels,

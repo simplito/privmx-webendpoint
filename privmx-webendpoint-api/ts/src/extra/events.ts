@@ -9,7 +9,7 @@ import {
     SubscriberForThreadsEvents
 } from "./subscriptions";
 import {
-    BaseEventDispatcherManager, ConnectionLibChannels,
+    BaseEventDispatcherManager, ConnectionChannels,
     ConnectionEventsManager,
     CustomEventsManager,
     InboxEventsManager, KvdbEventsManager,
@@ -21,11 +21,11 @@ import {
 function normalizeConnectionEvent(e: Types.Event): Types.Event {
     switch (e.type) {
         case 'libDisconnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionLibChannels[ConnectionLibEventType.LIB_DISCONNECTED]}`]}
+            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionLibEventType.LIB_DISCONNECTED]}`]}
         case 'libPlatformDisconnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionLibChannels[ConnectionLibEventType.LIB_PLATFORM_DISCONNECTED]}`]}
+            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionLibEventType.LIB_PLATFORM_DISCONNECTED]}`]}
         case 'libConnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionLibChannels[ConnectionLibEventType.LIB_CONNECTED]}`]}
+            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionLibEventType.LIB_CONNECTED]}`]}
         default:
             return e
     }
