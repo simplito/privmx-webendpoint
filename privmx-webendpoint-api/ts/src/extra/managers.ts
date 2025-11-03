@@ -78,9 +78,10 @@ export abstract class BaseEventDispatcherManager {
   protected abstract apiUnsubscribeFrom(strings: string[]): Promise<void>;
 
   dispatchEvent(event: Types.Event) {
-    const callbacks = event.subscriptions.flatMap((s) =>
-      this._listeners.get(s),
-    );
+    const callbacks = event.subscriptions.flatMap((s) => {
+      const listeners = this._listeners.get(s);
+      return listeners ?? [];
+    });
     for (const listener of callbacks) {
       listener.callback(event);
     }

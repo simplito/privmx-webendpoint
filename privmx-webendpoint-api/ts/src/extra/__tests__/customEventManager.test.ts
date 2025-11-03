@@ -15,6 +15,7 @@ describe("Custom event manager", () => {
   beforeEach(() => {
     let { q: _q, manager: _manager } = createTestSetup();
     q = _q;
+    manager = _manager;
     customEventsManager = _manager.getCustomEventManager(
       new MockContainerSubscriber<string, Types.EventsEventSelectorType>(q),
     );
