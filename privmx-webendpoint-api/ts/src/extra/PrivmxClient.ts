@@ -11,7 +11,7 @@ import {
 } from '../service';
 
 import { PublicConnection } from './PublicConnection';
-import {ConnectionEventsManager, InboxEventsManager, StoreEventsManager, ThreadEventsManager} from "./managers";
+import {ConnectionEventsManager, CustomEventsManager, InboxEventsManager, StoreEventsManager, ThreadEventsManager} from "./managers";
 import {EventManager} from "./events";
 
 /**
@@ -56,6 +56,7 @@ export class PrivmxClient {
   private threadEventManager: Promise<ThreadEventsManager> | null = null;
   private storeEventManager: Promise<StoreEventsManager> | null = null;
   private inboxEventManager: Promise<InboxEventsManager> | null = null;
+  private customEventsManager: Promise<CustomEventsManager> | null = null;
 
   /**
    * @constructor
@@ -285,9 +286,11 @@ export class PrivmxClient {
     this.connectionEventManager = (async () => {
       const eventManager = await PrivmxClient.getEventManager();
       const connection = this.getConnection();
-      const connectionId =
-        (await connection.getConnectionId()) as unknown as string;
-      return eventManager.getConnectionEventManager(connectionId);
+      const connectionId = await connection.getConnectionId();
+      return eventManager.getConnectionEventManager(
+        connection,
+        `${connectionId}`,
+      );
     })();
 
     return this.connectionEventManager;
@@ -345,6 +348,23 @@ export class PrivmxClient {
   }
 
   /**
+   * @description Gets the Custom Events Manager.
+   * @returns {Promise<CustomEventsManager>}
+   */
+  public async getCustomEventsManager(): Promise<CustomEventsManager> {
+    if (this.customEventsManager) {
+      return this.customEventsManager;
+    }
+
+    this.customEventsManager = (async () => {
+      const eventManager = await PrivmxClient.getEventManager();
+      return eventManager.getCustomEventManager(await this.getEventApi());
+    })();
+
+    return this.customEventsManager;
+  }
+
+  /**
    * @description Disconnects from the PrivMX bridge.
    * @returns {Promise<void>}
    */
@@ -355,6 +375,7 @@ export class PrivmxClient {
       this.storeApi = null;
       this.inboxApi = null;
       this.connectionEventManager = null;
+      this.customEventsManager = null;
       this.threadEventManager = null;
       this.storeEventManager = null;
       this.inboxEventManager = null;

@@ -1,14 +1,17 @@
 import {Types} from "..";
 import {
-    ConnectionEventType,
+    ConnectionLibEventType,
     SubscriberForInboxEvents,
+    SubscriberForConnectionEvents,
+    SubscriberForEvents,
     SubscriberForKvdbEvents,
     SubscriberForStoreEvents,
     SubscriberForThreadsEvents
 } from "./subscriptions";
 import {
-    BaseEventDispatcherManager, ConnectionChannels,
+    BaseEventDispatcherManager, ConnectionLibChannels,
     ConnectionEventsManager,
+    CustomEventsManager,
     InboxEventsManager, KvdbEventsManager,
     StoreEventsManager,
     ThreadEventsManager
@@ -18,11 +21,11 @@ import {
 function normalizeConnectionEvent(e: Types.Event): Types.Event {
     switch (e.type) {
         case 'libDisconnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionEventType.LIB_DISCONNECTED]}`]}
+            return {...e, subscriptions: [`${e.connectionId}/${ConnectionLibChannels[ConnectionLibEventType.LIB_DISCONNECTED]}`]}
         case 'libPlatformDisconnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionEventType.LIB_PLATFORM_DISCONNECTED]}`]}
+            return {...e, subscriptions: [`${e.connectionId}/${ConnectionLibChannels[ConnectionLibEventType.LIB_PLATFORM_DISCONNECTED]}`]}
         case 'libConnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionEventType.LIB_CONNECTED]}`]}
+            return {...e, subscriptions: [`${e.connectionId}/${ConnectionLibChannels[ConnectionLibEventType.LIB_CONNECTED]}`]}
         default:
             return e
     }
@@ -101,8 +104,14 @@ export class EventManager {
         return manager;
     }
 
-    getConnectionEventManager(connectionId: string) {
-        const manager = new ConnectionEventsManager(connectionId);
+    getCustomEventManager(eventApi: SubscriberForEvents) {
+        const manager = new CustomEventsManager(eventApi);
+        this.registerDispatcher(manager);
+        return manager;
+    }
+
+    getConnectionEventManager(connectionApi: SubscriberForConnectionEvents, connectionId: string) {
+        const manager = new ConnectionEventsManager(connectionId, connectionApi);
         this.registerDispatcher(manager);
         return manager;
     }

@@ -1,9 +1,5 @@
 import { Types } from "..";
-import {
-    ThreadEventSelectorType,
-    ThreadEventType
-} from "../Types";
-import {GenericEvent} from "./managers";
+import { GenericEvent } from "./managers";
 
 export type ThreadCallbackPayload = {
     // Thread events
@@ -77,116 +73,183 @@ export type KvdbCallbackPayload = {
     [Types.KvdbEventType.COLLECTION_CHANGE]: Types.CollectionChangedEventData;
 };
 
+export type ConnectionCallbackPayload = {
+    [Types.ConnectionEventType.USER_ADD]: Types.ContextUserEventData;
+    [Types.ConnectionEventType.USER_REMOVE]: Types.ContextUserEventData;
+    [Types.ConnectionEventType.USER_STATUS]: Types.ContextUsersStatusChangedEventData;
+};
 
-type EventParam<P, T> = T extends keyof P ? P[T] : unknown;
+export type EventsCallbackPayload = Types.ContextCustomEventData;
 
 export type EventCallback = {
-    callback:(e:Types.Event)=>void
-    symbol:Symbol
-}
+    callback: (e: Types.Event) => void;
+    symbol: Symbol;
+};
 
-export interface Subscription<T,S>{
-    type:T;
-    selector:S;
-    id:string,
-    callbacks:EventCallback[]
+export interface Subscription<T, S> {
+    type: T;
+    selector: S;
+    id: string;
+    callbacks: EventCallback[];
 }
-function toEventCallback(f:Function):EventCallback{
+function toEventCallback(f: Function): EventCallback {
     return {
-        callback:f as any,
-        symbol:Symbol()
-    }
+        callback: f as any,
+        symbol: Symbol(),
+    };
 }
 
-export function createThreadSubscription<T extends Types.ThreadEventType, S extends Types.ThreadEventSelectorType>(s:{
-    type:T;
-    selector:S;
-    id:string,
-    callbacks:((arg: GenericEvent<ThreadCallbackPayload[T]>) => void)[]
+export function createThreadSubscription<
+    T extends Types.ThreadEventType,
+    S extends Types.ThreadEventSelectorType
+>(s: {
+    type: T;
+    selector: S;
+    id: string;
+    callbacks: ((arg: GenericEvent<ThreadCallbackPayload[T]>) => void)[];
 }) {
     return {
         ...s,
-        callbacks:s.callbacks.map(toEventCallback)
-    }
+        callbacks: s.callbacks.map(toEventCallback),
+    };
 }
 
 
-export function createStoreSubscription<T extends Types.StoreEventType, S extends Types.StoreEventSelectorType>(s:{
-    type:T;
-    selector:S;
-    id:string,
-    callbacks:((arg: GenericEvent<StoreCallbackPayload[T]>) => void)[]
+export function createStoreSubscription<
+    T extends Types.StoreEventType,
+    S extends Types.StoreEventSelectorType
+>(s: {
+    type: T;
+    selector: S;
+    id: string;
+    callbacks: ((arg: GenericEvent<StoreCallbackPayload[T]>) => void)[];
 }) {
     return {
         ...s,
-        callbacks:s.callbacks.map(toEventCallback)
-    }
+        callbacks: s.callbacks.map(toEventCallback),
+    };
 }
 
 
-export function createKvdbSubscription<T extends Types.KvdbEventType, S extends Types.KvdbEventSelectorType>(s:{
-    type:T;
-    selector:S;
-    id:string,
-    callbacks:((arg: GenericEvent<KvdbCallbackPayload[T]>) => void)[]
+export function createKvdbSubscription<
+    T extends Types.KvdbEventType,
+    S extends Types.KvdbEventSelectorType
+>(s: {
+    type: T;
+    selector: S;
+    id: string;
+    callbacks: ((arg: GenericEvent<KvdbCallbackPayload[T]>) => void)[];
 }) {
     return {
         ...s,
-        callbacks:s.callbacks.map(toEventCallback)
-    }
+        callbacks: s.callbacks.map(toEventCallback),
+    };
 }
 
-export function createInboxSubscription<T extends Types.InboxEventType, S extends Types.InboxEventSelectorType>(s:{
-    type:T;
-    selector:S;
-    id:string,
-    callbacks:((arg: GenericEvent<InboxCallbackPayload[T]>) => void)[]
+export function createInboxSubscription<
+    T extends Types.InboxEventType,
+    S extends Types.InboxEventSelectorType
+>(s: {
+    type: T;
+    selector: S;
+    id: string;
+    callbacks: ((arg: GenericEvent<InboxCallbackPayload[T]>) => void)[];
 }) {
     return {
         ...s,
-        callbacks:s.callbacks.map(toEventCallback)
-    }
+        callbacks: s.callbacks.map(toEventCallback),
+    };
 }
 
-export enum ConnectionEventType {
-    LIB_DISCONNECTED=0,
-    LIB_PLATFORM_DISCONNECTED=1,
-    LIB_CONNECTED=2,
+export function createEventSubscription(
+    s: {
+        channel: string;
+        selector: Types.EventsEventSelectorType;
+        id: string;
+        callbacks: ((arg: GenericEvent<EventsCallbackPayload>) => void)[];
+    },
+): Subscription<string, Types.EventsEventSelectorType> & { channel: string } {
+    return {
+        type: s.channel,
+        selector: s.selector,
+        id: s.id,
+        callbacks: s.callbacks.map(toEventCallback),
+        channel: s.channel,
+    };
+}
+export enum ConnectionLibEventType {
+    LIB_DISCONNECTED = 0,
+    LIB_PLATFORM_DISCONNECTED = 1,
+    LIB_CONNECTED = 2,
 }
 
-export function createConnectionSubscription(s:{
-    type:ConnectionEventType;
-    callbacks:((arg: GenericEvent<undefined>) => void)[]
-}) {
+export function createConnectionSubscription<
+    T extends Types.ConnectionEventType,
+    S extends Types.ConnectionEventSelectorType
+>(s: {
+    type: T;
+    selector: S;
+    id: string;
+    callbacks: ((arg: GenericEvent<ConnectionCallbackPayload[T]>) => void)[];
+}): Subscription<T, S>;
+export function createConnectionSubscription(s: {
+    type: ConnectionLibEventType;
+    callbacks: ((arg: GenericEvent<undefined>) => void)[];
+}): {
+    type: ConnectionLibEventType;
+    callbacks: EventCallback[];
+};
+export function createConnectionSubscription(s: any) {
     return {
         ...s,
-        callbacks:s.callbacks.map(toEventCallback)
-    }
+        callbacks: s.callbacks.map(toEventCallback),
+    };
 }
 
-
-
-export interface EventSubscriber<E,S>{
+export interface EventSubscriber<E, S> {
     /**
-     * Subscribe for the Thread events on the given subscription query.
+     * Subscribe for events on the given subscription queries.
      * @param {string[]} subscriptionQueries list of queries
      */
     subscribeFor(subscriptionQueries: string[]): Promise<string[]>;
     /**
-     * Unsubscribes from events for the given subscriptionId.
+     * Unsubscribe from events for the given subscriptionIds.
      */
     unsubscribeFrom(subscriptionIds: string[]): Promise<void>;
     /**
-     * Generate subscription Query for the Thread events.
-     * @param {EventType} eventType type of event which you listen for
-     * @param {EventSelectorType} selectorType scope on which you listen for events
+     * Generate subscription query string for the requested event scope.
+     * @param {E} eventType type of event which you listen for
+     * @param {S} selectorType scope on which you listen for events
      * @param {string} selectorId ID of the selector
      */
-    buildSubscriptionQuery(eventType: E, selectorType: S, selectorId: string): Promise<string>;
+    buildSubscriptionQuery(
+        eventType: E,
+        selectorType: S,
+        selectorId: string,
+    ): Promise<string>;
 }
 
-export type SubscriberForThreadsEvents = EventSubscriber<ThreadEventType, ThreadEventSelectorType>
-export type SubscriberForStoreEvents = EventSubscriber<Types.StoreEventType, Types.StoreEventSelectorType>
-export type SubscriberForInboxEvents = EventSubscriber<Types.InboxEventType, Types.InboxEventSelectorType>
-export type SubscriberForKvdbEvents = EventSubscriber<Types.KvdbEventType, Types.KvdbEventSelectorType>
-
+export type SubscriberForThreadsEvents = EventSubscriber<
+    Types.ThreadEventType,
+    Types.ThreadEventSelectorType
+>;
+export type SubscriberForStoreEvents = EventSubscriber<
+    Types.StoreEventType,
+    Types.StoreEventSelectorType
+>;
+export type SubscriberForInboxEvents = EventSubscriber<
+    Types.InboxEventType,
+    Types.InboxEventSelectorType
+>;
+export type SubscriberForKvdbEvents = EventSubscriber<
+    Types.KvdbEventType,
+    Types.KvdbEventSelectorType
+>;
+export type SubscriberForConnectionEvents = EventSubscriber<
+    Types.ConnectionEventType,
+    Types.ConnectionEventSelectorType
+>;
+export type SubscriberForEvents = EventSubscriber<
+    string,
+    Types.EventsEventSelectorType
+>;

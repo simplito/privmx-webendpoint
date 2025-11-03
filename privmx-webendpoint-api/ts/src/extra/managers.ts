@@ -1,7 +1,9 @@
 import { Types } from "..";
 import {
-  ConnectionEventType,
+  ConnectionLibEventType,
   EventCallback,
+  SubscriberForConnectionEvents,
+  SubscriberForEvents,
   SubscriberForInboxEvents,
   SubscriberForKvdbEvents,
   SubscriberForStoreEvents,
@@ -50,7 +52,11 @@ export type Channel =
   | `store/${string}/files`
   | "thread"
   | `thread/${string}/messages`
-  | `connection/${string}`;
+  | `connection/${string}`
+  | "context/userAdded"
+  | "context/userRemoved"
+  | "context/userStatus"
+  | `context/${string}/${string}`;
 
 export interface GenericEvent<K> extends Types.Event {
   /**
@@ -239,32 +245,154 @@ export class KvdbEventsManager extends BaseEventDispatcherManager {
   }
 }
 
-export const ConnectionChannels = {
-  [ConnectionEventType.LIB_CONNECTED]: "channel/lib_connected",
-  [ConnectionEventType.LIB_DISCONNECTED]: "channel/lib_disconnected",
-  [ConnectionEventType.LIB_PLATFORM_DISCONNECTED]:
-    "channel/lib_platform_disconnected",
-};
-
-export class ConnectionEventsManager extends BaseEventDispatcherManager {
-  constructor(private connectionId: string) {
+export class CustomEventsManager extends BaseEventDispatcherManager {
+  constructor(private eventsApi: SubscriberForEvents) {
     super();
   }
 
   protected override apiSubscribeFor(channels: string[]) {
+    return this.eventsApi.subscribeFor(channels);
+  }
+  protected override apiUnsubscribeFrom(subscriptionId: string[]) {
+    return this.eventsApi.unsubscribeFrom(subscriptionId);
+  }
+
+  async subscribeFor(
+    subscriptions: Subscription<string, Types.EventsEventSelectorType>[],
+  ) {
+    const subscriptionChannels = await Promise.all(
+      subscriptions.map((s) => {
+        return this.eventsApi.buildSubscriptionQuery(s.type, s.selector, s.id);
+      }),
+    );
+    return this.prepareSubscription(subscriptionChannels, subscriptions);
+  }
+}
+
+export const ConnectionLibChannels: Record<ConnectionLibEventType, string> = {
+  [ConnectionLibEventType.LIB_CONNECTED]: "channel/lib_connected",
+  [ConnectionLibEventType.LIB_DISCONNECTED]: "channel/lib_disconnected",
+  [ConnectionLibEventType.LIB_PLATFORM_DISCONNECTED]:
+    "channel/lib_platform_disconnected",
+};
+
+export class ConnectionEventsManager extends BaseEventDispatcherManager {
+  private useConnectionApi = false;
+  private remoteSubscriptionIds = new Set<string>();
+
+  constructor(
+    private connectionId: string,
+    private connectionApi?: SubscriberForConnectionEvents,
+  ) {
+    super();
+  }
+
+  protected override apiSubscribeFor(channels: string[]) {
+    if (this.useConnectionApi) {
+      if (!this.connectionApi) {
+        return Promise.reject(
+          new Error("Connection API not available for remote subscriptions."),
+        );
+      }
+      return this.connectionApi.subscribeFor(channels);
+    }
     return Promise.resolve(channels);
   }
 
-  protected override apiUnsubscribeFrom() {
+  protected override async apiUnsubscribeFrom(subscriptionIds: string[]) {
+    if (this.connectionApi) {
+      const remoteIds = subscriptionIds.filter((id) =>
+        this.remoteSubscriptionIds.has(id),
+      );
+      if (remoteIds.length) {
+        await this.connectionApi.unsubscribeFrom(remoteIds);
+        remoteIds.forEach((id) => this.remoteSubscriptionIds.delete(id));
+      }
+    }
     return Promise.resolve();
   }
 
   async subscribeFor(
-    subscriptions: { type: ConnectionEventType; callbacks: EventCallback[] }[],
+    subscriptions: (
+      | Subscription<
+          Types.ConnectionEventType,
+          Types.ConnectionEventSelectorType
+        >
+      | { type: ConnectionLibEventType; callbacks: EventCallback[] }
+    )[],
   ) {
-    const subscriptionChannels = subscriptions.map((x) => {
-      return `${this.connectionId}/${ConnectionEventType[x.type]}`;
-    });
-    return this.prepareSubscription(subscriptionChannels, subscriptions);
+    const isRemoteSubscription = (
+      sub:
+        | Subscription<
+            Types.ConnectionEventType,
+            Types.ConnectionEventSelectorType
+          >
+        | { type: ConnectionLibEventType; callbacks: EventCallback[] },
+    ): sub is Subscription<
+      Types.ConnectionEventType,
+      Types.ConnectionEventSelectorType
+    > => "selector" in sub && "id" in sub;
+
+    const remoteSubscriptions = subscriptions.filter(isRemoteSubscription);
+    const libSubscriptions = subscriptions.filter(
+      (s) => !isRemoteSubscription(s),
+    ) as { type: ConnectionLibEventType; callbacks: EventCallback[] }[];
+
+    const result: string[] = new Array(subscriptions.length);
+
+    if (remoteSubscriptions.length) {
+      if (!this.connectionApi) {
+        throw new Error(
+          "Connection API not provided. Cannot subscribe for remote connection events.",
+        );
+      }
+      const channels = await Promise.all(
+        remoteSubscriptions.map((s) =>
+          this.connectionApi!.buildSubscriptionQuery(
+            s.type,
+            s.selector,
+            s.id,
+          ),
+        ),
+      );
+      const remoteIds = await (async () => {
+        this.useConnectionApi = true;
+        try {
+          return await this.prepareSubscription(
+            channels,
+            remoteSubscriptions,
+          );
+        } finally {
+          this.useConnectionApi = false;
+        }
+      })();
+      remoteIds.forEach((id) => this.remoteSubscriptionIds.add(id));
+
+      let cursor = 0;
+      subscriptions.forEach((sub, idx) => {
+        if (isRemoteSubscription(sub)) {
+          result[idx] = remoteIds[cursor++];
+        }
+      });
+    }
+
+    if (libSubscriptions.length) {
+      const libChannels = libSubscriptions.map(
+        (x) => `${this.connectionId}/${ConnectionLibChannels[x.type]}`,
+      );
+      const libIds = await this.prepareSubscription(
+        libChannels,
+        libSubscriptions,
+      );
+
+      let cursor = 0;
+      subscriptions.forEach((sub, idx) => {
+        if (!isRemoteSubscription(sub)) {
+          result[idx] = libIds[cursor++];
+        }
+      });
+    }
+
+    return result;
   }
 }
