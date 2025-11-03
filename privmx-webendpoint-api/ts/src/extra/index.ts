@@ -11,7 +11,8 @@ export {EventManager} from "./events"
 export {
   createInboxSubscription,
   createThreadSubscription,
-  createConnectionSubscription,
+  createConnectionLibSubscription,
+  createUserEventSubscription,
   createKvdbSubscription,
   createStoreSubscription,
   createEventSubscription,

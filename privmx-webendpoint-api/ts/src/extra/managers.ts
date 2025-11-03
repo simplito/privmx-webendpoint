@@ -1,13 +1,14 @@
 import { Types } from "..";
 import {
   ConnectionLibEventType,
+  ConnectionLibSubscription,
   EventCallback,
-  SubscriberForConnectionEvents,
   SubscriberForEvents,
   SubscriberForInboxEvents,
   SubscriberForKvdbEvents,
   SubscriberForStoreEvents,
   SubscriberForThreadsEvents,
+  SubscriberForUserEvents,
   Subscription,
 } from "./subscriptions";
 
@@ -121,17 +122,22 @@ export abstract class BaseEventDispatcherManager {
   }
 
   async unsubscribeFrom(subscriptionsId: string[]) {
+    const knownIds: string[] = [];
     for (const subscriptionId of subscriptionsId) {
       for (const [
         key,
         callbackSubscription,
       ] of this._listenersSymbols.entries()) {
         if (callbackSubscription === subscriptionId) {
+          knownIds.push(subscriptionId);
           this.unregisterCallback(key);
         }
       }
     }
-    return this.apiUnsubscribeFrom(subscriptionsId);
+    if (knownIds.length === 0) {
+      return Promise.resolve();
+    }
+    return this.apiUnsubscribeFrom(knownIds);
   }
 }
 
@@ -278,122 +284,54 @@ export const ConnectionChannels: Record<ConnectionLibEventType, string> = {
 };
 
 export class ConnectionEventsManager extends BaseEventDispatcherManager {
-  private useConnectionApi = false;
-  private remoteSubscriptionIds = new Set<string>();
-
-  constructor(
-    private connectionId: string,
-    private connectionApi?: SubscriberForConnectionEvents,
-  ) {
+  constructor(private connectionId: string) {
     super();
   }
 
   protected override apiSubscribeFor(channels: string[]) {
-    if (this.useConnectionApi) {
-      if (!this.connectionApi) {
-        return Promise.reject(
-          new Error("Connection API not available for remote subscriptions."),
-        );
-      }
-      return this.connectionApi.subscribeFor(channels);
-    }
     return Promise.resolve(channels);
   }
 
-  protected override async apiUnsubscribeFrom(subscriptionIds: string[]) {
-    if (this.connectionApi) {
-      const remoteIds = subscriptionIds.filter((id) =>
-        this.remoteSubscriptionIds.has(id),
-      );
-      if (remoteIds.length) {
-        await this.connectionApi.unsubscribeFrom(remoteIds);
-        remoteIds.forEach((id) => this.remoteSubscriptionIds.delete(id));
-      }
-    }
+  protected override apiUnsubscribeFrom(): Promise<void> {
     return Promise.resolve();
   }
 
+  async subscribeFor(subscriptions: ConnectionLibSubscription[]) {
+    const subscriptionChannels = subscriptions.map((x) => {
+      return `${this.connectionId}/${ConnectionChannels[x.type]}`;
+    });
+    return this.prepareSubscription(subscriptionChannels, subscriptions);
+  }
+}
+
+export class UserEventsManager extends BaseEventDispatcherManager {
+  constructor(private userEventsApi: SubscriberForUserEvents) {
+    super();
+  }
+
+  protected override apiSubscribeFor(channels: string[]) {
+    return this.userEventsApi.subscribeFor(channels);
+  }
+  protected override apiUnsubscribeFrom(subscriptionId: string[]) {
+    return this.userEventsApi.unsubscribeFrom(subscriptionId);
+  }
+
   async subscribeFor(
-    subscriptions: (
-      | Subscription<
-          Types.ConnectionEventType,
-          Types.ConnectionEventSelectorType
-        >
-      | { type: ConnectionLibEventType; callbacks: EventCallback[] }
-    )[],
-  ) {
-    const isRemoteSubscription = (
-      sub:
-        | Subscription<
-            Types.ConnectionEventType,
-            Types.ConnectionEventSelectorType
-          >
-        | { type: ConnectionLibEventType; callbacks: EventCallback[] },
-    ): sub is Subscription<
+    subscriptions: Subscription<
       Types.ConnectionEventType,
       Types.ConnectionEventSelectorType
-    > => "selector" in sub && "id" in sub;
-
-    const remoteSubscriptions = subscriptions.filter(isRemoteSubscription);
-    const libSubscriptions = subscriptions.filter(
-      (s) => !isRemoteSubscription(s),
-    ) as { type: ConnectionLibEventType; callbacks: EventCallback[] }[];
-
-    const result: string[] = new Array(subscriptions.length);
-
-    if (remoteSubscriptions.length) {
-      if (!this.connectionApi) {
-        throw new Error(
-          "Connection API not provided. Cannot subscribe for remote connection events.",
+    >[],
+  ) {
+    const subscriptionChannels = await Promise.all(
+      subscriptions.map((s) => {
+        return this.userEventsApi.buildSubscriptionQuery(
+          s.type,
+          s.selector,
+          s.id,
         );
-      }
-      const channels = await Promise.all(
-        remoteSubscriptions.map((s) =>
-          this.connectionApi!.buildSubscriptionQuery(
-            s.type,
-            s.selector,
-            s.id,
-          ),
-        ),
-      );
-      const remoteIds = await (async () => {
-        this.useConnectionApi = true;
-        try {
-          return await this.prepareSubscription(
-            channels,
-            remoteSubscriptions,
-          );
-        } finally {
-          this.useConnectionApi = false;
-        }
-      })();
-      remoteIds.forEach((id) => this.remoteSubscriptionIds.add(id));
+      }),
+    );
 
-      let cursor = 0;
-      subscriptions.forEach((sub, idx) => {
-        if (isRemoteSubscription(sub)) {
-          result[idx] = remoteIds[cursor++];
-        }
-      });
-    }
-
-    if (libSubscriptions.length) {
-      const libChannels = libSubscriptions.map(
-        (x) => `${this.connectionId}/${ConnectionChannels[x.type]}`,
-      );
-      const libIds = await this.prepareSubscription(
-        libChannels,
-        libSubscriptions,
-      );
-
-      let cursor = 0;
-      subscriptions.forEach((sub, idx) => {
-        if (!isRemoteSubscription(sub)) {
-          result[idx] = libIds[cursor++];
-        }
-      });
-    }
-
-    return result;
+    return this.prepareSubscription(subscriptionChannels, subscriptions);
   }
 }

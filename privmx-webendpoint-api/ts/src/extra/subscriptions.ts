@@ -73,7 +73,7 @@ export type KvdbCallbackPayload = {
     [Types.KvdbEventType.COLLECTION_CHANGE]: Types.CollectionChangedEventData;
 };
 
-export type ConnectionCallbackPayload = {
+export type UserEventCallbackPayload = {
     [Types.ConnectionEventType.USER_ADD]: Types.ContextUserEventData;
     [Types.ConnectionEventType.USER_REMOVE]: Types.ContextUserEventData;
     [Types.ConnectionEventType.USER_STATUS]: Types.ContextUsersStatusChangedEventData;
@@ -183,23 +183,30 @@ export enum ConnectionLibEventType {
     LIB_CONNECTED = 2,
 }
 
-export function createConnectionSubscription<
+export type ConnectionLibSubscription = {
+    type: ConnectionLibEventType;
+    callbacks: EventCallback[];
+};
+
+export function createConnectionLibSubscription(s: {
+    type: ConnectionLibEventType;
+    callbacks: ((arg: GenericEvent<undefined>) => void)[];
+}): ConnectionLibSubscription {
+    return {
+        ...s,
+        callbacks: s.callbacks.map(toEventCallback),
+    };
+}
+
+export function createUserEventSubscription<
     T extends Types.ConnectionEventType,
     S extends Types.ConnectionEventSelectorType
 >(s: {
     type: T;
     selector: S;
     id: string;
-    callbacks: ((arg: GenericEvent<ConnectionCallbackPayload[T]>) => void)[];
-}): Subscription<T, S>;
-export function createConnectionSubscription(s: {
-    type: ConnectionLibEventType;
-    callbacks: ((arg: GenericEvent<undefined>) => void)[];
-}): {
-    type: ConnectionLibEventType;
-    callbacks: EventCallback[];
-};
-export function createConnectionSubscription(s: any) {
+    callbacks: ((arg: GenericEvent<UserEventCallbackPayload[T]>) => void)[];
+}): Subscription<T, S> {
     return {
         ...s,
         callbacks: s.callbacks.map(toEventCallback),
@@ -245,7 +252,7 @@ export type SubscriberForKvdbEvents = EventSubscriber<
     Types.KvdbEventType,
     Types.KvdbEventSelectorType
 >;
-export type SubscriberForConnectionEvents = EventSubscriber<
+export type SubscriberForUserEvents = EventSubscriber<
     Types.ConnectionEventType,
     Types.ConnectionEventSelectorType
 >;

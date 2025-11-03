@@ -11,7 +11,7 @@ import {
 } from '../service';
 
 import { PublicConnection } from './PublicConnection';
-import {ConnectionEventsManager, CustomEventsManager, InboxEventsManager, StoreEventsManager, ThreadEventsManager} from "./managers";
+import {ConnectionEventsManager, CustomEventsManager, InboxEventsManager, StoreEventsManager, ThreadEventsManager, UserEventsManager} from "./managers";
 import {EventManager} from "./events";
 
 /**
@@ -53,6 +53,7 @@ export class PrivmxClient {
 
   private connectionEventManager: Promise<ConnectionEventsManager> | null =
     null;
+  private userEventManager: Promise<UserEventsManager> | null = null;
   private threadEventManager: Promise<ThreadEventsManager> | null = null;
   private storeEventManager: Promise<StoreEventsManager> | null = null;
   private inboxEventManager: Promise<InboxEventsManager> | null = null;
@@ -287,13 +288,27 @@ export class PrivmxClient {
       const eventManager = await PrivmxClient.getEventManager();
       const connection = this.getConnection();
       const connectionId = await connection.getConnectionId();
-      return eventManager.getConnectionEventManager(
-        connection,
-        `${connectionId}`,
-      );
+      return eventManager.getConnectionEventManager(`${connectionId}`);
     })();
 
     return this.connectionEventManager;
+  }
+
+  /**
+   * @description Gets the User Event Manager.
+   * @returns {Promise<UserEventsManager>}
+   */
+  public async getUserEventManager(): Promise<UserEventsManager> {
+    if (this.userEventManager) {
+      return this.userEventManager;
+    }
+
+    this.userEventManager = (async () => {
+      const eventManager = await PrivmxClient.getEventManager();
+      return eventManager.getUserEventManager(this.getConnection());
+    })();
+
+    return this.userEventManager;
   }
 
   /**
@@ -376,6 +391,7 @@ export class PrivmxClient {
       this.inboxApi = null;
       this.connectionEventManager = null;
       this.customEventsManager = null;
+      this.userEventManager = null;
       this.threadEventManager = null;
       this.storeEventManager = null;
       this.inboxEventManager = null;
