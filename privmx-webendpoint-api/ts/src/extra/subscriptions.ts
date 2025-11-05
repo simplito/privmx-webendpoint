@@ -177,21 +177,21 @@ export function createEventSubscription(
         channel: s.channel,
     };
 }
-export enum ConnectionLibEventType {
+export enum ConnectionEventType {
     LIB_DISCONNECTED = 0,
     LIB_PLATFORM_DISCONNECTED = 1,
     LIB_CONNECTED = 2,
 }
 
-export type ConnectionLibSubscription = {
-    type: ConnectionLibEventType;
+export type ConnectionSubscription = {
+    type: ConnectionEventType;
     callbacks: EventCallback[];
 };
 
-export function createConnectionLibSubscription(s: {
-    type: ConnectionLibEventType;
+export function createConnectionSubscription(s: {
+    type: ConnectionEventType;
     callbacks: ((arg: GenericEvent<undefined>) => void)[];
-}): ConnectionLibSubscription {
+}): ConnectionSubscription {
     return {
         ...s,
         callbacks: s.callbacks.map(toEventCallback),

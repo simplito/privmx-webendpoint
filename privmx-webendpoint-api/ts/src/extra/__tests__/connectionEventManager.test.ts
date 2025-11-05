@@ -2,8 +2,8 @@ import { MOCK_LIB_CONNECTED_EVENT } from "../__mocks__/constants";
 import { createTestSetup, waitForNextTick } from "../__mocks__/utils";
 import { ConnectionEventsManager } from "../managers";
 import {
-  ConnectionLibEventType,
-  createConnectionLibSubscription,
+  ConnectionEventType,
+  createConnectionSubscription,
 } from "../subscriptions";
 
 describe("Connection event manager", () => {
@@ -20,8 +20,8 @@ describe("Connection event manager", () => {
   it("supports legacy lib connection events", async () => {
     const callback = jest.fn();
 
-    const libSubscription = createConnectionLibSubscription({
-      type: ConnectionLibEventType.LIB_CONNECTED,
+    const libSubscription = createConnectionSubscription({
+      type: ConnectionEventType.LIB_CONNECTED,
       callbacks: [callback],
     });
 

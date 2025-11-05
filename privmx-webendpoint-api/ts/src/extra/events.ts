@@ -1,6 +1,6 @@
 import {Types} from "..";
 import {
-    ConnectionLibEventType,
+    ConnectionEventType,
     SubscriberForInboxEvents,
     SubscriberForUserEvents,
     SubscriberForEvents,
@@ -22,11 +22,11 @@ import {
 function normalizeConnectionEvent(e: Types.Event): Types.Event {
     switch (e.type) {
         case 'libDisconnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionLibEventType.LIB_DISCONNECTED]}`]}
+            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionEventType.LIB_DISCONNECTED]}`]}
         case 'libPlatformDisconnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionLibEventType.LIB_PLATFORM_DISCONNECTED]}`]}
+            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionEventType.LIB_PLATFORM_DISCONNECTED]}`]}
         case 'libConnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionLibEventType.LIB_CONNECTED]}`]}
+            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionEventType.LIB_CONNECTED]}`]}
         default:
             return e
     }

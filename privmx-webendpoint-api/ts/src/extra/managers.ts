@@ -1,7 +1,7 @@
 import { Types } from "..";
 import {
-  ConnectionLibEventType,
-  ConnectionLibSubscription,
+  ConnectionEventType,
+  ConnectionSubscription,
   EventCallback,
   SubscriberForEvents,
   SubscriberForInboxEvents,
@@ -276,10 +276,10 @@ export class CustomEventsManager extends BaseEventDispatcherManager {
   }
 }
 
-export const ConnectionChannels: Record<ConnectionLibEventType, string> = {
-  [ConnectionLibEventType.LIB_CONNECTED]: "channel/lib_connected",
-  [ConnectionLibEventType.LIB_DISCONNECTED]: "channel/lib_disconnected",
-  [ConnectionLibEventType.LIB_PLATFORM_DISCONNECTED]:
+export const ConnectionChannels: Record<ConnectionEventType, string> = {
+  [ConnectionEventType.LIB_CONNECTED]: "channel/lib_connected",
+  [ConnectionEventType.LIB_DISCONNECTED]: "channel/lib_disconnected",
+  [ConnectionEventType.LIB_PLATFORM_DISCONNECTED]:
     "channel/lib_platform_disconnected",
 };
 
@@ -296,7 +296,7 @@ export class ConnectionEventsManager extends BaseEventDispatcherManager {
     return Promise.resolve();
   }
 
-  async subscribeFor(subscriptions: ConnectionLibSubscription[]) {
+  async subscribeFor(subscriptions: ConnectionSubscription[]) {
     const subscriptionChannels = subscriptions.map((x) => {
       return `${this.connectionId}/${ConnectionChannels[x.type]}`;
     });
