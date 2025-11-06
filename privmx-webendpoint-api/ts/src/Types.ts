@@ -149,7 +149,7 @@ import { ExtKey } from "./service/ExtKey";
      */
     export interface UserWithAction {
         user: UserWithPubKey;
-        action: string;
+        action: 'login' | 'logout';
     };
 
     /**

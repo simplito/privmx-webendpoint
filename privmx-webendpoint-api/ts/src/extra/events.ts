@@ -105,7 +105,7 @@ export class EventManager {
         return manager;
     }
 
-    getCustomEventManager(eventApi: SubscriberForEvents) {
+    getCustomEventsManager(eventApi: SubscriberForEvents) {
         const manager = new CustomEventsManager(eventApi);
         this.registerDispatcher(manager);
         return manager;
@@ -117,7 +117,7 @@ export class EventManager {
         return manager;
     }
 
-    getUserEventManager(connectionApi: SubscriberForUserEvents) {
+    getUserEventsManager(connectionApi: SubscriberForUserEvents) {
         const manager = new UserEventsManager(connectionApi);
         this.registerDispatcher(manager);
         return manager;

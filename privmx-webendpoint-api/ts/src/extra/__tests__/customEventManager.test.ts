@@ -8,7 +8,7 @@ import { createEventSubscription } from "../subscriptions";
 
 describe("Custom event manager", () => {
   let { q, manager } = createTestSetup();
-  let customEventsManager = manager.getCustomEventManager(
+  let customEventsManager = manager.getCustomEventsManager(
     new MockContainerSubscriber<string, Types.EventsEventSelectorType>(q),
   );
 
@@ -16,7 +16,7 @@ describe("Custom event manager", () => {
     let { q: _q, manager: _manager } = createTestSetup();
     q = _q;
     manager = _manager;
-    customEventsManager = _manager.getCustomEventManager(
+    customEventsManager = _manager.getCustomEventsManager(
       new MockContainerSubscriber<string, Types.EventsEventSelectorType>(q),
     );
   });
@@ -33,7 +33,7 @@ describe("Custom event manager", () => {
         return `${channel}|${selectorId}`;
       });
 
-    const managerWithSpy = manager.getCustomEventManager(subscriber);
+    const managerWithSpy = manager.getCustomEventsManager(subscriber);
 
     const callback = jest.fn();
 

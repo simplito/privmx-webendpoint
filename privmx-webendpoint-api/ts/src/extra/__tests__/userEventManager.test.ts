@@ -16,7 +16,7 @@ describe("User event manager", () => {
     let { q: _q, manager: _manager } = createTestSetup();
     q = _q;
     manager = _manager;
-    userEventsManager = manager.getUserEventManager(
+    userEventsManager = manager.getUserEventsManager(
       new MockContainerSubscriber<
         Types.ConnectionEventType,
         Types.ConnectionEventSelectorType

@@ -298,14 +298,14 @@ export class PrivmxClient {
    * @description Gets the User Event Manager.
    * @returns {Promise<UserEventsManager>}
    */
-  public async getUserEventManager(): Promise<UserEventsManager> {
+  public async getUserEventsManager(): Promise<UserEventsManager> {
     if (this.userEventManager) {
       return this.userEventManager;
     }
 
     this.userEventManager = (async () => {
       const eventManager = await PrivmxClient.getEventManager();
-      return eventManager.getUserEventManager(this.getConnection());
+      return eventManager.getUserEventsManager(this.getConnection());
     })();
 
     return this.userEventManager;
@@ -373,7 +373,7 @@ export class PrivmxClient {
 
     this.customEventsManager = (async () => {
       const eventManager = await PrivmxClient.getEventManager();
-      return eventManager.getCustomEventManager(await this.getEventApi());
+      return eventManager.getCustomEventsManager(await this.getEventApi());
     })();
 
     return this.customEventsManager;
