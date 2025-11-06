@@ -5,7 +5,7 @@ export class App {
 
     async testApi() {
         const bridgeUrl = "http://localhost:9111";
-        const solutionId = "924d3b49-5206-43ab-a1cc-7539e0b9977d";
+        const solutionId = "8c5bfd97-1cce-4975-a4f2-134235ea0401";
     
         const userPubKey = "51WPnnGwztNPWUDEbhncYDxZCZWAFS4M9Yqv94N2335nL92fEn";
         const userPrivKey = "L3ycXibEzJm9t9swoJ4KtSmJsenHmmgRnYY79Q2TqfJMwTGaWfA7";
@@ -31,11 +31,159 @@ export class App {
         // get available threads
         const threads = await threadsApi.listThreads(contextId, defaultPaging);
         console.log("threads...", threads);
-        const threadId = threads.readItems[0].threadId;
+
+        
+        const threadId =  await (async () => {
+            if (threads.readItems.length > 0) {
+                return threads.readItems[0].threadId;
+            }
+            return await threadsApi.createThread(contextId, [{pubKey: userPubKey, userId: userId}], [{pubKey: userPubKey, userId: userId}], new Uint8Array(), new Uint8Array());
+        })()
 
         // subscribe for events in the selected thread and send a sample message to that thread
-        await threadsApi.subscribeForMessageEvents(threadId);
+        // await threadsApi.subscribeForMessageEvents(threadId);
         await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );
+          await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
+            this.strToUint8("some public meta-data"), 
+            this.strToUint8("some private meta-data"), 
+            this.strToUint8("message_" + String(Math.random()))
+        );  await threadsApi.sendMessage(threadId, 
             this.strToUint8("some public meta-data"), 
             this.strToUint8("some private meta-data"), 
             this.strToUint8("message_" + String(Math.random()))
