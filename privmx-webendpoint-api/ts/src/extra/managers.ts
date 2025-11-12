@@ -1,11 +1,14 @@
 import { Types } from "..";
 import {
   ConnectionEventType,
+  ConnectionSubscription,
   EventCallback,
+  SubscriberForEvents,
   SubscriberForInboxEvents,
   SubscriberForKvdbEvents,
   SubscriberForStoreEvents,
   SubscriberForThreadsEvents,
+  SubscriberForUserEvents,
   Subscription,
 } from "./subscriptions";
 
@@ -50,7 +53,11 @@ export type Channel =
   | `store/${string}/files`
   | "thread"
   | `thread/${string}/messages`
-  | `connection/${string}`;
+  | `connection/${string}`
+  | "context/userAdded"
+  | "context/userRemoved"
+  | "context/userStatus"
+  | `context/${string}/${string}`;
 
 export interface GenericEvent<K> extends Types.Event {
   /**
@@ -72,9 +79,10 @@ export abstract class BaseEventDispatcherManager {
   protected abstract apiUnsubscribeFrom(strings: string[]): Promise<void>;
 
   dispatchEvent(event: Types.Event) {
-    const callbacks = event.subscriptions.flatMap((s) =>
-      this._listeners.get(s),
-    );
+    const callbacks = event.subscriptions.flatMap((s) => {
+      const listeners = this._listeners.get(s);
+      return listeners ?? [];
+    });
     for (const listener of callbacks) {
       listener.callback(event);
     }
@@ -114,17 +122,22 @@ export abstract class BaseEventDispatcherManager {
   }
 
   async unsubscribeFrom(subscriptionsId: string[]) {
+    const knownIds: string[] = [];
     for (const subscriptionId of subscriptionsId) {
       for (const [
         key,
         callbackSubscription,
       ] of this._listenersSymbols.entries()) {
         if (callbackSubscription === subscriptionId) {
+          knownIds.push(subscriptionId);
           this.unregisterCallback(key);
         }
       }
     }
-    return this.apiUnsubscribeFrom(subscriptionsId);
+    if (knownIds.length === 0) {
+      return Promise.resolve();
+    }
+    return this.apiUnsubscribeFrom(knownIds);
   }
 }
 
@@ -239,7 +252,31 @@ export class KvdbEventsManager extends BaseEventDispatcherManager {
   }
 }
 
-export const ConnectionChannels = {
+export class CustomEventsManager extends BaseEventDispatcherManager {
+  constructor(private eventsApi: SubscriberForEvents) {
+    super();
+  }
+
+  protected override apiSubscribeFor(channels: string[]) {
+    return this.eventsApi.subscribeFor(channels);
+  }
+  protected override apiUnsubscribeFrom(subscriptionId: string[]) {
+    return this.eventsApi.unsubscribeFrom(subscriptionId);
+  }
+
+  async subscribeFor(
+    subscriptions: Subscription<string, Types.EventsEventSelectorType>[],
+  ) {
+    const subscriptionChannels = await Promise.all(
+      subscriptions.map((s) => {
+        return this.eventsApi.buildSubscriptionQuery(s.type, s.selector, s.id);
+      }),
+    );
+    return this.prepareSubscription(subscriptionChannels, subscriptions);
+  }
+}
+
+export const ConnectionChannels: Record<ConnectionEventType, string> = {
   [ConnectionEventType.LIB_CONNECTED]: "channel/lib_connected",
   [ConnectionEventType.LIB_DISCONNECTED]: "channel/lib_disconnected",
   [ConnectionEventType.LIB_PLATFORM_DISCONNECTED]:
@@ -255,16 +292,46 @@ export class ConnectionEventsManager extends BaseEventDispatcherManager {
     return Promise.resolve(channels);
   }
 
-  protected override apiUnsubscribeFrom() {
+  protected override apiUnsubscribeFrom(): Promise<void> {
     return Promise.resolve();
   }
 
-  async subscribeFor(
-    subscriptions: { type: ConnectionEventType; callbacks: EventCallback[] }[],
-  ) {
+  async subscribeFor(subscriptions: ConnectionSubscription[]) {
     const subscriptionChannels = subscriptions.map((x) => {
-      return `${this.connectionId}/${ConnectionEventType[x.type]}`;
+      return `${this.connectionId}/${ConnectionChannels[x.type]}`;
     });
+    return this.prepareSubscription(subscriptionChannels, subscriptions);
+  }
+}
+
+export class UserEventsManager extends BaseEventDispatcherManager {
+  constructor(private userEventsApi: SubscriberForUserEvents) {
+    super();
+  }
+
+  protected override apiSubscribeFor(channels: string[]) {
+    return this.userEventsApi.subscribeFor(channels);
+  }
+  protected override apiUnsubscribeFrom(subscriptionId: string[]) {
+    return this.userEventsApi.unsubscribeFrom(subscriptionId);
+  }
+
+  async subscribeFor(
+    subscriptions: Subscription<
+      Types.ConnectionEventType,
+      Types.ConnectionEventSelectorType
+    >[],
+  ) {
+    const subscriptionChannels = await Promise.all(
+      subscriptions.map((s) => {
+        return this.userEventsApi.buildSubscriptionQuery(
+          s.type,
+          s.selector,
+          s.id,
+        );
+      }),
+    );
+
     return this.prepareSubscription(subscriptionChannels, subscriptions);
   }
 }

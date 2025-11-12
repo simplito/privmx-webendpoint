@@ -12,10 +12,14 @@ export {
   createInboxSubscription,
   createThreadSubscription,
   createConnectionSubscription,
+  createUserEventSubscription,
   createKvdbSubscription,
   createStoreSubscription,
+  createEventSubscription,
   EventCallback,
-  Subscription
+  Subscription,
+  ConnectionEventType,
+  ConnectionSubscription,
 } from "./subscriptions"
 
 export {

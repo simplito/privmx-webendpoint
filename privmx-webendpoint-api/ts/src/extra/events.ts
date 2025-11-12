@@ -2,6 +2,8 @@ import {Types} from "..";
 import {
     ConnectionEventType,
     SubscriberForInboxEvents,
+    SubscriberForUserEvents,
+    SubscriberForEvents,
     SubscriberForKvdbEvents,
     SubscriberForStoreEvents,
     SubscriberForThreadsEvents
@@ -9,9 +11,11 @@ import {
 import {
     BaseEventDispatcherManager, ConnectionChannels,
     ConnectionEventsManager,
+    CustomEventsManager,
     InboxEventsManager, KvdbEventsManager,
     StoreEventsManager,
-    ThreadEventsManager
+    ThreadEventsManager,
+    UserEventsManager
 } from "./managers";
 
 
@@ -101,8 +105,20 @@ export class EventManager {
         return manager;
     }
 
+    getCustomEventsManager(eventApi: SubscriberForEvents) {
+        const manager = new CustomEventsManager(eventApi);
+        this.registerDispatcher(manager);
+        return manager;
+    }
+
     getConnectionEventManager(connectionId: string) {
         const manager = new ConnectionEventsManager(connectionId);
+        this.registerDispatcher(manager);
+        return manager;
+    }
+
+    getUserEventsManager(connectionApi: SubscriberForUserEvents) {
+        const manager = new UserEventsManager(connectionApi);
         this.registerDispatcher(manager);
         return manager;
     }
