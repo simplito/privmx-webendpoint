@@ -16,8 +16,8 @@ limitations under the License.
 #include <privmx/endpoint/core/Exception.hpp>
 
 #include "Mapper.hpp"
+#include "WorkerPool.hpp"
 
-// C++17 standard library includes for the worker pool
 #include <queue>
 #include <vector>
 #include <thread>
@@ -25,99 +25,21 @@ limitations under the License.
 #include <condition_variable>
 #include <functional>
 #include <atomic>
-#include <memory> // For std::unique_ptr and std::make_unique
+#include <memory>
 
 using namespace privmx::webendpoint;
 
 namespace privmx {
-namespace webendpoint {
-namespace { // Anonymous namespace
-
-EM_JS(void, pushToJsCallbackQueue,(emscripten::EM_VAL callbackHandle, emscripten::EM_VAL valueHandle), {
-    const callback = Emval.toValue(callbackHandle);
-    const value = Emval.toValue(valueHandle);
-    setTimeout(()=>callback(value), 0);
-});
-
-class WorkerPool {
-public:
-    explicit WorkerPool(size_t numThreads)
-        : stop(false) {
-        for (size_t i = 0; i < numThreads; ++i) {
-            workers.emplace_back([this] {
-                this->worker_loop();
-            });
-        }
-    }
-
-    ~WorkerPool() {
-        {
-            std::unique_lock<std::mutex> lock(queue_mutex);
-            stop = true;
-        }
-
-        condition.notify_all();
-
-        for (std::thread &worker : workers) {
-            if (worker.joinable()) {
-                worker.join();
-            }
-        }
-    }
-
-    WorkerPool(const WorkerPool&) = delete;
-    WorkerPool& operator=(const WorkerPool&) = delete;
-    WorkerPool(WorkerPool&&) = delete;
-    WorkerPool& operator=(WorkerPool&&) = delete;
-
-    void enqueue(std::function<void()> task) {
-        {
-            std::unique_lock<std::mutex> lock(queue_mutex);
-            if (stop) {
-                return;
-            }            
-            tasks.emplace(std::move(task));
+    namespace webendpoint {
         
-        }
-        condition.notify_one();
+        EM_JS(void, pushToJsCallbackQueue,(emscripten::EM_VAL callbackHandle, emscripten::EM_VAL valueHandle), {
+            const callback = Emval.toValue(callbackHandle);
+            const value = Emval.toValue(valueHandle);
+            setTimeout(()=>callback(value), 0);
+        });
+        
     }
-
-private:
-    void worker_loop() {
-        while (true) {
-            std::function<void()> task;
-            {
-                std::unique_lock<std::mutex> lock(queue_mutex);
-                condition.wait(lock, [this] {
-                    return this->stop || !this->tasks.empty();
-                });
-                if (this->stop && this->tasks.empty()) {
-                    return;
-                }
-                task = std::move(tasks.front());
-                tasks.pop();
-
-            }
-            try {
-                task();
-            } catch (...) {
-                // This shouldn't be hit if the task handles its own exceptions,
-                // but it's safe to have.
-            }
-        }
-    }
-
-    std::vector<std::thread> workers;
-    std::queue<std::function<void()>> tasks;
-
-    std::mutex queue_mutex;
-    std::condition_variable condition;
-    std::atomic<bool> stop;
-};
-
-} // anonymous namespace
-} // namespace webendpoint
-} // namespace privmx
+}
 
 
 ProxyedTaskRunner* ProxyedTaskRunner::_instance = nullptr;
