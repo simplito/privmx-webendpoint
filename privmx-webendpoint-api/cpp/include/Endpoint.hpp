@@ -187,6 +187,7 @@ namespace api {
     API_FUNCTION_HEADER(StreamApi, listStreamRooms)
     API_FUNCTION_HEADER(StreamApi, createStream)
     API_FUNCTION_HEADER(StreamApi, publishStream)
+    API_FUNCTION_HEADER(StreamApi, updateStream)
     API_FUNCTION_HEADER(StreamApi, unpublishStream)
     API_FUNCTION_HEADER(StreamApi, joinStreamRoom)
     API_FUNCTION_HEADER(StreamApi, listStreams)

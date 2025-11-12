@@ -5,7 +5,7 @@ import { WebRtcClient } from "../webStreams/WebRtcClient";
 import { DataChannelMeta, StreamCreateMeta, StreamId } from "../webStreams/types/ApiTypes";
 import { BaseApi } from "./BaseApi";
 // import { StreamApiNative } from "../api/StreamApiNative";
-import { ContainerPolicy, PagingList, PagingQuery, Stream, StreamEventSelectorType, StreamEventType, StreamRoom, UserWithPubKey, StreamSettings, StreamHandle, StreamSubscription } from "../Types";
+import { ContainerPolicy, PagingList, PagingQuery, StreamInfo, StreamEventSelectorType, StreamEventType, StreamRoom, UserWithPubKey, StreamSettings, StreamHandle, StreamSubscription, StreamPublishResult } from "../Types";
 import { StreamApiNative } from "../api/StreamApiNative";
 
 
@@ -16,6 +16,8 @@ export interface StreamTrack {
     streamHandle: StreamHandle;
     track?: MediaStreamTrack;
     dataChannelMeta?: DataChannelMeta;
+    published: Boolean;
+    markedToRemove?: boolean;
 }
 
 export class StreamApi extends BaseApi {
@@ -83,41 +85,13 @@ export class StreamApi extends BaseApi {
         return handle;
     }
 
-    public async listStreams(streamRoomId: Types.StreamRoomId): Promise<Stream[]> {
+    public async listStreams(streamRoomId: Types.StreamRoomId): Promise<StreamInfo[]> {
         const remoteStreams = await this.native.listStreams(this.servicePtr, [streamRoomId]);
         return remoteStreams;
 
     }
 
     public async addStreamTrack(streamHandle: StreamHandle, meta: Types.StreamTrackMeta): Promise<Types.StreamTrackId> {
-        //// orig
-        //// tutaj byly tez wysylane dane dataChannela na serwer aplikacyjny i tam trzymane w mapie
-
-        // const key = streamId.toString();
-        // if (! this.streams.has(key)) {
-        //     console.log("LOG: ", this.streams);
-        //     throw new Error("[addStreamTrack]: there is no Stream with given Id: "+key);
-        // }
-        // for (const [key, streamTrack] of this.streamTracks.entries()) {
-        //     if (streamTrack.track && streamTrack.track?.id === meta.track?.id) {
-        //         throw new Error("[addStreamTrack] StreamTrack with given browser's track already added.");
-        //     }
-        // }
-        // const stream = this.streams.get(key);
-        // if (! stream) {
-        //     throw new Error("Cannot find stream by id");
-        // }
-        
-        // const streamTrackId = Utils.getRandomString(8) as Types.StreamTrackId;
-        // const streamTrack: StreamTrack = {
-        //     id: streamTrackId,
-        //     streamId: streamId,
-        //     track: meta.track,
-        //     dataChannelMeta: meta.dataChannel
-        // };
-
-        // this.streamTracks.set(streamTrackId, streamTrack);
-
         // if (streamTrack.dataChannelMeta) {
         //     await this.client.provideSession();
         //     const request: StreamDataTrackAddRequest = {
@@ -148,36 +122,29 @@ export class StreamApi extends BaseApi {
             throw new Error("Cannot find stream by id");
         }
         
-        const streamTrackId = Utils.getRandomString(8) as Types.StreamTrackId;
+        const streamTrackId = Utils.getRandomString(16) as Types.StreamTrackId;
         const streamTrack: StreamTrack = {
             id: streamTrackId,
             streamHandle: streamHandle,
             track: meta.track,
-            dataChannelMeta: meta.dataChannel
+            dataChannelMeta: meta.dataChannel,
+            published: false
         };
-
         this.streamTracks.set(streamTrackId, streamTrack);
+        console.log("defined streamTracks", {tracks: this.streamTracks});
         return streamTrackId;
     }
 
-    public async removeStreamTrack(_streamTrackId: Types.StreamTrackId): Promise<void> {
-        // await this.client.provideSession();
-        // const track = Array.from(this.streamTracks.values()).find(x => x.id === streamTrackId);
-        // if (!track) {
-        //     throw new Error("There is no track with given id");
-        // }
-        // const streamKey = track?.streamId.toString();
-        // const streamEntry = this.streams.get(streamKey);
-        // if (! streamEntry) {
-        //     throw new Error("Cannot get local stream by given id");
-        // }
-
-        // await this.client.provideSession();
-        // return this.serverChannel.call<StreamsApi.StreamTrackRemoveRequest, void>({kind: "streams.streamTrackRemove", data: {
-        //     streamTrackId, streamRoomId: streamEntry.streamRoomId, streamId: streamEntry.streamId
-        // }});
-
-        throw new Error("not implemented");
+    public async removeStreamTrack(streamHandle: StreamHandle, meta: Types.StreamTrackMeta): Promise<void> {
+        if (! this.streams.has(streamHandle)) {
+            console.log("LOG: ", this.streams);
+            throw new Error("[removeStreamTrack]: there is no Stream with given Id: "+streamHandle);
+        }
+        for (const [key, streamTrack] of this.streamTracks.entries()) {
+            if (streamTrack.track && streamTrack.track?.id === meta.track?.id) {
+                streamTrack.markedToRemove = true;
+            }
+        }
     }
 
     public async streamTrackSendData(_streamTrackId: Types.StreamTrackId, _data: Buffer): Promise<void> {
@@ -206,20 +173,19 @@ export class StreamApi extends BaseApi {
                 throw new Error("not implemented");
     }
 
-    // PART DONE
-    public async publishStream(streamHandle: StreamHandle): Promise<void> {
+    public async publishStream(streamHandle: StreamHandle): Promise<StreamPublishResult> {
         // configure client
         const mediaTracks: MediaStreamTrack[] = [];
         for (const value of this.streamTracks.values()) {
-            if (value.streamHandle === streamHandle && value.track) {
+            if (value.streamHandle === streamHandle && value.track && !value.markedToRemove && value.published === false) {
                 mediaTracks.push(value.track);
+                value.published = true;
             }
         }
         const _stream = this.streams.get(streamHandle);
         if (!_stream) {
             throw new Error("No stream defined to publish");
         }
-
         // // natywna obsluga datachanneli
         // let dataChannelId = -1;
         // for (const value of this.streamTracks.values()) {
@@ -262,9 +228,74 @@ export class StreamApi extends BaseApi {
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
         await this.client.setTurnCredentials(turnCredentials);
         await this.client.createPeerConnectionWithLocalStream(_stream.streamRoomId, mediaStream);
-
-        return this.native.publishStream(this.servicePtr, [streamHandle]);
+        const res = await this.native.publishStream(this.servicePtr, [streamHandle]);
+        return res;
     }
+
+    public async updateStream(streamHandle: StreamHandle): Promise<StreamPublishResult> {
+        // configure client
+        const tracksToAdd: MediaStreamTrack[] = [];
+        const tracksToRemove: MediaStreamTrack[] = [];
+        for (const value of this.streamTracks.values()) {
+            if (value.streamHandle === streamHandle && value.track) {
+                if (!value.published && !value.markedToRemove) {
+                    tracksToAdd.push(value.track);
+                }
+                if (value.published && value.markedToRemove) {
+                    tracksToRemove.push(value.track);
+                }
+            }
+        }
+        const _stream = this.streams.get(streamHandle);
+        if (!_stream) {
+            throw new Error("No stream defined to publish");
+        }
+        // // natywna obsluga datachanneli
+        // let dataChannelId = -1;
+        // for (const value of this.streamTracks.values()) {
+        //     if (value.streamId === streamId && value.dataChannelMeta) {
+        //         const channel = peerConnection.createDataChannel(value.dataChannelMeta.name, {id: (++dataChannelId)});
+        //         console.log("CREATING AND SETTING UP data channel", value, channel);
+        //         this.dataChannels.set(value.id, channel);
+        //     }
+        // }
+
+        // await this.client.provideSession();
+        // console.log("-----> call streamPublish with new offer", offer);
+        // const joinResult = await this.serverChannel.call<StreamsApi.StreamPublishRequest, JoinedEvent>({kind: "streams.streamPublish", data: {
+        //     streamRoomId: _stream.streamRoomId,
+        //     streamId: streamId,
+        //     peerConnectionOffer: offer
+        // }});
+        // // update local streams info
+        // const streamUpdate = this.streams.get(key);
+        // if (streamUpdate) {
+        //     streamUpdate.remoteStreamInfo = {
+        //         id: joinResult.id as unknown as StreamId
+        //     }
+        //     this.streams.set(key, streamUpdate);    
+        // }
+
+
+        // createOfferAndSetLocalDescription... jest wolane przez kod C++ 
+        // const sdp = webRtcImpl.createOfferAndSetLocalDescription()
+
+        const newMediaStream = new MediaStream(tracksToAdd);
+        // tutaj createPeerConnectionWithLocalStream przypisuje w ostatnim kroku utworzone PeerConnection do this wiec nie trzeba go zwracac
+        // const turnCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
+        // console.log("peerCredentials: ", peerCredentials);
+        // const overrideUrl = "turn:webrtc1.s24.simplito.com:3478";
+        // const overridenCreds = peerCredentials.map(x => {
+        //     return {...x, url: overrideUrl}
+        // });
+        // console.log("override peerCredentials url with: ", overrideUrl);
+        const turnCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
+        await this.client.setTurnCredentials(turnCredentials);
+        await this.client.updatePeerConnectionWithLocalStream(_stream.streamRoomId, newMediaStream, tracksToRemove);
+        const res = await this.native.updateStream(this.servicePtr, [streamHandle]);
+        return res;
+    }
+
 
     // PART DONE
     public async unpublishStream(streamHandle: StreamHandle): Promise<void> {

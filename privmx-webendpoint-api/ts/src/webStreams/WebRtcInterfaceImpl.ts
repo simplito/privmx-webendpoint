@@ -136,7 +136,7 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     }
 
     async updateKeys(model: UpdateKeysModel) {
-        return this.getClient().updateKeys(model.keys);
+        return this.getClient().updateKeys(model.streamRoomId, model.keys);
     }
 
     async updateSessionId(streamRoomId: StreamRoomId, sessionId: number, connectionType: ConnectionType): Promise<void> {

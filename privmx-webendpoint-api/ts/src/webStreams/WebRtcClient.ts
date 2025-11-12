@@ -192,31 +192,84 @@ export class WebRtcClient {
         // this.receiverPeerConnection = this.createPeerConnectionMulti(this.configuration);
         console.log("=========> peerConnection multi created.", this.uniqId);
         if (stream.getTracks().length > 0) {
-            const [track] = stream.getTracks();
-            console.log("adding track to peerConnection...");
-            const videoSender = pc.addTrack(track, stream);
+            const tracks = stream.getTracks();
             this.e2eeWorker = await this.getWorker();
+
+            console.log("adding track to peerConnection...");
+            for (const track of tracks) {
+                const videoSender = pc.addTrack(track, stream);
+
+                if ((window as any).RTCRtpScriptTransform) {
+                    const options = {
+                        operation: 'encode',
+                    };
+                    console.log("======> set e2ee worker for frame encoding (RTCRtpScriptTransform).");
+                    (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
+                } else {
+
+                    const senderStreams = (videoSender as any).createEncodedStreams();
+                    console.log("post 'encode' frame to the e2ee worker..");
+                    this.e2eeWorker.postMessage({
+                        operation: 'encode',
+                        readableStream: senderStreams.readable,
+                        writableStream: senderStreams.writable,
+                    }, [ senderStreams.readable, senderStreams.writable ]);
+                }
+
+            }
+            
+            
     
             console.log("this.e2eeWorker", this.e2eeWorker);
 
-            if ((window as any).RTCRtpScriptTransform) {
-                const options = {
-                    operation: 'encode',
-                };
-                console.log("======> set e2ee worker for frame encoding (RTCRtpScriptTransform).");
-                (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
-            } else {
 
-                const senderStreams = (videoSender as any).createEncodedStreams();
-                console.log("post 'encode' frame to the e2ee worker..");
-                this.e2eeWorker.postMessage({
-                    operation: 'encode',
-                    readableStream: senderStreams.readable,
-                    writableStream: senderStreams.writable,
-                }, [ senderStreams.readable, senderStreams.writable ]);
-            }
     
             console.log("Transform streams added.")
+        }
+        return pc;
+    }
+
+    async updatePeerConnectionWithLocalStream(streamRoomId: StreamRoomId, newStream: MediaStream, tracksToRemove: MediaStreamTrack[]): Promise<RTCPeerConnection> {
+        this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
+        const peerConnManager = this.getConnectionManager();
+        peerConnManager.initialize(streamRoomId, "publisher");
+
+        const pc = this.getConnectionManager().getConnectionWithSession(streamRoomId, "publisher").pc;
+
+        if (newStream.getTracks().length > 0) {
+            const tracks = newStream.getTracks();
+            this.e2eeWorker = await this.getWorker();
+            
+            console.log("adding track to peerConnection...");
+            for (const track of tracks) {
+                const videoSender = pc.addTrack(track, newStream);
+
+                if ((window as any).RTCRtpScriptTransform) {
+                    const options = {
+                        operation: 'encode',
+                    };
+                    console.log("======> set e2ee worker for frame encoding (RTCRtpScriptTransform).");
+                    (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
+                } else {
+
+                    const senderStreams = (videoSender as any).createEncodedStreams();
+                    console.log("post 'encode' frame to the e2ee worker..");
+                    this.e2eeWorker.postMessage({
+                        operation: 'encode',
+                        readableStream: senderStreams.readable,
+                        writableStream: senderStreams.writable,
+                    }, [ senderStreams.readable, senderStreams.writable ]);
+                }
+            }
+
+            // remove marked tracks
+            const senders = pc.getSenders();
+            for (const oldTrack of tracksToRemove) {
+                const sender = senders.find(s => s.track === oldTrack);
+                if (sender) {
+                    pc.removeTrack(sender);
+                }
+            }
         }
         return pc;
     }
@@ -472,7 +525,7 @@ export class WebRtcClient {
         console.log("Message sent!");
     }
 
-    async updateKeys(keys: Key[]) {
+    async updateKeys(_streamRoomId: StreamRoomId, keys: Key[]) {
         this.keyStore.setKeys(keys);
 
         // propagate keys to the worker

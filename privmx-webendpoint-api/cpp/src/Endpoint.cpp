@@ -384,6 +384,7 @@ namespace api {
     API_FUNCTION(StreamApi, listStreamRooms)
     API_FUNCTION(StreamApi, createStream)
     API_FUNCTION(StreamApi, publishStream)
+    API_FUNCTION(StreamApi, updateStream)
     API_FUNCTION(StreamApi, unpublishStream)
     API_FUNCTION(StreamApi, joinStreamRoom)
     API_FUNCTION(StreamApi, listStreams)

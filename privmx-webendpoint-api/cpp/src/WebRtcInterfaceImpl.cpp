@@ -169,6 +169,7 @@ void WebRtcInterfaceImpl::updateKeys(const std::string& streamRoomId, const std:
             keyObj.set("type", mapToVal(key.type));    
             keysArrayVal.call<emscripten::val>("push", keyObj);
         }
+
         emscripten::val params = val::object();
         params.set("streamRoomId", streamRoomIdVal);
         params.set("keys", keysArrayVal);

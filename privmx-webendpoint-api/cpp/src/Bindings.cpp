@@ -180,6 +180,7 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(StreamApi, listStreamRooms)
     BINDING_FUNCTION(StreamApi, createStream)
     BINDING_FUNCTION(StreamApi, publishStream)
+    BINDING_FUNCTION(StreamApi, updateStream)
     BINDING_FUNCTION(StreamApi, unpublishStream)
     BINDING_FUNCTION(StreamApi, joinStreamRoom)
     BINDING_FUNCTION(StreamApi, listStreams)

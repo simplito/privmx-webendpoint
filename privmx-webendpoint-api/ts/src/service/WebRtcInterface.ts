@@ -3,6 +3,7 @@ import { ConnectionType } from "../webStreams/PeerConnectionsManager";
 import { StreamRoomId } from "../webStreams/types/ApiTypes";
 
 export class UpdateKeysModel {
+  streamRoomId: StreamRoomId;
   keys: Key[]; 
 }
 
