@@ -1,6 +1,6 @@
 import { Types } from "..";
 import {
-  ConnectionEventType,
+  ConnectionStatusEventType,
   ConnectionSubscription,
   EventCallback,
   SubscriberForEvents,
@@ -276,10 +276,10 @@ export class CustomEventsManager extends BaseEventDispatcherManager {
   }
 }
 
-export const ConnectionChannels: Record<ConnectionEventType, string> = {
-  [ConnectionEventType.LIB_CONNECTED]: "channel/lib_connected",
-  [ConnectionEventType.LIB_DISCONNECTED]: "channel/lib_disconnected",
-  [ConnectionEventType.LIB_PLATFORM_DISCONNECTED]:
+export const ConnectionChannels: Record<ConnectionStatusEventType, string> = {
+  [ConnectionStatusEventType.LIB_CONNECTED]: "channel/lib_connected",
+  [ConnectionStatusEventType.LIB_DISCONNECTED]: "channel/lib_disconnected",
+  [ConnectionStatusEventType.LIB_PLATFORM_DISCONNECTED]:
     "channel/lib_platform_disconnected",
 };
 
