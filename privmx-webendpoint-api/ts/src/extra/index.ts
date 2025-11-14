@@ -18,7 +18,7 @@ export {
   createEventSubscription,
   EventCallback,
   Subscription,
-  ConnectionEventType,
+  ConnectionStatusEventType,
   ConnectionSubscription,
 } from "./subscriptions"
 
