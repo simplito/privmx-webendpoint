@@ -58,7 +58,6 @@ export class Queue<T> implements Iterable<T> {
             } catch (err) {
                 console.error("Error while processing queue item", randId, err);
             }
-            console.log("Processing finished... randId:", randId);
         }
 
         this.processing = false;

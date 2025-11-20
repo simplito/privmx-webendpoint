@@ -47,6 +47,7 @@ export class WebRtcClient {
     private logger: Logger = Logger.get();
 
     private peerConnectionReconfigureQueue: Queue<QueueItem> | undefined;
+    public lastProcessedAnswer: {[roomId: string]: Jsep} = {};
     // private subscriberAttachedProcessing: boolean = false;
 
     constructor(private assetsDir: string) {
@@ -63,6 +64,7 @@ export class WebRtcClient {
         this.peerConnectionReconfigureQueue = new Queue<QueueItem>();
         this.peerConnectionReconfigureQueue.assignProcessorFunc(async(_item: QueueItem) => {
             // await this.reconfigure(_item);
+            await this.reconfigureSingle(_item._room, _item.offer);
         });
     }
 
@@ -446,7 +448,7 @@ export class WebRtcClient {
         });
         connection.addEventListener('negotiationneeded', async event => {
             this.logger.log("info", "negotiationneeded: ", event);
-            await this.startNegotiationMulti(connection);
+            // await this.startNegotiationMulti(connection);
         });
         connection.addEventListener('signalingstatechange', event => {
             this.logger.log("info", "signalingstatechange: ", event);
@@ -637,18 +639,19 @@ export class WebRtcClient {
     }
 
 
-    // public async onSubscriptionUpdated(_room: StreamRoomId, offer: any) {
+    // test
+    public async onSubscriptionUpdated(_room: StreamRoomId, offer: any) {
 
-    //     if (!this.peerConnectionReconfigureQueue) {
-    //         throw new Error("ReconfigureQueue does not exist.");
-    //     }
-    //     this.peerConnectionReconfigureQueue.enqueue({taskId: Math.floor(1 + Math.random() * 10000), _room, offer});
-    //     try {
-    //         await this.peerConnectionReconfigureQueue.processAll();
-    //     } catch (e) {
-    //         console.error("Error on onSubscriberAttached", e);
-    //     }
-    // }
+        if (!this.peerConnectionReconfigureQueue) {
+            throw new Error("ReconfigureQueue does not exist.");
+        }
+        this.peerConnectionReconfigureQueue.enqueue({taskId: Math.floor(1 + Math.random() * 10000), _room, offer});
+        try {
+            await this.peerConnectionReconfigureQueue.processAll();
+        } catch (e) {
+            console.error("Error on onSubscriberAttached", e);
+        }
+    }
 
     public async onSubscriptionUpdatedSingle(_room: StreamRoomId, offer: any) {
 
@@ -663,33 +666,6 @@ export class WebRtcClient {
         // }
         return this.reconfigureSingle(_room, offer);
     }
-
-    // private async reconfigure(item: QueueItem) {
-    //     this.subscriberAttachedProcessing = true;
-    //     console.group("Reconfiguring to recv streams of all publishers - task: ", item.taskId);
-
-    //     if (!this.configuration) {
-    //         throw new Error("Configuration missing.");
-    //     }
-    //     const janusConnection = this.getConnectionManager().getConnectionWithSession(item._room, "subscriber");
-    //     const peerConnection = janusConnection.pc;
-
-    //     this.logger.log("important-only", "1. Setting up remoteDescription...");
-    //     await peerConnection.setRemoteDescription(new RTCSessionDescription(item.offer));
-    //     this.logger.log("important-only", "offer from Janus: ", JSON.stringify(item.offer, null, 2));
-
-    //     this.logger.log("important-only", "2. Creating an answer...", "peerConnection state", peerConnection.connectionState);
-    //     const answer = await peerConnection.createAnswer();
-
-    //     this.logger.log("important-only", "3. Setting up localDescription...");
-    //     await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
-        
-    //     this.logger.log("important-only", "4. notifying Janus with answer...");
-    //     await this.streamsApiInterface.acceptOffer(janusConnection.sessionId, {type: answer.type, sdp: answer.sdp});
-    //     // await this.mediaServerChannel?.videoRoomAcceptOffer(item.sessionId, item.handle, answer);
-    //     console.groupEnd();
-    //     this.subscriberAttachedProcessing = false;
-    // }
 
     private async reconfigureSingle(room: StreamRoomId, offer: Jsep): Promise<Jsep> {
         // this.subscriberAttachedProcessing = true;
@@ -715,7 +691,8 @@ export class WebRtcClient {
         // await this.streamsApiInterface.acceptOffer(janusConnection.sessionId, {type: answer.type, sdp: answer.sdp});
         // await this.mediaServerChannel?.videoRoomAcceptOffer(item.sessionId, item.handle, answer);
         console.groupEnd();
-        // this.subscriberAttachedProcessing = false;
+        // this.subscriberAttachedProcessing = false
+                this.lastProcessedAnswer[room] = answer as Jsep;
         return answer as Jsep;
     }
 

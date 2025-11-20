@@ -107,8 +107,9 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         // const answer = await peerConnection.createAnswer();
         // await peerConnection.setLocalDescription(answer);
         const offer: Jsep = {sdp: model.sdp, type: model.type};
-        const answer = await this.getClient().onSubscriptionUpdatedSingle(model.roomId, offer);
-        return answer.sdp;
+        const answer = await this.getClient().onSubscriptionUpdated(model.roomId, offer);
+        // return answer.sdp;
+        return this.webRtcClient.lastProcessedAnswer[model.roomId].sdp;
     }
 
     async setAnswerAndSetRemoteDescription(model: SetAnswerAndSetRemoteDescriptionModel) {
