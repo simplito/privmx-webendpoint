@@ -409,6 +409,7 @@ export class PrivmxClient {
       this.threadEventManager = null;
       this.storeEventManager = null;
       this.inboxEventManager = null;
+      this.kvdbEventsManager = null;
     } catch (e) {
       console.error('Error during disconnection:', e);
     }
