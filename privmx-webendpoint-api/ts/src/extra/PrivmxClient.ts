@@ -11,7 +11,7 @@ import {
 } from '../service';
 
 import { PublicConnection } from './PublicConnection';
-import {ConnectionEventsManager, CustomEventsManager, InboxEventsManager, StoreEventsManager, ThreadEventsManager, UserEventsManager} from "./managers";
+import {ConnectionEventsManager, CustomEventsManager, InboxEventsManager, KvdbEventsManager, StoreEventsManager, ThreadEventsManager, UserEventsManager} from "./managers";
 import {EventManager} from "./events";
 
 /**
@@ -58,6 +58,7 @@ export class PrivmxClient {
   private storeEventManager: Promise<StoreEventsManager> | null = null;
   private inboxEventManager: Promise<InboxEventsManager> | null = null;
   private customEventsManager: Promise<CustomEventsManager> | null = null;
+  private kvdbEventsManager: Promise<KvdbEventsManager> | null = null;
 
   /**
    * @constructor
@@ -377,6 +378,19 @@ export class PrivmxClient {
     })();
 
     return this.customEventsManager;
+  }
+
+  public async getKvdbEventsManager(): Promise<KvdbEventsManager> {
+    if (this.kvdbEventsManager){
+      return this.kvdbEventsManager
+    }
+
+    this.kvdbEventsManager = (async () => {
+      const eventManager = await PrivmxClient.getEventManager();
+      return eventManager.getKvdbEventManager(await this.getKvdbApi())
+    })();
+
+    return this.kvdbEventsManager;
   }
 
   /**
