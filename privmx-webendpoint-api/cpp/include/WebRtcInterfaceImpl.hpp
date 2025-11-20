@@ -61,7 +61,7 @@ private:
 
     // copy of verifier methods - to modify
     void printErrorInJS(const std::string& msg);
-    emscripten::val callWebRtcJSHandler(emscripten::EM_VAL name, emscripten::EM_VAL params);
+    emscripten::val callWebRtcJSHandler(emscripten::EM_VAL name, emscripten::EM_VAL params, int promise_id);
     void runTaskAsync(const std::function<void(void)>& func);
 
     template<typename T>
