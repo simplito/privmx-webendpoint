@@ -9,8 +9,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#include <stdexcept>
+#include <vector>
+#include <string>
+
 #include <emscripten/emscripten.h>
 #include <emscripten/val.h>
+#include <secp256k1.h>
 
 #include <privmx/drv/BNImpl.hpp>
 #include <privmx/drv/Bindings.hpp>
@@ -44,22 +49,47 @@ PointImpl& PointImpl::operator=(PointImpl&& obj) {
     return *this;
 }
 
-string PointImpl::encode(bool compact) const {
+string PointImpl::encode(secp256k1_context* ctx, bool compact) const {
     validate();
-    emscripten::val name { emscripten::val::u8string("point_encode") };
-    emscripten::val params { emscripten::val::object() };
-    params.set("point", emscripten::typed_memory_view(_point.size(), _point.data()));
-    params.set("compact", compact);
-
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on point_encode");
+    if (!_point.empty()) {
+        unsigned char prefix = static_cast<unsigned char>(_point[0]);
+        if (compact && _point.size() == 33) {
+            if (prefix == 0x02 || prefix == 0x03) {
+                return _point;
+            }
+        }
+        else if (!compact && _point.size() == 65) {
+            if (prefix == 0x04) {
+                return _point;
+            }
+        }
     }
+    if (ctx == nullptr) {
+        throw std::runtime_error("Error: Failed to get secp256k1 context");
+    }
+    secp256k1_pubkey pubkey;
+    if (!secp256k1_ec_pubkey_parse(ctx, &pubkey, 
+                                  reinterpret_cast<const unsigned char*>(_point.data()), 
+                                  _point.size())) {
+        throw std::runtime_error("Error: Failed to parse point data");
+    }
+    unsigned int flags = compact ? SECP256K1_EC_COMPRESSED : SECP256K1_EC_UNCOMPRESSED;
+    size_t output_size = compact ? 33 : 65;
+    std::vector<unsigned char> output_buffer(output_size);
+    size_t output_len = output_size;
+    int ret = secp256k1_ec_pubkey_serialize(ctx, 
+                                           output_buffer.data(), 
+                                           &output_len, 
+                                           &pubkey, 
+                                           flags);
 
-    return result["buff"].as<std::string>();
+    if (!ret) {
+        throw std::runtime_error("Error: Failed to serialize point");
+    }
+    if (output_len != output_size) {
+        throw std::runtime_error("Error: Serialized point has unexpected length");
+    }
+    return std::string(output_buffer.begin(), output_buffer.end());
 }
 
 PointImpl::Ptr PointImpl::mul(const BNImpl& bn) const {
