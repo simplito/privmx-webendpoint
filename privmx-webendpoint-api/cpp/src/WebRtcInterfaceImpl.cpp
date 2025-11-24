@@ -9,6 +9,10 @@
 #include "privmx/utils/Utils.hpp"
 #include "./RemoteExecutor.hpp"
 
+// Include Poco Headers for extraction
+#include <Poco/Dynamic/Var.h>
+#include <Poco/JSON/Object.h>
+
 using namespace privmx::webendpoint::stream;
 using namespace privmx::endpoint::stream;
 using namespace privmx::endpoint;
@@ -22,44 +26,34 @@ EM_JS(emscripten::EM_VAL, print_error_webrtc, (const char* msg), {
     console.error(UTF8ToString(msg));
 });
 
-// oryginalny kod produkcyjny
-// EM_ASYNC_JS(emscripten::EM_VAL, webRtcJsHandler, (emscripten::EM_VAL name_handle, emscripten::EM_VAL val_handle, emscripten::EM_VAL val_bindId), {
-//     let name = Emval.toValue(name_handle);
-//     let params = Emval.toValue(val_handle);
-//     let bindId = Emval.toValue(val_bindId);
-//     let response = {};
-//     try {
-//         response = window.webRtcInterfaceToNativeHandler[bindId].methodCall(name, params);
-//     } catch (error) {
-//         console.error("Error on webRtcInterfaceToNativeHandler call from C for", name, params, error);
-//         let ret = { status: -1, buff: "", error: error.toString()};
-//         return Emval.toHandle(ret);
-//     }
-//     let ret = {status: 1, buff: response, error: ""};
-//     return Emval.toHandle(ret);
-// });
-
 EM_JS(emscripten::EM_VAL, webRtcJsHandler, (emscripten::EM_VAL name_handle, emscripten::EM_VAL val_handle, emscripten::EM_VAL val_bindId, int promise_id), {
     let name = Emval.toValue(name_handle);
     let params = Emval.toValue(val_handle);
     let bindId = Emval.toValue(val_bindId);
-    window.webRtcInterfaceToNativeHandler[bindId].methodCall(name, params)
-        .then(
-            response => {
-                let ret = {status: 1, buff: response, error: ""};
-                // Call generic executor success
-                Module.ccall('RemoteExecutor_onSuccess', null, ['number', 'number'], [promise_id, Emval.toHandle(ret)]);
-            },
-            error => {
-                console.error("Error on em_crypto call", name, error);
-                let ret = { status: -1, buff: "", error: error.toString()};
-                // Call generic executor error
-                Module.ccall('RemoteExecutor_onError', null, ['number', 'number'], [promise_id, Emval.toHandle(ret)]);
-            }
-        );
+    
+    // Call the actual JS implementation
+    // Note: Ensure window.webRtcInterfaceToNativeHandler exists and returns a Promise or Value
+    let callResult;
+    try {
+        callResult = window.webRtcInterfaceToNativeHandler[bindId].methodCall(name, params);
+    } catch(e) {
+        let ret = { status: -1, buff: "", error: e.toString()};
+        Module.ccall('RemoteExecutor_onError', null, ['number', 'number'], [promise_id, Emval.toHandle(ret)]);
+        return;
+    }
 
+    // Handle both async (Promise) and sync returns
+    Promise.resolve(callResult)
+        .then(response => {
+            let ret = {status: 1, buff: response, error: ""};
+            Module.ccall('RemoteExecutor_onSuccess', null, ['number', 'number'], [promise_id, Emval.toHandle(ret)]);
+        })
+        .catch(error => {
+            console.error("Error on webRtcJsHandler", name, error);
+            let ret = { status: -1, buff: "", error: error.toString()};
+            Module.ccall('RemoteExecutor_onError', null, ['number', 'number'], [promise_id, Emval.toHandle(ret)]);
+        });
 });
-
 
 WebRtcInterfaceImpl::WebRtcInterfaceImpl(int interfaceBindId): _interfaceBindId(interfaceBindId) {
     printErrorInJS("created WebRtcInterfaceImpl(wersion for web) with bindId: " + std::to_string(_interfaceBindId));
@@ -69,14 +63,11 @@ void WebRtcInterfaceImpl::printErrorInJS(const std::string& msg) {
     print_error_webrtc(msg.c_str());
 }
 
-// oryginalny kod produkcyjny
 emscripten::val WebRtcInterfaceImpl::callWebRtcJSHandler(emscripten::EM_VAL name, emscripten::EM_VAL params, int promise_id) {
     emscripten::val bindId = emscripten::val(_interfaceBindId);
-    auto ret = emscripten::val::take_ownership(webRtcJsHandler(name, params, bindId.as_handle(), promise_id));
-    // emscripten_sleep(0); // <-- this line caused ASYNCIFY_STACK overflow when webRtcJsHandler code was called in parallel
-    return ret;
+    // This returns undefined usually, as the result comes back via RemoteExecutor
+    return emscripten::val::take_ownership(webRtcJsHandler(name, params, bindId.as_handle(), promise_id));
 }
-
 
 void WebRtcInterfaceImpl::runTaskAsync(const std::function<void(void)>& func){
     pthread_t mainThread = emscripten_main_runtime_thread_id();
@@ -112,24 +103,12 @@ void WebRtcInterfaceImpl::assertStatus(const std::string& method, const emscript
     }
 }
 
-// std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription(const std::string& streamRoomId) {
-//     std::promise<std::string> prms;
-//     std::future<std::string> ftr = prms.get_future();
-//     runTaskAsync([&]{
-//         auto methodName {"createOfferAndSetLocalDescription"};
-//         emscripten::val name = emscripten::val::u8string(methodName);
-//         RoomModel paramsModel = {.roomId = streamRoomId};
-//         emscripten::val params = mapToVal(paramsModel);
-//         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
-//         assertStatus(methodName, jsResult);
-//         prms.set_value(jsResult["buff"].as<std::string>());
-//     });
-//     return ftr.get();
-// }
+// --- IMPLEMENTATIONS ---
 
 std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription(const std::string& streamRoomId) {
-    std::future<val> ftr = RemoteExecutor::getInstance().execute([&](int id) {
-        runTaskAsync([&]{
+    // 1. Execute on Main Thread via RemoteExecutor
+    std::future<Poco::Dynamic::Var> ftr = RemoteExecutor::getInstance().execute([&](int id) {
+        runTaskAsync([&, streamRoomId, id]{
             auto methodName {"createOfferAndSetLocalDescription"};
             emscripten::val name = emscripten::val::u8string(methodName);
             RoomModel paramsModel = {.roomId = streamRoomId};
@@ -137,31 +116,14 @@ std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription(const std::st
             callWebRtcJSHandler(name.as_handle(), params.as_handle(), id);
         });
     });
-
-    // 2. Wait for result (BLOCKING - only safe on worker thread)
-    return ftr.get().as<std::string>();
-    // return ftr.get();
-
+    Poco::Dynamic::Var result = ftr.get();
+    Poco::JSON::Object::Ptr obj = result.extract<Poco::JSON::Object::Ptr>();
+    return obj->getValue<std::string>("buff");
 }
 
-// std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::string& streamRoomId, const std::string& sdp, const std::string& type) {
-//     std::promise<std::string> prms;
-//     std::future<std::string> ftr = prms.get_future();
-//     runTaskAsync([&, sdp, type, streamRoomId]{
-//         auto methodName {"createAnswerAndSetDescriptions"};
-//         emscripten::val name = emscripten::val::u8string(methodName);
-//         SdpWithRoomModel paramsModel = {.roomId = streamRoomId, .sdp = sdp, .type = type};
-//         emscripten::val params = mapToVal(paramsModel);
-//         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
-//         assertStatus(methodName, jsResult);
-//         prms.set_value(jsResult["buff"].as<std::string>());
-//     });
-//     return ftr.get();
-// }
-
 std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::string& streamRoomId, const std::string& sdp, const std::string& type) {
-    std::future<val> ftr = RemoteExecutor::getInstance().execute([&](int id) {
-        runTaskAsync([&, sdp, type, streamRoomId]{
+    std::future<Poco::Dynamic::Var> ftr = RemoteExecutor::getInstance().execute([&](int id) {
+        runTaskAsync([&, sdp, type, streamRoomId, id]{
             auto methodName {"createAnswerAndSetDescriptions"};
             emscripten::val name = emscripten::val::u8string(methodName);
             SdpWithRoomModel paramsModel = {.roomId = streamRoomId, .sdp = sdp, .type = type};
@@ -169,24 +131,15 @@ std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::strin
             callWebRtcJSHandler(name.as_handle(), params.as_handle(), id);
         });
     });
-    return ftr.get().as<std::string>();
-    // return ftr.get();
+
+    Poco::Dynamic::Var result = ftr.get();
+    Poco::JSON::Object::Ptr obj = result.extract<Poco::JSON::Object::Ptr>();
+    return obj->getValue<std::string>("buff");
 }
 
-// void WebRtcInterfaceImpl::setAnswerAndSetRemoteDescription(const std::string& streamRoomId, const std::string& sdp, const std::string& type) {
-//     runTaskAsync([&, sdp, type, streamRoomId]{
-//         auto methodName {"setAnswerAndSetRemoteDescription"};
-//         emscripten::val name = emscripten::val::u8string(methodName);
-//         SdpWithRoomModel paramsModel = {.roomId = streamRoomId, .sdp = sdp, .type = type};
-//         emscripten::val params = mapToVal(paramsModel);
-//         emscripten::val jsResult = callWebRtcJSHandler(name.as_handle(), params.as_handle());
-//         assertStatus(methodName, jsResult);
-//     });
-// }
-
 void WebRtcInterfaceImpl::setAnswerAndSetRemoteDescription(const std::string& streamRoomId, const std::string& sdp, const std::string& type) {
-    std::future<val> ftr = RemoteExecutor::getInstance().execute([&](int id) {
-        runTaskAsync([&, sdp, type, streamRoomId]{
+    std::future<Poco::Dynamic::Var> ftr = RemoteExecutor::getInstance().execute([&](int id) {
+        runTaskAsync([&, sdp, type, streamRoomId, id]{
             auto methodName {"setAnswerAndSetRemoteDescription"};
             emscripten::val name = emscripten::val::u8string(methodName);
             SdpWithRoomModel paramsModel = {.roomId = streamRoomId, .sdp = sdp, .type = type};
@@ -194,11 +147,12 @@ void WebRtcInterfaceImpl::setAnswerAndSetRemoteDescription(const std::string& st
             callWebRtcJSHandler(name.as_handle(), params.as_handle(), id);
         });
     });
+    ftr.get(); 
 }
 
 void WebRtcInterfaceImpl::updateSessionId(const std::string& streamRoomId, const int64_t sessionId, const std::string& connectionType) {
-    std::future<val> ftr = RemoteExecutor::getInstance().execute([&](int id) {
-        runTaskAsync([&, sessionId, connectionType, streamRoomId]{
+    std::future<Poco::Dynamic::Var> ftr = RemoteExecutor::getInstance().execute([&](int id) {
+        runTaskAsync([&, sessionId, connectionType, streamRoomId, id]{
             auto methodName {"updateSessionId"};
             emscripten::val name = emscripten::val::u8string(methodName);
             UpdateSessionIdModel paramsModel = {.streamRoomId = streamRoomId, .connectionType = connectionType, .sessionId = sessionId};
@@ -206,11 +160,13 @@ void WebRtcInterfaceImpl::updateSessionId(const std::string& streamRoomId, const
             callWebRtcJSHandler(name.as_handle(), params.as_handle(), id);
         });
     });
+
+    ftr.get();
 }
 
 void WebRtcInterfaceImpl::close(const std::string& streamRoomId) {
-    std::future<val> ftr = RemoteExecutor::getInstance().execute([&](int id) {
-        runTaskAsync([&, streamRoomId]{
+    std::future<Poco::Dynamic::Var> ftr = RemoteExecutor::getInstance().execute([&](int id) {
+        runTaskAsync([&, streamRoomId, id]{
             auto methodName {"close"};
             emscripten::val name = emscripten::val::u8string(methodName);
             RoomModel paramsModel = {.roomId = streamRoomId};
@@ -218,13 +174,16 @@ void WebRtcInterfaceImpl::close(const std::string& streamRoomId) {
             callWebRtcJSHandler(name.as_handle(), params.as_handle(), id);
         });
     });
+    ftr.get();
 }
 
 void WebRtcInterfaceImpl::updateKeys(const std::string& streamRoomId, const std::vector<privmx::endpoint::stream::Key>& keys) {
-    std::future<val> ftr = RemoteExecutor::getInstance().execute([&](int id) {
-        runTaskAsync([&, keys]{
+    std::future<Poco::Dynamic::Var> ftr = RemoteExecutor::getInstance().execute([&](int id) {
+        runTaskAsync([&, keys, streamRoomId, id]{
             auto methodName {"updateKeys"};
             emscripten::val name = emscripten::val::u8string(methodName);
+            
+            // Manual mapping logic preserved from your comment
             emscripten::val streamRoomIdVal = emscripten::val::u8string(streamRoomId.c_str());
             emscripten::val keysArrayVal = emscripten::val::array();
             for (auto key: keys) {
@@ -242,8 +201,10 @@ void WebRtcInterfaceImpl::updateKeys(const std::string& streamRoomId, const std:
             emscripten::val params = val::object();
             params.set("streamRoomId", streamRoomIdVal);
             params.set("keys", keysArrayVal);
+            
             callWebRtcJSHandler(name.as_handle(), params.as_handle(), id);
         });
     });
+    
+    ftr.get();
 }
-

@@ -25,6 +25,9 @@ limitations under the License.
 #include <emscripten/emscripten.h>
 #include "Macros.hpp"
 #include "Mapper.hpp"
+#include <Poco/Dynamic/Var.h>
+#include <Poco/JSON/Object.h>
+#include <Poco/Types.h>
 
 #include <memory>
 #include <future>
@@ -52,6 +55,7 @@ public:
     std::string createOfferAndSetLocalDescription(const std::string& streamRoomId);
     std::string createAnswerAndSetDescriptions(const std::string& streamRoomId, const std::string& sdp, const std::string& type);
     void setAnswerAndSetRemoteDescription(const std::string& streamRoomId, const std::string& sdp, const std::string& type);
+    std::string testAsync();
     void updateSessionId(const std::string& streamRoomId, const int64_t sessionId, const std::string& connectionType);
     void close(const std::string& streamRoomId);
     void updateKeys(const std::string& streamRoomId, const std::vector<privmx::endpoint::stream::Key>& keys);
