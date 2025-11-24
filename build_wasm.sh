@@ -15,6 +15,8 @@ sep "build_poco"
 "$SCRIPT_PATH/scripts/build_poco" $POCO
 sep "build_pson"
 "$SCRIPT_PATH/scripts/build_pson" $PSON_CPP
+sep "build_secp"
+"$SCRIPT_PATH/scripts/build_secp"
 
 sep "build_webdrivers"
 "$SCRIPT_PATH/scripts/build_webdrivers"
