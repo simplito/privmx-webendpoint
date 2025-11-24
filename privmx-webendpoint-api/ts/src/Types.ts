@@ -126,6 +126,64 @@ import { StreamRoomId } from "./webStreams/types/ApiTypes";
         isActive: boolean;
         lastStatusChange?: UserStatusChange;
     };
+
+    /**
+     * Contains information about the user assigned to a Context.
+     *
+     * @type {ContextUserEventData}
+     *
+     * @param {string} contextId ID of the Context
+     * @param {UserWithPubKey} user user metadata
+     */
+    export interface ContextUserEventData {
+        contextId: string;
+        user: UserWithPubKey;
+    };
+
+    /**
+     * Contains the user and their status change action.
+     *
+     * @type {UserWithAction}
+     *
+     * @param {UserWithPubKey} user user metadata
+     * @param {string} action User status change action, e.g. "login" or "logout"
+     */
+    export interface UserWithAction {
+        user: UserWithPubKey;
+        action: 'login' | 'logout';
+    };
+
+    /**
+     * Contains information about changed statuses of users in the Context.
+     *
+     * @type {ContextUsersStatusChangedEventData}
+     *
+     * @param {string} contextId ID of the Context
+     * @param {UserWithAction[]} users List of users with their status changes
+     */
+    export interface ContextUsersStatusChangedEventData {
+        contextId: string;
+        users: UserWithAction[];
+    };
+
+    /**
+     * Contains information of custom context event payload.
+     *
+     * @type {ContextCustomEventData}
+     *
+     * @param {string} contextId ID of the Context where the event originated
+     * @param {string} userId ID of the user who emitted the event
+     * @param {Uint8Array} payload Raw payload of the custom event
+     * @param {number} statusCode Status code of payload decryption
+     * @param {number} schemaVersion Version describing payload encoding/encryption
+     */
+    export interface ContextCustomEventData {
+        contextId: string;
+        userId: string;
+        payload: Uint8Array;
+        statusCode: number;
+        schemaVersion: number;
+    };
 // }
 
 // export namespace thread {
@@ -804,9 +862,5 @@ export type CollectionChangedEventData = {
     moduleType: string;
     moduleId: string;
     affectedItemsCount: number;
-    items: CollectionItemChange;
+    items: CollectionItemChange[];
 };
-
-
-
-

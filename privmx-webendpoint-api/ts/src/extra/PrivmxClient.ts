@@ -11,7 +11,7 @@ import {
 } from '../service';
 
 import { PublicConnection } from './PublicConnection';
-import {ConnectionEventsManager, InboxEventsManager, StoreEventsManager, ThreadEventsManager} from "./managers";
+import {ConnectionEventsManager, CustomEventsManager, InboxEventsManager, KvdbEventsManager, StoreEventsManager, ThreadEventsManager, UserEventsManager} from "./managers";
 import {EventManager} from "./events";
 
 /**
@@ -53,9 +53,12 @@ export class PrivmxClient {
 
   private connectionEventManager: Promise<ConnectionEventsManager> | null =
     null;
+  private userEventManager: Promise<UserEventsManager> | null = null;
   private threadEventManager: Promise<ThreadEventsManager> | null = null;
   private storeEventManager: Promise<StoreEventsManager> | null = null;
   private inboxEventManager: Promise<InboxEventsManager> | null = null;
+  private customEventsManager: Promise<CustomEventsManager> | null = null;
+  private kvdbEventsManager: Promise<KvdbEventsManager> | null = null;
 
   /**
    * @constructor
@@ -285,12 +288,28 @@ export class PrivmxClient {
     this.connectionEventManager = (async () => {
       const eventManager = await PrivmxClient.getEventManager();
       const connection = this.getConnection();
-      const connectionId =
-        (await connection.getConnectionId()) as unknown as string;
-      return eventManager.getConnectionEventManager(connectionId);
+      const connectionId = await connection.getConnectionId();
+      return eventManager.getConnectionEventManager(`${connectionId}`);
     })();
 
     return this.connectionEventManager;
+  }
+
+  /**
+   * @description Gets the User Event Manager.
+   * @returns {Promise<UserEventsManager>}
+   */
+  public async getUserEventsManager(): Promise<UserEventsManager> {
+    if (this.userEventManager) {
+      return this.userEventManager;
+    }
+
+    this.userEventManager = (async () => {
+      const eventManager = await PrivmxClient.getEventManager();
+      return eventManager.getUserEventsManager(this.getConnection());
+    })();
+
+    return this.userEventManager;
   }
 
   /**
@@ -345,6 +364,36 @@ export class PrivmxClient {
   }
 
   /**
+   * @description Gets the Custom Events Manager.
+   * @returns {Promise<CustomEventsManager>}
+   */
+  public async getCustomEventsManager(): Promise<CustomEventsManager> {
+    if (this.customEventsManager) {
+      return this.customEventsManager;
+    }
+
+    this.customEventsManager = (async () => {
+      const eventManager = await PrivmxClient.getEventManager();
+      return eventManager.getCustomEventsManager(await this.getEventApi());
+    })();
+
+    return this.customEventsManager;
+  }
+
+  public async getKvdbEventsManager(): Promise<KvdbEventsManager> {
+    if (this.kvdbEventsManager){
+      return this.kvdbEventsManager
+    }
+
+    this.kvdbEventsManager = (async () => {
+      const eventManager = await PrivmxClient.getEventManager();
+      return eventManager.getKvdbEventManager(await this.getKvdbApi())
+    })();
+
+    return this.kvdbEventsManager;
+  }
+
+  /**
    * @description Disconnects from the PrivMX bridge.
    * @returns {Promise<void>}
    */
@@ -355,9 +404,12 @@ export class PrivmxClient {
       this.storeApi = null;
       this.inboxApi = null;
       this.connectionEventManager = null;
+      this.customEventsManager = null;
+      this.userEventManager = null;
       this.threadEventManager = null;
       this.storeEventManager = null;
       this.inboxEventManager = null;
+      this.kvdbEventsManager = null;
     } catch (e) {
       console.error('Error during disconnection:', e);
     }

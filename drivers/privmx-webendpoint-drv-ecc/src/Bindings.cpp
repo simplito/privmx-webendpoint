@@ -23,6 +23,7 @@ EM_JS(EM_VAL, print_error, (const char* msg), {
     console.error(UTF8ToString(msg));
 });
 
+
 EM_ASYNC_JS(EM_VAL, em_method_caller, (EM_VAL name_handle, EM_VAL val_handle), {
     let name = Emval.toValue(name_handle);
     let params = Emval.toValue(val_handle);
@@ -37,7 +38,6 @@ EM_ASYNC_JS(EM_VAL, em_method_caller, (EM_VAL name_handle, EM_VAL val_handle), {
     }
 
     let ret = {status: 1, buff: response, error: ""};
-
     return Emval.toHandle(ret);
 });
 
@@ -47,6 +47,5 @@ void Bindings::printErrorInJS(std::string& msg) {
 
 val Bindings::callJSRawSync(val& name, val& params) {
     auto ret = val::take_ownership(em_method_caller(name.as_handle(), params.as_handle()));
-    emscripten_sleep(0);
     return ret;
 }

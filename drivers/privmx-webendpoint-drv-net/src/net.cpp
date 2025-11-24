@@ -94,7 +94,6 @@ std::tuple<int,std::string> HTTPSend(const std::string& data, const std::string&
         response_data = response["data"].as<std::string>();
     } catch (...) {
     }
-    emscripten_sleep(0);
     return {status,response_data};
 }
  

@@ -15,6 +15,7 @@ limitations under the License.
 #include <string>
 #include <privmx/drv/BNImpl.hpp>
 #include <privmx/drv/PointImpl.hpp>
+#include <secp256k1.h>
 
 class PointImpl
 {
@@ -30,7 +31,7 @@ public:
     PointImpl& operator=(PointImpl&& obj);
     operator bool() const;
     bool isEmpty() const;
-    std::string encode(bool compact = false) const;
+    std::string encode(secp256k1_context* ctx, bool compact = false) const;
     PointImpl::Ptr mul(const BNImpl& bn) const;
     PointImpl::Ptr add(const PointImpl& point) const;
 
