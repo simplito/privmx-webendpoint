@@ -16,7 +16,6 @@ limitations under the License.
 
 #include "privmx/drv/Bindings.hpp"
 #include "privmx/drv/crypto.h"
-// #include "privmx/utils/Utils.hpp"
 #include <emscripten.h>
 #include <emscripten/val.h>
 #include <emscripten/bind.h>
@@ -109,6 +108,7 @@ int privmxDrvCrypto_md(const char* data, int datalen, const char* config, char**
     memcpy(*out, cpp_str.c_str(), cpp_str.length());
     return 0;
 }
+
 int privmxDrvCrypto_hmac(const char* key, unsigned int keylen, const char* data, int datalen, const char* config, char** out, unsigned int* outlen){
     std::string str_config = translateSHAConfig(config);
     std::string cpp_str;

@@ -32,6 +32,7 @@ OUT_DIR="$BASE_DIR/out"
 
 PRIVMX_ENDPOINT_SRC="$SOURCE_DIR/privmx-endpoint"
 PSON_CPP_SRC="$SOURCE_DIR/pson-cpp"
+PRIVMX_WEB_ASYNC_ENGINE="$BASE_DIR/async-engine"
 
 PRIVMX_WEBENDPOINT_API_SRC="$BASE_DIR/privmx-webendpoint-api"
 PRIVMX_WEBENDPOINT_DRV_ECC_SRC="$DRIVERS_DIR/privmx-webendpoint-drv-ecc"

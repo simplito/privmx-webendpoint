@@ -5,7 +5,7 @@ set -e
 SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 
 if [ -z "$1" ]; then
-    echo "$0: Parameter missing."
+    echo "$0: Parameter missing. Usage: ./build.sh <version>"
     exit -1;
 fi
 VERSION=$1
@@ -13,15 +13,37 @@ VERSION=$1
 source "$SCRIPT_PATH/config.sh"
 source "$EMSDK_DIR/emsdk_env.sh"
 
+# ---------------------------------------------------------
+# OS Detection and Host Compiler Configuration
+# ---------------------------------------------------------
+OS_NAME=$(uname -s)
+echo "Detected OS: $OS_NAME"
+
+if [ "$OS_NAME" = "Darwin" ]; then
+    SDK_PATH=$(xcrun --show-sdk-path)    
+    export CC_FOR_BUILD="/usr/bin/clang"    
+    export CPPFLAGS_FOR_BUILD="-I${SDK_PATH}/usr/include"
+    export CFLAGS_FOR_BUILD="-W"
+    echo "  > Configured for macOS: SDK at $SDK_PATH"
+elif [ "$OS_NAME" = "Linux" ]; then
+    export CC_FOR_BUILD="/usr/bin/cc"    
+    export CPPFLAGS_FOR_BUILD="" 
+    export CFLAGS_FOR_BUILD=""
+    echo "  > Configured for Linux: Using /usr/bin/cc"
+else
+    echo "Error: Unsupported Operating System: $OS_NAME"
+    exit 1
+fi
+# ---------------------------------------------------------
+
 GMP_DIR="$SOURCE_DIR/gmp-${VERSION}"
 
 if [ -d "$GMP_DIR" ];
 then
     echo "$GMP_DIR directory exists. Skip download of sources."
 else
-	echo "$GMP_DIR directory does not exist. Get sources..."
+    echo "$GMP_DIR directory does not exist. Get sources..."
     cd "$SOURCE_DIR"
-    # curl "https://ftp.gnu.org/gnu/gmp/gmp-$GMP_VERSION.tar.xz" --output gmp.tar.xz
     curl "https://gmplib.org/download/gmp/gmp-$VERSION.tar.xz" --output gmp.tar.xz
     tar -xf gmp.tar.xz
 fi
@@ -30,10 +52,24 @@ cd "$GMP_DIR"
 
 if [ ! -d "$GMP_DIR/build-emscripten" ]; then
     mkdir -p build-emscripten && cd build-emscripten
-    emconfigure ../configure --disable-assembly --host none --enable-cxx --prefix=$SYSROOT_DIR CFLAGS="-Os" CXXFLAGS="-Os"
+    
+    echo "Running Configure..."
+    emconfigure ../configure \
+        --disable-assembly \
+        --host none \
+        --enable-cxx \
+        --prefix=$SYSROOT_DIR \
+        CC_FOR_BUILD="$CC_FOR_BUILD" \
+        CPPFLAGS_FOR_BUILD="$CPPFLAGS_FOR_BUILD" \
+        CFLAGS_FOR_BUILD="$CFLAGS_FOR_BUILD" \
+        CFLAGS="-Os" \
+        CXXFLAGS="-Os"
 else
     cd build-emscripten
 fi
-emmake make -j$(nproc)
-emmake make check || echo "TEST FAIL"
+
+echo "Running Make..."
+emmake make -j20
+emmake make check || echo "WARNING: Tests failed (Expected during cross-compilation)"
 emmake make install
+echo "Build Complete."
