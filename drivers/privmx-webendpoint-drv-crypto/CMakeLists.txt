@@ -11,4 +11,12 @@ add_library(privmxdrvcrypto ${SOURCES})
 target_include_directories(privmxdrvcrypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 set_target_properties(privmxdrvcrypto PROPERTIES PUBLIC_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/include/privmx/drv/crypto.h)
 target_link_libraries(privmxdrvcrypto embind)
+target_compile_options(privmxdrvcrypto PUBLIC 
+    -O3
+    -pthread
+)
+set(CMAKE_CXX_FLAGS "-std=c++17 -fexceptions -pthread")
+target_link_options(privmxdrvcrypto PUBLIC
+    -sUSE_PTHREADS
+)
 install(TARGETS privmxdrvcrypto PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/privmx/drv)

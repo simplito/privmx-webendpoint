@@ -1,0 +1,30 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+
+source "$SCRIPT_PATH/config.sh"
+source "$EMSDK_DIR/emsdk_env.sh"
+
+SECP_DIR="$SOURCE_DIR/secp256k1"
+
+if [ -d "$SECP_DIR" ];
+then
+    echo "$SECP_DIR directory exists. Skip download of sources."
+else
+	echo "$SECP_DIR directory does not exist. Get sources..."
+    git clone https://github.com/bitcoin-core/secp256k1.git $SECP_DIR
+fi
+
+cd "$SECP_DIR"
+git checkout v0.7.0
+if [ ! -d "./build-emscripten" ]; then
+    mkdir -p build-emscripten && cd build-emscripten
+    emcmake cmake -DSECP256K1_ENABLE_MODULE_ECDH=ON -DCMAKE_BUILD_TYPE=Release ..
+else
+    cd build-emscripten
+fi
+
+emmake make -j20
+emmake make install
