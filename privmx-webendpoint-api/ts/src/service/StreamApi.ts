@@ -217,6 +217,7 @@ export class StreamApi extends BaseApi {
         // const sdp = webRtcImpl.createOfferAndSetLocalDescription()
 
         const mediaStream = new MediaStream(mediaTracks);
+        _stream.localMediaStream = mediaStream;
         // tutaj createPeerConnectionWithLocalStream przypisuje w ostatnim kroku utworzone PeerConnection do this wiec nie trzeba go zwracac
         // const turnCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
         // console.log("peerCredentials: ", peerCredentials);
@@ -232,6 +233,35 @@ export class StreamApi extends BaseApi {
         return res;
     }
 
+    // public async updateStream(streamHandle: StreamHandle): Promise<StreamPublishResult> {
+    //     // configure client
+    //     const tracksToAdd: MediaStreamTrack[] = [];
+    //     const tracksToRemove: MediaStreamTrack[] = [];
+    //     for (const value of this.streamTracks.values()) {
+    //         if (value.streamHandle === streamHandle && value.track) {
+    //             if (!value.published && !value.markedToRemove) {
+    //                 tracksToAdd.push(value.track);
+    //             }
+    //             if (value.published && value.markedToRemove) {
+    //                 tracksToRemove.push(value.track);
+    //             }
+    //         }
+    //     }
+    //     const _stream = this.streams.get(streamHandle);
+    //     if (!_stream) {
+    //         throw new Error("No stream defined to publish");
+    //     }
+
+    //     console.log("TRACKS_TO_ADD_ON_UPDATE_STERAM: ", tracksToAdd);
+    //     const newMediaStream = new MediaStream(tracksToAdd);
+
+    //     const turnCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
+    //     await this.client.setTurnCredentials(turnCredentials);
+    //     await this.client.updatePeerConnectionWithLocalStream(_stream.streamRoomId, newMediaStream, tracksToRemove);
+    //     const res = await this.native.updateStream(this.servicePtr, [streamHandle]);
+    //     return res;
+    // }
+
     public async updateStream(streamHandle: StreamHandle): Promise<StreamPublishResult> {
         // configure client
         const tracksToAdd: MediaStreamTrack[] = [];
@@ -241,7 +271,7 @@ export class StreamApi extends BaseApi {
                 if (!value.published && !value.markedToRemove) {
                     tracksToAdd.push(value.track);
                 }
-                if (value.published && value.markedToRemove) {
+                if (value.markedToRemove) {
                     tracksToRemove.push(value.track);
                 }
             }
@@ -250,48 +280,10 @@ export class StreamApi extends BaseApi {
         if (!_stream) {
             throw new Error("No stream defined to publish");
         }
-        // // natywna obsluga datachanneli
-        // let dataChannelId = -1;
-        // for (const value of this.streamTracks.values()) {
-        //     if (value.streamId === streamId && value.dataChannelMeta) {
-        //         const channel = peerConnection.createDataChannel(value.dataChannelMeta.name, {id: (++dataChannelId)});
-        //         console.log("CREATING AND SETTING UP data channel", value, channel);
-        //         this.dataChannels.set(value.id, channel);
-        //     }
-        // }
 
-        // await this.client.provideSession();
-        // console.log("-----> call streamPublish with new offer", offer);
-        // const joinResult = await this.serverChannel.call<StreamsApi.StreamPublishRequest, JoinedEvent>({kind: "streams.streamPublish", data: {
-        //     streamRoomId: _stream.streamRoomId,
-        //     streamId: streamId,
-        //     peerConnectionOffer: offer
-        // }});
-        // // update local streams info
-        // const streamUpdate = this.streams.get(key);
-        // if (streamUpdate) {
-        //     streamUpdate.remoteStreamInfo = {
-        //         id: joinResult.id as unknown as StreamId
-        //     }
-        //     this.streams.set(key, streamUpdate);    
-        // }
-
-
-        // createOfferAndSetLocalDescription... jest wolane przez kod C++ 
-        // const sdp = webRtcImpl.createOfferAndSetLocalDescription()
-
-        const newMediaStream = new MediaStream(tracksToAdd);
-        // tutaj createPeerConnectionWithLocalStream przypisuje w ostatnim kroku utworzone PeerConnection do this wiec nie trzeba go zwracac
-        // const turnCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
-        // console.log("peerCredentials: ", peerCredentials);
-        // const overrideUrl = "turn:webrtc1.s24.simplito.com:3478";
-        // const overridenCreds = peerCredentials.map(x => {
-        //     return {...x, url: overrideUrl}
-        // });
-        // console.log("override peerCredentials url with: ", overrideUrl);
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr,[]);
         await this.client.setTurnCredentials(turnCredentials);
-        await this.client.updatePeerConnectionWithLocalStream(_stream.streamRoomId, newMediaStream, tracksToRemove);
+        await this.client.updatePeerConnectionWithLocalStream(_stream.streamRoomId, _stream.localMediaStream, tracksToAdd, tracksToRemove);
         const res = await this.native.updateStream(this.servicePtr, [streamHandle]);
         return res;
     }

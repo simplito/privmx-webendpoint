@@ -56,7 +56,7 @@ EM_JS(emscripten::EM_VAL, webRtcJsHandler, (emscripten::EM_VAL name_handle, emsc
 });
 
 WebRtcInterfaceImpl::WebRtcInterfaceImpl(int interfaceBindId): _interfaceBindId(interfaceBindId) {
-    printErrorInJS("created WebRtcInterfaceImpl(wersion for web) with bindId: " + std::to_string(_interfaceBindId));
+    // printErrorInJS("created WebRtcInterfaceImpl(wersion for web) with bindId: " + std::to_string(_interfaceBindId));
 }
 
 void WebRtcInterfaceImpl::printErrorInJS(const std::string& msg) {

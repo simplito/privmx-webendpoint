@@ -46,6 +46,7 @@ export interface Stream {
     remote: boolean;
     createStreamMeta?: StreamCreateMeta;
     remoteStreamInfo?: StreamRemoteInfo;
+    localMediaStream?: MediaStream;
 }
 
 export interface StreamList {

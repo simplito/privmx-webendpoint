@@ -231,20 +231,69 @@ export class WebRtcClient {
         return pc;
     }
 
-    async updatePeerConnectionWithLocalStream(streamRoomId: StreamRoomId, newStream: MediaStream, tracksToRemove: MediaStreamTrack[]): Promise<RTCPeerConnection> {
+    // async updatePeerConnectionWithLocalStream(streamRoomId: StreamRoomId, newStream: MediaStream, tracksToRemove: MediaStreamTrack[]): Promise<RTCPeerConnection> {
+    //     this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
+    //     const peerConnManager = this.getConnectionManager();
+    //     peerConnManager.initialize(streamRoomId, "publisher");
+
+    //     const pc = this.getConnectionManager().getConnectionWithSession(streamRoomId, "publisher").pc;
+
+    //     if (newStream.getTracks().length > 0) {
+    //         const tracks = newStream.getTracks();
+    //         this.e2eeWorker = await this.getWorker();
+            
+    //         console.log("adding track to peerConnection...");
+    //         for (const track of tracks) {
+    //             const videoSender = pc.addTrack(track, newStream);
+    //             console.log("PEER_CONNECTION: addTrack", track);
+
+    //             if ((window as any).RTCRtpScriptTransform) {
+    //                 const options = {
+    //                     operation: 'encode',
+    //                 };
+    //                 console.log("======> set e2ee worker for frame encoding (RTCRtpScriptTransform).");
+    //                 (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
+    //             } else {
+
+    //                 const senderStreams = (videoSender as any).createEncodedStreams();
+    //                 console.log("post 'encode' frame to the e2ee worker..");
+    //                 this.e2eeWorker.postMessage({
+    //                     operation: 'encode',
+    //                     readableStream: senderStreams.readable,
+    //                     writableStream: senderStreams.writable,
+    //                 }, [ senderStreams.readable, senderStreams.writable ]);
+    //             }
+    //         }
+
+    //         // remove marked tracks
+    //         const senders = pc.getSenders();
+    //         for (const oldTrack of tracksToRemove) {
+    //             const sender = senders.find(s => s.track === oldTrack);
+    //             if (sender) {
+    //                 pc.removeTrack(sender);
+    //             }
+    //         }
+    //     }
+    //     return pc;
+    // }
+
+
+    async updatePeerConnectionWithLocalStream(streamRoomId: StreamRoomId, localStream: MediaStream, tracksToAdd: MediaStreamTrack[], tracksToRemove: MediaStreamTrack[]): Promise<RTCPeerConnection> {
+        console.log("[WebRTCClient] on updatePeerConnectionWithLocalStream", {tracksToAdd}, {tracksToRemove});
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
         const peerConnManager = this.getConnectionManager();
         peerConnManager.initialize(streamRoomId, "publisher");
 
         const pc = this.getConnectionManager().getConnectionWithSession(streamRoomId, "publisher").pc;
 
-        if (newStream.getTracks().length > 0) {
-            const tracks = newStream.getTracks();
+        if (tracksToAdd.length > 0) {
+            // const tracks = newStream.getTracks();
             this.e2eeWorker = await this.getWorker();
             
             console.log("adding track to peerConnection...");
-            for (const track of tracks) {
-                const videoSender = pc.addTrack(track, newStream);
+            for (const track of tracksToAdd) {
+                const videoSender = pc.addTrack(track, localStream);
+                console.log("PEER_CONNECTION: addTrack", track);
 
                 if ((window as any).RTCRtpScriptTransform) {
                     const options = {
@@ -263,12 +312,14 @@ export class WebRtcClient {
                     }, [ senderStreams.readable, senderStreams.writable ]);
                 }
             }
-
+        }
+        if (tracksToRemove.length > 0) {
             // remove marked tracks
             const senders = pc.getSenders();
             for (const oldTrack of tracksToRemove) {
                 const sender = senders.find(s => s.track === oldTrack);
                 if (sender) {
+                    console.log("[WebRTCClient] on updatePeerConnectionWithLocalStream - pc.removeTrack", {sender});
                     pc.removeTrack(sender);
                 }
             }
