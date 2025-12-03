@@ -1,24 +1,28 @@
 /*
 PrivMX Endpoint.
 Copyright © 2024 Simplito sp. z o.o.
+
+This file is part of the PrivMX Platform (https://privmx.dev).
+This software is Licensed under the PrivMX Free License.
+
+See the License for the specific language governing permissions and
+limitations under the License.
 */
 
 #include <emscripten/emscripten.h>
 #include <emscripten/val.h>
-#include <emscripten/bind.h> // For typed_memory_view
+#include <emscripten/bind.h>
 
 #include <privmx/drv/BNImpl.hpp>
 #include <privmx/drv/Bindings.hpp>
 #include <privmx/drv/ECCImpl.hpp>
 #include <privmx/drv/PointImpl.hpp>
 
-// Async Engine & Mapper
 #include <AsyncEngine.hpp>
 #include "Mapper.hpp"
 #include <Poco/JSON/Object.h>
 #include <Pson/BinaryString.hpp>
 
-#include <iostream>
 #include <stdexcept>
 
 using namespace std;

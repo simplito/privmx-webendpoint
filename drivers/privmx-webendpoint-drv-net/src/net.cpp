@@ -12,16 +12,10 @@ limitations under the License.
 #include <cstdlib>
 #include <iterator>
 #include <string>
-#include <unordered_map>
 #include <emscripten/emscripten.h>
 #include <emscripten/websocket.h>
 #include <emscripten/bind.h>
-#include <emscripten/proxying.h>
-#include <emscripten/threading.h>
 #include <privmx/drv/net.h>
-#include <chrono>
-#include <map>
-#include <iostream>
 #include <memory>
 #include <thread>
 #include <future>
@@ -32,7 +26,6 @@ limitations under the License.
 #include <Poco/JSON/Object.h>
 #include <Pson/BinaryString.hpp>
 
-#include "privmx/drv/net.h"
 #include "privmx/drv/websocket.h"
 
 using namespace privmx::webendpoint;
@@ -85,7 +78,7 @@ std::future<Poco::Dynamic::Var> HTTPSendAsync(const std::string& data, const std
         params.set("method", get ? "GET" : "POST");
         
         if (!get) {
-            params.set("body", emscripten::typed_memory_view(data.size(), data.data()));
+            params.set("body", emscripten::val::global("Uint8Array").new_(emscripten::typed_memory_view(data.size(), data.data())));
             
             headers.set("Content-Type", content_type);
             for (const auto& [key, value]: request_headers){

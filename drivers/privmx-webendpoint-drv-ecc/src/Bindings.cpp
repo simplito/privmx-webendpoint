@@ -10,7 +10,7 @@ using namespace privmx::webendpoint;
 EM_JS(void, performBindingsCall_impl, (const char* method_str, emscripten::EM_VAL params_handle, int callId), {
     let method = UTF8ToString(method_str);
     let params = Emval.toValue(params_handle);
-    Promise.resolve(em_crypto.methodCaller(method, params))
+    Promise.resolve(self['em_crypto'].methodCaller(method, params))
     .then((response) => {
         let ret = {status: 1, buff: response, error: ""};
         Module.ccall('AsyncEngine_onSuccess', null, ['number', 'number'], [callId, Emval.toHandle(ret)]);

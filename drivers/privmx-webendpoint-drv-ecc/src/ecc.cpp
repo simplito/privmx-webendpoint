@@ -20,7 +20,6 @@ limitations under the License.
 #include <emscripten.h>
 #include <emscripten/val.h>
 #include <emscripten/bind.h>
-#include <iostream>
 #include "privmx/drv/ecc.h"
 #include <string.h>
 
