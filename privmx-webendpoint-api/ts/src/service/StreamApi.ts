@@ -2,7 +2,7 @@
 import {Types} from "../ServerTypes";
 import { Utils } from "../webStreams/Utils";
 import { WebRtcClient } from "../webStreams/WebRtcClient";
-import { DataChannelMeta, StreamCreateMeta, StreamId } from "../webStreams/types/ApiTypes";
+import { DataChannelMeta, StreamCreateMeta, StreamId, StreamTrackId } from "../webStreams/types/ApiTypes";
 import { BaseApi } from "./BaseApi";
 // import { StreamApiNative } from "../api/StreamApiNative";
 import { ContainerPolicy, PagingList, PagingQuery, StreamInfo, StreamEventSelectorType, StreamEventType, StreamRoom, UserWithPubKey, StreamSettings, StreamHandle, StreamSubscription, StreamPublishResult } from "../Types";
@@ -109,13 +109,25 @@ export class StreamApi extends BaseApi {
 
 
         if (! this.streams.has(streamHandle)) {
-            console.log("LOG: ", this.streams);
             throw new Error("[addStreamTrack]: there is no Stream with given Id: "+streamHandle);
         }
+
+        let alreadyAddedId = "";
+
         for (const [key, streamTrack] of this.streamTracks.entries()) {
             if (streamTrack.track && streamTrack.track?.id === meta.track?.id) {
-                throw new Error("[addStreamTrack] StreamTrack with given browser's track already added.");
+                if (streamTrack.markedToRemove === true) {
+                    streamTrack.markedToRemove === undefined;
+                    alreadyAddedId = streamTrack.id;
+                    break;
+                }
+                else {
+                    throw new Error("[addStreamTrack] StreamTrack with given browser's track already added.");
+                }
             }
+        }
+        if (alreadyAddedId.length > 0) {
+            return alreadyAddedId as StreamTrackId;
         }
         const stream = this.streams.get(streamHandle);
         if (! stream) {
@@ -148,28 +160,10 @@ export class StreamApi extends BaseApi {
     }
 
     public async streamTrackSendData(_streamTrackId: Types.StreamTrackId, _data: Buffer): Promise<void> {
-        // if (! this.dataChannels.has(streamTrackId)) {
-        //     throw new Error("No data channel with given id");
-        // }
-        // const channel = this.dataChannels.get(streamTrackId);
-        // if (!channel) {
-        //     throw new Error("Cannot access data channel..");
-        // }
-        // channel.send(data);
                 throw new Error("not implemented");
     }
 
     public async streamTrackRecvData(_streamTrackId: Types.StreamTrackId, _onData: (data: Buffer) => void): Promise<void> {
-        // if (! this.dataChannels.has(streamTrackId)) {
-        //     throw new Error("No data channel with given id");
-        // }
-        // const channel = this.dataChannels.get(streamTrackId);
-        // if (!channel) {
-        //     throw new Error("Cannot access data channel..");
-        // }
-        // channel.addEventListener("message", evt => {
-        //     onData(evt.data);
-        // })
                 throw new Error("not implemented");
     }
 

@@ -86,16 +86,12 @@ export class StreamApiNative extends BaseNative {
     }
 
     async publishStream(ptr: number, args: [number]): Promise<Types.StreamPublishResult> {
-        console.log("native.publishStream call")
         const ret = await this.runAsync<Types.StreamPublishResult>((taskId)=>this.api.lib.StreamApi_publishStream(taskId, ptr, args));
-        console.log("========== publishStream() on StreamApiLow returns: ", ret);
         return ret;
     }
 
     async updateStream(ptr: number, args: [number]): Promise<Types.StreamPublishResult> {
-        console.log("native.updateStream call")
         const ret = await this.runAsync<Types.StreamPublishResult>((taskId)=>this.api.lib.StreamApi_updateStream(taskId, ptr, args));
-        console.log("========== updateStream() on StreamApiLow returns: ", ret);
         return ret;
     }
 
@@ -106,10 +102,6 @@ export class StreamApiNative extends BaseNative {
     async listStreams(ptr: number, args: [string]): Promise<StreamInfo[]> {
         return this.runAsync<StreamInfo[]>((taskId)=>this.api.lib.StreamApi_listStreams(taskId, ptr, args));
     }
-
-    // void subscribeToRemoteStreams(const std::string& streamRoomId, const std::vector<StreamSubscription>& subscriptions, const StreamSettings& options);
-    // void modifyRemoteStreamsSubscriptions(const std::string& streamRoomId, const std::vector<StreamSubscription>& subscriptionsToAdd, const std::vector<StreamSubscription>& subscriptionsToRemove, const StreamSettings& options);
-    // void unsubscribeFromRemoteStreams(const std::string& streamRoomId, const std::vector<StreamSubscription>& subscriptionsToRemove);
 
     async subscribeToRemoteStreams(ptr: number, args: [string, Types.StreamSubscription[], Types.StreamSettings]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.StreamApi_subscribeToRemoteStreams(taskId, ptr, args));
@@ -150,31 +142,12 @@ export class StreamApiNative extends BaseNative {
     }
 
     protected bindWebRtcInterfaceAsHandler(bindingId: number): void {
-        // if (this.webRtcInterfacePtr > -1) {
-        //     await this.deleteWebRtcInterface(this.webRtcInterfacePtr);
-        //     this.webRtcInterfacePtr = -1;
-        //     this.webRtcInterfaceImpl = null;
-        // }
-
-        // const [client] = args;
-
         this.webRtcInterfaceImpl = new WebRtcInterfaceImpl(this.webRtcClient);
-        console.log("webRtcInterfaceImpl(JS) created", this.webRtcInterfaceImpl, "with bindingId: ", bindingId);
         let windowBinder = (window as any).webRtcInterfaceToNativeHandler;
         if (!windowBinder) {
             windowBinder = {};
         }
         windowBinder[bindingId] = this.webRtcInterfaceImpl;
         (window as any).webRtcInterfaceToNativeHandler = windowBinder;
-        console.log("... and binded to window", (window as any).webRtcInterfaceToNativeHandler[bindingId]);
-        // this.webRtcInterfacePtr = await this.newWebRtcInterface(connectionPtr);
     }
-
-    // protected async newWebRtcInterface(connectionPtr: number): Promise<number> {
-    //     return this.runAsync<number>((taskId) => this.api.lib.StreamApi_newWebRtcInterface(taskId, connectionPtr));
-    // }
-
-    // protected async deleteWebRtcInterface(ptr: number): Promise<void> {
-    //     await this.runAsync<void>((taskId)=>this.api.lib.StreamApi_deleteWebRtcInterface(taskId, ptr));
-    // }
 }

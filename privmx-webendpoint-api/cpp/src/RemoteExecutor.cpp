@@ -56,7 +56,6 @@ void RemoteExecutor::resolve(int id, emscripten::val result) {
     if (prms) {
         try {
             Poco::Dynamic::Var convertedResult = Mapper::map(result);
-            std::cout<<"Converted"<<std::endl;
             prms->set_value(convertedResult);
         } catch (const std::exception& e) {
             prms->set_exception(std::make_exception_ptr(e));
