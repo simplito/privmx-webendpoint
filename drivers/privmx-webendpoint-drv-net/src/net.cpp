@@ -85,9 +85,8 @@ std::future<Poco::Dynamic::Var> HTTPSendAsync(const std::string& data, const std
                 headers.set(key, value);
             }
         }
-        
+        if (keepAlive) headers.set("Connection", "Keep-Alive");
         params.set("headers", headers);
-        if (keepAlive) params.set("keepalive", true);
         callJSFetch_async(params.as_handle(), callId);
 
     }, ThreadTarget::Worker);
