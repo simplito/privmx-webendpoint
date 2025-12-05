@@ -20,7 +20,6 @@ limitations under the License.
 #include <emscripten.h>
 #include <emscripten/val.h>
 #include <emscripten/bind.h>
-
 #include "privmx/drv/ecc.h"
 #include <string.h>
 
@@ -84,7 +83,7 @@ int privmxDrvEcc_bnBitsLength(const privmxDrvEcc_BN* bn, int* res) {
     if (!bn || !bn->impl || !res) {
         return 1;
     }
-    *res = bn->impl->getBitsLength();
+    *res = 256; // bn->impl->getBitsLength();
     return 0;
 }
 

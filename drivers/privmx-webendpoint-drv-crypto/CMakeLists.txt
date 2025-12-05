@@ -18,5 +18,6 @@ target_compile_options(privmxdrvcrypto PUBLIC
 set(CMAKE_CXX_FLAGS "-std=c++17 -fexceptions -pthread")
 target_link_options(privmxdrvcrypto PUBLIC
     -sUSE_PTHREADS
+    -sEXPORTED_RUNTIME_METHODS=['HEAPU8','ccall']
 )
 install(TARGETS privmxdrvcrypto PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/privmx/drv)

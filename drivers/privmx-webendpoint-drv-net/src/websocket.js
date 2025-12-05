@@ -105,6 +105,7 @@
 						if (!!webSocket.PingTimeout) clearTimeout(webSocket.PingTimeout);
 					}
 					var pBuffer = _malloc(size);
+					
 					var heapBytes = new Uint8Array(Module['HEAPU8'].buffer, pBuffer, size);
 					heapBytes.set(byteArray);
 					var userPointer = webSocket.UserPointer || 0;

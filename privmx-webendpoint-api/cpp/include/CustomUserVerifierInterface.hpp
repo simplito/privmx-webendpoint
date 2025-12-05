@@ -14,6 +14,7 @@
 #include <privmx/endpoint/core/UserVerifierInterface.hpp>
 #include "privmx/endpoint/core/VarDeserializer.hpp"
 #include "privmx/endpoint/core/VarSerializer.hpp"
+#include <Poco/Dynamic/Var.h> 
 
 namespace privmx {
 namespace webendpoint {
@@ -24,9 +25,8 @@ public:
     std::vector<bool> verify(const std::vector<endpoint::core::VerificationRequest>& request) override;
 private:
     void printErrorInJS(const std::string& msg);
-    emscripten::val callVerifierOnJS(emscripten::EM_VAL name, emscripten::EM_VAL params);
-    void runTaskAsync(const std::function<void(void)>& func);
-    emscripten::val mapToVal(const std::vector<endpoint::core::VerificationRequest>& request);
+    Poco::Dynamic::Var callVerifierOnJS(const std::string& methodName, const Poco::Dynamic::Var& params);
+    void runAsyncTaskOnMain(const std::function<void(void)>& func);
     int _interfaceBindId;
 };
 

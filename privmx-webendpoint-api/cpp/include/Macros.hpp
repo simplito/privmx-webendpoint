@@ -8,6 +8,7 @@ This software is Licensed under the PrivMX Free License.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+#include <privmx/utils/Utils.hpp>
 
 #ifndef _PRIVMXLIB_WEBENDPOINT_MACROS_HPP_
 #define _PRIVMXLIB_WEBENDPOINT_MACROS_HPP_
@@ -25,7 +26,7 @@ void FUNCTION_NAME(SERVICE, NAME) (int taskId, int ptr, emscripten::val args);
 #define API_FUNCTION(SERVICE, NAME)                                                             \
 void FUNCTION_NAME(SERVICE, NAME) (int taskId, int ptr, emscripten::val args) {                 \
     Poco::Dynamic::Var argsVar = Mapper::map(args);                                             \
-    ProxyedTaskRunner::getInstance()->runTask(taskId,[&, ptr, argsVar] {                        \
+    AsyncEngine::getInstance()->postWorkerTask(taskId,[&, ptr, argsVar] {                       \
         return ((SERVICE##Var*)ptr)->NAME(argsVar);                                             \
     });                                                                                         \
 }
