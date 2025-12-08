@@ -28,11 +28,9 @@ limitations under the License.
 
 #include "Macros.hpp"
 #include "Mapper.hpp"
-#include "ProxyedTaskRunner.hpp"
+#include "AsyncEngine.hpp" 
 #include <emscripten/threading.h>
 #include <emscripten/proxying.h>
-
-
 
 using namespace privmx::endpoint;
 using namespace privmx::webendpoint;
@@ -50,22 +48,23 @@ using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
 
 using UserVerifierInterface = privmx::endpoint::core::UserVerifierInterface;
 using VerificationRequest = privmx::endpoint::core::VerificationRequest;
+
 namespace privmx {
 namespace webendpoint {
 namespace api {
 
     void setResultsCallback(emscripten::val callback){
-        ProxyedTaskRunner::getInstance()->setResultsCallback(callback);
+        AsyncEngine::getInstance()->setResultsCallback(callback);
     }
 
     void EventQueue_newEventQueue(int taskId) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&]{
             auto service = new EventQueueVar(core::EventQueue::getInstance(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
             return (int)service;
         });
     }
     void EventQueue_deleteEventQueue(int taskId, int ptr) {
-        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
             delete (EventQueueVar*)ptr;
         });
     }
@@ -74,13 +73,13 @@ namespace api {
     API_FUNCTION(EventQueue, getEvent)
 
     void Connection_newConnection(int taskId) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&]{
             auto service = new ConnectionVar(core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
             return (int)service;
         });
     }
     void Connection_deleteConnection(int taskId, int ptr) {
-        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
             delete (ConnectionVar*)ptr;
         });
     }
@@ -95,7 +94,7 @@ namespace api {
     API_FUNCTION(Connection, disconnect)
 
     void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int interfaceBindId) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr, interfaceBindId]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, interfaceBindId]{
             auto connection = (ConnectionVar*)connectionPtr;
             auto customInterfaceRawPtr = new UserVerifierHolder(interfaceBindId);
             connection->getApi().setUserVerifier(customInterfaceRawPtr->getInstance());
@@ -104,20 +103,20 @@ namespace api {
     }
 
     void Connection_deleteUserVerifierInterface(int taskId, int ptr) {
-        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
             delete (UserVerifierHolder*)ptr;
         });
     }
 
     void ThreadApi_newThreadApi(int taskId, int connectionPtr) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr]{
             auto connection = (ConnectionVar*)connectionPtr;
             auto threadApi = new ThreadApiVar(connection->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
             return (int)threadApi;
         });
     }
     void ThreadApi_deleteThreadApi(int taskId, int ptr) {
-        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
             delete (ThreadApiVar*)ptr;
         });
     }
@@ -137,14 +136,14 @@ namespace api {
     API_FUNCTION(ThreadApi, buildSubscriptionQuery)
 
     void StoreApi_newStoreApi(int taskId, int connectionPtr) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr]{
             auto connection = (ConnectionVar*)connectionPtr;
             auto threadApi = new StoreApiVar(connection->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
             return (int)threadApi;
         });
     }
     void StoreApi_deleteStoreApi(int taskId, int ptr) {
-        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
             delete (StoreApiVar*)ptr;
         });
     }
@@ -171,7 +170,7 @@ namespace api {
     API_FUNCTION(StoreApi, buildSubscriptionQuery)
 
     void InboxApi_newInboxApi(int taskId, int connectionPtr, int threadApiPtr, int storeApiPtr) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr, threadApiPtr, storeApiPtr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, threadApiPtr, storeApiPtr]{
             auto connection = (ConnectionVar*)connectionPtr;
             auto threadApi = (ThreadApiVar*)threadApiPtr;
             auto storeApi = (StoreApiVar*)storeApiPtr;
@@ -180,7 +179,7 @@ namespace api {
         });
     }
     void InboxApi_deleteInboxApi(int taskId, int ptr) {
-        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
             delete (InboxApiVar*)ptr;
         });
     }
@@ -207,14 +206,14 @@ namespace api {
     API_FUNCTION(InboxApi, buildSubscriptionQuery)
 
     void KvdbApi_newKvdbApi(int taskId, int connectionPtr) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr]{
             auto connection = (ConnectionVar*)connectionPtr;
             auto kvdbApi = new KvdbApiVar(connection->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
             return (int)kvdbApi;
         });
     }
     void KvdbApi_deleteKvdbApi(int taskId, int ptr) {
-        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
             delete (KvdbApiVar*)ptr;
         });
     }
@@ -237,13 +236,13 @@ namespace api {
     API_FUNCTION(KvdbApi, buildSubscriptionQueryForSelectedEntry)
 
     void CryptoApi_newCryptoApi(int taskId) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&]{
             auto service = new CryptoApiVar(core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
             return (int)service;
         });
     }
     void CryptoApi_deleteCryptoApi(int taskId, int ptr) {
-        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
             delete (CryptoApiVar*)ptr;
         });
     }
@@ -266,14 +265,14 @@ namespace api {
     API_FUNCTION(CryptoApi, mnemonicToSeed)
 
     void ExtKey_deleteExtKey(int taskId, int ptr) {
-        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
             delete (ExtKeyVar*)ptr;
         });
     }
 
     void ExtKey_fromSeed(int taskId, emscripten::val args) {
         Poco::Dynamic::Var argsVar = Mapper::map(args);
-        ProxyedTaskRunner::getInstance()->runTask(taskId,[&, argsVar] {
+        AsyncEngine::getInstance()->postWorkerTask(taskId,[&, argsVar] {
             auto service = new ExtKeyVar(core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
             return service->fromSeed(argsVar);
         });    
@@ -281,7 +280,7 @@ namespace api {
 
     void ExtKey_fromBase58(int taskId, emscripten::val args) {
         Poco::Dynamic::Var argsVar = Mapper::map(args);
-        ProxyedTaskRunner::getInstance()->runTask(taskId,[&, argsVar] {
+        AsyncEngine::getInstance()->postWorkerTask(taskId,[&, argsVar] {
             auto service = new ExtKeyVar(core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
             return service->fromBase58(argsVar);
         });   
@@ -289,7 +288,7 @@ namespace api {
 
     void ExtKey_generateRandom(int taskId, emscripten::val args) {
         Poco::Dynamic::Var argsVar = Mapper::map(args);
-        ProxyedTaskRunner::getInstance()->runTask(taskId,[&, argsVar] {
+        AsyncEngine::getInstance()->postWorkerTask(taskId,[&, argsVar] {
             auto service = new ExtKeyVar(core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
             return service->generateRandom(argsVar);
         });   
@@ -309,14 +308,14 @@ namespace api {
 
 
     void EventApi_newEventApi(int taskId, int connectionPtr) {
-        ProxyedTaskRunner::getInstance()->runTask(taskId, [&, connectionPtr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr]{
             auto connection = (ConnectionVar*)connectionPtr;
             auto api = new EventApiVar(connection->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
             return (int)api;
         });
     }
     void EventApi_deleteEventApi(int taskId, int ptr) {
-        ProxyedTaskRunner::getInstance()->runTaskVoid(taskId, [&, ptr]{
+        AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
             delete (EventApiVar*)ptr;
         });
     }

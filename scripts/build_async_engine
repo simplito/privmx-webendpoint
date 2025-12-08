@@ -1,0 +1,25 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+
+source "$SCRIPT_PATH/config.sh"
+source "$EMSDK_DIR/emsdk_env.sh"
+
+sep() {
+    echo "=========================== $1 =========================="
+}
+
+sep "PRIVMX_WEBENDPOINT_DRV_CRYPTO_SRC"
+cd "$PRIVMX_WEB_ASYNC_ENGINE"
+
+if [ ! -d "./build-emscripten" ]; then
+    mkdir -p build-emscripten && cd build-emscripten
+    emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
+else
+    cd build-emscripten
+fi
+
+emmake make -j20
+emmake make install

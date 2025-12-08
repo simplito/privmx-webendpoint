@@ -11,74 +11,70 @@ limitations under the License.
 
 #include <emscripten/emscripten.h>
 #include <emscripten/val.h>
+#include <emscripten/bind.h>
 
 #include <privmx/drv/BNImpl.hpp>
 #include <privmx/drv/Bindings.hpp>
 #include <privmx/drv/ECCImpl.hpp>
+#include <privmx/drv/PointImpl.hpp>
 
+#include <AsyncEngine.hpp>
+#include "Mapper.hpp"
+#include <Poco/JSON/Object.h>
+#include <Pson/BinaryString.hpp>
+
+#include <stdexcept>
 
 using namespace std;
+using namespace emscripten;
+using namespace privmx::webendpoint;
 
-ECCImpl::Ptr ECCImpl::genPair() {
-    emscripten::val name { emscripten::val::u8string("ecc_genPair") };
-    emscripten::val params { emscripten::val::null() };
+namespace {
+    
+    template<typename T>
+    T runEccOp(const std::string& method, const Poco::Dynamic::Var& paramsVar) {
+            auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+            Poco::Dynamic::Var localParams = paramsVar;
+            emscripten::val jsParams = Mapper::map((pson_value*)&localParams);        
+            performBindingsCall(method, jsParams, callId);
+        }, ThreadTarget::Worker);
 
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on genPair");
+        Poco::Dynamic::Var resultVar = future.get();
+        
+        Poco::JSON::Object::Ptr obj = resultVar.extract<Poco::JSON::Object::Ptr>();
+        int status = obj->getValue<int>("status");
+        
+        if (status < 0) {
+            std::string error = obj->getValue<Pson::BinaryString>("error");
+            throw std::runtime_error("Error: on " + method + ": " + error);
+        }
+
+        return obj->getValue<T>("buff");
     }
 
-    std::string priv_key { result["buff"]["privateKey"].as<std::string>() };
-    std::string pub_key { result["buff"]["publicKey"].as<std::string>() };
+    Poco::JSON::Object::Ptr runEccOpObj(const std::string& method, const Poco::Dynamic::Var& paramsVar) {
+        
+        auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+            Poco::Dynamic::Var localParams = paramsVar;
+            emscripten::val jsParams = Mapper::map((pson_value*)&localParams);
+            performBindingsCall(method, jsParams, callId);
+        }, ThreadTarget::Worker);
 
-    return std::make_unique<ECCImpl>(priv_key, pub_key, true);
-}
-
-ECCImpl::Ptr ECCImpl::fromPublicKey(const string& public_key) {
-    emscripten::val name { emscripten::val::u8string("ecc_fromPublicKey") };
-    emscripten::val params { emscripten::val::object() };
-    params.set("key", typed_memory_view(public_key.size(), public_key.data())); 
-
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on fromPublicKey");
+        Poco::Dynamic::Var resultVar = future.get();
+        Poco::JSON::Object::Ptr obj = resultVar.extract<Poco::JSON::Object::Ptr>();
+        
+        if (obj->getValue<int>("status") < 0) {
+            throw std::runtime_error("Error: on " + method + ": " + obj->getValue<Pson::BinaryString>("error"));
+        }
+        
+        return obj->getObject("buff");
     }
-    std::string pub_key { result["buff"]["publicKey"].as<std::string>() };
-
-    return std::make_unique<ECCImpl>(std::string(), pub_key, false);
 }
 
-ECCImpl::Ptr ECCImpl::fromPrivateKey(const std::string& private_key) {
-    emscripten::val name { emscripten::val::u8string("ecc_fromPrivateKey") };
-    emscripten::val params { emscripten::val::object() };
-    params.set("key", typed_memory_view(private_key.size(), private_key.data())); 
-
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on fromPrivateKey");
-    }
-
-    std::string priv_key { result["buff"]["privateKey"].as<std::string>() };
-    std::string pub_key { result["buff"]["publicKey"].as<std::string>() };
-
-    return std::make_unique<ECCImpl>(priv_key, pub_key, true);
-}
 
 ECCImpl::ECCImpl() {}
-
 ECCImpl::ECCImpl(const ECCImpl& obj) : _privkey(obj._privkey), _pubkey(obj._pubkey), _has_priv(obj._has_priv) {}
-
 ECCImpl::ECCImpl(ECCImpl&& obj) : _privkey(std::move(obj._privkey)), _pubkey(obj._pubkey), _has_priv(std::move(obj._has_priv)) {}
-
 ECCImpl::ECCImpl(const std::string& privkey, const std::string& pubkey, bool has_priv)
         : _privkey(privkey), _pubkey(pubkey), _has_priv(has_priv) {}
 
@@ -96,185 +92,114 @@ ECCImpl& ECCImpl::operator=(ECCImpl&& obj) {
     return *this;
 }
 
-string ECCImpl::getPublicKey(bool compact) const {
-    return _pubkey;
+string ECCImpl::getPublicKey(bool compact) const { return _pubkey; }
+PointImpl::Ptr ECCImpl::getPublicKey2() const { return std::make_unique<PointImpl>(_pubkey); }
+string ECCImpl::getPrivateKey() const { 
+    return _privkey; 
+}
+BNImpl::Ptr ECCImpl::getPrivateKey2() const { return std::make_unique<BNImpl>(_privkey); }
+
+
+// --- ASYNC IMPLEMENTATIONS ---
+
+ECCImpl::Ptr ECCImpl::genPair() {
+    Poco::Dynamic::Var params; // Null/Empty
+
+    Poco::JSON::Object::Ptr result = runEccOpObj("ecc_genPair", params);
+
+    std::string priv_key = result->getValue<Pson::BinaryString>("privateKey");
+    std::string pub_key = result->getValue<Pson::BinaryString>("publicKey");
+
+    return std::make_unique<ECCImpl>(priv_key, pub_key, true);
 }
 
-PointImpl::Ptr ECCImpl::getPublicKey2() const {
-    return std::make_unique<PointImpl>(_pubkey);
+ECCImpl::Ptr ECCImpl::fromPublicKey(const string& public_key) {
+    Poco::JSON::Object::Ptr params = new Poco::JSON::Object();
+    params->set("key", Pson::BinaryString(public_key));
+
+    Poco::JSON::Object::Ptr result = runEccOpObj("ecc_fromPublicKey", params);
+    std::string pub_key = result->getValue<Pson::BinaryString>("publicKey");
+
+    return std::make_unique<ECCImpl>(std::string(), pub_key, false);
 }
 
-string ECCImpl::getPrivateKey() const {
-    return _privkey;
-}
+ECCImpl::Ptr ECCImpl::fromPrivateKey(const std::string& private_key) {
+    Poco::JSON::Object::Ptr params = new Poco::JSON::Object();
+    params->set("key", Pson::BinaryString(private_key));
 
-BNImpl::Ptr ECCImpl::getPrivateKey2() const {
-    return std::make_unique<BNImpl>(_privkey);
+    Poco::JSON::Object::Ptr result = runEccOpObj("ecc_fromPrivateKey", params);
+    
+    std::string priv_key = result->getValue<Pson::BinaryString>("privateKey");
+    std::string pub_key = result->getValue<Pson::BinaryString>("publicKey");
+
+    return std::make_unique<ECCImpl>(priv_key, pub_key, true);
 }
 
 string ECCImpl::sign(const string& data) const {
-    emscripten::val name { emscripten::val::u8string("ecc_sign") };
-    emscripten::val params { emscripten::val::object() };
-    params.set("privateKey", typed_memory_view(_privkey.size(), _privkey.data()));
-    params.set("data", emscripten::typed_memory_view(data.size(), data.data()));
+    Poco::JSON::Object::Ptr params = new Poco::JSON::Object();
+    params->set("privateKey", Pson::BinaryString(_privkey));
+    params->set("data", Pson::BinaryString(data));
 
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on sign");
-    }
-
-    std::string sig { result["buff"].as<std::string>() };
-    return sig;
+    return runEccOp<Pson::BinaryString>("ecc_sign", params);
 }
 
 Signature ECCImpl::sign2(const string& data) const {
-    emscripten::val name { emscripten::val::u8string("ecc_sign") };
-    emscripten::val params { emscripten::val::object() };
-    params.set("privateKey", typed_memory_view(_privkey.size(), _privkey.data()));
-    params.set("data", emscripten::typed_memory_view(data.size(), data.data())); 
-
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on sign");
-    }
-
-    std::string tmp { result["buff"].as<std::string>() };
-    std::string r { tmp.substr(1, 32) };
-    std::string s { tmp.substr(33, 32) };
+    std::string sig = sign(data);
+    if(sig.size() < 65) throw std::runtime_error("Signature too short");
+    std::string r = sig.substr(1, 32);
+    std::string s = sig.substr(33, 32);
     return {.r = std::make_unique<BNImpl>(r), .s = std::make_unique<BNImpl>(s)};
 }
 
 bool ECCImpl::verify(const std::string& data, const std::string& signature) const {
-    emscripten::val name { emscripten::val::u8string("ecc_verify") };
-    emscripten::val params { emscripten::val::object() };
-    params.set("publicKey", typed_memory_view(_pubkey.size(), _pubkey.data()));
-    params.set("data", emscripten::typed_memory_view(data.size(), data.data()));
-    params.set("signature", emscripten::typed_memory_view(signature.size(), signature.data())); 
+    Poco::JSON::Object::Ptr params = new Poco::JSON::Object();
+    params->set("publicKey", Pson::BinaryString(_pubkey));
+    params->set("data", Pson::BinaryString(data));
+    params->set("signature", Pson::BinaryString(signature));
 
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on verify");
-    }
-    bool verified { result["buff"].as<bool>() };
-    return verified;
+    return runEccOp<bool>("ecc_verify", params);
 }
 
 bool ECCImpl::verify2(const std::string& data, const Signature& signature) const {
-    emscripten::val name { emscripten::val::u8string("ecc_verify2") };
-    emscripten::val params { emscripten::val::object() };
-    params.set("data", emscripten::typed_memory_view(data.size(), data.data()));
-    params.set("r", emscripten::typed_memory_view(signature.r->toBuffer().size(), signature.r->toBuffer().data())); 
-    params.set("s", emscripten::typed_memory_view(signature.s->toBuffer().size(), signature.s->toBuffer().data())); 
-
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on verify");
-    }
-    bool verified { result["buff"].as<bool>() };
-    return verified;
+    Poco::JSON::Object::Ptr params = new Poco::JSON::Object();
+    params->set("data", Pson::BinaryString(data));
+    
+    params->set("r", Pson::BinaryString(signature.r->toBuffer()));
+    params->set("s", Pson::BinaryString(signature.s->toBuffer()));
+    return runEccOp<bool>("ecc_verify2", params);
 }
 
 string ECCImpl::derive(const ECCImpl& ecc) const {
-    emscripten::val name { emscripten::val::u8string("ecc_derive") };
-    emscripten::val params { emscripten::val::object() };
-    auto pub_key = ecc._pubkey; // TODO
-    params.set("privateKey", typed_memory_view(_privkey.size(), _privkey.data()));
-    params.set("publicKey", typed_memory_view(pub_key.size(), pub_key.data()));
+    Poco::JSON::Object::Ptr params = new Poco::JSON::Object();
+    params->set("privateKey", Pson::BinaryString(_privkey));
+    params->set("publicKey", Pson::BinaryString(ecc._pubkey));
     
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on derive");
-    }
-
-    return std::string(result["buff"].as<std::string>());
+    return runEccOp<Pson::BinaryString>("ecc_derive", params);
 }
 
-string ECCImpl::getOrder() const {
-    emscripten::val name { emscripten::val::u8string("ecc_getOrder") };
-    emscripten::val params { emscripten::val::null() };
-    
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on getOrder");
-    }
-    std::string n { result["buff"].as<std::string>() };
-    return n;
+std::string ECCImpl::getOrder() { 
+    Poco::Dynamic::Var params; // Null
+    return runEccOp<Pson::BinaryString>("ecc_getOrder", params);
 }
 
 BNImpl::Ptr ECCImpl::getOrder2() {
-    emscripten::val name { emscripten::val::u8string("ecc_getOrder") };
-    emscripten::val params { emscripten::val::null() };
-    
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on getOrder");
-    }
-    std::string n { result["buff"].as<std::string>() };
+    std::string n = getOrder(); // OK: static calling static
     return std::make_unique<BNImpl>(n);
 }
 
 PointImpl::Ptr ECCImpl::getGenerator() const {
-    emscripten::val name { emscripten::val::u8string("ecc_getGenerator") };
-    emscripten::val params { emscripten::val::null() };
-    
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on getGenerator");
-    }
-    std::string g { result["buff"].as<std::string>() };
+    Poco::Dynamic::Var params; // Null
+    std::string g = runEccOp<Pson::BinaryString>("ecc_getGenerator", params);
     return std::make_unique<PointImpl>(g);
 }
 
 BNImpl::Ptr ECCImpl::getEcOrder() const {
-    emscripten::val name { emscripten::val::u8string("ecc_getOrder") };
-    emscripten::val params { emscripten::val::null() };
-    
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on getOrder");
-    }
-    std::string n { result["buff"].as<std::string>() };
-    return std::make_unique<BNImpl>(n);
+    return std::make_unique<BNImpl>(getOrder());
 }
 
 PointImpl::Ptr ECCImpl::getEcGenerator() {
-    emscripten::val name { emscripten::val::u8string("ecc_getGenerator") };
-    emscripten::val params { emscripten::val::null() };
-    
-    emscripten::val result = Bindings::callJSRawSync(name, params);
-    int status = result["status"].as<int>();
-    if (status < 0) {
-        auto errorString = result["error"].as<std::string>();
-        Bindings::printErrorInJS(errorString);
-        throw std::runtime_error("Error: on getGenerator");
-    }
-    std::string g { result["buff"].as<std::string>() };
+    // Same as getGenerator
+    Poco::Dynamic::Var params;
+    std::string g = runEccOp<Pson::BinaryString>("ecc_getGenerator", params);
     return std::make_unique<PointImpl>(g);
 }
