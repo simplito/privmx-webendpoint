@@ -38,7 +38,7 @@ cd "$PRIVMX_ENDPOINT_DIR"
 
 rm -rf ./build-emscripten
 mkdir -p build-emscripten && cd build-emscripten
-emcmake cmake .. -D PRIVMX_EMSCRIPTEN=ON -D PRIVMX_BUILD_ENDPOINT=ON -D PRIVMX_DRIVER_CRYPTO=ON -D PRIVMX_DRIVER_NET=ON \
+emcmake cmake .. -D PRIVMX_EXECUTOR_THREAD_POOL_SIZE=2 -D PRIVMX_EMSCRIPTEN=ON -D PRIVMX_BUILD_ENDPOINT=ON -D PRIVMX_DRIVER_CRYPTO=ON -D PRIVMX_DRIVER_NET=ON \
     -D CMAKE_BUILD_TYPE=MinSizeRel 
 emmake make -j20
 emmake make install

@@ -349,8 +349,8 @@ export class EmCrypto {
         const privateKey = Utils.toArrayBuffer(this.fillWithZeroesTo32(Buffer.from(keyPair.getPrivate("hex"), "hex")));
         const publicKey = Utils.toArrayBuffer(Buffer.from(keyPair.getPublic().encodeCompressed()));
         return {
-            privateKey: privateKey,
-            publicKey: publicKey
+            privateKey: new Uint8Array(privateKey),
+            publicKey: new Uint8Array(publicKey),
         }
     }
 
