@@ -10,6 +10,7 @@ limitations under the License.
 */
 
 #include "Mapper.hpp"
+#include "Buffer.hpp"
 
 #include <emscripten.h>
 #include <emscripten/val.h>
@@ -21,8 +22,7 @@ limitations under the License.
 #include <Pson/BinaryString.hpp>
 #include <Pson/pson.h>
 
-#include <privmx/endpoint/core/Buffer.hpp>
-#include <privmx/endpoint/core/Exception.hpp>
+#include <stdexcept>
 
 #define CANONICAL_NUMBER_FACTOR 1073741823 // 0b00111111111111111111111111111111 = 2^30 - 1
 #define MIN_JS_SAFE_INTEGER -9007199254740991
@@ -105,7 +105,7 @@ Poco::Dynamic::Var Mapper::map(emscripten::val value){
         return value.as<bool>();
     }
     if (value.instanceof(emscripten::val::global("Uint8Array"))) {
-        return privmx::endpoint::core::Buffer::from(value.as<std::string>());
+        return Pson::BinaryString(value.as<std::string>());
     }
     if (value.isArray()) {
         Poco::JSON::Array::Ptr result = Poco::JSON::Array::Ptr(new Poco::JSON::Array());
@@ -149,7 +149,8 @@ emscripten::val Mapper::map(pson_value* res) {
                 int64_t val;
                 pson_get_int64(res, &val);
                 if (val < MIN_JS_SAFE_INTEGER || MAX_JS_SAFE_INTEGER < val) {
-                    throw privmx::endpoint::core::Exception("Number exceeded js safe integer range");
+                    // CHANGED: Use std::runtime_error instead of custom Exception
+                    throw std::runtime_error("Number exceeded js safe integer range");
                 }
                 bool isNegative = false;
                 if (val < 0) {

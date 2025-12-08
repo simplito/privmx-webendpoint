@@ -46,7 +46,7 @@ public:
     bool verify(const std::string& data, const std::string& signature) const;
     bool verify2(const std::string& data, const Signature& signature) const;
     std::string derive(const ECCImpl& ecc) const;
-    std::string getOrder() const;
+    static std::string getOrder();
     static BNImpl::Ptr getOrder2();
     PointImpl::Ptr getGenerator() const;
     BNImpl::Ptr getEcOrder() const;
