@@ -205,8 +205,8 @@ int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data
 int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* salt, unsigned int saltlen, int rounds, unsigned int length, const char* hash, char** out, unsigned int* outlen){
     auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
         val params = val::object();
-        params.set("password", createUint8Array(pass, passlen));
-        params.set("salt", createUint8Array(salt, saltlen));
+        params.set("password", std::string(pass,passlen));
+        params.set("salt", std::string(salt,saltlen));
         params.set("rounds", rounds);
         params.set("length", length);
         params.set("hash", std::string(hash));
