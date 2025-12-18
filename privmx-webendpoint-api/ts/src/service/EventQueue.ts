@@ -15,21 +15,17 @@ import { Event } from '../Types';
 
 export class EventQueue extends BaseApi {
 
-    private isPending: boolean = false;
+    private deferedPromise: Promise<Event>;
     constructor(private native: EventQueueNative, ptr: number) {
         super(ptr);
     }
 
     async waitEvent(): Promise<Event> {
-        if (this.isPending) {
-            throw ("WaitEvent() is already in a pending state waiting for new events");
+        if (!this.deferedPromise) {
+            this.deferedPromise = this.native.waitEvent(this.servicePtr, [])
+            this.deferedPromise.finally(() => this.deferedPromise = null);
         }
-        try {
-            return await this.native.waitEvent(this.servicePtr, []);
-        }
-        finally {
-            this.isPending = false;
-        }
+        return this.deferedPromise;
     }
 
     async emitBreakEvent(): Promise<void> {

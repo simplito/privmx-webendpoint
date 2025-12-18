@@ -18,5 +18,6 @@ set(CMAKE_CXX_FLAGS "-std=c++17 -fexceptions -pthread")
 target_link_options(privmxdrvnet PUBLIC
     -L $ENV{SDK_DIR}/upstream/emscripten/cache/sysroot/lib
     -sUSE_PTHREADS
+    -sEXPORTED_RUNTIME_METHODS=['HEAPU8','ccall']
 )
 install(TARGETS privmxdrvnet PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/privmx/drv)
