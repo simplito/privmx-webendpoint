@@ -5,8 +5,9 @@ file(GLOB_RECURSE SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 add_executable(endpoint-wasm-module main.cpp ${SRC_FILES})
 target_include_directories(endpoint-wasm-module PUBLIC ${PROJECT_SOURCE_DIR}/include)
 find_package(Threads REQUIRED)
+find_package(SQLite3 REQUIRED)
 find_package(Poco REQUIRED COMPONENTS Foundation JSON)
-target_link_libraries(endpoint-wasm-module secp256k1 Threads::Threads Poco::Foundation Poco::JSON Pson gmp privmx privmxendpointcore privmxendpointcrypto privmxendpointthread privmxendpointstore privmxendpointinbox privmxendpointkvdb privmxendpointevent embind privmxdrvcrypto privmxdrvecc privmxdrvnet asyncengine)
+target_link_libraries(endpoint-wasm-module secp256k1 Threads::Threads Poco::Foundation Poco::JSON Pson gmp privmx privmxendpointcore privmxendpointcrypto privmxendpointthread privmxendpointstore privmxendpointinbox privmxendpointkvdb privmxendpointevent embind privmxdrvcrypto privmxdrvecc privmxdrvnet asyncengine SQLite::SQLite3 privmxendpointsearch)
 set(CMAKE_CXX_FLAGS "-std=c++17 -fexceptions -pthread -flto")
 target_compile_options(endpoint-wasm-module PUBLIC 
     -O3

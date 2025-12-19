@@ -175,6 +175,24 @@ namespace api {
     API_FUNCTION_HEADER(ExtKey, verifyCompactSignatureWithHash)
     API_FUNCTION_HEADER(ExtKey, isPrivate)
 
+    void SearchApi_newSearchApi(int taskId, int connectionPtr, int storePtr, int kvdbPtr);
+    void SearchApi_deleteSearchApi(int taskId, int ptr);
+    API_FUNCTION_HEADER(SearchApi, create)
+    API_FUNCTION_HEADER(SearchApi, createSearchIndex)
+    API_FUNCTION_HEADER(SearchApi, updateSearchIndex)
+    API_FUNCTION_HEADER(SearchApi, deleteSearchIndex)
+    API_FUNCTION_HEADER(SearchApi, deleteSearchIndex)
+    API_FUNCTION_HEADER(SearchApi, getSearchIndex)
+    API_FUNCTION_HEADER(SearchApi, listSearchIndexes)
+    API_FUNCTION_HEADER(SearchApi, openSearchIndex)
+    API_FUNCTION_HEADER(SearchApi, closeSearchIndex)
+    API_FUNCTION_HEADER(SearchApi, addDocument)
+    API_FUNCTION_HEADER(SearchApi, updateDocument)
+    API_FUNCTION_HEADER(SearchApi, deleteDocument)
+    API_FUNCTION_HEADER(SearchApi, getDocument)
+    API_FUNCTION_HEADER(SearchApi, listDocuments)
+    API_FUNCTION_HEADER(SearchApi, searchDocuments)
+
 } // namespace api
 } // namespace webendpoint
 } // namespace privmx
