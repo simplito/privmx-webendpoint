@@ -7,6 +7,7 @@ import { BaseApi } from "./BaseApi";
 // import { StreamApiNative } from "../api/StreamApiNative";
 import { ContainerPolicy, PagingList, PagingQuery, StreamInfo, StreamEventSelectorType, StreamEventType, StreamRoom, UserWithPubKey, StreamSettings, StreamHandle, StreamSubscription, StreamPublishResult } from "../Types";
 import { StreamApiNative } from "../api/StreamApiNative";
+import { Buffer } from "buffer";
 
 
 
@@ -153,7 +154,7 @@ export class StreamApi extends BaseApi {
             throw new Error("[removeStreamTrack]: there is no Stream with given Id: "+streamHandle);
         }
         for (const [key, streamTrack] of this.streamTracks.entries()) {
-            if (streamTrack.track && streamTrack.track?.id === meta.track?.id) {
+            if (streamTrack.track && streamTrack.track?.id === meta.track?.id && streamTrack.streamHandle === streamHandle) {
                 streamTrack.markedToRemove = true;
             }
         }
@@ -283,12 +284,27 @@ export class StreamApi extends BaseApi {
     }
 
 
+    private filterMapByValue<K, V>(map: Map<K, V>, predicate: (value: V, key: K) => boolean): Map<K, V> {
+        const result = new Map<K, V>();
+
+        for (const [key, value] of map) {
+            if (predicate(value, key)) {
+            result.set(key, value);
+            }
+        }
+
+        return result;
+    }
+
     // PART DONE
     public async unpublishStream(streamHandle: StreamHandle): Promise<void> {
         if (!this.streams.has(streamHandle)) {
             throw new Error ("No local stream with given id to unpublish"); 
         }
         const _stream = this.streams.get(streamHandle);
+
+        const filteredTracks = this.filterMapByValue(this.streamTracks, (x => x.streamHandle !== streamHandle));
+        this.streamTracks = filteredTracks;
 
         // orig
         // await this.client.provideSession();
@@ -308,8 +324,8 @@ export class StreamApi extends BaseApi {
         //     streamId: streamIdToUnpublish
         // }});
 
-
         await this.native.unpublishStream(this.servicePtr, [streamHandle]);
+        this.client.removeSenderPeerConnectionOnUnpublish(_stream.streamRoomId, _stream.localMediaStream);
         this.streams.delete(streamHandle);
     }
 

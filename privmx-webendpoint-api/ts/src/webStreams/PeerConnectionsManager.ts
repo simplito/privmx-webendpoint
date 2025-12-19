@@ -11,7 +11,7 @@ export class PeerConnectionManager {
     constructor(private createPeerConnection: (room: StreamRoomId) => RTCPeerConnection, private onTrickle: (sessionId: SessionId, candidate: RTCIceCandidate) => void) {}
 
     public initialize(room: StreamRoomId, connectionType: ConnectionType, sessionId: SessionId = -1 as SessionId) {
-        if (room in this.connections && connectionType in this.connections[room]) {
+        if (room in this.connections && connectionType in this.connections[room] && this.connections[room][connectionType].pc) {
             // throw new Error("JanusConnection with given parameters initialized already.");
             return;
         }

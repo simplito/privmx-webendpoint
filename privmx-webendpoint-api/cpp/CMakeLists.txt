@@ -1,6 +1,7 @@
 project(endpoint-wasm-module)
 cmake_minimum_required(VERSION 3.18)
 set(CMAKE_CXX_STANDARD 17)
+
 file(GLOB_RECURSE SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
 add_executable(endpoint-wasm-module main.cpp ${SRC_FILES})
 target_include_directories(endpoint-wasm-module PUBLIC ${PROJECT_SOURCE_DIR}/include)
@@ -9,11 +10,13 @@ find_package(Poco REQUIRED COMPONENTS Foundation JSON)
 target_link_libraries(endpoint-wasm-module secp256k1 Threads::Threads Poco::Foundation Poco::JSON Pson gmp privmx privmxendpointcore privmxendpointcrypto privmxendpointthread privmxendpointstore privmxendpointinbox privmxendpointkvdb privmxendpointevent embind privmxdrvcrypto privmxdrvecc privmxdrvnet privmxendpointstream)
 set(CMAKE_CXX_FLAGS "-std=c++17 -fexceptions -pthread")
 target_compile_options(endpoint-wasm-module PUBLIC 
-    -O3
+    -O0
 )
 target_link_options(endpoint-wasm-module PUBLIC
     -L $ENV{SDK_DIR}/upstream/emscripten/cache/sysroot/lib
     -sASSERTIONS=2 -sEXPORT_EXCEPTION_HANDLING_HELPERS -sLLD_REPORT_UNDEFINED -sUSE_PTHREADS -sSAFE_HEAP=1
+    -sSTACK_OVERFLOW_CHECK=2
+    # -sDEMANGLE_SUPPORT=1
     -sASYNCIFY -sNO_EXIT_RUNTIME -sWASM=1 -sMODULARIZE -sEXPORT_NAME=endpointWasmModule
     -sALLOW_MEMORY_GROWTH=1 -sALLOW_BLOCKING_ON_MAIN_THREAD=0 -sPTHREAD_POOL_SIZE=0
     -sPTHREAD_POOL_SIZE_STRICT=0

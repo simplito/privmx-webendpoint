@@ -231,6 +231,13 @@ export class WebRtcClient {
         return pc;
     }
 
+    removeSenderPeerConnectionOnUnpublish(streamRoomId: StreamRoomId, _stream: MediaStream) {
+        const peerConnManager = this.getConnectionManager();
+        const session = peerConnManager.getConnectionWithSession(streamRoomId, "publisher");
+        session.pc.close();
+        session.pc = undefined;
+    }
+
     // async updatePeerConnectionWithLocalStream(streamRoomId: StreamRoomId, newStream: MediaStream, tracksToRemove: MediaStreamTrack[]): Promise<RTCPeerConnection> {
     //     this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
     //     const peerConnManager = this.getConnectionManager();
