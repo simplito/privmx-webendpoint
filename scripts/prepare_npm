@@ -17,7 +17,18 @@ mkdir -p $PUB_DIR
 
 
 cp $WORKING_DIR/package-template.json $WORKING_DIR/package.json
-sed -i '' "s/{__VERSION__}/$1/g" $WORKING_DIR/package.json
+
+OS="$(uname -s)"
+
+if [[ "$OS" == "Darwin" ]]; then
+  # macOS (BSD sed)
+  SED_INPLACE=(-i '')
+else
+  # Linux (GNU sed)
+  SED_INPLACE=(-i)
+fi
+
+sed "${SED_INPLACE[@]}" "s/{__VERSION__}/$1/g" $WORKING_DIR/package.json
 
 cd $WORKING_DIR
 npm run build
