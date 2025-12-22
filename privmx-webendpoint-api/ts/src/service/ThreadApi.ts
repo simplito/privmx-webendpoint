@@ -23,7 +23,10 @@ import {
 } from "../Types";
 
 export class ThreadApi extends BaseApi {
-  constructor(protected native: ThreadApiNative, ptr: number) {
+  constructor(
+    protected native: ThreadApiNative,
+    ptr: number,
+  ) {
     super(ptr);
   }
 
@@ -121,10 +124,7 @@ export class ThreadApi extends BaseApi {
    * @param {PagingQuery} pagingQuery  with list query parameters
    * @returns {PagingList<Thread>}  containing a list of Threads
    */
-  async listThreads(
-    contextId: string,
-    pagingQuery: PagingQuery
-  ): Promise<PagingList<Thread>> {
+  async listThreads(contextId: string, pagingQuery: PagingQuery): Promise<PagingList<Thread>> {
     return this.native.listThreads(this.servicePtr, [contextId, pagingQuery]);
   }
 
@@ -145,10 +145,7 @@ export class ThreadApi extends BaseApi {
    * @param {PagingQuery} pagingQuery  with list query parameters
    * @returns {PagingList<Message>}  containing a list of messages
    */
-  async listMessages(
-    threadId: string,
-    pagingQuery: PagingQuery
-  ): Promise<PagingList<Message>> {
+  async listMessages(threadId: string, pagingQuery: PagingQuery): Promise<PagingList<Message>> {
     return this.native.listMessages(this.servicePtr, [threadId, pagingQuery]);
   }
 
@@ -165,14 +162,9 @@ export class ThreadApi extends BaseApi {
     threadId: string,
     publicMeta: Uint8Array,
     privateMeta: Uint8Array,
-    data: Uint8Array
+    data: Uint8Array,
   ): Promise<string> {
-    return this.native.sendMessage(this.servicePtr, [
-      threadId,
-      publicMeta,
-      privateMeta,
-      data,
-    ]);
+    return this.native.sendMessage(this.servicePtr, [threadId, publicMeta, privateMeta, data]);
   }
 
   /**
@@ -196,14 +188,9 @@ export class ThreadApi extends BaseApi {
     messageId: string,
     publicMeta: Uint8Array,
     privateMeta: Uint8Array,
-    data: Uint8Array
+    data: Uint8Array,
   ): Promise<void> {
-    return this.native.updateMessage(this.servicePtr, [
-      messageId,
-      publicMeta,
-      privateMeta,
-      data,
-    ]);
+    return this.native.updateMessage(this.servicePtr, [messageId, publicMeta, privateMeta, data]);
   }
 
   // /**
@@ -240,29 +227,37 @@ export class ThreadApi extends BaseApi {
 
   /**
    * Subscribe for the Thread events on the given subscription query.
-   * 
+   *
    * @param {string[]} subscriptionQueries list of queries
    * @return list of subscriptionIds in maching order to subscriptionQueries
    */
-    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
-      return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
-    }
+  async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+    return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
+  }
 
-    /**
-     * Unsubscribe from events for the given subscriptionId.
-     * @param {string[]} subscriptionIds list of subscriptionId
-     */
-    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
-      return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
-    }
+  /**
+   * Unsubscribe from events for the given subscriptionId.
+   * @param {string[]} subscriptionIds list of subscriptionId
+   */
+  async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
+    return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
+  }
 
-    /**
-     * Generate subscription Query for the Thread events.
-     * @param {EventType} eventType type of event which you listen for
-     * @param {EventSelectorType} selectorType scope on which you listen for events  
-     * @param {string} selectorId ID of the selector
-     */
-    async buildSubscriptionQuery(eventType: ThreadEventType, selectorType: ThreadEventSelectorType, selectorId: string): Promise<string> {
-      return this.native.buildSubscriptionQuery(this.servicePtr, [eventType, selectorType, selectorId]);
-    }
+  /**
+   * Generate subscription Query for the Thread events.
+   * @param {EventType} eventType type of event which you listen for
+   * @param {EventSelectorType} selectorType scope on which you listen for events
+   * @param {string} selectorId ID of the selector
+   */
+  async buildSubscriptionQuery(
+    eventType: ThreadEventType,
+    selectorType: ThreadEventSelectorType,
+    selectorId: string,
+  ): Promise<string> {
+    return this.native.buildSubscriptionQuery(this.servicePtr, [
+      eventType,
+      selectorType,
+      selectorId,
+    ]);
+  }
 }

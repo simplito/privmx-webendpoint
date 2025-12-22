@@ -66,7 +66,6 @@ export interface GenericEvent<K> extends Types.Event {
   data: K;
 }
 
-
 export abstract class BaseEventDispatcherManager {
   private _listenersSymbols = new Map<Symbol, string>();
   private _listeners = new Map<string, EventCallback[]>();
@@ -124,10 +123,7 @@ export abstract class BaseEventDispatcherManager {
   async unsubscribeFrom(subscriptionsId: string[]) {
     const knownIds: string[] = [];
     for (const subscriptionId of subscriptionsId) {
-      for (const [
-        key,
-        callbackSubscription,
-      ] of this._listenersSymbols.entries()) {
+      for (const [key, callbackSubscription] of this._listenersSymbols.entries()) {
         if (callbackSubscription === subscriptionId) {
           knownIds.push(subscriptionId);
           this.unregisterCallback(key);
@@ -154,10 +150,7 @@ export class ThreadEventsManager extends BaseEventDispatcherManager {
   }
 
   async subscribeFor(
-    subscriptions: Subscription<
-      Types.ThreadEventType,
-      Types.ThreadEventSelectorType
-    >[],
+    subscriptions: Subscription<Types.ThreadEventType, Types.ThreadEventSelectorType>[],
   ) {
     const subscriptionChannels = await Promise.all(
       subscriptions.map((s) => {
@@ -182,10 +175,7 @@ export class StoreEventsManager extends BaseEventDispatcherManager {
   }
 
   async subscribeFor(
-    subscriptions: Subscription<
-      Types.StoreEventType,
-      Types.StoreEventSelectorType
-    >[],
+    subscriptions: Subscription<Types.StoreEventType, Types.StoreEventSelectorType>[],
   ) {
     const subscriptionChannels = await Promise.all(
       subscriptions.map((s) => {
@@ -210,10 +200,7 @@ export class InboxEventsManager extends BaseEventDispatcherManager {
   }
 
   async subscribeFor(
-    subscriptions: Subscription<
-      Types.InboxEventType,
-      Types.InboxEventSelectorType
-    >[],
+    subscriptions: Subscription<Types.InboxEventType, Types.InboxEventSelectorType>[],
   ) {
     const subscriptionChannels = await Promise.all(
       subscriptions.map((s) => {
@@ -237,10 +224,7 @@ export class KvdbEventsManager extends BaseEventDispatcherManager {
   }
 
   async subscribeFor(
-    subscriptions: Subscription<
-      Types.KvdbEventType,
-      Types.KvdbEventSelectorType
-    >[],
+    subscriptions: Subscription<Types.KvdbEventType, Types.KvdbEventSelectorType>[],
   ) {
     const subscriptionChannels = await Promise.all(
       subscriptions.map((s) => {
@@ -264,9 +248,7 @@ export class CustomEventsManager extends BaseEventDispatcherManager {
     return this.eventsApi.unsubscribeFrom(subscriptionId);
   }
 
-  async subscribeFor(
-    subscriptions: Subscription<string, Types.EventsEventSelectorType>[],
-  ) {
+  async subscribeFor(subscriptions: Subscription<string, Types.EventsEventSelectorType>[]) {
     const subscriptionChannels = await Promise.all(
       subscriptions.map((s) => {
         return this.eventsApi.buildSubscriptionQuery(s.type, s.selector, s.id);
@@ -279,8 +261,7 @@ export class CustomEventsManager extends BaseEventDispatcherManager {
 export const ConnectionChannels: Record<ConnectionStatusEventType, string> = {
   [ConnectionStatusEventType.LIB_CONNECTED]: "channel/lib_connected",
   [ConnectionStatusEventType.LIB_DISCONNECTED]: "channel/lib_disconnected",
-  [ConnectionStatusEventType.LIB_PLATFORM_DISCONNECTED]:
-    "channel/lib_platform_disconnected",
+  [ConnectionStatusEventType.LIB_PLATFORM_DISCONNECTED]: "channel/lib_platform_disconnected",
 };
 
 export class ConnectionEventsManager extends BaseEventDispatcherManager {
@@ -317,18 +298,11 @@ export class UserEventsManager extends BaseEventDispatcherManager {
   }
 
   async subscribeFor(
-    subscriptions: Subscription<
-      Types.ConnectionEventType,
-      Types.ConnectionEventSelectorType
-    >[],
+    subscriptions: Subscription<Types.ConnectionEventType, Types.ConnectionEventSelectorType>[],
   ) {
     const subscriptionChannels = await Promise.all(
       subscriptions.map((s) => {
-        return this.userEventsApi.buildSubscriptionQuery(
-          s.type,
-          s.selector,
-          s.id,
-        );
+        return this.userEventsApi.buildSubscriptionQuery(s.type, s.selector, s.id);
       }),
     );
 

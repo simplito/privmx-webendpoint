@@ -39,222 +39,233 @@ declare function endpointWasmModule(): Promise<any>; // Provided by emscripten j
  * Contains static factory methods - generators for Connection and APIs.
  */
 export class EndpointFactory {
-    private static api: Api;
-    private static eventQueueInstance: EventQueue;
+  private static api: Api;
+  private static eventQueueInstance: EventQueue;
 
-    /**
-     * Load the Endpoint's WASM assets and initialize the Endpoint library.
-     *
-     * @param {string} [assetsBasePath] base path/url to the Endpoint's WebAssembly assets (like: endpoint-wasm-module.js, driver-web-context.js and others)
-     */
-    public static async setup(assetsBasePath?: string): Promise<void> {
-        const basePath = assetsBasePath || (document.currentScript as HTMLScriptElement).src.split("/").slice(0, -1).join("/");
-        const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
-        for (const asset of assets) {
-            await this.loadScript(basePath + "/" + asset);
-        }
-        const lib = await endpointWasmModule();
-        EndpointFactory.init(lib);
+  /**
+   * Load the Endpoint's WASM assets and initialize the Endpoint library.
+   *
+   * @param {string} [assetsBasePath] base path/url to the Endpoint's WebAssembly assets (like: endpoint-wasm-module.js, driver-web-context.js and others)
+   */
+  public static async setup(assetsBasePath?: string): Promise<void> {
+    const basePath =
+      assetsBasePath ||
+      (document.currentScript as HTMLScriptElement).src.split("/").slice(0, -1).join("/");
+    const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
+    for (const asset of assets) {
+      await this.loadScript(basePath + "/" + asset);
     }
+    const lib = await endpointWasmModule();
+    EndpointFactory.init(lib);
+  }
 
-    private static async loadScript(url: string): Promise<void> {
-        return new Promise<void>(resolve => {
-            const head = document.getElementsByTagName('head')[0];
-            const script = document.createElement('script');
-            script.type = 'text/javascript';
-            script.src = url;
+  private static async loadScript(url: string): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const head = document.getElementsByTagName("head")[0];
+      const script = document.createElement("script");
+      script.type = "text/javascript";
+      script.src = url;
 
-            script.onload = () => {
-                resolve()
-            };
-            head.appendChild(script);
-        });
+      script.onload = () => {
+        resolve();
+      };
+      head.appendChild(script);
+    });
+  }
+
+  /**
+   * //doc-gen:ignore
+   */
+  private static init(lib: any) {
+    this.api = new Api(lib);
+    ApiStatic.init(this.api);
+    FinalizationHelper.init(lib);
+  }
+
+  /**
+   * Gets the EventQueue instance.
+   *
+   * @returns {EventQueue} instance of EventQueue
+   */
+  static async getEventQueue(): Promise<EventQueue> {
+    if (!this.eventQueueInstance) {
+      const nativeApi = new EventQueueNative(this.api);
+      const ptr = await nativeApi.newEventQueue();
+      this.eventQueueInstance = new EventQueue(nativeApi, ptr);
     }
+    return this.eventQueueInstance;
+  }
 
-    /**
-     * //doc-gen:ignore
-     */
-    private static init(lib: any) {
-        this.api = new Api(lib);
-        ApiStatic.init(this.api);
-        FinalizationHelper.init(lib);
+  private static generateDefaultPKIVerificationOptions(): PKIVerificationOptions {
+    return {
+      bridgeInstanceId: undefined,
+      bridgePubKey: undefined,
+    };
+  }
+
+  /**
+   * Connects to the platform backend.
+   *
+   * @param {string} userPrivKey user's private key
+   * @param {string} solutionId ID of the Solution
+   * @param {string} bridgeUrl the Bridge Server URL
+   * @param {PKIVerificationOptions} [verificationOptions] PrivMX Bridge server instance verification options using a PKI server
+   * @returns {Connection} instance of Connection
+   */
+  static async connect(
+    userPrivKey: string,
+    solutionId: string,
+    bridgeUrl: string,
+    verificationOptions?: PKIVerificationOptions,
+  ): Promise<Connection> {
+    const nativeApi = new ConnectionNative(this.api);
+    const ptr = await nativeApi.newConnection();
+    await nativeApi.connect(ptr, [
+      userPrivKey,
+      solutionId,
+      bridgeUrl,
+      verificationOptions || this.generateDefaultPKIVerificationOptions(),
+    ]);
+
+    return new Connection(nativeApi, ptr);
+  }
+
+  /**
+   * Connects to the Platform backend as a guest user.
+   *
+   * @param {string} solutionId ID of the Solution
+   * @param {string} bridgeUrl the Bridge Server URL
+   * @param {PKIVerificationOptions} [verificationOptions] PrivMX Bridge server instance verification options using a PKI server
+   * @returns {Connection} instance of Connection
+   */
+  static async connectPublic(
+    solutionId: string,
+    bridgeUrl: string,
+    verificationOptions?: PKIVerificationOptions,
+  ): Promise<Connection> {
+    const nativeApi = new ConnectionNative(this.api);
+    const ptr = await nativeApi.newConnection();
+    await nativeApi.connectPublic(ptr, [
+      solutionId,
+      bridgeUrl,
+      verificationOptions || this.generateDefaultPKIVerificationOptions(),
+    ]);
+    return new Connection(nativeApi, ptr);
+  }
+
+  /**
+   * Creates an instance of the Thread API.
+   *
+   * @param {Connection} connection instance of Connection
+   *
+   * @returns {ThreadApi} instance of ThreadApi
+   */
+  static async createThreadApi(connection: Connection): Promise<ThreadApi> {
+    if ("threads" in connection.apisRefs) {
+      throw new Error("ThreadApi already registered for given connection.");
     }
+    const nativeApi = new ThreadApiNative(this.api);
+    const ptr = await nativeApi.newApi(connection.servicePtr);
+    await nativeApi.create(ptr, []);
+    connection.apisRefs["threads"] = { _apiServicePtr: ptr };
+    connection.nativeApisDeps["threads"] = nativeApi;
+    return new ThreadApi(nativeApi, ptr);
+  }
 
-    /**
-     * Gets the EventQueue instance.
-     *
-     * @returns {EventQueue} instance of EventQueue
-     */
-    static async getEventQueue(): Promise<EventQueue> {
-        if (!this.eventQueueInstance) {
-            const nativeApi = new EventQueueNative(this.api);
-            const ptr = await nativeApi.newEventQueue();
-            this.eventQueueInstance = new EventQueue(nativeApi, ptr);
-        }
-        return this.eventQueueInstance;
+  /**
+   * Creates an instance of the Store API.
+   *
+   * @param {Connection} connection instance of Connection
+   *
+   * @returns {StoreApi} instance of StoreApi
+   */
+  static async createStoreApi(connection: Connection): Promise<StoreApi> {
+    if ("stores" in connection.apisRefs) {
+      throw new Error("StoreApi already registered for given connection.");
     }
+    const nativeApi = new StoreApiNative(this.api);
+    const ptr = await nativeApi.newApi(connection.servicePtr);
+    connection.apisRefs["stores"] = { _apiServicePtr: ptr };
+    connection.nativeApisDeps["stores"] = nativeApi;
+    await nativeApi.create(ptr, []);
+    return new StoreApi(nativeApi, ptr);
+  }
 
-    private static generateDefaultPKIVerificationOptions(): PKIVerificationOptions {
-        return {
-            bridgeInstanceId: undefined,
-            bridgePubKey: undefined
-        }
+  /**
+   * Creates an instance of the Inbox API.
+   *
+   * @param {Connection} connection instance of Connection
+   * @param {ThreadApi} threadApi instance of ThreadApi
+   * @param {StoreApi} storeApi instance of StoreApi
+   * @returns {InboxApi} instance of InboxApi
+   */
+  static async createInboxApi(
+    connection: Connection,
+    threadApi: ThreadApi,
+    storeApi: StoreApi,
+  ): Promise<InboxApi> {
+    if ("inboxes" in connection.apisRefs) {
+      throw new Error("InboxApi already registered for given connection.");
     }
+    const nativeApi = new InboxApiNative(this.api);
+    const ptr = await nativeApi.newApi(
+      connection.servicePtr,
+      threadApi.servicePtr,
+      storeApi.servicePtr,
+    );
+    connection.apisRefs["inboxes"] = { _apiServicePtr: ptr };
+    connection.nativeApisDeps["inboxes"] = nativeApi;
+    await nativeApi.create(ptr, []);
+    return new InboxApi(nativeApi, ptr);
+  }
 
-    /**
-     * Connects to the platform backend.
-     *
-     * @param {string} userPrivKey user's private key
-     * @param {string} solutionId ID of the Solution
-     * @param {string} bridgeUrl the Bridge Server URL
-     * @param {PKIVerificationOptions} [verificationOptions] PrivMX Bridge server instance verification options using a PKI server
-     * @returns {Connection} instance of Connection
-     */
-    static async connect(
-        userPrivKey: string,
-        solutionId: string,
-        bridgeUrl: string,
-        verificationOptions?: PKIVerificationOptions
-    ): Promise<Connection> {
-        const nativeApi = new ConnectionNative(this.api);
-        const ptr = await nativeApi.newConnection();
-        await nativeApi.connect(ptr, [userPrivKey, solutionId, bridgeUrl, verificationOptions || this.generateDefaultPKIVerificationOptions()]);
-
-        return new Connection(nativeApi, ptr);
+  /**
+   * Creates an instance of the Kvdb API.
+   *
+   * @param {Connection} connection instance of Connection
+   *
+   * @returns {KvdbApi} instance of KvdbApi
+   */
+  static async createKvdbApi(connection: Connection): Promise<KvdbApi> {
+    if ("kvdbs" in connection.apisRefs) {
+      throw new Error("KvdbApi already registered for given connection.");
     }
+    const nativeApi = new KvdbApiNative(this.api);
+    const ptr = await nativeApi.newApi(connection.servicePtr);
+    await nativeApi.create(ptr, []);
+    connection.apisRefs["kvdbs"] = { _apiServicePtr: ptr };
+    connection.nativeApisDeps["kvdbs"] = nativeApi;
+    return new KvdbApi(nativeApi, ptr);
+  }
 
-    /**
-     * Connects to the Platform backend as a guest user.
-     *
-     * @param {string} solutionId ID of the Solution
-     * @param {string} bridgeUrl the Bridge Server URL
-     * @param {PKIVerificationOptions} [verificationOptions] PrivMX Bridge server instance verification options using a PKI server
-     * @returns {Connection} instance of Connection
-     */
-    static async connectPublic(
-        solutionId: string,
-        bridgeUrl: string,
-        verificationOptions?: PKIVerificationOptions
-    ): Promise<Connection> {
-        const nativeApi = new ConnectionNative(this.api);
-        const ptr = await nativeApi.newConnection();
-        await nativeApi.connectPublic(ptr, [solutionId, bridgeUrl, verificationOptions || this.generateDefaultPKIVerificationOptions()]);
-        return new Connection(nativeApi, ptr);
-    }
+  /**
+   * Creates an instance of the Crypto API.
+   *
+   * @returns {CryptoApi} instance of CryptoApi
+   */
+  static async createCryptoApi(): Promise<CryptoApi> {
+    const nativeApi = new CryptoApiNative(this.api);
+    const ptr = await nativeApi.newApi();
+    await nativeApi.create(ptr, []);
+    return new CryptoApi(nativeApi, ptr);
+  }
 
-    /**
-     * Creates an instance of the Thread API.
-     *
-     * @param {Connection} connection instance of Connection
-     *
-     * @returns {ThreadApi} instance of ThreadApi
-     */
-    static async createThreadApi(connection: Connection): Promise<ThreadApi> {
-        if ("threads" in connection.apisRefs) {
-            throw new Error("ThreadApi already registered for given connection.");
-        }
-        const nativeApi = new ThreadApiNative(this.api);
-        const ptr = await nativeApi.newApi(connection.servicePtr);
-        await nativeApi.create(ptr, []);
-        connection.apisRefs["threads"] = { _apiServicePtr: ptr };
-        connection.nativeApisDeps["threads"] = nativeApi;
-        return new ThreadApi(nativeApi, ptr);
+  /**
+   * Creates an instance of 'EventApi'.
+   *
+   * @param connection instance of 'Connection'
+   *
+   * @returns {EventApi} instance of EventApi
+   */
+  static async createEventApi(connection: Connection): Promise<EventApi> {
+    if ("events" in connection.apisRefs) {
+      throw new Error("EventApi already registered for given connection.");
     }
-
-    /**
-     * Creates an instance of the Store API.
-     *
-     * @param {Connection} connection instance of Connection
-     *
-     * @returns {StoreApi} instance of StoreApi
-     */
-    static async createStoreApi(connection: Connection): Promise<StoreApi> {
-        if ("stores" in connection.apisRefs) {
-            throw new Error("StoreApi already registered for given connection.");
-        }
-        const nativeApi = new StoreApiNative(this.api);
-        const ptr = await nativeApi.newApi(connection.servicePtr);
-        connection.apisRefs["stores"] = { _apiServicePtr: ptr };
-        connection.nativeApisDeps["stores"] = nativeApi;
-        await nativeApi.create(ptr, []);
-        return new StoreApi(nativeApi, ptr);
-    }
-
-    /**
-     * Creates an instance of the Inbox API.
-     *
-     * @param {Connection} connection instance of Connection
-     * @param {ThreadApi} threadApi instance of ThreadApi
-     * @param {StoreApi} storeApi instance of StoreApi
-     * @returns {InboxApi} instance of InboxApi
-     */
-    static async createInboxApi(
-        connection: Connection,
-        threadApi: ThreadApi,
-        storeApi: StoreApi
-    ): Promise<InboxApi> {
-        if ("inboxes" in connection.apisRefs) {
-            throw new Error("InboxApi already registered for given connection.");
-        }
-        const nativeApi = new InboxApiNative(this.api);
-        const ptr = await nativeApi.newApi(
-            connection.servicePtr,
-            threadApi.servicePtr,
-            storeApi.servicePtr
-        );
-        connection.apisRefs["inboxes"] = { _apiServicePtr: ptr };
-        connection.nativeApisDeps["inboxes"] = nativeApi;
-        await nativeApi.create(ptr, []);
-        return new InboxApi(nativeApi, ptr);
-    }
-
-    /**
-     * Creates an instance of the Kvdb API.
-     *
-     * @param {Connection} connection instance of Connection
-     *
-     * @returns {KvdbApi} instance of KvdbApi
-     */
-    static async createKvdbApi(connection: Connection): Promise<KvdbApi> {
-        if ("kvdbs" in connection.apisRefs) {
-            throw new Error("KvdbApi already registered for given connection.");
-        }
-        const nativeApi = new KvdbApiNative(this.api);
-        const ptr = await nativeApi.newApi(connection.servicePtr);
-        await nativeApi.create(ptr, []);
-        connection.apisRefs["kvdbs"] = { _apiServicePtr: ptr };
-        connection.nativeApisDeps["kvdbs"] = nativeApi;
-        return new KvdbApi(nativeApi, ptr);
-    }
-
-    /**
-     * Creates an instance of the Crypto API.
-     *
-     * @returns {CryptoApi} instance of CryptoApi
-     */
-    static async createCryptoApi(): Promise<CryptoApi> {
-        const nativeApi = new CryptoApiNative(this.api);
-        const ptr = await nativeApi.newApi();
-        await nativeApi.create(ptr, []);
-        return new CryptoApi(nativeApi, ptr);
-    }
-
-    /**
-     * Creates an instance of 'EventApi'.
-     * 
-     * @param connection instance of 'Connection'
-     * 
-     * @returns {EventApi} instance of EventApi
-     */
-    static async createEventApi(connection: Connection): Promise<EventApi> {
-        if ("events" in connection.apisRefs) {
-            throw new Error("EventApi already registered for given connection.");
-        }
-        const nativeApi = new EventApiNative(this.api);
-        const ptr = await nativeApi.newApi(connection.servicePtr);
-        connection.apisRefs["events"] = { _apiServicePtr: ptr };
-        connection.nativeApisDeps["events"] = nativeApi;
-        await nativeApi.create(ptr, []);
-        return new EventApi(nativeApi, ptr);
-    }
+    const nativeApi = new EventApiNative(this.api);
+    const ptr = await nativeApi.newApi(connection.servicePtr);
+    connection.apisRefs["events"] = { _apiServicePtr: ptr };
+    connection.nativeApisDeps["events"] = nativeApi;
+    await nativeApi.create(ptr, []);
+    return new EventApi(nativeApi, ptr);
+  }
 }

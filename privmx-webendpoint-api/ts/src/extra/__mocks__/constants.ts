@@ -19,10 +19,7 @@ export const MOCK_INBOX_CREATED_EVENT = (subsId: string) =>
     channel: `inbox`,
   }) satisfies Types.Event;
 
-export const MOCK_INBOX_ENTRY_DELETED_EVENT = (
-  inboxID: string,
-  subsId: string,
-) =>
+export const MOCK_INBOX_ENTRY_DELETED_EVENT = (inboxID: string, subsId: string) =>
   ({
     ...createBaseEvent(subsId),
     type: "inboxEntryDeleted",
@@ -35,10 +32,7 @@ export const MOCK_STORE_CREATED_EVENT = (subsId: string) => ({
   channel: `store`,
 });
 
-export const MOCK_STORE_FILE_DELETED_EVENT = (
-  storeID: string,
-  subsId: string,
-) =>
+export const MOCK_STORE_FILE_DELETED_EVENT = (storeID: string, subsId: string) =>
   ({
     ...createBaseEvent(subsId),
     type: "storeFileCreated",
@@ -51,19 +45,14 @@ export const MOCK_THREAD_CREATED_EVENT = (subsId: string) => ({
   channel: `thread`,
 });
 
-export const MOCK_THREAD_MESSAGE_DELETED_EVENT = (
-  threadID: string,
-  subsId: string,
-) =>
+export const MOCK_THREAD_MESSAGE_DELETED_EVENT = (threadID: string, subsId: string) =>
   ({
     ...createBaseEvent(subsId),
     type: "threadNewMessage",
     channel: `thread/${threadID}/messages`,
   }) as const;
 
-export const MOCK_CONNECTION_USER_ADDED_EVENT = (
-  subsId: string,
-): Types.Event => ({
+export const MOCK_CONNECTION_USER_ADDED_EVENT = (subsId: string): Types.Event => ({
   ...createBaseEvent(subsId),
   type: "contextUserAdded",
   channel: "context/userAdded",
@@ -76,9 +65,7 @@ export const MOCK_CONNECTION_USER_ADDED_EVENT = (
   } satisfies Types.ContextUserEventData,
 });
 
-export const MOCK_CONNECTION_USER_STATUS_EVENT = (
-  subsId: string,
-): Types.Event => ({
+export const MOCK_CONNECTION_USER_STATUS_EVENT = (subsId: string): Types.Event => ({
   ...createBaseEvent(subsId),
   type: "contextUserStatusChanged",
   channel: "context/userStatus",
@@ -96,9 +83,7 @@ export const MOCK_CONNECTION_USER_STATUS_EVENT = (
   } satisfies Types.ContextUsersStatusChangedEventData,
 });
 
-export const MOCK_LIB_CONNECTED_EVENT = (
-  connectionId: number,
-): Types.Event => ({
+export const MOCK_LIB_CONNECTED_EVENT = (connectionId: number): Types.Event => ({
   ...createBaseEvent("ignored"),
   type: "libConnected",
   channel: "channel/lib_connected",

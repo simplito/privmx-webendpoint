@@ -11,12 +11,19 @@ limitations under the License.
 
 import { BaseApi } from "./BaseApi";
 import { ConnectionNative } from "../api/ConnectionNative";
-import { PagingQuery, PagingList, Context, UserInfo, PKIVerificationOptions, ConnectionEventType, ConnectionEventSelectorType } from "../Types";
+import {
+  PagingQuery,
+  PagingList,
+  Context,
+  UserInfo,
+  PKIVerificationOptions,
+  ConnectionEventType,
+  ConnectionEventSelectorType,
+} from "../Types";
 import { BaseNative } from "../api/BaseNative";
 import { UserVerifierInterface } from "./UserVerifierInterface";
 
 export class Connection extends BaseApi {
-  
   /**
    * //doc-gen:ignore
    */
@@ -27,7 +34,10 @@ export class Connection extends BaseApi {
    */
   nativeApisDeps: { [apiId: string]: BaseNative } = {};
 
-  constructor(private native: ConnectionNative, ptr: number) {
+  constructor(
+    private native: ConnectionNative,
+    ptr: number,
+  ) {
     super(ptr);
   }
 
@@ -52,18 +62,21 @@ export class Connection extends BaseApi {
 
   /**
    * Gets a list of users of given context.
-   * 
+   *
    * @param contextId ID of the Context
-   * 
+   *
    * @returns a list of the UserInfo objects
    */
-  async listContextUsers(contextId: string, pagingQuery: PagingQuery): Promise<PagingList<UserInfo>> {
+  async listContextUsers(
+    contextId: string,
+    pagingQuery: PagingQuery,
+  ): Promise<PagingList<UserInfo>> {
     return this.native.listContextUsers(this.servicePtr, [contextId, pagingQuery]);
   }
 
   /**
    * Subscribe for the Context events on the given subscription query.
-   * 
+   *
    * @param {string[]} subscriptionQueries list of queries
    * @return list of subscriptionIds in matching order to subscriptionQueries
    */
@@ -82,11 +95,19 @@ export class Connection extends BaseApi {
   /**
    * Generate subscription Query for the Context events.
    * @param {EventType} eventType type of event which you listen for
-   * @param {EventSelectorType} selectorType scope on which you listen for events  
+   * @param {EventSelectorType} selectorType scope on which you listen for events
    * @param {string} selectorId ID of the selector
    */
-  async buildSubscriptionQuery(eventType: ConnectionEventType, selectorType: ConnectionEventSelectorType, selectorId: string): Promise<string> {
-    return this.native.buildSubscriptionQuery(this.servicePtr, [eventType, selectorType, selectorId]);
+  async buildSubscriptionQuery(
+    eventType: ConnectionEventType,
+    selectorType: ConnectionEventSelectorType,
+    selectorId: string,
+  ): Promise<string> {
+    return this.native.buildSubscriptionQuery(this.servicePtr, [
+      eventType,
+      selectorType,
+      selectorId,
+    ]);
   }
 
   /**
@@ -99,26 +120,24 @@ export class Connection extends BaseApi {
     await this.native.deleteConnection(this.servicePtr);
   }
 
-    /**
-     * Sets user's custom verification callback.
-     * 
-     * The feature allows the developer to set up a callback for user verification. 
-     * A developer can implement an interface and pass the implementation to the function. 
-     * Each time data is read from the container, a callback will be triggered, allowing the developer to validate the sender in an external service,
-     * e.g. Developer's Application Server or PKI Server.
-     * @param verifier an implementation of the UserVerifierInterface
-     * 
-     */
-    setUserVerifier(verifier: UserVerifierInterface): Promise<void> {
-      return this.native.setUserVerifier(this.servicePtr, [this.servicePtr, verifier]);
-    }
+  /**
+   * Sets user's custom verification callback.
+   *
+   * The feature allows the developer to set up a callback for user verification.
+   * A developer can implement an interface and pass the implementation to the function.
+   * Each time data is read from the container, a callback will be triggered, allowing the developer to validate the sender in an external service,
+   * e.g. Developer's Application Server or PKI Server.
+   * @param verifier an implementation of the UserVerifierInterface
+   *
+   */
+  setUserVerifier(verifier: UserVerifierInterface): Promise<void> {
+    return this.native.setUserVerifier(this.servicePtr, [this.servicePtr, verifier]);
+  }
 
   private async freeApis() {
     for (const apiId in this.apisRefs) {
       if (this.nativeApisDeps[apiId]) {
-        await this.nativeApisDeps[apiId].deleteApi(
-          this.apisRefs[apiId]._apiServicePtr
-        );
+        await this.nativeApisDeps[apiId].deleteApi(this.apisRefs[apiId]._apiServicePtr);
       }
     }
   }

@@ -1,7 +1,5 @@
 import { Types } from "../../index";
-import {
-  MOCK_CUSTOM_EVENT,
-} from "../__mocks__/constants";
+import { MOCK_CUSTOM_EVENT } from "../__mocks__/constants";
 import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber";
 import { createTestSetup, waitForNextTick } from "../__mocks__/utils";
 import { createEventSubscription } from "../subscriptions";
@@ -22,8 +20,7 @@ describe("Custom event manager", () => {
   });
 
   it("dispatches custom events to registered callbacks", async () => {
-    const subscriber =
-      new MockContainerSubscriber<string, Types.EventsEventSelectorType>(q);
+    const subscriber = new MockContainerSubscriber<string, Types.EventsEventSelectorType>(q);
     const buildQuerySpy = jest
       .spyOn(subscriber, "buildSubscriptionQuery")
       .mockImplementation(async (channel, selector, selectorId) => {
@@ -73,9 +70,7 @@ describe("Custom event manager", () => {
       callbacks: [callback],
     });
 
-    const [subscriptionId] = await customEventsManager.subscribeFor([
-      subscription,
-    ]);
+    const [subscriptionId] = await customEventsManager.subscribeFor([subscription]);
 
     await customEventsManager.unsubscribeFrom([subscriptionId]);
 

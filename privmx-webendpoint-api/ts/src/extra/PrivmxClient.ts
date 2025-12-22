@@ -8,11 +8,19 @@ import {
   ThreadApi,
   KvdbApi,
   EventApi,
-} from '../service';
+} from "../service";
 
-import { PublicConnection } from './PublicConnection';
-import {ConnectionEventsManager, CustomEventsManager, InboxEventsManager, KvdbEventsManager, StoreEventsManager, ThreadEventsManager, UserEventsManager} from "./managers";
-import {EventManager} from "./events";
+import { PublicConnection } from "./PublicConnection";
+import {
+  ConnectionEventsManager,
+  CustomEventsManager,
+  InboxEventsManager,
+  KvdbEventsManager,
+  StoreEventsManager,
+  ThreadEventsManager,
+  UserEventsManager,
+} from "./managers";
+import { EventManager } from "./events";
 
 /**
  * @class PrivmxClient
@@ -51,8 +59,7 @@ export class PrivmxClient {
   private kvdbApi: Promise<KvdbApi> | null = null;
   private eventApi: Promise<EventApi> | null = null;
 
-  private connectionEventManager: Promise<ConnectionEventsManager> | null =
-    null;
+  private connectionEventManager: Promise<ConnectionEventsManager> | null = null;
   private userEventManager: Promise<UserEventsManager> | null = null;
   private threadEventManager: Promise<ThreadEventsManager> | null = null;
   private storeEventManager: Promise<StoreEventsManager> | null = null;
@@ -81,9 +88,7 @@ export class PrivmxClient {
 
   private static checkSetup() {
     if (!this.isSetup) {
-      throw new Error(
-        'Endpoint not initialized, use PrivMXClient.setup(folderPath).'
-      );
+      throw new Error("Endpoint not initialized, use PrivMXClient.setup(folderPath).");
     }
   }
 
@@ -153,23 +158,19 @@ export class PrivmxClient {
   static async connect(
     privateKey: string,
     solutionId: string,
-    bridgeUrl: string
+    bridgeUrl: string,
   ): Promise<PrivmxClient> {
     this.checkSetup();
 
-    const connection = await EndpointFactory.connect(
-      privateKey,
-      solutionId,
-      bridgeUrl
-    );
+    const connection = await EndpointFactory.connect(privateKey, solutionId, bridgeUrl);
 
     if (!connection) {
-      throw new Error('ERROR: Could not connect to bridge');
+      throw new Error("ERROR: Could not connect to bridge");
     }
     return new PrivmxClient(connection);
   }
 
-    /**
+  /**
    * Connects to the Platform backend as a guest user.
    *
    * @param {string} solutionId ID of the Solution
@@ -177,13 +178,13 @@ export class PrivmxClient {
    *
    * @returns {Promise<PublicConnection>} Promised instance of Connection
    */
-  static async connectPublic(solutionId: string, bridgeUrl: string): Promise<PublicConnection>{
+  static async connectPublic(solutionId: string, bridgeUrl: string): Promise<PublicConnection> {
     this.checkSetup();
 
-    const connection = await EndpointFactory.connectPublic(solutionId, bridgeUrl)
+    const connection = await EndpointFactory.connectPublic(solutionId, bridgeUrl);
 
-    if(!connection){
-      throw new Error('ERROR: Could not connect to bridge');
+    if (!connection) {
+      throw new Error("ERROR: Could not connect to bridge");
     }
 
     return new PublicConnection(connection);
@@ -196,7 +197,7 @@ export class PrivmxClient {
    */
   public getConnection(): Connection {
     if (!this.connection) {
-      throw new Error('No active connection');
+      throw new Error("No active connection");
     }
     return this.connection;
   }
@@ -240,7 +241,7 @@ export class PrivmxClient {
         return EndpointFactory.createInboxApi(
           connection,
           await this.getThreadApi(),
-          await this.getStoreApi()
+          await this.getStoreApi(),
         );
       })();
     }
@@ -260,7 +261,6 @@ export class PrivmxClient {
     }
     return this.kvdbApi;
   }
-
 
   /**
    * @description Gets the Event API.
@@ -381,13 +381,13 @@ export class PrivmxClient {
   }
 
   public async getKvdbEventsManager(): Promise<KvdbEventsManager> {
-    if (this.kvdbEventsManager){
-      return this.kvdbEventsManager
+    if (this.kvdbEventsManager) {
+      return this.kvdbEventsManager;
     }
 
     this.kvdbEventsManager = (async () => {
       const eventManager = await PrivmxClient.getEventManager();
-      return eventManager.getKvdbEventManager(await this.getKvdbApi())
+      return eventManager.getKvdbEventManager(await this.getKvdbApi());
     })();
 
     return this.kvdbEventsManager;
@@ -411,7 +411,7 @@ export class PrivmxClient {
       this.inboxEventManager = null;
       this.kvdbEventsManager = null;
     } catch (e) {
-      console.error('Error during disconnection:', e);
+      console.error("Error during disconnection:", e);
     }
   }
 }

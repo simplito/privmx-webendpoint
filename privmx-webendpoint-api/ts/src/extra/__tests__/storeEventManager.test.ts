@@ -1,8 +1,5 @@
 import { createTestSetup, waitForNextTick } from "../__mocks__/utils";
-import {
-  MOCK_STORE_CREATED_EVENT,
-  MOCK_STORE_FILE_DELETED_EVENT,
-} from "../__mocks__/constants";
+import { MOCK_STORE_CREATED_EVENT, MOCK_STORE_FILE_DELETED_EVENT } from "../__mocks__/constants";
 import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber";
 import { StoreEventsManager } from "../managers";
 import { createStoreSubscription } from "../subscriptions";
@@ -17,9 +14,7 @@ describe("Store event manager", () => {
   beforeEach(() => {
     let { q: _q, manager } = createTestSetup();
     q = _q;
-    mockEventsManager = manager.getStoreEventManager(
-      new MockContainerSubscriber(q),
-    );
+    mockEventsManager = manager.getStoreEventManager(new MockContainerSubscriber(q));
   });
 
   it("should add callback for event", async () => {

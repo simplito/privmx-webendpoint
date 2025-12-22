@@ -17,9 +17,7 @@ describe("Thread event manager", () => {
   beforeEach(() => {
     let { q: _q, manager } = createTestSetup();
     q = _q;
-    mockEventsManager = manager.getThreadEventManager(
-      new MockContainerSubscriber(q),
-    );
+    mockEventsManager = manager.getThreadEventManager(new MockContainerSubscriber(q));
   });
 
   it("should create manager", async () => {

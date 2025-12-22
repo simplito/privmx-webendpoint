@@ -25,7 +25,10 @@ import {
 } from "../Types";
 
 export class InboxApi extends BaseApi {
-  constructor(private native: InboxApiNative, ptr: number) {
+  constructor(
+    private native: InboxApiNative,
+    ptr: number,
+  ) {
     super(ptr);
   }
 
@@ -50,7 +53,6 @@ export class InboxApi extends BaseApi {
     privateMeta: Uint8Array,
     filesConfig?: FilesConfig,
     policies?: ContainerWithoutItemPolicy,
-
   ): Promise<string> {
     return this.native.createInbox(this.servicePtr, [
       contextId,
@@ -121,10 +123,7 @@ export class InboxApi extends BaseApi {
    * @param {PagingQuery} pagingQuery  with list query parameters
    * @returns {PagingList<Inbox>} containing list of Inboxes
    */
-  async listInboxes(
-    contextId: string,
-    pagingQuery: PagingQuery
-  ): Promise<PagingList<Inbox>> {
+  async listInboxes(contextId: string, pagingQuery: PagingQuery): Promise<PagingList<Inbox>> {
     return this.native.listInboxes(this.servicePtr, [contextId, pagingQuery]);
   }
 
@@ -162,7 +161,7 @@ export class InboxApi extends BaseApi {
     inboxId: string,
     data: Uint8Array,
     inboxFileHandles: number[],
-    userPrivKey?: string | undefined
+    userPrivKey?: string | undefined,
   ): Promise<number> {
     return this.native.prepareEntry(this.servicePtr, [
       inboxId,
@@ -199,10 +198,7 @@ export class InboxApi extends BaseApi {
    * @param {PagingQuery} pagingQuery with list query parameters
    * @returns {PagingList<InboxEntry>} containing list of entries
    */
-  async listEntries(
-    inboxId: string,
-    pagingQuery: PagingQuery
-  ): Promise<PagingList<InboxEntry>> {
+  async listEntries(inboxId: string, pagingQuery: PagingQuery): Promise<PagingList<InboxEntry>> {
     return this.native.listEntries(this.servicePtr, [inboxId, pagingQuery]);
   }
 
@@ -227,13 +223,9 @@ export class InboxApi extends BaseApi {
   async createFileHandle(
     publicMeta: Uint8Array,
     privateMeta: Uint8Array,
-    fileSize: number
+    fileSize: number,
   ): Promise<number> {
-    return this.native.createFileHandle(this.servicePtr, [
-      publicMeta,
-      privateMeta,
-      fileSize,
-    ]);
+    return this.native.createFileHandle(this.servicePtr, [publicMeta, privateMeta, fileSize]);
   }
 
   /**
@@ -248,13 +240,9 @@ export class InboxApi extends BaseApi {
   async writeToFile(
     inboxHandle: number,
     inboxFileHandle: number,
-    dataChunk: Uint8Array
+    dataChunk: Uint8Array,
   ): Promise<void> {
-    return this.native.writeToFile(this.servicePtr, [
-      inboxHandle,
-      inboxFileHandle,
-      dataChunk,
-    ]);
+    return this.native.writeToFile(this.servicePtr, [inboxHandle, inboxFileHandle, dataChunk]);
   }
 
   /**
@@ -329,31 +317,39 @@ export class InboxApi extends BaseApi {
   //   return this.native.unsubscribeFromEntryEvents(this.servicePtr, [inboxId]);
   // }
 
-    /**
-     * Subscribe for the Inbox events on the given subscription query.
-     * 
-     * @param {string[]} subscriptionQueries list of queries
-     * @return list of subscriptionIds in maching order to subscriptionQueries
-     */
-    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
-      return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
-    }
+  /**
+   * Subscribe for the Inbox events on the given subscription query.
+   *
+   * @param {string[]} subscriptionQueries list of queries
+   * @return list of subscriptionIds in maching order to subscriptionQueries
+   */
+  async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+    return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
+  }
 
-    /**
-     * Unsubscribe from events for the given subscriptionId.
-     * @param {string[]} subscriptionIds list of subscriptionId
-     */
-    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
-      return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
-    }
+  /**
+   * Unsubscribe from events for the given subscriptionId.
+   * @param {string[]} subscriptionIds list of subscriptionId
+   */
+  async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
+    return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
+  }
 
-    /**
-     * Generate subscription Query for the Inbox events.
-     * @param {EventType} eventType type of event which you listen for
-     * @param {EventSelectorType} selectorType scope on which you listen for events  
-     * @param {string} selectorId ID of the selector
-     */
-    async buildSubscriptionQuery(eventType: InboxEventType, selectorType: InboxEventSelectorType, selectorId: string): Promise<string> {
-      return this.native.buildSubscriptionQuery(this.servicePtr, [eventType, selectorType, selectorId]);
-    }
+  /**
+   * Generate subscription Query for the Inbox events.
+   * @param {EventType} eventType type of event which you listen for
+   * @param {EventSelectorType} selectorType scope on which you listen for events
+   * @param {string} selectorId ID of the selector
+   */
+  async buildSubscriptionQuery(
+    eventType: InboxEventType,
+    selectorType: InboxEventSelectorType,
+    selectorId: string,
+  ): Promise<string> {
+    return this.native.buildSubscriptionQuery(this.servicePtr, [
+      eventType,
+      selectorType,
+      selectorId,
+    ]);
+  }
 }

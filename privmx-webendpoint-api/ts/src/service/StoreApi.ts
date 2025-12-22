@@ -11,10 +11,22 @@ limitations under the License.
 
 import { BaseApi } from "./BaseApi";
 import { StoreApiNative } from "../api/StoreApiNative";
-import { PagingQuery, PagingList, UserWithPubKey, Store, File, ContainerPolicy, StoreEventSelectorType, StoreEventType } from "../Types";
+import {
+  PagingQuery,
+  PagingList,
+  UserWithPubKey,
+  Store,
+  File,
+  ContainerPolicy,
+  StoreEventSelectorType,
+  StoreEventType,
+} from "../Types";
 
 export class StoreApi extends BaseApi {
-  constructor(private native: StoreApiNative, ptr: number) {
+  constructor(
+    private native: StoreApiNative,
+    ptr: number,
+  ) {
     super(ptr);
   }
 
@@ -44,7 +56,7 @@ export class StoreApi extends BaseApi {
       managers,
       publicMeta,
       privateMeta,
-      policies
+      policies,
     ]);
   }
 
@@ -82,7 +94,7 @@ export class StoreApi extends BaseApi {
       version,
       force,
       forceGenerateNewKey,
-      policies
+      policies,
     ]);
   }
 
@@ -112,10 +124,7 @@ export class StoreApi extends BaseApi {
    * @param {PagingQuery} pagingQuery  with list query parameters
    * @returns {PagingList<Store>}  containing list of Stores
    */
-  async listStores(
-    contextId: string,
-    pagingQuery: PagingQuery
-  ): Promise<PagingList<Store>> {
+  async listStores(contextId: string, pagingQuery: PagingQuery): Promise<PagingList<Store>> {
     return this.native.listStores(this.servicePtr, [contextId, pagingQuery]);
   }
 
@@ -134,14 +143,14 @@ export class StoreApi extends BaseApi {
     publicMeta: Uint8Array,
     privateMeta: Uint8Array,
     size: number,
-    randomWriteSupport: boolean = false
+    randomWriteSupport: boolean = false,
   ): Promise<number> {
     return this.native.createFile(this.servicePtr, [
       storeId,
       publicMeta,
       privateMeta,
       size,
-      randomWriteSupport
+      randomWriteSupport,
     ]);
   }
 
@@ -158,14 +167,9 @@ export class StoreApi extends BaseApi {
     fileId: string,
     publicMeta: Uint8Array,
     privateMeta: Uint8Array,
-    size: number
+    size: number,
   ): Promise<number> {
-    return this.native.updateFile(this.servicePtr, [
-      fileId,
-      publicMeta,
-      privateMeta,
-      size,
-    ]);
+    return this.native.updateFile(this.servicePtr, [fileId, publicMeta, privateMeta, size]);
   }
 
   /**
@@ -178,13 +182,9 @@ export class StoreApi extends BaseApi {
   async updateFileMeta(
     fileId: string,
     publicMeta: Uint8Array,
-    privateMeta: Uint8Array
+    privateMeta: Uint8Array,
   ): Promise<void> {
-    return this.native.updateFileMeta(this.servicePtr, [
-      fileId,
-      publicMeta,
-      privateMeta,
-    ]);
+    return this.native.updateFileMeta(this.servicePtr, [fileId, publicMeta, privateMeta]);
   }
 
   /**
@@ -194,7 +194,11 @@ export class StoreApi extends BaseApi {
    * @param {Uint8Array} dataChunk file data chunk
    * @param {boolean} [truncate] truncate the file from: current pos + dataChunk size
    */
-  async writeToFile(fileHandle: number, dataChunk: Uint8Array, truncate: boolean = false): Promise<void> {
+  async writeToFile(
+    fileHandle: number,
+    dataChunk: Uint8Array,
+    truncate: boolean = false,
+  ): Promise<void> {
     return this.native.writeToFile(this.servicePtr, [fileHandle, dataChunk, truncate]);
   }
 
@@ -224,10 +228,7 @@ export class StoreApi extends BaseApi {
    * @param {PagingQuery} pagingQuery  with list query parameters
    * @returns {PagingList<File>}  containing list of files
    */
-  async listFiles(
-    storeId: string,
-    pagingQuery: PagingQuery
-  ): Promise<PagingList<File>> {
+  async listFiles(storeId: string, pagingQuery: PagingQuery): Promise<PagingList<File>> {
     return this.native.listFiles(this.servicePtr, [storeId, pagingQuery]);
   }
 
@@ -275,9 +276,9 @@ export class StoreApi extends BaseApi {
 
   /**
    * Synchronize file handle data with newest data on server
-   * 
+   *
    * @param {number} fileHandle handle to read/write file data
-   */ 
+   */
   async syncFile(fileHandle: number): Promise<void> {
     return this.native.syncFile(this.servicePtr, [fileHandle]);
   }
@@ -314,29 +315,37 @@ export class StoreApi extends BaseApi {
 
   /**
    * Subscribe for the Store events on the given subscription query.
-   * 
+   *
    * @param {string[]} subscriptionQueries list of queries
    * @return list of subscriptionIds in maching order to subscriptionQueries
    */
-    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
-      return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
-    }
+  async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+    return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
+  }
 
-    /**
-     * Unsubscribe from events for the given subscriptionId.
-     * @param {string[]} subscriptionIds list of subscriptionId
-     */
-    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
-      return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
-    }
+  /**
+   * Unsubscribe from events for the given subscriptionId.
+   * @param {string[]} subscriptionIds list of subscriptionId
+   */
+  async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
+    return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
+  }
 
-    /**
-     * Generate subscription Query for the Store events.
-     * @param {EventType} eventType type of event which you listen for
-     * @param {EventSelectorType} selectorType scope on which you listen for events  
-     * @param {string} selectorId ID of the selector
-     */
-    async buildSubscriptionQuery(eventType: StoreEventType, selectorType: StoreEventSelectorType, selectorId: string): Promise<string> {
-      return this.native.buildSubscriptionQuery(this.servicePtr, [eventType, selectorType, selectorId]);
-    }  
+  /**
+   * Generate subscription Query for the Store events.
+   * @param {EventType} eventType type of event which you listen for
+   * @param {EventSelectorType} selectorType scope on which you listen for events
+   * @param {string} selectorId ID of the selector
+   */
+  async buildSubscriptionQuery(
+    eventType: StoreEventType,
+    selectorType: StoreEventSelectorType,
+    selectorId: string,
+  ): Promise<string> {
+    return this.native.buildSubscriptionQuery(this.servicePtr, [
+      eventType,
+      selectorType,
+      selectorId,
+    ]);
+  }
 }

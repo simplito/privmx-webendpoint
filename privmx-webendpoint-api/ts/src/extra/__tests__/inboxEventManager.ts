@@ -1,24 +1,17 @@
 import { createTestSetup, waitForNextTick } from "../__mocks__/utils";
-import {
-  MOCK_INBOX_CREATED_EVENT,
-  MOCK_INBOX_ENTRY_DELETED_EVENT,
-} from "../__mocks__/constants";
+import { MOCK_INBOX_CREATED_EVENT, MOCK_INBOX_ENTRY_DELETED_EVENT } from "../__mocks__/constants";
 import { createInboxSubscription } from "../subscriptions";
 import { InboxEventSelectorType, InboxEventType } from "../../Types";
 import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber";
 
 describe("Inbox event manager", () => {
   let { q, manager } = createTestSetup();
-  let mockEventsManager = manager.getInboxEventManager(
-    new MockContainerSubscriber(q),
-  );
+  let mockEventsManager = manager.getInboxEventManager(new MockContainerSubscriber(q));
 
   beforeEach(() => {
     let { q: _q, manager } = createTestSetup();
     q = _q;
-    mockEventsManager = manager.getInboxEventManager(
-      new MockContainerSubscriber(q),
-    );
+    mockEventsManager = manager.getInboxEventManager(new MockContainerSubscriber(q));
   });
 
   it("should add callback for event", async () => {

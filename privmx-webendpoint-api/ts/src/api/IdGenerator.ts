@@ -10,10 +10,10 @@ limitations under the License.
 */
 
 export class IdGenerator {
-    private _id: number = 0;
+  private _id: number = 0;
 
-    generateId(): number {
-        this._id++;
-        return this._id;
-    }
+  generateId(): number {
+    this._id++;
+    return this._id;
+  }
 }

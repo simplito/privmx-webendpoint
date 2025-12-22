@@ -4,20 +4,14 @@ export class MockContainerSubscriber<E, S> {
   constructor(private queue: MockEventQueue) {}
 
   subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
-    return Promise.resolve(
-      subscriptionQueries.map(() => generateRandomString()),
-    );
+    return Promise.resolve(subscriptionQueries.map(() => generateRandomString()));
   }
 
   unsubscribeFrom(): Promise<void> {
     return Promise.resolve();
   }
 
-  buildSubscriptionQuery(
-    _eventType: E,
-    _selectorType: S,
-    _selectorId: string,
-  ): Promise<string> {
+  buildSubscriptionQuery(_eventType: E, _selectorType: S, _selectorId: string): Promise<string> {
     return Promise.resolve("");
   }
 }

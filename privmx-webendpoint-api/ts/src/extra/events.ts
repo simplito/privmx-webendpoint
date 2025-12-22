@@ -1,129 +1,150 @@
-import {Types} from "..";
+import { Types } from "..";
 import {
-    ConnectionStatusEventType,
-    SubscriberForInboxEvents,
-    SubscriberForUserEvents,
-    SubscriberForEvents,
-    SubscriberForKvdbEvents,
-    SubscriberForStoreEvents,
-    SubscriberForThreadsEvents
+  ConnectionStatusEventType,
+  SubscriberForInboxEvents,
+  SubscriberForUserEvents,
+  SubscriberForEvents,
+  SubscriberForKvdbEvents,
+  SubscriberForStoreEvents,
+  SubscriberForThreadsEvents,
 } from "./subscriptions";
 import {
-    BaseEventDispatcherManager, ConnectionChannels,
-    ConnectionEventsManager,
-    CustomEventsManager,
-    InboxEventsManager, KvdbEventsManager,
-    StoreEventsManager,
-    ThreadEventsManager,
-    UserEventsManager
+  BaseEventDispatcherManager,
+  ConnectionChannels,
+  ConnectionEventsManager,
+  CustomEventsManager,
+  InboxEventsManager,
+  KvdbEventsManager,
+  StoreEventsManager,
+  ThreadEventsManager,
+  UserEventsManager,
 } from "./managers";
 
-
 function normalizeConnectionEvent(e: Types.Event): Types.Event {
-    switch (e.type) {
-        case 'libDisconnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionStatusEventType.LIB_DISCONNECTED]}`]}
-        case 'libPlatformDisconnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionStatusEventType.LIB_PLATFORM_DISCONNECTED]}`]}
-        case 'libConnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionStatusEventType.LIB_CONNECTED]}`]}
-        default:
-            return e
-    }
+  switch (e.type) {
+    case "libDisconnected":
+      return {
+        ...e,
+        subscriptions: [
+          `${e.connectionId}/${ConnectionChannels[ConnectionStatusEventType.LIB_DISCONNECTED]}`,
+        ],
+      };
+    case "libPlatformDisconnected":
+      return {
+        ...e,
+        subscriptions: [
+          `${e.connectionId}/${ConnectionChannels[ConnectionStatusEventType.LIB_PLATFORM_DISCONNECTED]}`,
+        ],
+      };
+    case "libConnected":
+      return {
+        ...e,
+        subscriptions: [
+          `${e.connectionId}/${ConnectionChannels[ConnectionStatusEventType.LIB_CONNECTED]}`,
+        ],
+      };
+    default:
+      return e;
+  }
 }
 
 export class EventManager {
-    private _isEventLoopRunning = false;
-    dispatchers: ((event: Types.Event) => void)[] = [];
-    private eventsQueue: { waitEvent: () => Promise<Types.Event> } | null = null;
+  private _isEventLoopRunning = false;
+  dispatchers: ((event: Types.Event) => void)[] = [];
+  private eventsQueue: { waitEvent: () => Promise<Types.Event> } | null = null;
 
-    constructor() {
-    }
+  constructor() {}
 
-    private listenForEvents() {
-        if (this.eventsQueue) {
-            this.eventsQueue.waitEvent().then((event) => {
-                this.onEvent(event);
-                this.listenForEvents();
-            }).catch(() => {
-                this.listenForEvents();
-            })
-        }
-    }
-
-    static startEventLoop(eventQueue: { waitEvent: () => Promise<Types.Event> }) {
-        const manager = new EventManager();
-
-        manager.eventsQueue = eventQueue;
-
-        manager._isEventLoopRunning = true;
-
-        manager.eventsQueue.waitEvent().then((event) => {
-            if (!manager._isEventLoopRunning) return;
-            manager.onEvent(event);
-            manager.listenForEvents();
-        }).catch(() => {
-            manager.listenForEvents()
+  private listenForEvents() {
+    if (this.eventsQueue) {
+      this.eventsQueue
+        .waitEvent()
+        .then((event) => {
+          this.onEvent(event);
+          this.listenForEvents();
         })
-
-        return manager;
+        .catch(() => {
+          this.listenForEvents();
+        });
     }
+  }
 
-    stopEventLoop() {
-        this._isEventLoopRunning = false;
-    }
+  static startEventLoop(eventQueue: { waitEvent: () => Promise<Types.Event> }) {
+    const manager = new EventManager();
 
-    removeAllDispatchers = (): void => {
-        this.dispatchers = [];
-    };
+    manager.eventsQueue = eventQueue;
 
-    protected onEvent(event: Types.Event) {
-        this.dispatchers.forEach((cb) => cb(normalizeConnectionEvent(event)));
-    }
+    manager._isEventLoopRunning = true;
 
-    registerDispatcher(manager: BaseEventDispatcherManager) {
-        this.dispatchers.push((e) => manager.dispatchEvent(e));
-    }
+    manager.eventsQueue
+      .waitEvent()
+      .then((event) => {
+        if (!manager._isEventLoopRunning) return;
+        manager.onEvent(event);
+        manager.listenForEvents();
+      })
+      .catch(() => {
+        manager.listenForEvents();
+      });
 
-    getThreadEventManager(threadApi: SubscriberForThreadsEvents) {
-        const manager = new ThreadEventsManager(threadApi);
-        this.registerDispatcher(manager);
-        return manager;
-    }
+    return manager;
+  }
 
-    getStoreEventManager(storeApi: SubscriberForStoreEvents) {
-        const manager = new StoreEventsManager(storeApi);
-        this.registerDispatcher(manager);
-        return manager;
-    }
+  stopEventLoop() {
+    this._isEventLoopRunning = false;
+  }
 
-    getKvdbEventManager(kvdbApi: SubscriberForKvdbEvents) {
-        const manager = new KvdbEventsManager(kvdbApi);
-        this.registerDispatcher(manager);
-        return manager;
-    }
+  removeAllDispatchers = (): void => {
+    this.dispatchers = [];
+  };
 
-    getInboxEventManager(inboxApi: SubscriberForInboxEvents) {
-        const manager = new InboxEventsManager(inboxApi);
-        this.registerDispatcher(manager);
-        return manager;
-    }
+  protected onEvent(event: Types.Event) {
+    this.dispatchers.forEach((cb) => cb(normalizeConnectionEvent(event)));
+  }
 
-    getCustomEventsManager(eventApi: SubscriberForEvents) {
-        const manager = new CustomEventsManager(eventApi);
-        this.registerDispatcher(manager);
-        return manager;
-    }
+  registerDispatcher(manager: BaseEventDispatcherManager) {
+    this.dispatchers.push((e) => manager.dispatchEvent(e));
+  }
 
-    getConnectionEventManager(connectionId: string) {
-        const manager = new ConnectionEventsManager(connectionId);
-        this.registerDispatcher(manager);
-        return manager;
-    }
+  getThreadEventManager(threadApi: SubscriberForThreadsEvents) {
+    const manager = new ThreadEventsManager(threadApi);
+    this.registerDispatcher(manager);
+    return manager;
+  }
 
-    getUserEventsManager(connectionApi: SubscriberForUserEvents) {
-        const manager = new UserEventsManager(connectionApi);
-        this.registerDispatcher(manager);
-        return manager;
-    }
+  getStoreEventManager(storeApi: SubscriberForStoreEvents) {
+    const manager = new StoreEventsManager(storeApi);
+    this.registerDispatcher(manager);
+    return manager;
+  }
+
+  getKvdbEventManager(kvdbApi: SubscriberForKvdbEvents) {
+    const manager = new KvdbEventsManager(kvdbApi);
+    this.registerDispatcher(manager);
+    return manager;
+  }
+
+  getInboxEventManager(inboxApi: SubscriberForInboxEvents) {
+    const manager = new InboxEventsManager(inboxApi);
+    this.registerDispatcher(manager);
+    return manager;
+  }
+
+  getCustomEventsManager(eventApi: SubscriberForEvents) {
+    const manager = new CustomEventsManager(eventApi);
+    this.registerDispatcher(manager);
+    return manager;
+  }
+
+  getConnectionEventManager(connectionId: string) {
+    const manager = new ConnectionEventsManager(connectionId);
+    this.registerDispatcher(manager);
+    return manager;
+  }
+
+  getUserEventsManager(connectionApi: SubscriberForUserEvents) {
+    const manager = new UserEventsManager(connectionApi);
+    this.registerDispatcher(manager);
+    return manager;
+  }
 }

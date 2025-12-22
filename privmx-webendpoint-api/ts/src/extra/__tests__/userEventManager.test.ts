@@ -17,10 +17,7 @@ describe("User event manager", () => {
     q = _q;
     manager = _manager;
     userEventsManager = manager.getUserEventsManager(
-      new MockContainerSubscriber<
-        Types.ConnectionEventType,
-        Types.ConnectionEventSelectorType
-      >(q),
+      new MockContainerSubscriber<Types.ConnectionEventType, Types.ConnectionEventSelectorType>(q),
     );
   });
 
@@ -34,9 +31,7 @@ describe("User event manager", () => {
       callbacks: [callback],
     });
 
-    const [subscriptionId] = await userEventsManager.subscribeFor([
-      subscription,
-    ]);
+    const [subscriptionId] = await userEventsManager.subscribeFor([subscription]);
 
     q.dispatchEvent(MOCK_CONNECTION_USER_ADDED_EVENT(subscriptionId));
 
@@ -59,9 +54,7 @@ describe("User event manager", () => {
       callbacks: [callback],
     });
 
-    const [subscriptionId] = await userEventsManager.subscribeFor([
-      subscription,
-    ]);
+    const [subscriptionId] = await userEventsManager.subscribeFor([subscription]);
 
     await userEventsManager.unsubscribeFrom([subscriptionId]);
 

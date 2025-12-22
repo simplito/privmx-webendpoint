@@ -20,11 +20,14 @@ import {
   KvdbEntry,
   DeleteEntriesResult,
   KvdbEventSelectorType,
-  KvdbEventType
+  KvdbEventType,
 } from "../Types";
 
 export class KvdbApi extends BaseApi {
-  constructor(protected native: KvdbApiNative, ptr: number) {
+  constructor(
+    protected native: KvdbApiNative,
+    ptr: number,
+  ) {
     super(ptr);
   }
 
@@ -122,10 +125,7 @@ export class KvdbApi extends BaseApi {
    * @param {PagingQuery} pagingQuery with list query parameters
    * @returns {PagingList<Kvdb>} containing a list of Kvdbs
    */
-  async listKvdbs(
-    contextId: string,
-    pagingQuery: PagingQuery
-  ): Promise<PagingList<Kvdb>> {
+  async listKvdbs(contextId: string, pagingQuery: PagingQuery): Promise<PagingList<Kvdb>> {
     return this.native.listKvdbs(this.servicePtr, [contextId, pagingQuery]);
   }
 
@@ -157,10 +157,7 @@ export class KvdbApi extends BaseApi {
    * @param {PagingQuery} pagingQuery with list query parameters
    * @returns {PagingList<string>} containing a list of KVDB entries
    */
-  async listEntriesKeys(
-    kvdbId: string,
-    pagingQuery: PagingQuery
-  ): Promise<PagingList<string>> {
+  async listEntriesKeys(kvdbId: string, pagingQuery: PagingQuery): Promise<PagingList<string>> {
     return this.native.listEntriesKeys(this.servicePtr, [kvdbId, pagingQuery]);
   }
 
@@ -171,10 +168,7 @@ export class KvdbApi extends BaseApi {
    * @param {PagingQuery} pagingQuery with list query parameters
    * @returns {PagingList<KvdbEntry>} containing a list of KVDB entries
    */
-  async listEntries(
-    kvdbId: string,
-    pagingQuery: PagingQuery
-  ): Promise<PagingList<KvdbEntry>> {
+  async listEntries(kvdbId: string, pagingQuery: PagingQuery): Promise<PagingList<KvdbEntry>> {
     return this.native.listEntries(this.servicePtr, [kvdbId, pagingQuery]);
   }
 
@@ -202,7 +196,7 @@ export class KvdbApi extends BaseApi {
       publicMeta,
       privateMeta,
       data,
-      version || 0
+      version || 0,
     ]);
   }
 
@@ -223,14 +217,8 @@ export class KvdbApi extends BaseApi {
    * @param {string[]} keys keys of the KVDB entries to delete
    * @returns {Map<string, boolean>} map with the statuses of deletion for every key
    */
-  async deleteEntries(
-    kvdbId: string,
-    keys: string[],
-  ): Promise<DeleteEntriesResult> {
-    return this.native.deleteEntries(this.servicePtr, [
-      kvdbId,
-      keys,
-    ]);
+  async deleteEntries(kvdbId: string, keys: string[]): Promise<DeleteEntriesResult> {
+    return this.native.deleteEntries(this.servicePtr, [kvdbId, keys]);
   }
 
   // /**
@@ -267,39 +255,55 @@ export class KvdbApi extends BaseApi {
 
   /**
    * Subscribe for the KVDB events on the given subscription query.
-   * 
+   *
    * @param {string[]} subscriptionQueries list of queries
    * @return list of subscriptionIds in maching order to subscriptionQueries
    */
-    async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
-      return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
-    }
+  async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
+    return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
+  }
 
-    /**
-     * Unsubscribe from events for the given subscriptionId.
-     * @param {string[]} subscriptionIds list of subscriptionId
-     */
-    async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
-      return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
-    }
+  /**
+   * Unsubscribe from events for the given subscriptionId.
+   * @param {string[]} subscriptionIds list of subscriptionId
+   */
+  async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
+    return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
+  }
 
-    /**
-     * Generate subscription Query for the KVDB events.
-     * @param {EventType} eventType type of event which you listen for
-     * @param {EventSelectorType} selectorType scope on which you listen for events  
-     * @param {string} selectorId ID of the selector
-     */
-    async buildSubscriptionQuery(eventType: KvdbEventType, selectorType: KvdbEventSelectorType, selectorId: string): Promise<string> {
-      return this.native.buildSubscriptionQuery(this.servicePtr, [eventType, selectorType, selectorId]);
-    }
+  /**
+   * Generate subscription Query for the KVDB events.
+   * @param {EventType} eventType type of event which you listen for
+   * @param {EventSelectorType} selectorType scope on which you listen for events
+   * @param {string} selectorId ID of the selector
+   */
+  async buildSubscriptionQuery(
+    eventType: KvdbEventType,
+    selectorType: KvdbEventSelectorType,
+    selectorId: string,
+  ): Promise<string> {
+    return this.native.buildSubscriptionQuery(this.servicePtr, [
+      eventType,
+      selectorType,
+      selectorId,
+    ]);
+  }
 
-    /**
-     * Generate subscription Query for the KVDB events for single KvdbEntry.
-     * @param {EventType} eventType type of event which you listen for
-     * @param {string} kvdbId ID of the KVDB  
-     * @param {string} kvdbEntryKey Key of Kvdb Entry
-     */
-    async buildSubscriptionQueryForSelectedEntry(eventType: KvdbEventType, kvdbId: string, kvdbEntryKey: string): Promise<string> {
-      return this.native.buildSubscriptionQueryForSelectedEntry(this.servicePtr, [eventType, kvdbId, kvdbEntryKey]);
-    }
+  /**
+   * Generate subscription Query for the KVDB events for single KvdbEntry.
+   * @param {EventType} eventType type of event which you listen for
+   * @param {string} kvdbId ID of the KVDB
+   * @param {string} kvdbEntryKey Key of Kvdb Entry
+   */
+  async buildSubscriptionQueryForSelectedEntry(
+    eventType: KvdbEventType,
+    kvdbId: string,
+    kvdbEntryKey: string,
+  ): Promise<string> {
+    return this.native.buildSubscriptionQueryForSelectedEntry(this.servicePtr, [
+      eventType,
+      kvdbId,
+      kvdbEntryKey,
+    ]);
+  }
 }

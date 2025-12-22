@@ -1,14 +1,7 @@
-import { Inboxes } from '.';
-import {
-  Connection,
-  EndpointFactory,
-  InboxApi,
-  StoreApi,
-  ThreadApi,
-  KvdbApi
-} from '../service';
+import { Inboxes } from ".";
+import { Connection, EndpointFactory, InboxApi, StoreApi, ThreadApi, KvdbApi } from "../service";
 
-import { InboxEntryPayload } from './inbox';
+import { InboxEntryPayload } from "./inbox";
 
 /**
  * @class PublicConnection
@@ -26,7 +19,7 @@ import { InboxEntryPayload } from './inbox';
  * // Send entry
  * const encoder = new TextEncoder();
  * const encodedData = encoder.encode(JSON.stringify({ message: 'Hello, PrivMX!' }));
- * 
+ *
  * await client.sendEntry(inboxId, {
  *  data: encodedData
  * })
@@ -45,7 +38,6 @@ export class PublicConnection {
    */
   constructor(private connection: Connection) {}
 
-
   /**
    * @description Gets the connection object.
    * @returns {Connection}
@@ -53,7 +45,7 @@ export class PublicConnection {
    */
   private getConnection(): Connection {
     if (!this.connection) {
-      throw new Error('No active connection');
+      throw new Error("No active connection");
     }
     return this.connection;
   }
@@ -97,7 +89,7 @@ export class PublicConnection {
         return EndpointFactory.createInboxApi(
           connection,
           await this.getThreadApi(),
-          await this.getStoreApi()
+          await this.getStoreApi(),
         );
       })();
     }
@@ -115,7 +107,7 @@ export class PublicConnection {
       this.storeApi = null;
       this.inboxApi = null;
     } catch (e) {
-      console.error('Error during disconnection:', e);
+      console.error("Error during disconnection:", e);
     }
   }
 
@@ -125,7 +117,7 @@ export class PublicConnection {
    * @param {InboxEntryPayload} payload - The payload of the entry to send.
    * @returns {Promise<void>}
    */
-  public async sendEntry(inboxId: string, payload: InboxEntryPayload): Promise<void>{
+  public async sendEntry(inboxId: string, payload: InboxEntryPayload): Promise<void> {
     const inboxApi = await this.getInboxApi();
     return await Inboxes.sendEntry(inboxApi, inboxId, payload);
   }

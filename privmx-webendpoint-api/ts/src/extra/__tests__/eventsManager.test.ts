@@ -7,9 +7,7 @@ import { createBaseEvent } from "../__mocks__/constants";
 
 describe("Events Helpers", () => {
   let { q, manager } = createTestSetup();
-  let mockEventsManager = new ThreadEventsManager(
-    new MockContainerSubscriber(q),
-  );
+  let mockEventsManager = new ThreadEventsManager(new MockContainerSubscriber(q));
   manager.registerDispatcher(mockEventsManager);
 
   beforeEach(() => {
