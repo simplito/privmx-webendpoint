@@ -44,7 +44,17 @@
     "build:bundle": "webpack",
     "build:mjs": "tsc -p tsconfig.mjs.json",
     "build:fixup": "node fixup-package-json.js",
-    "watch": "tsc -w"
+    "watch": "tsc -w",
+    "lint": "eslint .",
+    "format": "prettier --write 'src/**/*.{ts,tsx,css,md}'",
+    "prepare": "husky install"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "npm run lint && npm run format"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": ["eslint --fix", "prettier --write"],
+    "*.{json,css,md}": ["prettier --write"]
   },
   "engines": {
     "node": ">=4"
@@ -52,6 +62,7 @@
   "devDependencies": {
     "@babel/core": "^7.26.0",
     "@babel/preset-env": "^7.26.0",
+    "@eslint/js": "^9.39.2",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.9.0",
     "@types/webpack": "^5.28.5",
@@ -59,15 +70,20 @@
     "babel-jest": "^29.7.0",
     "buffer": "^6.0.3",
     "crypto-browserify": "^3.12.0",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
     "jest": "^29.7.0",
     "prettier": "^3.4.2",
     "process": "^0.11.10",
+    "simple-git-hooks": "^2.13.1",
     "stream-browserify": "^3.0.0",
     "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.1",
     "tslib": "^2.6.2",
     "typescript": "5.8",
+    "typescript-eslint": "^8.50.0",
     "vm-browserify": "^1.1.2",
     "webpack": "^5.89.0",
     "webpack-cli": "^5.1.4",
