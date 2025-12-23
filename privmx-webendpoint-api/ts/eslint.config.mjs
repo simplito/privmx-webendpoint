@@ -6,7 +6,7 @@ import tsParser from "@typescript-eslint/parser";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import prettierPlugin from "eslint-plugin-prettier";
-import prettierConfig from "eslint-config-prettier"
+import prettierConfig from "eslint-config-prettier";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -43,7 +43,7 @@ export default [
       "indent-empty-lines/indent-empty-lines": ["error", 4],
     },
   },
-
+  
   // TypeScript files with type-aware rules
   {
     files: ["*.ts", "*.tsx"],
@@ -64,9 +64,7 @@ export default [
     rules: {
       ...typescriptEslint.configs["recommended"].rules,
       ...typescriptEslint.configs["recommended-requiring-type-checking"].rules,
-
       "prettier/prettier": ["error", prettierConfig, { usePrettierrc: true }],
-
       // Your custom TS rules overrides
       "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
       "@typescript-eslint/unbound-method": ["error", { ignoreStatic: true }],

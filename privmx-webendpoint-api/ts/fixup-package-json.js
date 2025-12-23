@@ -6,7 +6,7 @@ const DIST_BUNDLE_PATH = "bundle";
 if (fs.existsSync(DIST_BUNDLE_PATH)) {
   fs.appendFileSync(path.resolve(DIST_BUNDLE_PATH, "package.json"), JSON.stringify({
     main: DIST_BUNDLE_PATH + "/bundle.js",
-    types: DIST_BUNDLE_PATH + "/bundle.d.ts"
+    types: DIST_BUNDLE_PATH + "/bundle.d.ts",
   }, null, 2));
 }
 
