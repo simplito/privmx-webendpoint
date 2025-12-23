@@ -12,15 +12,15 @@ limitations under the License.
 import { Api } from "./Api";
 
 export class ApiStatic {
-  private static instance: Api;
+    private static instance: Api;
 
-  public static init(api: Api) {
-    this.instance = api;
-  }
-  public static getInstance() {
-    if (!this.instance) {
-      throw new Error("API Static not initialized");
+    public static init(api: Api) {
+        this.instance = api;
     }
-    return this.instance;
-  }
+    public static getInstance() {
+        if (!this.instance) {
+            throw new Error("API Static not initialized");
+        }
+        return this.instance;
+    }
 }

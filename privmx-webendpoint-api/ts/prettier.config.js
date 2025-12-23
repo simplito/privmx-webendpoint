@@ -5,4 +5,5 @@ module.exports = {
   trailingComma: 'all',
   bracketSpacing: true,
   arrowParens: 'always',
+  tabWidth: 4 
 };

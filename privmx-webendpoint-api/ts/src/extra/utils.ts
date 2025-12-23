@@ -4,13 +4,13 @@
  * @returns {Uint8Array} object serialized to `Uint8Array`
  */
 export function serializeObject(object: Record<string, any>): Uint8Array {
-  if (object === null || typeof object !== "object") {
-    throw new TypeError("Input must be a non-null object.");
-  }
+    if (object === null || typeof object !== "object") {
+        throw new TypeError("Input must be a non-null object.");
+    }
 
-  const encoder = new TextEncoder();
-  const parsed = JSON.stringify(object);
-  return encoder.encode(parsed);
+    const encoder = new TextEncoder();
+    const parsed = JSON.stringify(object);
+    return encoder.encode(parsed);
 }
 
 /**
@@ -19,26 +19,26 @@ export function serializeObject(object: Record<string, any>): Uint8Array {
  * @returns {Record<string, any>} parsed JSON object
  */
 export function deserializeObject(data: Uint8Array): Record<string, any> {
-  if (!(data instanceof Uint8Array)) {
-    throw new TypeError("Input must be a Uint8Array.");
-  }
-
-  const decoder = new TextDecoder();
-  const decodedData = decoder.decode(data);
-
-  if (decodedData.trim() === "") {
-    return {};
-  }
-
-  try {
-    return JSON.parse(decodedData);
-  } catch (error) {
-    if (error instanceof SyntaxError) {
-      throw new SyntaxError("Failed to parse JSON: " + error.message);
-    } else {
-      throw new Error("An unexpected error occurred: " + String(error));
+    if (!(data instanceof Uint8Array)) {
+        throw new TypeError("Input must be a Uint8Array.");
     }
-  }
+
+    const decoder = new TextDecoder();
+    const decodedData = decoder.decode(data);
+
+    if (decodedData.trim() === "") {
+        return {};
+    }
+
+    try {
+        return JSON.parse(decodedData);
+    } catch (error) {
+        if (error instanceof SyntaxError) {
+            throw new SyntaxError("Failed to parse JSON: " + error.message);
+        } else {
+            throw new Error("An unexpected error occurred: " + String(error));
+        }
+    }
 }
 
 /**
@@ -47,11 +47,11 @@ export function deserializeObject(data: Uint8Array): Record<string, any> {
  * @returns {string} The resulting string
  */
 export function uint8ToStr(arr: Uint8Array): string {
-  if (!(arr instanceof Uint8Array)) {
-    throw new TypeError("Input must be a Uint8Array.");
-  }
+    if (!(arr instanceof Uint8Array)) {
+        throw new TypeError("Input must be a Uint8Array.");
+    }
 
-  return new TextDecoder().decode(arr);
+    return new TextDecoder().decode(arr);
 }
 
 /**
@@ -60,9 +60,9 @@ export function uint8ToStr(arr: Uint8Array): string {
  * @returns {Uint8Array} The resulting Uint8Array
  */
 export function strToUint8(text: string): Uint8Array {
-  if (typeof text !== "string") {
-    throw new TypeError("Input must be a string.");
-  }
+    if (typeof text !== "string") {
+        throw new TypeError("Input must be a string.");
+    }
 
-  return new TextEncoder().encode(text);
+    return new TextEncoder().encode(text);
 }

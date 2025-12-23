@@ -5,30 +5,30 @@ import { FileUploader } from "./files";
  * Represents payload that is sent to an Inbox.
  */
 export interface InboxEntryPayload {
-  /**
-   * Content of the entry.
-   */
-  data: Uint8Array;
-
-  /**
-   * Optional files associated with the entry.
-   */
-  files?: Array<{
     /**
-     *Optional, contains confidential data that will be encrypted before being sent to server.
+     * Content of the entry.
      */
-    privateMeta?: Uint8Array;
+    data: Uint8Array;
 
     /**
-     *Optional, contains data that can be accessed by everyone and is not encrypted.
+     * Optional files associated with the entry.
      */
-    publicMeta?: Uint8Array;
+    files?: Array<{
+        /**
+         *Optional, contains confidential data that will be encrypted before being sent to server.
+         */
+        privateMeta?: Uint8Array;
 
-    /**
-     * Content of the file.
-     */
-    content: File;
-  }>;
+        /**
+         *Optional, contains data that can be accessed by everyone and is not encrypted.
+         */
+        publicMeta?: Uint8Array;
+
+        /**
+         * Content of the file.
+         */
+        content: File;
+    }>;
 }
 
 /**
@@ -42,40 +42,40 @@ export interface InboxEntryPayload {
  *
  */
 export async function sendEntry(
-  inboxApi: InboxApi,
-  inboxId: string,
-  payload: InboxEntryPayload,
+    inboxApi: InboxApi,
+    inboxId: string,
+    payload: InboxEntryPayload,
 ): Promise<void> {
-  const preparedFiles = payload.files
-    ? await Promise.all(
-        payload.files.map((file) => {
-          return FileUploader.prepareInboxUpload({
-            inboxApi,
-            file: file.content,
-            privateMeta: file.privateMeta,
-            publicMeta: file.publicMeta,
-          });
-        }),
-      )
-    : [];
+    const preparedFiles = payload.files
+        ? await Promise.all(
+              payload.files.map((file) => {
+                  return FileUploader.prepareInboxUpload({
+                      inboxApi,
+                      file: file.content,
+                      privateMeta: file.privateMeta,
+                      publicMeta: file.publicMeta,
+                  });
+              }),
+          )
+        : [];
 
-  const inboxEntryHandle = await inboxApi.prepareEntry(
-    inboxId,
-    payload.data,
-    preparedFiles.map((file) => file.handle),
-  );
+    const inboxEntryHandle = await inboxApi.prepareEntry(
+        inboxId,
+        payload.data,
+        preparedFiles.map((file) => file.handle),
+    );
 
-  const uploaders = await Promise.all(
-    preparedFiles.map((file) =>
-      FileUploader.uploadInboxFile({
-        inboxApi,
-        inboxHandle: inboxEntryHandle,
-        preparedFileUpload: file,
-      }),
-    ),
-  );
+    const uploaders = await Promise.all(
+        preparedFiles.map((file) =>
+            FileUploader.uploadInboxFile({
+                inboxApi,
+                inboxHandle: inboxEntryHandle,
+                preparedFileUpload: file,
+            }),
+        ),
+    );
 
-  await Promise.all(uploaders.map((uploader) => uploader.uploadFileContent()));
+    await Promise.all(uploaders.map((uploader) => uploader.uploadFileContent()));
 
-  await inboxApi.sendEntry(inboxEntryHandle);
+    await inboxApi.sendEntry(inboxEntryHandle);
 }

@@ -25,13 +25,13 @@ export type SortOrder = "desc" | "asc";
  *
  */
 export interface Event {
-  type: string;
-  channel: string;
-  connectionId: number;
-  data?: unknown;
-  subscriptions: string[];
-  version: number;
-  timestamp: number;
+    type: string;
+    channel: string;
+    connectionId: number;
+    data?: unknown;
+    subscriptions: string[];
+    version: number;
+    timestamp: number;
 }
 
 /**
@@ -47,12 +47,12 @@ export interface Event {
  * @param {string} [queryAsJson] extra query parameters in serialized JSON
  */
 export interface PagingQuery {
-  skip: number;
-  limit: number;
-  sortOrder: SortOrder;
-  lastId?: string;
-  sortBy?: string;
-  queryAsJson?: string;
+    skip: number;
+    limit: number;
+    sortOrder: SortOrder;
+    lastId?: string;
+    sortBy?: string;
+    queryAsJson?: string;
 }
 
 /**
@@ -65,8 +65,8 @@ export interface PagingQuery {
  *
  */
 export interface PagingList<T> {
-  totalAvailable: number;
-  readItems: T[];
+    totalAvailable: number;
+    readItems: T[];
 }
 
 /**
@@ -79,8 +79,8 @@ export interface PagingList<T> {
  *
  */
 export interface Context {
-  userId: string;
-  contextId: string;
+    userId: string;
+    contextId: string;
 }
 
 /**
@@ -93,8 +93,8 @@ export interface Context {
  *
  */
 export interface UserWithPubKey {
-  userId: string;
-  pubKey: string;
+    userId: string;
+    pubKey: string;
 }
 
 /**
@@ -106,8 +106,8 @@ export interface UserWithPubKey {
  * @param {string} timestamp Timestamp of the change
  */
 export interface UserStatusChange {
-  action: string;
-  timestamp: number;
+    action: string;
+    timestamp: number;
 }
 
 /**
@@ -121,9 +121,9 @@ export interface UserStatusChange {
  *
  */
 export interface UserInfo {
-  user: UserWithPubKey;
-  isActive: boolean;
-  lastStatusChange?: UserStatusChange;
+    user: UserWithPubKey;
+    isActive: boolean;
+    lastStatusChange?: UserStatusChange;
 }
 
 /**
@@ -135,8 +135,8 @@ export interface UserInfo {
  * @param {UserWithPubKey} user user metadata
  */
 export interface ContextUserEventData {
-  contextId: string;
-  user: UserWithPubKey;
+    contextId: string;
+    user: UserWithPubKey;
 }
 
 /**
@@ -148,8 +148,8 @@ export interface ContextUserEventData {
  * @param {string} action User status change action, e.g. "login" or "logout"
  */
 export interface UserWithAction {
-  user: UserWithPubKey;
-  action: "login" | "logout";
+    user: UserWithPubKey;
+    action: "login" | "logout";
 }
 
 /**
@@ -161,8 +161,8 @@ export interface UserWithAction {
  * @param {UserWithAction[]} users List of users with their status changes
  */
 export interface ContextUsersStatusChangedEventData {
-  contextId: string;
-  users: UserWithAction[];
+    contextId: string;
+    users: UserWithAction[];
 }
 
 /**
@@ -177,11 +177,11 @@ export interface ContextUsersStatusChangedEventData {
  * @param {number} schemaVersion Version describing payload encoding/encryption
  */
 export interface ContextCustomEventData {
-  contextId: string;
-  userId: string;
-  payload: Uint8Array;
-  statusCode: number;
-  schemaVersion: number;
+    contextId: string;
+    userId: string;
+    payload: Uint8Array;
+    statusCode: number;
+    schemaVersion: number;
 }
 // }
 
@@ -210,21 +210,21 @@ export interface ContextCustomEventData {
  *
  */
 export interface Thread {
-  contextId: string;
-  threadId: string;
-  createDate: number;
-  creator: string;
-  lastModificationDate: number;
-  lastModifier: string;
-  users: string[];
-  managers: string[];
-  version: number;
-  lastMsgDate: number;
-  publicMeta: Uint8Array;
-  privateMeta: Uint8Array;
-  policy: ContainerPolicy;
-  messagesCount: number;
-  statusCode: number;
+    contextId: string;
+    threadId: string;
+    createDate: number;
+    creator: string;
+    lastModificationDate: number;
+    lastModifier: string;
+    users: string[];
+    managers: string[];
+    version: number;
+    lastMsgDate: number;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    policy: ContainerPolicy;
+    messagesCount: number;
+    statusCode: number;
 }
 
 /**
@@ -241,12 +241,12 @@ export interface Thread {
  *
  */
 export interface Message {
-  info: ServerMessageInfo;
-  publicMeta: Uint8Array;
-  privateMeta: Uint8Array;
-  data: Uint8Array;
-  authorPubKey: string;
-  statusCode: number;
+    info: ServerMessageInfo;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    data: Uint8Array;
+    authorPubKey: string;
+    statusCode: number;
 }
 
 /**
@@ -261,10 +261,10 @@ export interface Message {
  *
  */
 export interface ServerMessageInfo {
-  threadId: string;
-  messageId: string;
-  createDate: number;
-  author: string;
+    threadId: string;
+    messageId: string;
+    createDate: number;
+    author: string;
 }
 // }
 
@@ -292,21 +292,21 @@ export interface ServerMessageInfo {
  *
  */
 export interface Store {
-  storeId: string;
-  contextId: string;
-  createDate: number;
-  creator: string;
-  lastModificationDate: number;
-  lastFileDate: number;
-  lastModifier: string;
-  users: string[];
-  managers: string[];
-  version: number;
-  publicMeta: Uint8Array;
-  privateMeta: Uint8Array;
-  policy: ContainerPolicy;
-  filesCount: number;
-  statusCode: number;
+    storeId: string;
+    contextId: string;
+    createDate: number;
+    creator: string;
+    lastModificationDate: number;
+    lastFileDate: number;
+    lastModifier: string;
+    users: string[];
+    managers: string[];
+    version: number;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    policy: ContainerPolicy;
+    filesCount: number;
+    statusCode: number;
 }
 
 /**
@@ -323,12 +323,12 @@ export interface Store {
  *
  */
 export interface File {
-  info: ServerFileInfo;
-  publicMeta: Uint8Array;
-  privateMeta: Uint8Array;
-  size: number;
-  authorPubKey: string;
-  statusCode: number;
+    info: ServerFileInfo;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    size: number;
+    authorPubKey: string;
+    statusCode: number;
 }
 
 /**
@@ -343,10 +343,10 @@ export interface File {
  *
  */
 export interface ServerFileInfo {
-  storeId: string;
-  fileId: string;
-  createDate: number;
-  author: string;
+    storeId: string;
+    fileId: string;
+    createDate: number;
+    author: string;
 }
 // }
 
@@ -373,20 +373,20 @@ export interface ServerFileInfo {
  *
  */
 export interface Inbox {
-  inboxId: string;
-  contextId: string;
-  createDate: number;
-  creator: string;
-  lastModificationDate: number;
-  lastModifier: string;
-  users: string[];
-  managers: string[];
-  version: number;
-  publicMeta: Uint8Array;
-  privateMeta: Uint8Array;
-  filesConfig?: FilesConfig;
-  policy: ContainerWithoutItemPolicy;
-  statusCode: number;
+    inboxId: string;
+    contextId: string;
+    createDate: number;
+    creator: string;
+    lastModificationDate: number;
+    lastModifier: string;
+    users: string[];
+    managers: string[];
+    version: number;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    filesConfig?: FilesConfig;
+    policy: ContainerWithoutItemPolicy;
+    statusCode: number;
 }
 /**
  * Holds Inbox' public information
@@ -399,9 +399,9 @@ export interface Inbox {
  *
  */
 export interface InboxPublicView {
-  inboxId: string;
-  version: number;
-  publicMeta: Uint8Array;
+    inboxId: string;
+    version: number;
+    publicMeta: Uint8Array;
 }
 
 /**
@@ -418,13 +418,13 @@ export interface InboxPublicView {
  * @param {number} statusCode status code of retrieval and decryption of the Inbox entry
  */
 export interface InboxEntry {
-  entryId: string;
-  inboxId: string;
-  data: Uint8Array;
-  files: File[];
-  authorPubKey: string;
-  createDate: number;
-  statusCode: number;
+    entryId: string;
+    inboxId: string;
+    data: Uint8Array;
+    files: File[];
+    authorPubKey: string;
+    createDate: number;
+    statusCode: number;
 }
 
 /**
@@ -439,10 +439,10 @@ export interface InboxEntry {
  *
  */
 export interface FilesConfig {
-  minCount: number;
-  maxCount: number;
-  maxFileSize: number;
-  maxWholeUploadSize: number;
+    minCount: number;
+    maxCount: number;
+    maxFileSize: number;
+    maxWholeUploadSize: number;
 }
 // }
 
@@ -471,22 +471,22 @@ export interface FilesConfig {
  * @param {number} schemaVersion Version of the KVDB data structure and how it is encoded/encrypted
  */
 export interface Kvdb {
-  contextId: string;
-  kvdbId: string;
-  createDate: number;
-  creator: string;
-  lastModificationDate: number;
-  lastModifier: string;
-  users: string[];
-  managers: string[];
-  version: number;
-  lastMsgDate: number;
-  publicMeta: Uint8Array;
-  privateMeta: Uint8Array;
-  policy: ContainerPolicy;
-  entries: number;
-  statusCode: number;
-  schemaVersion: number;
+    contextId: string;
+    kvdbId: string;
+    createDate: number;
+    creator: string;
+    lastModificationDate: number;
+    lastModifier: string;
+    users: string[];
+    managers: string[];
+    version: number;
+    lastMsgDate: number;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    policy: ContainerPolicy;
+    entries: number;
+    statusCode: number;
+    schemaVersion: number;
 }
 
 /**
@@ -504,14 +504,14 @@ export interface Kvdb {
  * @param {number} schemaVersion Version of the KVDB entry data structure and how it is encoded/encrypted
  */
 export interface KvdbEntry {
-  info: ServerKvdbEntryInfo;
-  publicMeta: Uint8Array;
-  privateMeta: Uint8Array;
-  data: Uint8Array;
-  authorPubKey: string;
-  version: number;
-  statusCode: number;
-  schemaVersion: number;
+    info: ServerKvdbEntryInfo;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    data: Uint8Array;
+    authorPubKey: string;
+    version: number;
+    statusCode: number;
+    schemaVersion: number;
 }
 
 /**
@@ -526,10 +526,10 @@ export interface KvdbEntry {
  *
  */
 export interface ServerKvdbEntryInfo {
-  kvdbId: string;
-  key: string;
-  createDate: number;
-  author: string;
+    kvdbId: string;
+    key: string;
+    createDate: number;
+    author: string;
 }
 
 /**
@@ -553,12 +553,12 @@ export type DeleteEntriesResult = Map<string, boolean>;
  * @param {PolicyBooleanEntry} ownerCanBeRemovedFromManagers determine whether the owner can be removed from the list of managers
  */
 export interface ContainerWithoutItemPolicy {
-  get?: PolicyEntry;
-  update?: PolicyEntry;
-  delete?: PolicyEntry;
-  updatePolicy?: PolicyEntry;
-  updaterCanBeRemovedFromManagers?: PolicyBooleanEntry;
-  ownerCanBeRemovedFromManagers?: PolicyBooleanEntry;
+    get?: PolicyEntry;
+    update?: PolicyEntry;
+    delete?: PolicyEntry;
+    updatePolicy?: PolicyEntry;
+    updaterCanBeRemovedFromManagers?: PolicyBooleanEntry;
+    ownerCanBeRemovedFromManagers?: PolicyBooleanEntry;
 }
 
 /**
@@ -569,32 +569,32 @@ export interface ContainerWithoutItemPolicy {
  * @param {ItemPolicy} item item policies
  */
 export interface ContainerPolicy extends ContainerWithoutItemPolicy {
-  item?: ItemPolicy;
+    item?: ItemPolicy;
 }
 
 /**
  * @type {PolicyEntry}
  */
 export type PolicyEntry =
-  | "inherit"
-  | "yes"
-  | "no"
-  | "default"
-  | "none"
-  | "all"
-  | "user"
-  | "owner"
-  | "manager"
-  | "itemOwner"
-  | "itemOwner&user"
-  | "itemOwner&user,manager"
-  | "owner&user"
-  | "manager&owner"
-  | "itemOwner,manager"
-  | "itemOwner,owner"
-  | "itemOwner,manager,owner"
-  | "manager,owner"
-  | (string & { __policyEntry: never });
+    | "inherit"
+    | "yes"
+    | "no"
+    | "default"
+    | "none"
+    | "all"
+    | "user"
+    | "owner"
+    | "manager"
+    | "itemOwner"
+    | "itemOwner&user"
+    | "itemOwner&user,manager"
+    | "owner&user"
+    | "manager&owner"
+    | "itemOwner,manager"
+    | "itemOwner,owner"
+    | "itemOwner,manager,owner"
+    | "manager,owner"
+    | (string & { __policyEntry: never });
 
 /**
  * @type {PolicyBooleanEntry}
@@ -614,12 +614,12 @@ export type PolicyBooleanEntry = "inherit" | "default" | "yes" | "no";
  * @param {PolicyEntry} delete determine who can delete an item
  */
 export interface ItemPolicy {
-  get?: PolicyEntry;
-  listMy?: PolicyEntry;
-  listAll?: PolicyEntry;
-  create?: PolicyEntry;
-  update?: PolicyEntry;
-  delete?: PolicyEntry;
+    get?: PolicyEntry;
+    listMy?: PolicyEntry;
+    listAll?: PolicyEntry;
+    create?: PolicyEntry;
+    update?: PolicyEntry;
+    delete?: PolicyEntry;
 }
 
 /**
@@ -635,11 +635,11 @@ export interface ItemPolicy {
  *
  */
 export interface Error {
-  code: number;
-  name: string;
-  scope: string;
-  description: string;
-  full: string;
+    code: number;
+    name: string;
+    scope: string;
+    description: string;
+    full: string;
 }
 /**
  * @param {string} mnemonic BIP-39 mnemonic
@@ -647,9 +647,9 @@ export interface Error {
  * @param {Uint8Array} entropy BIP-39 entropy
  */
 export interface BIP39 {
-  mnemonic: string;
-  entropy: Uint8Array;
-  extKey: ExtKey;
+    mnemonic: string;
+    entropy: Uint8Array;
+    extKey: ExtKey;
 }
 
 /**
@@ -663,11 +663,11 @@ export interface BIP39 {
  * @param {BridgeIdentity} bridgeIdentity Bridge Identity
  */
 export interface VerificationRequest {
-  contextId: string;
-  senderId: string;
-  senderPubKey: string;
-  date: number;
-  bridgeIdentity?: BridgeIdentity;
+    contextId: string;
+    senderId: string;
+    senderPubKey: string;
+    date: number;
+    bridgeIdentity?: BridgeIdentity;
 }
 
 /**
@@ -680,9 +680,9 @@ export interface VerificationRequest {
  * @param {string} instanceId Bridge instance Id given by PKI
  */
 export interface BridgeIdentity {
-  url: string;
-  pubKey?: string;
-  instanceId?: string;
+    url: string;
+    pubKey?: string;
+    instanceId?: string;
 }
 
 /**
@@ -694,99 +694,99 @@ export interface BridgeIdentity {
  * @param {string} [bridgeInstanceId] Bridge instance Id given by PKI
  */
 export interface PKIVerificationOptions {
-  bridgePubKey?: string;
-  bridgeInstanceId?: string;
+    bridgePubKey?: string;
+    bridgeInstanceId?: string;
 }
 
 // Enums
 export enum ConnectionEventType {
-  USER_ADD = 0,
-  USER_REMOVE = 1,
-  USER_STATUS = 2,
+    USER_ADD = 0,
+    USER_REMOVE = 1,
+    USER_STATUS = 2,
 }
 
 export enum ConnectionEventSelectorType {
-  CONTEXT_ID = 0,
+    CONTEXT_ID = 0,
 }
 
 export enum StoreEventType {
-  STORE_CREATE = 0,
-  STORE_UPDATE = 1,
-  STORE_DELETE = 2,
-  STORE_STATS = 3,
-  FILE_CREATE = 4,
-  FILE_UPDATE = 5,
-  FILE_DELETE = 6,
-  COLLECTION_CHANGE = 7,
+    STORE_CREATE = 0,
+    STORE_UPDATE = 1,
+    STORE_DELETE = 2,
+    STORE_STATS = 3,
+    FILE_CREATE = 4,
+    FILE_UPDATE = 5,
+    FILE_DELETE = 6,
+    COLLECTION_CHANGE = 7,
 }
 
 export enum StoreEventSelectorType {
-  CONTEXT_ID = 0,
-  STORE_ID = 1,
-  FILE_ID = 2,
+    CONTEXT_ID = 0,
+    STORE_ID = 1,
+    FILE_ID = 2,
 }
 
 export enum ThreadEventType {
-  THREAD_CREATE = 0,
-  THREAD_UPDATE = 1,
-  THREAD_DELETE = 2,
-  THREAD_STATS = 3,
-  MESSAGE_CREATE = 4,
-  MESSAGE_UPDATE = 5,
-  MESSAGE_DELETE = 6,
-  COLLECTION_CHANGE = 7,
+    THREAD_CREATE = 0,
+    THREAD_UPDATE = 1,
+    THREAD_DELETE = 2,
+    THREAD_STATS = 3,
+    MESSAGE_CREATE = 4,
+    MESSAGE_UPDATE = 5,
+    MESSAGE_DELETE = 6,
+    COLLECTION_CHANGE = 7,
 }
 
 export enum ThreadEventSelectorType {
-  CONTEXT_ID = 0,
-  THREAD_ID = 1,
-  MESSAGE_ID = 2,
+    CONTEXT_ID = 0,
+    THREAD_ID = 1,
+    MESSAGE_ID = 2,
 }
 
 export enum InboxEventType {
-  INBOX_CREATE = 0,
-  INBOX_UPDATE = 1,
-  INBOX_DELETE = 2,
-  ENTRY_CREATE = 3,
-  ENTRY_DELETE = 4,
-  COLLECTION_CHANGE = 5,
+    INBOX_CREATE = 0,
+    INBOX_UPDATE = 1,
+    INBOX_DELETE = 2,
+    ENTRY_CREATE = 3,
+    ENTRY_DELETE = 4,
+    COLLECTION_CHANGE = 5,
 }
 
 export enum InboxEventSelectorType {
-  CONTEXT_ID = 0,
-  INBOX_ID = 1,
-  ENTRY_ID = 2,
+    CONTEXT_ID = 0,
+    INBOX_ID = 1,
+    ENTRY_ID = 2,
 }
 
 export enum KvdbEventType {
-  KVDB_CREATE = 0,
-  KVDB_UPDATE = 1,
-  KVDB_DELETE = 2,
-  KVDB_STATS = 3,
-  ENTRY_CREATE = 4,
-  ENTRY_UPDATE = 5,
-  ENTRY_DELETE = 6,
-  COLLECTION_CHANGE = 7,
+    KVDB_CREATE = 0,
+    KVDB_UPDATE = 1,
+    KVDB_DELETE = 2,
+    KVDB_STATS = 3,
+    ENTRY_CREATE = 4,
+    ENTRY_UPDATE = 5,
+    ENTRY_DELETE = 6,
+    COLLECTION_CHANGE = 7,
 }
 
 export enum KvdbEventSelectorType {
-  CONTEXT_ID = 0,
-  KVDB_ID = 1,
-  ENTRY_ID = 2,
+    CONTEXT_ID = 0,
+    KVDB_ID = 1,
+    ENTRY_ID = 2,
 }
 
 export enum EventsEventSelectorType {
-  CONTEXT_ID = 0,
+    CONTEXT_ID = 0,
 }
 
 export type CollectionItemChange = {
-  itemId: string;
-  action: string;
+    itemId: string;
+    action: string;
 };
 
 export type CollectionChangedEventData = {
-  moduleType: string;
-  moduleId: string;
-  affectedItemsCount: number;
-  items: CollectionItemChange[];
+    moduleType: string;
+    moduleId: string;
+    affectedItemsCount: number;
+    items: CollectionItemChange[];
 };

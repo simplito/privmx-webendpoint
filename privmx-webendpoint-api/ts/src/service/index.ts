@@ -11,15 +11,15 @@ import { ExtKey } from "./ExtKey";
 import { EventApi } from "./EventApi";
 
 export {
-  EndpointFactory,
-  ThreadApi,
-  StoreApi,
-  InboxApi,
-  KvdbApi,
-  CryptoApi,
-  Connection,
-  EventQueue,
-  BaseApi,
-  ExtKey,
-  EventApi,
+    EndpointFactory,
+    ThreadApi,
+    StoreApi,
+    InboxApi,
+    KvdbApi,
+    CryptoApi,
+    Connection,
+    EventQueue,
+    BaseApi,
+    ExtKey,
+    EventApi,
 };
