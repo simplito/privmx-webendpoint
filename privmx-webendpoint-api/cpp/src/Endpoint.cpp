@@ -11,8 +11,9 @@ limitations under the License.
 
 #include "Endpoint.hpp"
 
-#include "privmx/endpoint/core/VarDeserializer.hpp"
-#include "privmx/endpoint/core/VarSerializer.hpp"
+#include <emscripten/proxying.h>
+#include <emscripten/threading.h>
+
 #include <privmx/endpoint/core/UserVerifierInterface.hpp>
 #include <privmx/endpoint/core/varinterface/ConnectionVarInterface.hpp>
 #include <privmx/endpoint/core/varinterface/EventQueueVarInterface.hpp>
@@ -24,13 +25,12 @@ limitations under the License.
 #include <privmx/endpoint/store/varinterface/StoreApiVarInterface.hpp>
 #include <privmx/endpoint/thread/varinterface/ThreadApiVarInterface.hpp>
 
-#include "CustomUserVerifierInterface.hpp"
-
 #include "AsyncEngine.hpp"
+#include "CustomUserVerifierInterface.hpp"
 #include "Macros.hpp"
 #include "Mapper.hpp"
-#include <emscripten/proxying.h>
-#include <emscripten/threading.h>
+#include "privmx/endpoint/core/VarDeserializer.hpp"
+#include "privmx/endpoint/core/VarSerializer.hpp"
 
 using namespace privmx::endpoint;
 using namespace privmx::webendpoint;
@@ -54,38 +54,34 @@ namespace webendpoint {
 namespace api {
 
 void setResultsCallback(emscripten::val callback) {
-  AsyncEngine::getInstance()->setResultsCallback(callback);
+    AsyncEngine::getInstance()->setResultsCallback(callback);
 }
 
 void EventQueue_newEventQueue(int taskId) {
-  AsyncEngine::getInstance()->postWorkerTask(taskId, [&] {
-    auto service = new EventQueueVar(
-        core::EventQueue::getInstance(),
-        core::VarSerializer::Options{
-            .addType = false,
-            .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
-    return (int)service;
-  });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&] {
+        auto service = new EventQueueVar(
+            core::EventQueue::getInstance(),
+            core::VarSerializer::Options{
+                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)service;
+    });
 }
 void EventQueue_deleteEventQueue(int taskId, int ptr) {
-  AsyncEngine::getInstance()->postWorkerTask(
-      taskId, [&, ptr] { delete (EventQueueVar *)ptr; });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (EventQueueVar *)ptr; });
 }
 API_FUNCTION(EventQueue, emitBreakEvent)
 API_FUNCTION(EventQueue, waitEvent)
 API_FUNCTION(EventQueue, getEvent)
 
 void Connection_newConnection(int taskId) {
-  AsyncEngine::getInstance()->postWorkerTask(taskId, [&] {
-    auto service = new ConnectionVar(core::VarSerializer::Options{
-        .addType = false,
-        .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
-    return (int)service;
-  });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&] {
+        auto service = new ConnectionVar(core::VarSerializer::Options{
+            .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)service;
+    });
 }
 void Connection_deleteConnection(int taskId, int ptr) {
-  AsyncEngine::getInstance()->postWorkerTask(
-      taskId, [&, ptr] { delete (ConnectionVar *)ptr; });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (ConnectionVar *)ptr; });
 }
 API_FUNCTION(Connection, connect)
 API_FUNCTION(Connection, connectPublic)
@@ -97,36 +93,32 @@ API_FUNCTION(Connection, unsubscribeFrom)
 API_FUNCTION(Connection, buildSubscriptionQuery)
 API_FUNCTION(Connection, disconnect)
 
-void Connection_newUserVerifierInterface(int taskId, int connectionPtr,
-                                         int interfaceBindId) {
-  AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr,
-                                                      interfaceBindId] {
-    auto connection = (ConnectionVar *)connectionPtr;
-    auto customInterfaceRawPtr = new UserVerifierHolder(interfaceBindId);
-    connection->getApi().setUserVerifier(customInterfaceRawPtr->getInstance());
-    return (int)customInterfaceRawPtr;
-  });
+void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int interfaceBindId) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, interfaceBindId] {
+        auto connection = (ConnectionVar *)connectionPtr;
+        auto customInterfaceRawPtr = new UserVerifierHolder(interfaceBindId);
+        connection->getApi().setUserVerifier(customInterfaceRawPtr->getInstance());
+        return (int)customInterfaceRawPtr;
+    });
 }
 
 void Connection_deleteUserVerifierInterface(int taskId, int ptr) {
-  AsyncEngine::getInstance()->postWorkerTask(
-      taskId, [&, ptr] { delete (UserVerifierHolder *)ptr; });
+    AsyncEngine::getInstance()->postWorkerTask(taskId,
+                                               [&, ptr] { delete (UserVerifierHolder *)ptr; });
 }
 
 void ThreadApi_newThreadApi(int taskId, int connectionPtr) {
-  AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
-    auto connection = (ConnectionVar *)connectionPtr;
-    auto threadApi = new ThreadApiVar(
-        connection->getApi(),
-        core::VarSerializer::Options{
-            .addType = false,
-            .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
-    return (int)threadApi;
-  });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
+        auto connection = (ConnectionVar *)connectionPtr;
+        auto threadApi = new ThreadApiVar(
+            connection->getApi(),
+            core::VarSerializer::Options{
+                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)threadApi;
+    });
 }
 void ThreadApi_deleteThreadApi(int taskId, int ptr) {
-  AsyncEngine::getInstance()->postWorkerTask(
-      taskId, [&, ptr] { delete (ThreadApiVar *)ptr; });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (ThreadApiVar *)ptr; });
 }
 API_FUNCTION(ThreadApi, create)
 API_FUNCTION(ThreadApi, createThread)
@@ -144,19 +136,17 @@ API_FUNCTION(ThreadApi, unsubscribeFrom)
 API_FUNCTION(ThreadApi, buildSubscriptionQuery)
 
 void StoreApi_newStoreApi(int taskId, int connectionPtr) {
-  AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
-    auto connection = (ConnectionVar *)connectionPtr;
-    auto threadApi = new StoreApiVar(
-        connection->getApi(),
-        core::VarSerializer::Options{
-            .addType = false,
-            .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
-    return (int)threadApi;
-  });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
+        auto connection = (ConnectionVar *)connectionPtr;
+        auto threadApi = new StoreApiVar(
+            connection->getApi(),
+            core::VarSerializer::Options{
+                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)threadApi;
+    });
 }
 void StoreApi_deleteStoreApi(int taskId, int ptr) {
-  AsyncEngine::getInstance()->postWorkerTask(
-      taskId, [&, ptr] { delete (StoreApiVar *)ptr; });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (StoreApiVar *)ptr; });
 }
 API_FUNCTION(StoreApi, create)
 API_FUNCTION(StoreApi, createStore)
@@ -180,25 +170,21 @@ API_FUNCTION(StoreApi, subscribeFor)
 API_FUNCTION(StoreApi, unsubscribeFrom)
 API_FUNCTION(StoreApi, buildSubscriptionQuery)
 
-void InboxApi_newInboxApi(int taskId, int connectionPtr, int threadApiPtr,
-                          int storeApiPtr) {
-  AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr,
-                                                      threadApiPtr,
-                                                      storeApiPtr] {
-    auto connection = (ConnectionVar *)connectionPtr;
-    auto threadApi = (ThreadApiVar *)threadApiPtr;
-    auto storeApi = (StoreApiVar *)storeApiPtr;
-    auto inboxApi = new InboxApiVar(
-        connection->getApi(), threadApi->getApi(), storeApi->getApi(),
-        core::VarSerializer::Options{
-            .addType = false,
-            .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
-    return (int)inboxApi;
-  });
+void InboxApi_newInboxApi(int taskId, int connectionPtr, int threadApiPtr, int storeApiPtr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, threadApiPtr,
+                                                        storeApiPtr] {
+        auto connection = (ConnectionVar *)connectionPtr;
+        auto threadApi = (ThreadApiVar *)threadApiPtr;
+        auto storeApi = (StoreApiVar *)storeApiPtr;
+        auto inboxApi = new InboxApiVar(
+            connection->getApi(), threadApi->getApi(), storeApi->getApi(),
+            core::VarSerializer::Options{
+                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)inboxApi;
+    });
 }
 void InboxApi_deleteInboxApi(int taskId, int ptr) {
-  AsyncEngine::getInstance()->postWorkerTask(
-      taskId, [&, ptr] { delete (InboxApiVar *)ptr; });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (InboxApiVar *)ptr; });
 }
 API_FUNCTION(InboxApi, create)
 API_FUNCTION(InboxApi, createInbox)
@@ -223,19 +209,17 @@ API_FUNCTION(InboxApi, unsubscribeFrom)
 API_FUNCTION(InboxApi, buildSubscriptionQuery)
 
 void KvdbApi_newKvdbApi(int taskId, int connectionPtr) {
-  AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
-    auto connection = (ConnectionVar *)connectionPtr;
-    auto kvdbApi = new KvdbApiVar(
-        connection->getApi(),
-        core::VarSerializer::Options{
-            .addType = false,
-            .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
-    return (int)kvdbApi;
-  });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
+        auto connection = (ConnectionVar *)connectionPtr;
+        auto kvdbApi = new KvdbApiVar(
+            connection->getApi(),
+            core::VarSerializer::Options{
+                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)kvdbApi;
+    });
 }
 void KvdbApi_deleteKvdbApi(int taskId, int ptr) {
-  AsyncEngine::getInstance()->postWorkerTask(
-      taskId, [&, ptr] { delete (KvdbApiVar *)ptr; });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (KvdbApiVar *)ptr; });
 }
 API_FUNCTION(KvdbApi, create)
 API_FUNCTION(KvdbApi, createKvdb)
@@ -256,16 +240,14 @@ API_FUNCTION(KvdbApi, buildSubscriptionQuery)
 API_FUNCTION(KvdbApi, buildSubscriptionQueryForSelectedEntry)
 
 void CryptoApi_newCryptoApi(int taskId) {
-  AsyncEngine::getInstance()->postWorkerTask(taskId, [&] {
-    auto service = new CryptoApiVar(core::VarSerializer::Options{
-        .addType = false,
-        .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
-    return (int)service;
-  });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&] {
+        auto service = new CryptoApiVar(core::VarSerializer::Options{
+            .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)service;
+    });
 }
 void CryptoApi_deleteCryptoApi(int taskId, int ptr) {
-  AsyncEngine::getInstance()->postWorkerTask(
-      taskId, [&, ptr] { delete (CryptoApiVar *)ptr; });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (CryptoApiVar *)ptr; });
 }
 API_FUNCTION(CryptoApi, create)
 API_FUNCTION(CryptoApi, signData)
@@ -286,38 +268,34 @@ API_FUNCTION(CryptoApi, mnemonicToEntropy)
 API_FUNCTION(CryptoApi, mnemonicToSeed)
 
 void ExtKey_deleteExtKey(int taskId, int ptr) {
-  AsyncEngine::getInstance()->postWorkerTask(
-      taskId, [&, ptr] { delete (ExtKeyVar *)ptr; });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (ExtKeyVar *)ptr; });
 }
 
 void ExtKey_fromSeed(int taskId, emscripten::val args) {
-  Poco::Dynamic::Var argsVar = Mapper::map(args);
-  AsyncEngine::getInstance()->postWorkerTask(taskId, [&, argsVar] {
-    auto service = new ExtKeyVar(core::VarSerializer::Options{
-        .addType = false,
-        .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
-    return service->fromSeed(argsVar);
-  });
+    Poco::Dynamic::Var argsVar = Mapper::map(args);
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, argsVar] {
+        auto service = new ExtKeyVar(core::VarSerializer::Options{
+            .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return service->fromSeed(argsVar);
+    });
 }
 
 void ExtKey_fromBase58(int taskId, emscripten::val args) {
-  Poco::Dynamic::Var argsVar = Mapper::map(args);
-  AsyncEngine::getInstance()->postWorkerTask(taskId, [&, argsVar] {
-    auto service = new ExtKeyVar(core::VarSerializer::Options{
-        .addType = false,
-        .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
-    return service->fromBase58(argsVar);
-  });
+    Poco::Dynamic::Var argsVar = Mapper::map(args);
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, argsVar] {
+        auto service = new ExtKeyVar(core::VarSerializer::Options{
+            .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return service->fromBase58(argsVar);
+    });
 }
 
 void ExtKey_generateRandom(int taskId, emscripten::val args) {
-  Poco::Dynamic::Var argsVar = Mapper::map(args);
-  AsyncEngine::getInstance()->postWorkerTask(taskId, [&, argsVar] {
-    auto service = new ExtKeyVar(core::VarSerializer::Options{
-        .addType = false,
-        .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
-    return service->generateRandom(argsVar);
-  });
+    Poco::Dynamic::Var argsVar = Mapper::map(args);
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, argsVar] {
+        auto service = new ExtKeyVar(core::VarSerializer::Options{
+            .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return service->generateRandom(argsVar);
+    });
 }
 
 API_FUNCTION(ExtKey, derive)
@@ -333,19 +311,17 @@ API_FUNCTION(ExtKey, verifyCompactSignatureWithHash)
 API_FUNCTION(ExtKey, isPrivate)
 
 void EventApi_newEventApi(int taskId, int connectionPtr) {
-  AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
-    auto connection = (ConnectionVar *)connectionPtr;
-    auto api = new EventApiVar(
-        connection->getApi(),
-        core::VarSerializer::Options{
-            .addType = false,
-            .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
-    return (int)api;
-  });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
+        auto connection = (ConnectionVar *)connectionPtr;
+        auto api = new EventApiVar(
+            connection->getApi(),
+            core::VarSerializer::Options{
+                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)api;
+    });
 }
 void EventApi_deleteEventApi(int taskId, int ptr) {
-  AsyncEngine::getInstance()->postWorkerTask(
-      taskId, [&, ptr] { delete (EventApiVar *)ptr; });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (EventApiVar *)ptr; });
 }
 API_FUNCTION(EventApi, create)
 API_FUNCTION(EventApi, emitEvent)
@@ -353,6 +329,6 @@ API_FUNCTION(EventApi, subscribeFor)
 API_FUNCTION(EventApi, unsubscribeFrom)
 API_FUNCTION(EventApi, buildSubscriptionQuery)
 
-} // namespace api
-} // namespace webendpoint
-} // namespace privmx
+}  // namespace api
+}  // namespace webendpoint
+}  // namespace privmx

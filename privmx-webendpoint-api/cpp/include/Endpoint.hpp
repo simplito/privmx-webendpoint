@@ -12,11 +12,12 @@ limitations under the License.
 #ifndef _PRIVMXLIB_WEBENDPOINT_ENDPOINT_HPP_
 #define _PRIVMXLIB_WEBENDPOINT_ENDPOINT_HPP_
 
-#include "Macros.hpp"
-#include "Mapper.hpp"
 #include <emscripten.h>
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
+
+#include "Macros.hpp"
+#include "Mapper.hpp"
 
 namespace privmx {
 namespace webendpoint {
@@ -41,11 +42,9 @@ API_FUNCTION_HEADER(Connection, subscribeFor)
 API_FUNCTION_HEADER(Connection, unsubscribeFrom)
 API_FUNCTION_HEADER(Connection, buildSubscriptionQuery)
 API_FUNCTION_HEADER(Connection, disconnect)
-void Connection_newUserVerifierInterface(int taskId, int connectionPtr,
-                                         int interfaceBindId);
+void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int interfaceBindId);
 void Connection_deleteUserVerifierInterface(int taskId, int ptr);
-emscripten::val callVerifierOnJS(emscripten::val &name,
-                                 emscripten::val &params);
+emscripten::val callVerifierOnJS(emscripten::val &name, emscripten::val &params);
 
 void ThreadApi_newThreadApi(int taskId, int connectionPtr);
 void ThreadApi_deleteThreadApi(int taskId, int ptr);
@@ -88,8 +87,7 @@ API_FUNCTION_HEADER(StoreApi, subscribeFor)
 API_FUNCTION_HEADER(StoreApi, unsubscribeFrom)
 API_FUNCTION_HEADER(StoreApi, buildSubscriptionQuery)
 
-void InboxApi_newInboxApi(int taskId, int connectionPtr, int threadApiPtr,
-                          int storeApiPtr);
+void InboxApi_newInboxApi(int taskId, int connectionPtr, int threadApiPtr, int storeApiPtr);
 void InboxApi_deleteInboxApi(int taskId, int ptr);
 API_FUNCTION_HEADER(InboxApi, create)
 API_FUNCTION_HEADER(InboxApi, createInbox)
@@ -177,8 +175,8 @@ API_FUNCTION_HEADER(ExtKey, getChainCode)
 API_FUNCTION_HEADER(ExtKey, verifyCompactSignatureWithHash)
 API_FUNCTION_HEADER(ExtKey, isPrivate)
 
-} // namespace api
-} // namespace webendpoint
-} // namespace privmx
+}  // namespace api
+}  // namespace webendpoint
+}  // namespace privmx
 
-#endif // _PRIVMXLIB_WEBENDPOINT_ENDPOINT_HPP_
+#endif  // _PRIVMXLIB_WEBENDPOINT_ENDPOINT_HPP_
