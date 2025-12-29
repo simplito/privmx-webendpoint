@@ -25,8 +25,11 @@ else
     unzip -o poco.zip
 fi
 
-cd "$POCO_DIR"
+echo "+++++++++++++++++++++"
+echo $POCO_DIR
+echo "+++++++++++++++++++++"
 
+cd "$POCO_DIR"
 # apply config patches for emscripten
 patch --forward -d "$POCO_DIR" -p1 -i "$BASE_DIR/patches/poco-$VERSION-all.patch" || echo "OK"
 

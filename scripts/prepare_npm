@@ -8,19 +8,21 @@ NPM_PACKAGE_VERSION="1.0.0"
 if [ -n "$1" ]; then
     NPM_PACKAGE_VERSION="$1"
 fi
+
 WORKING_DIR="$PRIVMX_WEBENDPOINT_API_SRC/ts"
 PUB_DIR="$WORKING_DIR/pub"
 
 rm -rf "$PUB_DIR"
 mkdir -p $PUB_DIR
-
-
+mkdir -p "$SCRIPT_PATH/../out"
 
 cp $WORKING_DIR/package-template.json $WORKING_DIR/package.json
-sed -i "s/{__VERSION__}/$1/g" $WORKING_DIR/package.json
+# sed -i "s/{__VERSION__}/$1/g" $WORKING_DIR/package.json
+sed -i '' "s/{__VERSION__}/$1/g" "$WORKING_DIR/package.json"
 
 cd $WORKING_DIR
 npm run build
+echo "after build"
 cp -R ./dist/* "$PUB_DIR"
 cp -R ./assets "$PUB_DIR"
 cp ./LICENSE.md "$PUB_DIR"
