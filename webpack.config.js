@@ -38,6 +38,7 @@ module.exports = {
     filename: (pathData) => {
       return pathData.chunk.name == 'bundle' ? 'privmx-endpoint-web.js' : 'privmx-endpoint-web.[name].js';
     },
+    globalObject: 'this',
     path: path.resolve(__dirname, 'dist/bundle'),
     library: {
       name: {

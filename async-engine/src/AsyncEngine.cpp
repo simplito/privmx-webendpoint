@@ -58,7 +58,7 @@ AsyncEngine *AsyncEngine::getInstance() {
 }
 
 AsyncEngine::AsyncEngine() {
-    _pool = std::make_unique<WorkerPool>(2);
+    _pool = std::make_unique<WorkerPool>(4);
     _taskManagerThread = std::thread([&]{
         emscripten_runtime_keepalive_push();
     });

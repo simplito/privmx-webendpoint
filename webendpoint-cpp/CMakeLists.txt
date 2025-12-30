@@ -15,7 +15,7 @@ target_link_options(endpoint-wasm-module PUBLIC
     -L $ENV{SDK_DIR}/upstream/emscripten/cache/sysroot/lib
     -flto                
     -sUSE_PTHREADS
-    -sASSERTIONS=0 -sEXPORT_EXCEPTION_HANDLING_HELPERS -sLLD_REPORT_UNDEFINED
+    -sASSERTIONS=2 -sEXPORT_EXCEPTION_HANDLING_HELPERS -sLLD_REPORT_UNDEFINED
     -sNO_EXIT_RUNTIME -sWASM=1 -sMODULARIZE -sEXPORT_NAME=endpointWasmModule
     -sALLOW_BLOCKING_ON_MAIN_THREAD=0
     -sALLOW_MEMORY_GROWTH=0

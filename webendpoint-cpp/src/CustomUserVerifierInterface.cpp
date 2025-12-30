@@ -58,7 +58,7 @@ Poco::Dynamic::Var CustomUserVerifierInterface::callVerifierOnJS(const std::stri
         Poco::Dynamic::Var localParams = params; 
         emscripten::val jsParams = Mapper::map((pson_value*)&localParams);
         verifier_caller(jsName.as_handle(), jsParams.as_handle(), jsBindId.as_handle(), id);
-    }, ThreadTarget::Worker);
+    }, ThreadTarget::Main);
     return ftr.get();
 }
 
