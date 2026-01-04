@@ -26,5 +26,18 @@ export default defineConfig({
         name: 'chromium',
         use: { ...devices['Desktop Chrome'] },
       },
+      {
+        name: 'firefox',
+        use: {
+          ...devices['Desktop Firefox'],
+          launchOptions: {
+            firefoxUserPrefs: {
+              'dom.postMessage.sharedArrayBuffer.bypassCOOP_COEP.insecure.enabled': true,
+              'dom.workers.maxPerDomain': 512,
+              'dom.min_background_timeout_value': 10,
+            }
+          }
+        },
+      },
     ] 
 });

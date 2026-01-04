@@ -12,10 +12,7 @@ declare global {
 
 test.describe('CoreTest: Connection & Contexts', () => {
 
-    // Helper to generate User 2 and give them access to our test contexts
-    // This runs before tests that need two users
     async function setupUser2(page: any, cli: any) {
-        // 1. Generate Keypair in Browser
         const user2Keys = await page.evaluate(async () => {
             const Endpoint = window.Endpoint;
             await Endpoint.setup("../../dist/assets");
@@ -29,14 +26,12 @@ test.describe('CoreTest: Connection & Contexts', () => {
 
         const user2Id = `user2-${Date.now()}`;
 
-        // 2. Add User 2 to BOTH contexts defined in testData via CLI
         await cli.call('context/addUserToContext', {
             contextId: testData.contextId,
             userId: user2Id,
             userPubKey: user2Keys.pubKey
         });
         
-        // Try adding to second context if it exists, ignore if not (for robustness)
         if (testData.contextId2) {
              try {
                 await cli.call('context/addUserToContext', {
@@ -44,7 +39,7 @@ test.describe('CoreTest: Connection & Contexts', () => {
                     userId: user2Id,
                     userPubKey: user2Keys.pubKey
                 });
-             } catch (e) { /* ignore if context2 missing */ }
+             } catch (e) {}
         }
 
         return { ...user2Keys, userId: user2Id };
@@ -61,7 +56,7 @@ test.describe('CoreTest: Connection & Contexts', () => {
         const args = {
             bridgeUrl: backend.bridgeUrl,
             user1: { privKey: testData.userPrivKey, id: testData.userId },
-            user2: user2, // Generated User
+            user2: user2,
             solutionId: testData.solutionId
         };
 
@@ -69,12 +64,11 @@ test.describe('CoreTest: Connection & Contexts', () => {
             const Endpoint = window.Endpoint;
             await Endpoint.setup("../../dist/assets");
 
-            // --- Helper: Expect Error ---
             const expectError = async (fn: () => Promise<any>) => {
                 try { await fn(); } catch (e) { return; }
                 throw new Error("Expected error but none was thrown");
             };
-            // ----------------------------
+
             // 1. Connect User 1
             const connection_1 = await Endpoint.connect(user1.privKey, solutionId, bridgeUrl);
             // 2. Expect error on re-connecting same user

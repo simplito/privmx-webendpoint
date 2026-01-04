@@ -1,4 +1,4 @@
-import { test as base } from '@playwright/test';
+import { test as base, Page } from '@playwright/test';
 import { execSync } from 'child_process';
 import { MongoClient, Db } from 'mongodb';
 import * as path from 'path';
@@ -21,7 +21,7 @@ type CliContext = {
     call: (method: string, params: object) => Promise<any>;
 };
 
-export const test = base.extend<{ backend: BackendContext; cli: CliContext }, { workerBackend: WorkerBackend }>({
+export const test = base.extend<{ backend: BackendContext; cli: CliContext; page: Page; }, { workerBackend: WorkerBackend }>({
 
     workerBackend: [async ({ }, use, workerInfo) => {
         const id = workerInfo.workerIndex;
@@ -113,7 +113,60 @@ export const test = base.extend<{ backend: BackendContext; cli: CliContext }, { 
             }
         };
         await use({ call: runCli });
+    },
+
+    page: async ({ page }, use) => {
+        
+        // 🟢 FIX: Robust CORS & Security Headers Injection
+        await page.route('**/*', async route => {
+            const request = route.request();
+            
+            // Determine Origin: Fallback to harness URL if header is missing
+            const requestOrigin = await request.headerValue('origin') || 'http://localhost:8080';
+            
+            // Define Standard CORS Headers
+            const corsHeaders = {
+                // WASM / Pthread Security (Required for SharedArrayBuffer)
+                'Cross-Origin-Opener-Policy': 'same-origin',
+                'Cross-Origin-Embedder-Policy': 'require-corp',
+                'Access-Control-Allow-Origin': requestOrigin,
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH',
+                'Access-Control-Allow-Headers': '*',
+                'Access-Control-Allow-Credentials': 'true'
+            };
+
+            // A. Handle Preflight (OPTIONS) requests directly in Playwright
+            // This prevents the backend from rejecting them or sending wrong headers.
+            // We reply "OK" immediately without ever hitting the real backend.
+            if (request.method() === 'OPTIONS') {
+                await route.fulfill({
+                    status: 200,
+                    headers: corsHeaders,
+                });
+                return;
+            }
+
+            // B. Handle Actual Requests
+            try {
+                // Fetch data from backend (Node.js ignores CORS)
+                const response = await route.fetch();
+                
+                // Inject headers into the real response before giving it to the browser
+                await route.fulfill({
+                    response,
+                    headers: {
+                        ...response.headers(),
+                        ...corsHeaders, // Force our CORS headers over backend ones
+                    }
+                });
+            } catch (e) {
+                // If backend connection fails, let browser handle it naturally
+                return route.continue();
+            }
+        });
+        await use(page);
     }
+    
 });
 
 

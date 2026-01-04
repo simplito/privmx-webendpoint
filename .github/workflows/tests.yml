@@ -1,0 +1,70 @@
+name: Playwright Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Checkout your code
+    - uses: actions/checkout@v4
+
+    # 2. Setup Node.js (for Playwright & Webpack)
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: 'npm'
+
+    - name: Install CMake and Build Tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential
+
+    # 4. Install NPM dependencies
+    - name: Install dependencies
+      run: npm ci
+
+    # 5. Build your Wasm Library
+    - name: Build Wasm
+      run: npm run build
+
+    # 6. Install Playwright Browsers & System Deps
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+
+    # 7. Start Backend Services (Docker)
+    # We use the exact command you were trying to run, but automating the MongoDB setup too.
+    - name: Start Backend Services
+      run: |
+        
+        cd tests
+
+        docker compose up -d
+
+        # Wait a few seconds for services to boot
+        sleep 10
+        
+        # Verify containers are running (helps debugging)
+        docker ps -a
+
+    # 8. Run Playwright Tests
+    - name: Run Playwright tests
+      run: npx playwright test
+      env:
+        # Ensure CI treats warnings as errors if needed, or set specific CI env vars
+        CI: true
+
+    # # 9. Upload Test Report (Only if tests fail)
+    # # You can download this zip from the GitHub Actions Summary page
+    # - uses: actions/upload-artifact@v4
+    #   if: always()
+    #   with:
+    #     name: playwright-report
+    #     path: playwright-report/
+    #     retention-days: 30

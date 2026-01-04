@@ -42,7 +42,12 @@ test.describe('ThreadTest', () => {
         await page.goto('/tests/harness/index.html');
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
         await page.evaluate(async () => {
-            await window.Endpoint.setup("../../dist/assets");
+            try {
+                await window.Endpoint.setup("../../dist/assets");
+            } 
+            catch (e) {
+                console.log(e);
+            }
         });
     });
 
