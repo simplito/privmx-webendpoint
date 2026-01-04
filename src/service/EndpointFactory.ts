@@ -48,7 +48,9 @@ export class EndpointFactory {
      * @param {string} [assetsBasePath] base path/url to the Endpoint's WebAssembly assets (like: endpoint-wasm-module.js, driver-web-context.js and others)
      */
     public static async setup(assetsBasePath?: string): Promise<void> {
-        const basePath = assetsBasePath || (document.currentScript as HTMLScriptElement).src.split("/").slice(0, -1).join("/");
+        const basePath =
+            assetsBasePath ||
+            (document.currentScript as HTMLScriptElement).src.split("/").slice(0, -1).join("/");
         const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
         for (const asset of assets) {
             await this.loadScript(basePath + "/" + asset);
@@ -58,14 +60,14 @@ export class EndpointFactory {
     }
 
     private static async loadScript(url: string): Promise<void> {
-        return new Promise<void>(resolve => {
-            const head = document.getElementsByTagName('head')[0];
-            const script = document.createElement('script');
-            script.type = 'text/javascript';
+        return new Promise<void>((resolve) => {
+            const head = document.getElementsByTagName("head")[0];
+            const script = document.createElement("script");
+            script.type = "text/javascript";
             script.src = url;
 
             script.onload = () => {
-                resolve()
+                resolve();
             };
             head.appendChild(script);
         });
@@ -97,8 +99,8 @@ export class EndpointFactory {
     private static generateDefaultPKIVerificationOptions(): PKIVerificationOptions {
         return {
             bridgeInstanceId: undefined,
-            bridgePubKey: undefined
-        }
+            bridgePubKey: undefined,
+        };
     }
 
     /**
@@ -114,11 +116,16 @@ export class EndpointFactory {
         userPrivKey: string,
         solutionId: string,
         bridgeUrl: string,
-        verificationOptions?: PKIVerificationOptions
+        verificationOptions?: PKIVerificationOptions,
     ): Promise<Connection> {
         const nativeApi = new ConnectionNative(this.api);
         const ptr = await nativeApi.newConnection();
-        await nativeApi.connect(ptr, [userPrivKey, solutionId, bridgeUrl, verificationOptions || this.generateDefaultPKIVerificationOptions()]);
+        await nativeApi.connect(ptr, [
+            userPrivKey,
+            solutionId,
+            bridgeUrl,
+            verificationOptions || this.generateDefaultPKIVerificationOptions(),
+        ]);
 
         return new Connection(nativeApi, ptr);
     }
@@ -134,11 +141,15 @@ export class EndpointFactory {
     static async connectPublic(
         solutionId: string,
         bridgeUrl: string,
-        verificationOptions?: PKIVerificationOptions
+        verificationOptions?: PKIVerificationOptions,
     ): Promise<Connection> {
         const nativeApi = new ConnectionNative(this.api);
         const ptr = await nativeApi.newConnection();
-        await nativeApi.connectPublic(ptr, [solutionId, bridgeUrl, verificationOptions || this.generateDefaultPKIVerificationOptions()]);
+        await nativeApi.connectPublic(ptr, [
+            solutionId,
+            bridgeUrl,
+            verificationOptions || this.generateDefaultPKIVerificationOptions(),
+        ]);
         return new Connection(nativeApi, ptr);
     }
 
@@ -191,7 +202,7 @@ export class EndpointFactory {
     static async createInboxApi(
         connection: Connection,
         threadApi: ThreadApi,
-        storeApi: StoreApi
+        storeApi: StoreApi,
     ): Promise<InboxApi> {
         if ("inboxes" in connection.apisRefs) {
             throw new Error("InboxApi already registered for given connection.");
@@ -200,7 +211,7 @@ export class EndpointFactory {
         const ptr = await nativeApi.newApi(
             connection.servicePtr,
             threadApi.servicePtr,
-            storeApi.servicePtr
+            storeApi.servicePtr,
         );
         connection.apisRefs["inboxes"] = { _apiServicePtr: ptr };
         connection.nativeApisDeps["inboxes"] = nativeApi;
@@ -241,9 +252,9 @@ export class EndpointFactory {
 
     /**
      * Creates an instance of 'EventApi'.
-     * 
+     *
      * @param connection instance of 'Connection'
-     * 
+     *
      * @returns {EventApi} instance of EventApi
      */
     static async createEventApi(connection: Connection): Promise<EventApi> {

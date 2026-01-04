@@ -1,4 +1,4 @@
-import {Types} from "..";
+import { Types } from "..";
 import {
     ConnectionStatusEventType,
     SubscriberForInboxEvents,
@@ -6,29 +6,45 @@ import {
     SubscriberForEvents,
     SubscriberForKvdbEvents,
     SubscriberForStoreEvents,
-    SubscriberForThreadsEvents
+    SubscriberForThreadsEvents,
 } from "./subscriptions";
 import {
-    BaseEventDispatcherManager, ConnectionChannels,
+    BaseEventDispatcherManager,
+    ConnectionChannels,
     ConnectionEventsManager,
     CustomEventsManager,
-    InboxEventsManager, KvdbEventsManager,
+    InboxEventsManager,
+    KvdbEventsManager,
     StoreEventsManager,
     ThreadEventsManager,
-    UserEventsManager
+    UserEventsManager,
 } from "./managers";
-
 
 function normalizeConnectionEvent(e: Types.Event): Types.Event {
     switch (e.type) {
-        case 'libDisconnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionStatusEventType.LIB_DISCONNECTED]}`]}
-        case 'libPlatformDisconnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionStatusEventType.LIB_PLATFORM_DISCONNECTED]}`]}
-        case 'libConnected':
-            return {...e, subscriptions: [`${e.connectionId}/${ConnectionChannels[ConnectionStatusEventType.LIB_CONNECTED]}`]}
+        case "libDisconnected":
+            return {
+                ...e,
+                subscriptions: [
+                    `${e.connectionId}/${ConnectionChannels[ConnectionStatusEventType.LIB_DISCONNECTED]}`,
+                ],
+            };
+        case "libPlatformDisconnected":
+            return {
+                ...e,
+                subscriptions: [
+                    `${e.connectionId}/${ConnectionChannels[ConnectionStatusEventType.LIB_PLATFORM_DISCONNECTED]}`,
+                ],
+            };
+        case "libConnected":
+            return {
+                ...e,
+                subscriptions: [
+                    `${e.connectionId}/${ConnectionChannels[ConnectionStatusEventType.LIB_CONNECTED]}`,
+                ],
+            };
         default:
-            return e
+            return e;
     }
 }
 
@@ -37,17 +53,19 @@ export class EventManager {
     dispatchers: ((event: Types.Event) => void)[] = [];
     private eventsQueue: { waitEvent: () => Promise<Types.Event> } | null = null;
 
-    constructor() {
-    }
+    constructor() {}
 
     private listenForEvents() {
         if (this.eventsQueue) {
-            this.eventsQueue.waitEvent().then((event) => {
-                this.onEvent(event);
-                this.listenForEvents();
-            }).catch(() => {
-                this.listenForEvents();
-            })
+            this.eventsQueue
+                .waitEvent()
+                .then((event) => {
+                    this.onEvent(event);
+                    this.listenForEvents();
+                })
+                .catch(() => {
+                    this.listenForEvents();
+                });
         }
     }
 
@@ -58,13 +76,16 @@ export class EventManager {
 
         manager._isEventLoopRunning = true;
 
-        manager.eventsQueue.waitEvent().then((event) => {
-            if (!manager._isEventLoopRunning) return;
-            manager.onEvent(event);
-            manager.listenForEvents();
-        }).catch(() => {
-            manager.listenForEvents()
-        })
+        manager.eventsQueue
+            .waitEvent()
+            .then((event) => {
+                if (!manager._isEventLoopRunning) return;
+                manager.onEvent(event);
+                manager.listenForEvents();
+            })
+            .catch(() => {
+                manager.listenForEvents();
+            });
 
         return manager;
     }
