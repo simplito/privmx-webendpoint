@@ -40,7 +40,6 @@ export type StoreCallbackPayload = {
     [Types.StoreEventType.COLLECTION_CHANGE]: Types.CollectionChangedEventData;
 };
 
-
 export type InboxCallbackPayload = {
     [Types.InboxEventType.INBOX_CREATE]: Types.Inbox;
     [Types.InboxEventType.INBOX_UPDATE]: Types.Inbox;
@@ -55,11 +54,11 @@ export type InboxCallbackPayload = {
 };
 
 export type KvdbCallbackPayload = {
-    [Types.KvdbEventType.KVDB_STATS]:  {
+    [Types.KvdbEventType.KVDB_STATS]: {
         lastEntryDate: number;
         entryCount: number;
         kvdbId: string;
-    },
+    };
     [Types.KvdbEventType.KVDB_CREATE]: Types.Kvdb;
     [Types.KvdbEventType.KVDB_UPDATE]: Types.Kvdb;
     [Types.KvdbEventType.KVDB_DELETE]: { kvdbId: string };
@@ -101,7 +100,7 @@ function toEventCallback(f: Function): EventCallback {
 
 export function createThreadSubscription<
     T extends Types.ThreadEventType,
-    S extends Types.ThreadEventSelectorType
+    S extends Types.ThreadEventSelectorType,
 >(s: {
     type: T;
     selector: S;
@@ -114,10 +113,9 @@ export function createThreadSubscription<
     };
 }
 
-
 export function createStoreSubscription<
     T extends Types.StoreEventType,
-    S extends Types.StoreEventSelectorType
+    S extends Types.StoreEventSelectorType,
 >(s: {
     type: T;
     selector: S;
@@ -130,10 +128,9 @@ export function createStoreSubscription<
     };
 }
 
-
 export function createKvdbSubscription<
     T extends Types.KvdbEventType,
-    S extends Types.KvdbEventSelectorType
+    S extends Types.KvdbEventSelectorType,
 >(s: {
     type: T;
     selector: S;
@@ -148,7 +145,7 @@ export function createKvdbSubscription<
 
 export function createInboxSubscription<
     T extends Types.InboxEventType,
-    S extends Types.InboxEventSelectorType
+    S extends Types.InboxEventSelectorType,
 >(s: {
     type: T;
     selector: S;
@@ -161,14 +158,12 @@ export function createInboxSubscription<
     };
 }
 
-export function createEventSubscription(
-    s: {
-        channel: string;
-        selector: Types.EventsEventSelectorType;
-        id: string;
-        callbacks: ((arg: GenericEvent<EventsCallbackPayload>) => void)[];
-    },
-): Subscription<string, Types.EventsEventSelectorType> & { channel: string } {
+export function createEventSubscription(s: {
+    channel: string;
+    selector: Types.EventsEventSelectorType;
+    id: string;
+    callbacks: ((arg: GenericEvent<EventsCallbackPayload>) => void)[];
+}): Subscription<string, Types.EventsEventSelectorType> & { channel: string } {
     return {
         type: s.channel,
         selector: s.selector,
@@ -200,7 +195,7 @@ export function createConnectionSubscription(s: {
 
 export function createUserEventSubscription<
     T extends Types.ConnectionEventType,
-    S extends Types.ConnectionEventSelectorType
+    S extends Types.ConnectionEventSelectorType,
 >(s: {
     type: T;
     selector: S;
@@ -229,11 +224,7 @@ export interface EventSubscriber<E, S> {
      * @param {S} selectorType scope on which you listen for events
      * @param {string} selectorId ID of the selector
      */
-    buildSubscriptionQuery(
-        eventType: E,
-        selectorType: S,
-        selectorId: string,
-    ): Promise<string>;
+    buildSubscriptionQuery(eventType: E, selectorType: S, selectorId: string): Promise<string>;
 }
 
 export type SubscriberForThreadsEvents = EventSubscriber<
@@ -256,7 +247,4 @@ export type SubscriberForUserEvents = EventSubscriber<
     Types.ConnectionEventType,
     Types.ConnectionEventSelectorType
 >;
-export type SubscriberForEvents = EventSubscriber<
-    string,
-    Types.EventsEventSelectorType
->;
+export type SubscriberForEvents = EventSubscriber<string, Types.EventsEventSelectorType>;

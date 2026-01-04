@@ -14,7 +14,10 @@ import { CryptoApiNative } from "../api/CryptoApiNative";
 import { BIP39 } from "../Types";
 
 export class CryptoApi extends BaseApi {
-    constructor(private native: CryptoApiNative, ptr: number) {
+    constructor(
+        private native: CryptoApiNative,
+        ptr: number,
+    ) {
         super(ptr);
     }
 
@@ -99,14 +102,8 @@ export class CryptoApi extends BaseApi {
      * @param {Uint8Array} symmetricKey key used to encrypt data
      * @returns {Uint8Array} encrypted data buffer
      */
-    async encryptDataSymmetric(
-        data: Uint8Array,
-        symmetricKey: Uint8Array
-    ): Promise<Uint8Array> {
-        return this.native.encryptDataSymmetric(this.servicePtr, [
-            data,
-            symmetricKey,
-        ]);
+    async encryptDataSymmetric(data: Uint8Array, symmetricKey: Uint8Array): Promise<Uint8Array> {
+        return this.native.encryptDataSymmetric(this.servicePtr, [data, symmetricKey]);
     }
 
     /**
@@ -116,14 +113,8 @@ export class CryptoApi extends BaseApi {
      * @param {Uint8Array} symmetricKey key used to decrypt data
      * @returns {Uint8Array} plain (decrypted) data buffer
      */
-    async decryptDataSymmetric(
-        data: Uint8Array,
-        symmetricKey: Uint8Array
-    ): Promise<Uint8Array> {
-        return this.native.decryptDataSymmetric(this.servicePtr, [
-            data,
-            symmetricKey,
-        ]);
+    async decryptDataSymmetric(data: Uint8Array, symmetricKey: Uint8Array): Promise<Uint8Array> {
+        return this.native.decryptDataSymmetric(this.servicePtr, [data, symmetricKey]);
     }
 
     /**
@@ -138,7 +129,7 @@ export class CryptoApi extends BaseApi {
 
     /**
      * Generates ECC key and BIP-39 mnemonic from a password using BIP-39.
-     * 
+     *
      * @param {number} strength size of BIP-39 entropy, must be a multiple of 32
      * @param {string} password the password used to generate the Key
      * @returns {BIP39} object containing ECC Key and associated with it BIP-39 mnemonic and entropy
@@ -149,7 +140,7 @@ export class CryptoApi extends BaseApi {
 
     /**
      * Generates ECC key using BIP-39 mnemonic.
-     * 
+     *
      * @param {string} mnemonic the BIP-39 mnemonic used to generate the Key
      * @param {string} password the password used to generate the Key
      * @return BIP39_t object containing ECC Key and associated with it BIP-39 mnemonic and entropy
@@ -160,7 +151,7 @@ export class CryptoApi extends BaseApi {
 
     /**
      * Generates ECC key using BIP-39 entropy.
-     * 
+     *
      * @param {Uint8Array} entropy the BIP-39 entropy used to generate the Key
      * @param {string} password the password used to generate the Key
      * @return {BIP39} object containing ECC Key and associated with it BIP-39 mnemonic and entropy
@@ -171,7 +162,7 @@ export class CryptoApi extends BaseApi {
 
     /**
      * Converts BIP-39 entropy to mnemonic.
-     * 
+     *
      * @param {Uint8Array} entropy BIP-39 entropy
      * @return {string} BIP-39 mnemonic
      */
@@ -181,7 +172,7 @@ export class CryptoApi extends BaseApi {
 
     /**
      * Converts BIP-39 mnemonic to entropy.
-     * 
+     *
      * @param {string} mnemonic BIP-39 mnemonic
      * @return {Uint8Array} BIP-39 entropy
      */
@@ -191,10 +182,10 @@ export class CryptoApi extends BaseApi {
 
     /**
      * Generates a seed used to generate a key using BIP-39 mnemonic with PBKDF2.
-     * 
+     *
      * @param {string} mnemonic BIP-39 mnemonic
      * @param {string} password the password used to generate the seed
-     * @return {Uint8Array} generated seed 
+     * @return {Uint8Array} generated seed
      */
     async mnemonicToSeed(mnemonic: string, password: string = ""): Promise<Uint8Array> {
         return this.native.mnemonicToSeed(this.servicePtr, [mnemonic, password]);
