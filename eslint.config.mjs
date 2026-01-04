@@ -14,6 +14,9 @@ const __dirname = path.dirname(__filename);
 export default [
   // JS / general language options
   {
+    ignores: ["dependency_sources", "drivers", "async-engine"],
+  },
+  {
     languageOptions: {
       globals: { ...globals.node },
       ecmaVersion: 2025,
