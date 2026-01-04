@@ -1,9 +1,9 @@
-import { test as base } from '@playwright/test';
-import { execSync } from 'child_process';
-import { MongoClient, Db } from 'mongodb';
-import * as path from 'path';
-import * as fs from 'fs';
-import { testData } from "./datasets/testData"; 
+import { test as base } from "@playwright/test";
+import { execSync } from "child_process";
+import { MongoClient, Db } from "mongodb";
+import * as path from "path";
+import * as fs from "fs";
+import { testData } from "./datasets/testData";
 
 type WorkerBackend = {
     hostPort: number;
@@ -21,64 +21,69 @@ type CliContext = {
     call: (method: string, params: object) => Promise<any>;
 };
 
-export const test = base.extend<{ backend: BackendContext; cli: CliContext }, { workerBackend: WorkerBackend }>({
+export const test = base.extend<
+    { backend: BackendContext; cli: CliContext },
+    { workerBackend: WorkerBackend }
+>({
+    workerBackend: [
+        async ({}, use, workerInfo) => {
+            const id = workerInfo.workerIndex;
+            const hostPort = 3001 + id;
+            const containerName = `privmx_cli_test_${id}`;
+            const dbName = `privmx_cli_db_${id}`;
+            const mongoUrl = `mongodb://test_mongodb:27017/${dbName}`;
 
-    workerBackend: [async ({ }, use, workerInfo) => {
-        const id = workerInfo.workerIndex;
-        const hostPort = 3001 + id; 
-        const containerName = `privmx_cli_test_${id}`;
-        const dbName = `privmx_cli_db_${id}`;
-        const mongoUrl = `mongodb://test_mongodb:27017/${dbName}`;
+            const envVars = [
+                `PRIVMX_PORT=3000`,
+                `PRIVMX_MONGO_URL=${mongoUrl}`,
+                `PRIVMX_WORKERS=1`,
+                `PMX_MIGRATION=Migration048FixAclCache`,
+                `API_KEY_ID=${testData.apiKeyId}`,
+                `API_KEY_SECRET=${testData.apiKeySecret}`,
+                `PRIVMX_HOSTNAME=0.0.0.0`,
+            ]
+                .map((e) => `-e ${e}`)
+                .join(" ");
 
-        const envVars = [
-            `PRIVMX_PORT=3000`,
-            `PRIVMX_MONGO_URL=${mongoUrl}`,
-            `PRIVMX_WORKERS=1`,
-            `PMX_MIGRATION=Migration048FixAclCache`,
-            `API_KEY_ID=${testData.apiKeyId}`,
-            `API_KEY_SECRET=${testData.apiKeySecret}`,
-            `PRIVMX_HOSTNAME=0.0.0.0`
-        ].map(e => `-e ${e}`).join(' ');
+            try {
+                execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
+            } catch {}
 
-        try { 
-            execSync(`docker rm -f ${containerName}`, { stdio: 'ignore' });
-        }
-        catch {}
-
-        execSync(`docker run -d --rm --name ${containerName} -p ${hostPort}:3000 \
+            execSync(
+                `docker run -d --rm --name ${containerName} -p ${hostPort}:3000 \
             --network tests_default \
             ${envVars} \
             --add-host=host.docker.internal:host-gateway \
-            privmx-bridge:latest`, 
-            { stdio: 'ignore' }
-        );
+            simplito/privmx-bridge:latest`,
+                { stdio: "ignore" },
+            );
 
-        await waitForServerReady(hostPort); 
-        await use({ hostPort, containerName, mongoUrl });
-        try { 
-            execSync(`docker stop ${containerName}`, { stdio: 'ignore' });
-        } 
-        catch {}
-
-    }, { scope: 'worker' }],
+            await waitForServerReady(hostPort);
+            await use({ hostPort, containerName, mongoUrl });
+            try {
+                execSync(`docker stop ${containerName}`, { stdio: "ignore" });
+            } catch {}
+        },
+        { scope: "worker" },
+    ],
 
     backend: async ({ workerBackend }, use) => {
-        const localMongoUrl = workerBackend.mongoUrl.replace('test_mongodb', 'localhost');
-        const dbName = localMongoUrl.split('/').pop()!;
+        const localMongoUrl = workerBackend.mongoUrl.replace("test_mongodb", "localhost");
+        const dbName = localMongoUrl.split("/").pop()!;
         const client = new MongoClient(localMongoUrl + "?directConnection=true");
         await client.connect();
         const db = client.db(dbName);
         await db.dropDatabase();
-        execSync(`docker restart ${workerBackend.containerName}`, { stdio: 'ignore' });
-        const datasetPath = path.resolve(__dirname, './datasets'); 
+        execSync(`docker restart ${workerBackend.containerName}`, { stdio: "ignore" });
+        const datasetPath = path.resolve(__dirname, "./datasets");
         await waitForServerReady(workerBackend.hostPort);
-        await loadDataset(db, datasetPath, "defaultDataset"); 
+        await loadDataset(db, datasetPath, "defaultDataset");
         await client.close();
 
         await use({
             bridgeUrl: `http://localhost:${workerBackend.hostPort}`,
             mongoConnectionString: localMongoUrl,
-            dbName
+            dbName,
         });
     },
 
@@ -96,7 +101,9 @@ export const test = base.extend<{ backend: BackendContext; cli: CliContext }, { 
                 const response = JSON.parse(stdout);
 
                 if (response.error) {
-                    throw new Error(`CLI Error [${response.error.code}]: ${response.error.message}`);
+                    throw new Error(
+                        `CLI Error [${response.error.code}]: ${response.error.message}`,
+                    );
                 }
                 return response.result;
             } catch (e: any) {
@@ -113,13 +120,12 @@ export const test = base.extend<{ backend: BackendContext; cli: CliContext }, { 
             }
         };
         await use({ call: runCli });
-    }
+    },
 });
-
 
 async function loadDataset(db: Db, basePath: string, dataSetName: string) {
     const fullPath = path.join(basePath, dataSetName);
-    
+
     if (!fs.existsSync(fullPath)) {
         console.error(`Dataset directory not found: ${fullPath}`);
         return;
@@ -128,13 +134,13 @@ async function loadDataset(db: Db, basePath: string, dataSetName: string) {
     const files = fs.readdirSync(fullPath);
 
     for (const file of files) {
-        if (path.extname(file) !== '.json') continue;
+        if (path.extname(file) !== ".json") continue;
 
-        const collectionName = path.basename(file, '.json');
+        const collectionName = path.basename(file, ".json");
         const filePath = path.join(fullPath, file);
-        
+
         try {
-            const fileContent = fs.readFileSync(filePath, 'utf8');
+            const fileContent = fs.readFileSync(filePath, "utf8");
             const docs = JSON.parse(fileContent);
 
             if (Array.isArray(docs) && docs.length > 0) {
@@ -153,7 +159,7 @@ async function waitForServerReady(port: number) {
         try {
             if ((await fetch(url)).ok) return;
         } catch {}
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise((r) => setTimeout(r, 200));
     }
     throw new Error(`Server failed to start on port ${port}`);
 }

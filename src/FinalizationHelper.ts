@@ -28,7 +28,7 @@ export class FinalizationHelper {
     private scheduler: any = null;
 
     private constructor(private wasmLib: any) {
-        this.finalizationRegistry = new FinalizationRegistry(onCleanup => {
+        this.finalizationRegistry = new FinalizationRegistry((onCleanup) => {
             const api = ApiStatic.getInstance();
             this.finalizationQueue.push(onCleanup.onFree);
             this.scheduleCleanup();
