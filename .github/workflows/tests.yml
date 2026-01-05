@@ -35,6 +35,8 @@ jobs:
 
     - name: Build Wasm
       run: npm run build
+      env:
+        TERM: xterm
 
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
