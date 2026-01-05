@@ -1,6 +1,26 @@
+# Base style
 IndentWidth: 4
+TabWidth: 4
+UseTab: Never
 ColumnLimit: 100
+
+# Spaces
 SpacesInParentheses: false
-AllowShortFunctionsOnASingleLine: All
-SpacesInParentheses: false
-SortIncludes: true
+SpaceBeforeParens: ControlStatements
+
+# Function formatting
+AllowShortFunctionsOnASingleLine: None
+BreakBeforeBraces: Allman
+
+# Comments
+ReflowComments: false
+
+# Include sorting
+SortIncludes: false
+
+# Alignment
+AlignAfterOpenBracket: DontAlign
+
+# Other
+DerivePointerAlignment: false
+PointerAlignment: Left
