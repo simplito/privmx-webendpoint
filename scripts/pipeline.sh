@@ -8,104 +8,151 @@ source "$SCRIPT_PATH/build-manifest.sh"
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
+
 RED=$(tput setaf 1)
 GREEN=$(tput setaf 2)
 BLUE=$(tput setaf 4)
 GRAY=$(tput setaf 8 2>/dev/null || tput setaf 240)
 RESET=$(tput sgr0)
 
-# Height of the streaming window (Header + N lines of logs)
-# e.g., 6 means 1 header line + 5 log lines
-WINDOW_SIZE=20
-
-# Hide cursor
-tput civis 
-cleanup() {
-    tput cnorm
-    rm -f /tmp/build_*.log /tmp/build_*.log.tmp
-}
-trap cleanup EXIT
-
 # ==============================================================================
-# BUILD FUNCTION
+# BUILD FUNCTIONS (CI VS INTERACTIVE)
 # ==============================================================================
-run_step() {
-    local step_name="$1"
-    shift
-    
-    local log_file="/tmp/build_${step_name}.log"
-    local pid
-    local spin='-\|/'
-    local i=0
-    local term_width=$(tput cols)
-    local max_len=$((term_width - 5))
 
-    ("$@" > "$log_file" 2>&1) &
-    pid=$!
+if [ -n "$CI" ]; then
+    echo "${BLUE}ℹ️  CI Environment detected. Disabling smart animations.${RESET}"
 
-    for ((k=0; k<WINDOW_SIZE; k++)); do echo ""; done
+    # --------------------------------------
+    # CI / SIMPLE MODE
+    # --------------------------------------
+    run_step() {
+        local step_name="$1"
+        shift
+        local log_file="/tmp/build_${step_name// /_}.log"
+        
+        printf "${BLUE}⚙️  %s...${RESET}\n" "$step_name"
 
-    while kill -0 "$pid" 2>/dev/null; do
-        tput cuu "$WINDOW_SIZE"
-
-        i=$(( (i+1) %4 ))
-        printf "\r${BLUE}⚙️  %s... [%s]${RESET}" "$step_name" "${spin:$i:1}"
-        tput el 
-        printf "\n"
-
-        if [ -f "$log_file" ]; then
-            tail -n $((WINDOW_SIZE - 1)) "$log_file" > "${log_file}.tmp"
-            local line_count=$(wc -l < "${log_file}.tmp")
-            line_count="${line_count##*( )}"
-
-            while IFS= read -r line; do
-                short_line=$(echo "$line" | cut -c 1-"$max_len")
-                printf "${GRAY}  > %s${RESET}" "$short_line"
-                tput el 
-                printf "\n"
-            done < "${log_file}.tmp"
-
-            local remaining=$(( (WINDOW_SIZE - 1) - line_count ))
-            for ((j=0; j<remaining; j++)); do
-                tput el; printf "\n"
-            done
+        # Run command, capture output to log file
+        if "$@" > "$log_file" 2>&1; then
+            printf "${GREEN}✔ %s - SUCCESS${RESET}\n" "$step_name"
+            rm -f "$log_file"
         else
-            for ((j=0; j<(WINDOW_SIZE - 1); j++)); do
-                tput el; printf "\n"
-            done
+            printf "${RED}❌ %s - FAILED${RESET}\n" "$step_name"
+            printf "${RED}==================== FAILURE LOGS ====================${RESET}\n"
+            cat "$log_file"
+            printf "${RED}======================================================${RESET}\n"
+            rm -f "$log_file"
+            exit 1
         fi
-        sleep 0.1
-    done
+    }
 
-    set +e 
-    wait "$pid"
-    local exit_code=$?
-    set -e 
-
-    tput cuu "$WINDOW_SIZE"
+else
+    # --------------------------------------
+    # INTERACTIVE / SMART MODE
+    # --------------------------------------
     
-    tput ed
+    WINDOW_SIZE=20
 
-    if [ $exit_code -eq 0 ]; then
-        printf "${GREEN} %s - SUCCESS${RESET}\n" "$step_name"
-        rm -f "$log_file" "${log_file}.tmp"
-    else
-        printf "${RED}❌ %s - FAILED${RESET}\n" "$step_name"
-        printf "${RED}==================== FAILURE LOGS (Last 100 lines) ====================${RESET}\n"
+    tput civis 
+
+    cleanup() {
+        tput cnorm
+        rm -f /tmp/build_*.log /tmp/build_*.log.tmp
+    }
+    trap cleanup EXIT
+
+    run_step() {
+        local step_name="$1"
+        shift
         
-        printf "${RED}"
-        tail -n 100 "$log_file"
-        printf "${RESET}\n"
+        local term_lines=$(tput lines)
+        local term_cols=$(tput cols)
         
-        printf "${RED}=======================================================================${RESET}\n"
-        rm -f "$log_file" "${log_file}.tmp"
-        exit 1
-    fi
-}
+        local available_height=$((term_lines - 6))
+        
+        local WINDOW_SIZE=20
+        if [ "$available_height" -lt 20 ]; then
+            WINDOW_SIZE=$available_height
+        fi
+        if [ "$WINDOW_SIZE" -lt 5 ]; then
+            WINDOW_SIZE=5
+        fi
+
+        local log_file="/tmp/build_${step_name}.log"
+        local pid
+        local spin='-\|/'
+        local i=0
+        local max_len=$((term_cols - 5))
+
+        ("$@" > "$log_file" 2>&1) &
+        pid=$!
+
+        for ((k=0; k<WINDOW_SIZE; k++)); do echo ""; done
+
+        while kill -0 "$pid" 2>/dev/null; do
+            tput cuu "$WINDOW_SIZE"
+
+            i=$(( (i+1) %4 ))
+            printf "\r${BLUE}⚙️  %s... [%s]${RESET}" "$step_name" "${spin:$i:1}"
+            tput el
+            printf "\n"
+
+            if [ -f "$log_file" ]; then
+                tail -n $((WINDOW_SIZE - 1)) "$log_file" > "${log_file}.tmp"
+                local line_count=$(wc -l < "${log_file}.tmp")
+                line_count="${line_count##*( )}"
+
+                while IFS= read -r line; do
+                    short_line=$(echo "$line" | cut -c 1-"$max_len")
+                    printf "${GRAY}  > %s${RESET}" "$short_line"
+                    tput el 
+                    printf "\n"
+                done < "${log_file}.tmp"
+
+                local remaining=$(( (WINDOW_SIZE - 1) - line_count ))
+                for ((j=0; j<remaining; j++)); do
+                    tput el; printf "\n"
+                done
+            else
+                for ((j=0; j<(WINDOW_SIZE - 1); j++)); do
+                    tput el; printf "\n"
+                done
+            fi
+            sleep 0.1
+        done
+
+        set +e 
+        wait "$pid"
+        local exit_code=$?
+        set -e 
+
+        tput cuu "$WINDOW_SIZE"
+        tput ed
+
+        if [ $exit_code -eq 0 ]; then
+            printf "${GREEN}✔ %s - SUCCESS${RESET}\n" "$step_name"
+            rm -f "$log_file" "${log_file}.tmp"
+        else
+            printf "${RED}❌ %s - FAILED${RESET}\n" "$step_name"
+            printf "${RED}==================== FAILURE LOGS (Last 100 lines) ====================${RESET}\n"
+            
+            printf "${RED}"
+            if [ -f "$log_file" ]; then
+                tail -n 100 "$log_file"
+            fi
+            printf "${RESET}\n"
+            
+            printf "${RED}=======================================================================${RESET}\n"
+            rm -f "$log_file" "${log_file}.tmp"
+            exit 1
+        fi
+    }
+fi
 
 # ==============================================================================
 # EXECUTION
 # ==============================================================================
+
 echo "${BLUE}----------------------------------------"
 echo " Starting Build Process..."
 echo "---------------------------------------${RESET}"
