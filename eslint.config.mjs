@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 export default [
   // JS / general language options
   {
-    ignores: ["dependency_sources", "drivers", "async-engine"],
+    ignores: ["dependency_sources", "drivers", "async-engine", "dist", "webendpoint-cpp"],
   },
   {
     languageOptions: {

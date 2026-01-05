@@ -21,21 +21,27 @@ type CliContext = {
     call: (method: string, params: object) => Promise<any>;
 };
 
+export type WorkerOptions = {
+    dockerImage: string;
+};
+
 export const test = base.extend<
     { backend: BackendContext; cli: CliContext; page: Page },
-    { workerBackend: WorkerBackend }
+    { workerBackend: WorkerBackend } & WorkerOptions
 >({
+    dockerImage: ["simplito/privmx-bridge:latest", { option: true, scope: "worker" }], 
+
     workerBackend: [
-        async ({}, use, workerInfo) => {
+        async ({ dockerImage }, use, workerInfo) => {
             const id = workerInfo.workerIndex;
             const hostPort = 3001 + id;
             const containerName = `privmx_cli_test_${id}`;
             const dbName = `privmx_cli_db_${id}`;
-            const mongoUrl = `mongodb://test_mongodb:27017/${dbName}`;
+            const internalMongoUrl = `mongodb://test_mongodb:27017/${dbName}`;
 
             const envVars = [
                 `PRIVMX_PORT=3000`,
-                `PRIVMX_MONGO_URL=${mongoUrl}`,
+                `PRIVMX_MONGO_URL=${internalMongoUrl}`,
                 `PRIVMX_WORKERS=1`,
                 `PMX_MIGRATION=Migration048FixAclCache`,
                 `API_KEY_ID=${testData.apiKeyId}`,
@@ -49,17 +55,21 @@ export const test = base.extend<
                 execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
             } catch {}
 
+            console.log(`[Worker ${id}] 🐳 Starting container: ${containerName} using ${dockerImage}`);
+
             execSync(
                 `docker run -d --rm --name ${containerName} -p ${hostPort}:3000 \
             --network tests_default \
             ${envVars} \
             --add-host=host.docker.internal:host-gateway \
-            simplito/privmx-bridge:latest`,
+            ${dockerImage}`,
                 { stdio: "ignore" },
             );
 
             await waitForServerReady(hostPort);
-            await use({ hostPort, containerName, mongoUrl });
+
+            await use({ hostPort, containerName, mongoUrl: internalMongoUrl });
+
             try {
                 execSync(`docker stop ${containerName}`, { stdio: "ignore" });
             } catch {}
@@ -70,14 +80,18 @@ export const test = base.extend<
     backend: async ({ workerBackend }, use) => {
         const localMongoUrl = workerBackend.mongoUrl.replace("test_mongodb", "localhost");
         const dbName = localMongoUrl.split("/").pop()!;
+        
         const client = new MongoClient(localMongoUrl + "?directConnection=true");
         await client.connect();
         const db = client.db(dbName);
+
         await db.dropDatabase();
         execSync(`docker restart ${workerBackend.containerName}`, { stdio: "ignore" });
-        const datasetPath = path.resolve(__dirname, "./datasets");
         await waitForServerReady(workerBackend.hostPort);
+
+        const datasetPath = path.resolve(__dirname, "./datasets");
         await loadDataset(db, datasetPath, "defaultDataset");
+        
         await client.close();
 
         await use({
@@ -99,40 +113,27 @@ export const test = base.extend<
             try {
                 const stdout = execSync(cmd).toString();
                 const response = JSON.parse(stdout);
-
-                if (response.error) {
-                    throw new Error(
-                        `CLI Error [${response.error.code}]: ${response.error.message}`,
-                    );
-                }
+                if (response.error) throw new Error(`CLI Error: ${response.error.message}`);
                 return response.result;
             } catch (e: any) {
-                if (e.stdout) {
-                    const output = e.stdout.toString();
-                    try {
-                        const errJson = JSON.parse(output);
-                        throw new Error(errJson.error?.message || e.message);
-                    } catch {
-                        throw new Error(`CLI Failed: ${output}`);
-                    }
+                const output = e.stdout?.toString() || e.message;
+                try {
+                    const errJson = JSON.parse(output);
+                    throw new Error(errJson.error?.message || e.message);
+                } catch {
+                    throw new Error(`CLI Failed: ${output}`);
                 }
-                throw e;
             }
         };
         await use({ call: runCli });
     },
 
     page: async ({ page }, use) => {
-        // 🟢 FIX: Robust CORS & Security Headers Injection
         await page.route("**/*", async (route) => {
             const request = route.request();
-
-            // Determine Origin: Fallback to harness URL if header is missing
             const requestOrigin = (await request.headerValue("origin")) || "http://localhost:8080";
-
-            // Define Standard CORS Headers
+            
             const corsHeaders = {
-                // WASM / Pthread Security (Required for SharedArrayBuffer)
                 "Cross-Origin-Opener-Policy": "same-origin",
                 "Cross-Origin-Embedder-Policy": "require-corp",
                 "Access-Control-Allow-Origin": requestOrigin,
@@ -141,33 +142,19 @@ export const test = base.extend<
                 "Access-Control-Allow-Credentials": "true",
             };
 
-            // A. Handle Preflight (OPTIONS) requests directly in Playwright
-            // This prevents the backend from rejecting them or sending wrong headers.
-            // We reply "OK" immediately without ever hitting the real backend.
             if (request.method() === "OPTIONS") {
-                await route.fulfill({
-                    status: 200,
-                    headers: corsHeaders,
-                });
+                await route.fulfill({ status: 200, headers: corsHeaders });
                 return;
             }
 
-            // B. Handle Actual Requests
             try {
-                // Fetch data from backend (Node.js ignores CORS)
                 const response = await route.fetch();
-
-                // Inject headers into the real response before giving it to the browser
                 await route.fulfill({
                     response,
-                    headers: {
-                        ...response.headers(),
-                        ...corsHeaders, // Force our CORS headers over backend ones
-                    },
+                    headers: { ...response.headers(), ...corsHeaders },
                 });
             } catch (e) {
-                // If backend connection fails, let browser handle it naturally
-                return route.continue();
+                route.continue();
             }
         });
         await use(page);
@@ -176,24 +163,15 @@ export const test = base.extend<
 
 async function loadDataset(db: Db, basePath: string, dataSetName: string) {
     const fullPath = path.join(basePath, dataSetName);
-
-    if (!fs.existsSync(fullPath)) {
-        console.error(`Dataset directory not found: ${fullPath}`);
-        return;
-    }
+    if (!fs.existsSync(fullPath)) return;
 
     const files = fs.readdirSync(fullPath);
-
     for (const file of files) {
         if (path.extname(file) !== ".json") continue;
-
         const collectionName = path.basename(file, ".json");
         const filePath = path.join(fullPath, file);
-
         try {
-            const fileContent = fs.readFileSync(filePath, "utf8");
-            const docs = JSON.parse(fileContent);
-
+            const docs = JSON.parse(fs.readFileSync(filePath, "utf8"));
             if (Array.isArray(docs) && docs.length > 0) {
                 await db.collection(collectionName).insertMany(docs);
             }

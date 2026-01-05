@@ -38,7 +38,7 @@
   },
   "scripts": {
     "clean": "rm -rf ./dist",
-    "test": "jest",
+    "test": "jest src",
     "build": "npm run clean && npm run build:wasm && npm run build:js && scripts/move_wasm_assets",
     "build:wasm": "scripts/pipeline.sh",
     "build:js": "npm run compile && npm run bundle",
@@ -46,7 +46,7 @@
     "bundle": "webpack",
     "watch:types": "tsc -w",
     "test:e2e": "playwright test",
-    "lint": "eslint .",
+    "lint": "eslint -c eslint.config.mjs .",
     "format": "prettier --write '{src,tests}/**/*.{ts,tsx,css,md}'"
   },
   "files": [
@@ -80,7 +80,7 @@
     "jest": "^29.7.0",
     "mongodb": "^7.0.0",
     "playwright": "^1.57.0",
-    "prettier": "^3.4.2",
+    "prettier": "^3.7.4",
     "process": "^0.11.10",
     "stream-browserify": "^3.0.0",
     "ts-jest": "^29.2.5",

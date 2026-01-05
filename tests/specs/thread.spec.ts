@@ -1,7 +1,7 @@
 import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
-import { Endpoint } from "../../dist";
+import type { Endpoint } from "../../dist";
 import { ContainerPolicy } from "../../dist/Types";
 
 declare global {

@@ -40,25 +40,19 @@ run_step() {
     local term_width=$(tput cols)
     local max_len=$((term_width - 5))
 
-    # 1. Run command in background
     ("$@" > "$log_file" 2>&1) &
     pid=$!
 
-    # 2. Reserve Space (Padding)
     for ((k=0; k<WINDOW_SIZE; k++)); do echo ""; done
 
-    # 3. Render Loop
     while kill -0 "$pid" 2>/dev/null; do
-        # Go to top of window
         tput cuu "$WINDOW_SIZE"
 
-        # Header
         i=$(( (i+1) %4 ))
-        printf "\r${BLUE}⚙️  Building %s... [%s]${RESET}" "$step_name" "${spin:$i:1}"
+        printf "\r${BLUE}⚙️  %s... [%s]${RESET}" "$step_name" "${spin:$i:1}"
         tput el 
         printf "\n"
 
-        # Logs
         if [ -f "$log_file" ]; then
             tail -n $((WINDOW_SIZE - 1)) "$log_file" > "${log_file}.tmp"
             local line_count=$(wc -l < "${log_file}.tmp")
@@ -83,31 +77,23 @@ run_step() {
         sleep 0.1
     done
 
-    # 4. Finalize
     set +e 
     wait "$pid"
     local exit_code=$?
     set -e 
-    # --- FIX END ---
 
-    # Wróć na górę okna po raz ostatni
     tput cuu "$WINDOW_SIZE"
     
-    # Wyczyść CAŁE okno w dół (usuwa logi i puste linie)
     tput ed
 
-    # Poniżej usuń wszelkie 'echo $exit_code', które mogłeś dodać (to one robią '0' przed fajką)
     if [ $exit_code -eq 0 ]; then
-        # SUKCES
         printf "${GREEN} %s - SUCCESS${RESET}\n" "$step_name"
         rm -f "$log_file" "${log_file}.tmp"
     else
-        # BŁĄD
         printf "${RED}❌ %s - FAILED${RESET}\n" "$step_name"
         printf "${RED}==================== FAILURE LOGS (Last 100 lines) ====================${RESET}\n"
         
         printf "${RED}"
-        # Pokazujemy ostatnie 100 linii, bo błąd make często jest wyżej niż na samym dnie
         tail -n 100 "$log_file"
         printf "${RESET}\n"
         

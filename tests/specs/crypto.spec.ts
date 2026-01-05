@@ -1,4 +1,4 @@
-import { Endpoint } from "../../dist";
+import type { Endpoint } from "../../dist";
 import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 

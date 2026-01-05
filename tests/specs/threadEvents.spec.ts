@@ -2,6 +2,14 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { ThreadEventSelectorType, ThreadEventType } from "../../dist/Types";
+import type { Endpoint } from "../../dist";
+
+declare global {
+    interface Window {
+        Endpoint: typeof Endpoint;
+        wasmReady: boolean;
+    }
+}
 
 test.describe("CoreTest: Thread Events", () => {
     async function setupUsers(page: any, cli: any) {
@@ -28,10 +36,6 @@ test.describe("CoreTest: Thread Events", () => {
     }
 
     test.beforeEach(async ({ page }) => {
-        page.on("console", (msg) => {
-            console.log(`[BROWSER]: ${msg.text()}`);
-            // if (msg.type() === 'error') console.error(`[BROWSER]: ${msg.text()}`);
-        });
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
         await page.evaluate(async () => {
