@@ -9,6 +9,8 @@ type WorkerBackend = {
     hostPort: number;
     containerName: string;
     mongoUrl: string;
+    db: Db;
+    mongoClient: MongoClient;
 };
 
 type BackendContext = {
@@ -17,7 +19,7 @@ type BackendContext = {
     dbName: string;
 };
 
-type CliContext = {
+export type CliContext = {
     call: (method: string, params: object) => Promise<any>;
 };
 
@@ -29,7 +31,7 @@ export const test = base.extend<
     { backend: BackendContext; cli: CliContext; page: Page },
     { workerBackend: WorkerBackend } & WorkerOptions
 >({
-    dockerImage: ["simplito/privmx-bridge:latest", { option: true, scope: "worker" }], 
+    dockerImage: ["simplito/privmx-bridge:latest", { option: true, scope: "worker" }],
 
     workerBackend: [
         async ({ dockerImage }, use, workerInfo) => {
@@ -38,6 +40,8 @@ export const test = base.extend<
             const containerName = `privmx_cli_test_${id}`;
             const dbName = `privmx_cli_db_${id}`;
             const internalMongoUrl = `mongodb://test_mongodb:27017/${dbName}`;
+            const localMongoUrl =
+                internalMongoUrl.replace("test_mongodb", "localhost") + "?directConnection=true";
 
             const envVars = [
                 `PRIVMX_PORT=3000`,
@@ -51,57 +55,75 @@ export const test = base.extend<
                 .map((e) => `-e ${e}`)
                 .join(" ");
 
-            try {
-                execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
-            } catch {}
-
-            console.log(`[Worker ${id}] 🐳 Starting container: ${containerName} using ${dockerImage}`);
-
-            execSync(
-                `docker run -d --rm --name ${containerName} -p ${hostPort}:3000 \
-            --network tests_default \
-            ${envVars} \
-            --add-host=host.docker.internal:host-gateway \
-            ${dockerImage}`,
-                { stdio: "ignore" },
-            );
-
-            await waitForServerReady(hostPort);
-
-            await use({ hostPort, containerName, mongoUrl: internalMongoUrl });
+            const client = new MongoClient(localMongoUrl);
+            await client.connect();
+            const db = client.db(dbName);
 
             try {
-                execSync(`docker stop ${containerName}`, { stdio: "ignore" });
-            } catch {}
+                try {
+                    execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
+                } catch {}
+
+                console.log(`\t[Worker ${id}] Starting container: ${containerName}`);
+
+                execSync(
+                    `docker run -d --name ${containerName} -p ${hostPort}:3000 \
+                    --network tests_default \
+                    ${envVars} \
+                    --add-host=host.docker.internal:host-gateway \
+                    ${dockerImage}`,
+                    { stdio: "ignore" },
+                );
+
+                await waitForServerReady(hostPort);
+
+                await use({
+                    hostPort,
+                    containerName,
+                    mongoUrl: internalMongoUrl,
+                    db,
+                    mongoClient: client,
+                });
+            } finally {
+                await client.close();
+                console.log(`[Worker ${id}] Removing container: ${containerName}`);
+                try {
+                    execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
+                } catch (e) {}
+            }
         },
         { scope: "worker" },
     ],
 
     backend: async ({ workerBackend }, use) => {
-        const localMongoUrl = workerBackend.mongoUrl.replace("test_mongodb", "localhost");
-        const dbName = localMongoUrl.split("/").pop()!;
-        
-        const client = new MongoClient(localMongoUrl + "?directConnection=true");
-        await client.connect();
-        const db = client.db(dbName);
+        const { db, containerName, hostPort, mongoUrl } = workerBackend;
+        const localMongoUrl = mongoUrl.replace("test_mongodb", "localhost");
 
-        await db.dropDatabase();
-        execSync(`docker restart ${workerBackend.containerName}`, { stdio: "ignore" });
-        await waitForServerReady(workerBackend.hostPort);
+        try {
+            const datasetPath = path.resolve(__dirname, "./datasets");
 
-        const datasetPath = path.resolve(__dirname, "./datasets");
-        await loadDataset(db, datasetPath, "defaultDataset");
-        
-        await client.close();
+            try {
+                execSync(`docker stop ${containerName}`, { stdio: "ignore" });
+            } catch (e) {}
 
-        await use({
-            bridgeUrl: `http://localhost:${workerBackend.hostPort}`,
-            mongoConnectionString: localMongoUrl,
-            dbName,
-        });
+            await db.dropDatabase();
+
+            execSync(`docker start ${containerName}`, { stdio: "ignore" });
+            await waitForServerReady(hostPort);
+
+            await loadDataset(db, datasetPath, "defaultDataset");
+
+            await use({
+                bridgeUrl: `http://localhost:${hostPort}`,
+                mongoConnectionString: localMongoUrl,
+                dbName: db.databaseName,
+            });
+        } finally {
+            await db.dropDatabase();
+        }
     },
 
-    cli: async ({ workerBackend }, use) => {
+    cli: async ({ workerBackend, backend }, use) => {
         const runCli = async (method: string, params: object) => {
             const jsonParams = JSON.stringify(params).replace(/'/g, "'\\''");
             const cmd = `docker exec \
@@ -132,7 +154,7 @@ export const test = base.extend<
         await page.route("**/*", async (route) => {
             const request = route.request();
             const requestOrigin = (await request.headerValue("origin")) || "http://localhost:8080";
-            
+
             const corsHeaders = {
                 "Cross-Origin-Opener-Policy": "same-origin",
                 "Cross-Origin-Embedder-Policy": "require-corp",

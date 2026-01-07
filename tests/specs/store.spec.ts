@@ -2,7 +2,8 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import type { Endpoint } from "../../dist";
-import { ContainerPolicy } from "../../dist/Types";
+import { ContainerPolicy, SortOrder } from "../../dist/Types";
+import { setupUsers } from "../test-utils";
 
 declare global {
     interface Window {
@@ -12,30 +13,6 @@ declare global {
 }
 
 test.describe("StoreTest", () => {
-    // --- Helper: Setup Users ---
-    async function setupUsers(page: any, cli: any) {
-        const user2Keys = await page.evaluate(async () => {
-            const cryptoApi = await window.Endpoint.createCryptoApi();
-            const privKey = await cryptoApi.generatePrivateKey();
-            return {
-                privKey: privKey,
-                pubKey: await cryptoApi.derivePublicKey(privKey),
-            };
-        });
-
-        const user2Id = `user2-${Date.now()}`;
-        await cli.call("context/addUserToContext", {
-            contextId: testData.contextId,
-            userId: user2Id,
-            userPubKey: user2Keys.pubKey,
-        });
-
-        return {
-            u1: { privKey: testData.userPrivKey, id: testData.userId, pubKey: testData.userPubKey },
-            u2: { privKey: user2Keys.privKey, id: user2Id, pubKey: user2Keys.pubKey },
-        };
-    }
-
     test.beforeEach(async ({ page }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
@@ -758,7 +735,7 @@ test.describe("StoreTest", () => {
                 updatePolicy: "owner",
                 updaterCanBeRemovedFromManagers: "no",
                 ownerCanBeRemovedFromManagers: "no",
-            };
+            } as ContainerPolicy;
 
             const sId = await api1.createStore(
                 contextId,
@@ -894,7 +871,11 @@ test.describe("StoreTest", () => {
             // @ts-ignore
             await expectError(
                 async () =>
-                    await storeApi.listFiles(sId, { skip: 0, limit: 1, sortOrder: "invalid" }),
+                    await storeApi.listFiles(sId, {
+                        skip: 0,
+                        limit: 1,
+                        sortOrder: "invalid" as SortOrder,
+                    }),
             );
 
             // --- Valid Inputs ---
@@ -1083,7 +1064,7 @@ test.describe("StoreTest", () => {
                 updatePolicy: "owner",
                 updaterCanBeRemovedFromManagers: "no",
                 ownerCanBeRemovedFromManagers: "no",
-            };
+            } as ContainerPolicy;
 
             // 3. Update Store to include User 2, BUT keep Policy strict
             // We create first, then update

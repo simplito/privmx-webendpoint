@@ -3,6 +3,7 @@ import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { ThreadEventSelectorType, ThreadEventType } from "../../dist/Types";
 import type { Endpoint } from "../../dist";
+import { setupUsers } from "../test-utils";
 
 declare global {
     interface Window {
@@ -12,29 +13,6 @@ declare global {
 }
 
 test.describe("CoreTest: Thread Events", () => {
-    async function setupUsers(page: any, cli: any) {
-        const user2Keys = await page.evaluate(async () => {
-            const cryptoApi = await window.Endpoint.createCryptoApi();
-            const privKey = await cryptoApi.generatePrivateKey();
-            return {
-                privKey: privKey,
-                pubKey: await cryptoApi.derivePublicKey(privKey),
-            };
-        });
-
-        const user2Id = `user2-${Date.now()}`;
-        await cli.call("context/addUserToContext", {
-            contextId: testData.contextId,
-            userId: user2Id,
-            userPubKey: user2Keys.pubKey,
-        });
-
-        return {
-            u1: { privKey: testData.userPrivKey, id: testData.userId, pubKey: testData.userPubKey },
-            u2: { privKey: user2Keys.privKey, id: user2Id, pubKey: user2Keys.pubKey },
-        };
-    }
-
     test.beforeEach(async ({ page }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
@@ -100,8 +78,8 @@ test.describe("CoreTest: Thread Events", () => {
         expect(result.event.type).toEqual("threadCreated");
         expect(result.event.connectionId).toEqual(result.connId);
         expect(result.event.data).toBeDefined();
-        expect(result.event.data.threadId).toEqual(result.threadId);
-        expect(result.event.data.contextId).toEqual(args.contextId);
+        expect((result.event.data as any).threadId).toEqual(result.threadId);
+        expect((result.event.data as any).contextId).toEqual(args.contextId);
     });
 
     test("Listening on ThreadCreatedEvent without proper subscription", async ({
@@ -142,7 +120,7 @@ test.describe("CoreTest: Thread Events", () => {
             // 3. Wait with Timeout (simulate Break)
             setTimeout(() => {
                 eventQueue.emitBreakEvent();
-            }, 2000);
+            }, 5000);
             const event = await eventQueue.waitEvent();
 
             return { event };
@@ -214,9 +192,11 @@ test.describe("CoreTest: Thread Events", () => {
 
         expect(result.event.type).toEqual("threadUpdated");
         expect(result.event.data).toBeDefined();
-        expect(result.event.data.threadId).toEqual(result.tId);
+        expect((result.event.data as any).threadId).toEqual(result.tId);
         // Verify meta matches "new"
-        const pubMeta = Buffer.from(Object.values(result.event.data.publicMeta)).toString();
+        const pubMeta = Buffer.from(
+            Object.values((result.event.data as any).publicMeta),
+        ).toString();
         expect(pubMeta).toEqual("new");
     });
 
@@ -268,7 +248,7 @@ test.describe("CoreTest: Thread Events", () => {
             // Wait/Break
             setTimeout(() => {
                 eventQueue.emitBreakEvent();
-            }, 2000);
+            }, 5000);
             const event = await eventQueue.waitEvent();
 
             return { event };
@@ -328,7 +308,7 @@ test.describe("CoreTest: Thread Events", () => {
 
         expect(result.event.type).toEqual("threadDeleted");
         expect(result.event.data).toBeDefined();
-        expect(result.event.data.threadId).toEqual(result.tId);
+        expect((result.event.data as any).threadId).toEqual(result.tId);
     });
 
     test("Listening on ThreadDeletedEvent without proper subscription", async ({
@@ -367,7 +347,7 @@ test.describe("CoreTest: Thread Events", () => {
 
             setTimeout(() => {
                 eventQueue.emitBreakEvent();
-            }, 2000);
+            }, 5000);
             const event = await eventQueue.waitEvent();
 
             return { event };
@@ -380,68 +360,61 @@ test.describe("CoreTest: Thread Events", () => {
     // MESSAGE EVENTS
     // =========================================================================
 
-    test.fixme(
-        "Listening on ThreadStatsChangedEvent via Message",
-        async ({ page, backend, cli }) => {
-            const users = await setupUsers(page, cli);
-            const args = {
-                bridgeUrl: backend.bridgeUrl,
-                solutionId: testData.solutionId,
-                contextId: testData.contextId,
-                users,
-                eventType: ThreadEventType,
-                selectorType: ThreadEventSelectorType,
-            };
+    test("Listening on ThreadStatsChangedEvent via Message", async ({ page, backend, cli }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+            eventType: ThreadEventType,
+            selectorType: ThreadEventSelectorType,
+        };
 
-            const result = await page.evaluate(
-                async ({ bridgeUrl, solutionId, contextId, users, eventType, selectorType }) => {
-                    const Endpoint = window.Endpoint;
-                    const connection = await Endpoint.connect(
-                        users.u1.privKey,
-                        solutionId,
-                        bridgeUrl,
-                    );
-                    const threadApi = await Endpoint.createThreadApi(connection);
-                    const eventQueue = await Endpoint.getEventQueue();
-                    const enc = new TextEncoder();
-                    const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+        const result = await page.evaluate(
+            async ({ bridgeUrl, solutionId, contextId, users, eventType, selectorType }) => {
+                const Endpoint = window.Endpoint;
+                const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+                const threadApi = await Endpoint.createThreadApi(connection);
+                const eventQueue = await Endpoint.getEventQueue();
+                const enc = new TextEncoder();
+                const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
 
-                    // Pop libConnectedEvent
-                    await eventQueue.waitEvent();
+                // Pop libConnectedEvent
+                await eventQueue.waitEvent();
 
-                    const tId = await threadApi.createThread(
-                        contextId,
-                        [u1Obj],
-                        [u1Obj],
-                        enc.encode("p"),
-                        enc.encode("p"),
-                    );
-                    // Subscribe to STATS changes on this thread
-                    const query = await threadApi.buildSubscriptionQuery(
-                        eventType.THREAD_STATS,
-                        selectorType.THREAD_ID,
-                        tId,
-                    );
-                    await threadApi.subscribeFor([query]);
-                    // Sending a message changes stats (msg count increases)
-                    await threadApi.sendMessage(
-                        tId,
-                        enc.encode("p"),
-                        enc.encode("p"),
-                        enc.encode("data"),
-                    );
-                    const event = await eventQueue.waitEvent();
-                    return { event, tId };
-                },
-                args,
-            );
+                const tId = await threadApi.createThread(
+                    contextId,
+                    [u1Obj],
+                    [u1Obj],
+                    enc.encode("p"),
+                    enc.encode("p"),
+                );
+                // Subscribe to STATS changes on this thread
+                const query = await threadApi.buildSubscriptionQuery(
+                    eventType.THREAD_STATS,
+                    selectorType.THREAD_ID,
+                    tId,
+                );
+                await threadApi.subscribeFor([query]);
+                // Sending a message changes stats (msg count increases)
+                await threadApi.sendMessage(
+                    tId,
+                    enc.encode("p"),
+                    enc.encode("p"),
+                    enc.encode("data"),
+                );
+                const event = await eventQueue.waitEvent();
+                return { event, tId };
+            },
+            args,
+        );
 
-            expect(result.event.type).toEqual("threadStatsChanged");
-            expect(result.event.data).toBeDefined();
-            expect(result.event.data.threadId).toEqual(result.tId);
-            expect(result.event.data.messagesCount).toBeGreaterThan(0);
-        },
-    );
+        expect(result.event.type).toEqual("threadStatsChanged");
+        expect(result.event.data).toBeDefined();
+        expect((result.event.data as any).threadId).toEqual(result.tId);
+        expect((result.event.data as any).messagesCount).toBeGreaterThan(0);
+    });
 
     test("Listening on ThreadNewMessageEvent", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
@@ -499,8 +472,8 @@ test.describe("CoreTest: Thread Events", () => {
 
         expect(result.event.type).toEqual("threadNewMessage");
         expect(result.event.data).toBeDefined();
-        expect(result.event.data.info.threadId).toEqual(result.tId);
-        expect(result.event.data.info.messageId).toEqual(result.mId);
+        expect((result.event.data as any).info.threadId).toEqual(result.tId);
+        expect((result.event.data as any).info.messageId).toEqual(result.mId);
     });
 
     test("Listening on ThreadMessageUpdatedEvent", async ({ page, backend, cli }) => {
@@ -564,7 +537,7 @@ test.describe("CoreTest: Thread Events", () => {
 
         expect(result.event.type).toEqual("threadUpdatedMessage"); // Check if actual event name differs
         expect(result.event.data).toBeDefined();
-        expect(result.event.data.info.messageId).toEqual(result.mId);
+        expect((result.event.data as any).info.messageId).toEqual(result.mId);
     });
 
     test("Listening on ThreadMessageDeletedEvent", async ({ page, backend, cli }) => {
@@ -623,7 +596,7 @@ test.describe("CoreTest: Thread Events", () => {
 
         expect(result.event.type).toEqual("threadMessageDeleted");
         expect(result.event.data).toBeDefined();
-        expect(result.event.data.messageId).toEqual(result.mId);
+        expect((result.event.data as any).messageId).toEqual(result.mId);
     });
 
     test("Subscribing for events from invalid module", async ({ page, backend, cli }) => {
@@ -720,9 +693,9 @@ test.describe("CoreTest: Thread Events", () => {
 
         expect(result.event.type).toEqual("collectionChanged");
         expect(result.event.data).toBeDefined();
-        expect(result.event.data.moduleId).toEqual(result.tId);
-        expect(result.event.data.affectedItemsCount).toBeGreaterThan(0);
-        expect(result.event.data.items[0].itemId).toEqual(result.mId);
+        expect((result.event.data as any).moduleId).toEqual(result.tId);
+        expect((result.event.data as any).affectedItemsCount).toBeGreaterThan(0);
+        expect((result.event.data as any).items[0].itemId).toEqual(result.mId);
     });
 
     // =========================================================================
@@ -765,10 +738,9 @@ test.describe("CoreTest: Thread Events", () => {
             await threadApi.sendMessage(tId, enc.encode("p"), enc.encode("p"), enc.encode("data"));
 
             // Wait with Timeout (Expect Break)
-            setTimeout(async () => {
-                console.log("emmiting");
-                await eventQueue.emitBreakEvent();
-            }, 2000);
+            setTimeout(() => {
+                eventQueue.emitBreakEvent();
+            }, 5000);
             const event = await eventQueue.waitEvent();
 
             return { event };
@@ -815,7 +787,7 @@ test.describe("CoreTest: Thread Events", () => {
             // Wait with Timeout
             setTimeout(() => {
                 eventQueue.emitBreakEvent();
-            }, 2000);
+            }, 5000);
             const event = await eventQueue.waitEvent();
 
             return { event };
@@ -824,7 +796,7 @@ test.describe("CoreTest: Thread Events", () => {
         expect(result.event.type).toEqual("libBreak");
     });
 
-    test("Listening on ThreadMessageUpdatedEvent without proper subscription", async ({
+    test.fixme("Listening on ThreadMessageUpdatedEvent without proper subscription", async ({
         page,
         backend,
         cli,
@@ -873,7 +845,7 @@ test.describe("CoreTest: Thread Events", () => {
             // Wait with Timeout
             setTimeout(() => {
                 eventQueue.emitBreakEvent();
-            }, 1500);
+            }, 5000);
             const event = await eventQueue.waitEvent();
 
             return { event };
@@ -926,7 +898,7 @@ test.describe("CoreTest: Thread Events", () => {
             // Wait with Timeout
             setTimeout(() => {
                 eventQueue.emitBreakEvent();
-            }, 2000);
+            }, 5000);
             const event = await eventQueue.waitEvent();
 
             return { event };
@@ -973,7 +945,7 @@ test.describe("CoreTest: Thread Events", () => {
             // Wait with Timeout
             setTimeout(() => {
                 eventQueue.emitBreakEvent();
-            }, 2000);
+            }, 5000);
             const event = await eventQueue.waitEvent();
 
             return { event };

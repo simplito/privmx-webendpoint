@@ -2,6 +2,8 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import type { Endpoint } from "../../dist";
+import { setupUsers } from "../test-utils";
+import { ContainerPolicy, SortOrder } from "../../dist/Types";
 
 declare global {
     interface Window {
@@ -11,33 +13,7 @@ declare global {
 }
 
 test.describe("InboxTest", () => {
-    async function setupUsers(page: any, cli: any) {
-        const user2Keys = await page.evaluate(async () => {
-            const cryptoApi = await window.Endpoint.createCryptoApi();
-            const privKey = await cryptoApi.generatePrivateKey();
-            return {
-                privKey: privKey,
-                pubKey: await cryptoApi.derivePublicKey(privKey),
-            };
-        });
-
-        const user2Id = `user2-${Date.now()}`;
-        await cli.call("context/addUserToContext", {
-            contextId: testData.contextId,
-            userId: user2Id,
-            userPubKey: user2Keys.pubKey,
-        });
-
-        return {
-            u1: { privKey: testData.userPrivKey, id: testData.userId, pubKey: testData.userPubKey },
-            u2: { privKey: user2Keys.privKey, id: user2Id, pubKey: user2Keys.pubKey },
-        };
-    }
-
     test.beforeEach(async ({ page }) => {
-        page.on("console", (msg) => {
-            if (msg.type() === "error") console.error(`[BROWSER]: ${msg.text()}`);
-        });
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
         await page.evaluate(async () => {
@@ -156,7 +132,7 @@ test.describe("InboxTest", () => {
                     await inboxApi.listInboxes(contextId, {
                         skip: 0,
                         limit: 1,
-                        sortOrder: "invalid",
+                        sortOrder: "invalid" as SortOrder,
                     }),
             );
 
@@ -880,7 +856,7 @@ test.describe("InboxTest", () => {
                 updatePolicy: "owner",
                 updaterCanBeRemovedFromManagers: "no",
                 ownerCanBeRemovedFromManagers: "no",
-            };
+            } as ContainerPolicy;
 
             const iId = await api1.createInbox(
                 contextId,

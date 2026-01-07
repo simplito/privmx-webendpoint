@@ -2,7 +2,9 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import type { Endpoint } from "../../dist";
-import { ContainerPolicy } from "../../dist/Types";
+import { ContainerPolicy, SortOrder } from "../../dist/Types";
+import { Sort } from "mongodb";
+import { setupUsers } from "../test-utils";
 
 declare global {
     interface Window {
@@ -12,39 +14,11 @@ declare global {
 }
 
 test.describe("ThreadTest", () => {
-    // --- Helper: Generate User 2 and add to Context ---
-    async function setupUsers(page: any, cli: any) {
-        const user2Keys = await page.evaluate(async () => {
-            const cryptoApi = await window.Endpoint.createCryptoApi();
-            const privKey = await cryptoApi.generatePrivateKey();
-            return {
-                privKey: privKey,
-                pubKey: await cryptoApi.derivePublicKey(privKey),
-            };
-        });
-
-        const user2Id = `user2-${Date.now()}`;
-        await cli.call("context/addUserToContext", {
-            contextId: testData.contextId,
-            userId: user2Id,
-            userPubKey: user2Keys.pubKey,
-        });
-
-        return {
-            u1: { privKey: testData.userPrivKey, id: testData.userId, pubKey: testData.userPubKey },
-            u2: { privKey: user2Keys.privKey, id: user2Id, pubKey: user2Keys.pubKey },
-        };
-    }
-
     test.beforeEach(async ({ page }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
         await page.evaluate(async () => {
-            try {
-                await window.Endpoint.setup("../../dist/assets");
-            } catch (e) {
-                console.log(e);
-            }
+            await window.Endpoint.setup("../../dist/assets");
         });
     });
 
@@ -154,7 +128,7 @@ test.describe("ThreadTest", () => {
                     await threadApi.listThreads(contextId, {
                         skip: 0,
                         limit: 1,
-                        sortOrder: "invalid_value",
+                        sortOrder: "invalid_value" as SortOrder,
                     }),
             );
             // incorrect lastId
@@ -812,7 +786,7 @@ test.describe("ThreadTest", () => {
                     await threadApi.listMessages(contextId, {
                         skip: 0,
                         limit: 1,
-                        sortOrder: "invalid",
+                        sortOrder: "invalid" as SortOrder,
                     }),
             );
             // incorrect lastId
@@ -1254,7 +1228,7 @@ test.describe("ThreadTest", () => {
                 updatePolicy: "owner",
                 updaterCanBeRemovedFromManagers: "no",
                 ownerCanBeRemovedFromManagers: "no",
-            };
+            } as ContainerPolicy;
 
             const tId = await api1.createThread(
                 contextId,
@@ -1321,7 +1295,8 @@ test.describe("ThreadTest", () => {
                 updatePolicy: "owner",
                 updaterCanBeRemovedFromManagers: "no",
                 ownerCanBeRemovedFromManagers: "no",
-            };
+            } as ContainerPolicy;
+
             const tId = await api1.createThread(
                 contextId,
                 usersArr,

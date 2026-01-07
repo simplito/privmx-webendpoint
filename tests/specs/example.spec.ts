@@ -15,6 +15,9 @@ test.describe("Core Functionality", () => {
     test.beforeEach(async ({ page }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
+        await page.evaluate(async () => {
+            await window.Endpoint.setup("../../dist/assets");
+        });
     });
 
     test("should successfully create and retrieve a thread via WASM", async ({ page, backend }) => {
@@ -29,11 +32,7 @@ test.describe("Core Functionality", () => {
         };
 
         const result = await page.evaluate(async ({ bridgeUrl, user }) => {
-            if (!window.Endpoint) throw new Error("Endpoint not loaded on window");
-
             const Endpoint = window.Endpoint;
-
-            await Endpoint.setup("../../dist/assets");
 
             const connection = await Endpoint.connect(user.privKey, user.solutionId, bridgeUrl);
             const threadsApi = await Endpoint.createThreadApi(connection);

@@ -14,6 +14,9 @@ test.describe("CoreTest: Events", () => {
     test.beforeEach(async ({ page }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
+        await page.evaluate(async () => {
+            await window.Endpoint.setup("../../dist/assets");
+        });
     });
 
     test("Listening on LibConnectedEvent", async ({ page, backend }) => {
@@ -118,11 +121,11 @@ test.describe("CoreTest: Events", () => {
 
         const e1 = events.find((e: any) => e.connectionId === result.connectionId_1);
         expect(e1).toBeDefined();
-        expect(e1.type).toEqual("libConnected");
+        expect(e1!.type).toEqual("libConnected");
 
         const e2 = events.find((e: any) => e.connectionId === result.connectionId_2);
         expect(e2).toBeDefined();
-        expect(e2.type).toEqual("libConnected");
+        expect(e2!.type).toEqual("libConnected");
     });
 
     test("Listening on LibDisconnectedEvent", async ({ page, backend }) => {

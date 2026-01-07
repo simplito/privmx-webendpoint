@@ -2,6 +2,8 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import type { Endpoint } from "../../dist";
+import { ContainerPolicy, PagingQuery, PolicyEntry, SortOrder } from "../../dist/Types";
+import { setupUsers } from "../test-utils";
 
 declare global {
     interface Window {
@@ -11,31 +13,6 @@ declare global {
 }
 
 test.describe("KvdbTest", () => {
-    // --- Helper: Generate User 2 and add to Context ---
-    async function setupUsers(page: any, cli: any) {
-        const user2Keys = await page.evaluate(async () => {
-            const cryptoApi = await window.Endpoint.createCryptoApi();
-            const privKey = await cryptoApi.generatePrivateKey();
-            return {
-                privKey: privKey,
-                pubKey: await cryptoApi.derivePublicKey(privKey),
-            };
-        });
-
-        const user2Id = `user2-${Date.now()}`;
-        // Add User 2 to Context via CLI so they can exist in the solution
-        await cli.call("context/addUserToContext", {
-            contextId: testData.contextId,
-            userId: user2Id,
-            userPubKey: user2Keys.pubKey,
-        });
-
-        return {
-            u1: { privKey: testData.userPrivKey, id: testData.userId, pubKey: testData.userPubKey },
-            u2: { privKey: user2Keys.privKey, id: user2Id, pubKey: user2Keys.pubKey },
-        };
-    }
-
     test.beforeEach(async ({ page }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
@@ -129,7 +106,11 @@ test.describe("KvdbTest", () => {
             // @ts-ignore
             await expectError(
                 async () =>
-                    await kvdbApi.listKvdbs(contextId, { skip: 0, limit: 1, sortOrder: "invalid" }),
+                    await kvdbApi.listKvdbs(contextId, {
+                        skip: 0,
+                        limit: 1,
+                        sortOrder: "invalid" as SortOrder,
+                    }),
             );
             // @ts-ignore
             await expectError(
@@ -160,7 +141,7 @@ test.describe("KvdbTest", () => {
             const enc = new TextEncoder();
             const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
 
-            const ids = [];
+            const ids: string[] = [];
             for (let i = 0; i < 3; i++) {
                 ids.push(
                     await kvdbApi.createKvdb(
@@ -767,7 +748,7 @@ test.describe("KvdbTest", () => {
                     await kvdbApi.listEntriesKeys(contextId, {
                         skip: 0,
                         limit: 1,
-                        sortOrder: "invalid",
+                        sortOrder: "invalid" as SortOrder,
                     }),
             );
         }, args);
@@ -864,7 +845,7 @@ test.describe("KvdbTest", () => {
                     await kvdbApi.listEntries(contextId, {
                         skip: 0,
                         limit: 1,
-                        sortOrder: "invalid",
+                        sortOrder: "invalid" as SortOrder,
                     }),
             );
         }, args);
@@ -1250,7 +1231,7 @@ test.describe("KvdbTest", () => {
                 updatePolicy: "owner",
                 updaterCanBeRemovedFromManagers: "no",
                 ownerCanBeRemovedFromManagers: "no",
-            };
+            } as ContainerPolicy;
 
             const kId = await api1.createKvdb(
                 contextId,
@@ -1320,7 +1301,7 @@ test.describe("KvdbTest", () => {
                 updatePolicy: "owner",
                 updaterCanBeRemovedFromManagers: "no",
                 ownerCanBeRemovedFromManagers: "no",
-            };
+            } as ContainerPolicy;
 
             // Update Policy
             await api1.updateKvdb(

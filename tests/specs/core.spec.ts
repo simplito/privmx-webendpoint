@@ -1,7 +1,8 @@
-import { test } from "../fixtures";
-import { expect } from "@playwright/test";
+import { CliContext, test } from "../fixtures";
+import { expect, Page } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import type { Endpoint } from "../../dist";
+import { setupTestUser } from "../test-utils";
 
 declare global {
     interface Window {
@@ -11,46 +12,16 @@ declare global {
 }
 
 test.describe("CoreTest: Connection & Contexts", () => {
-    async function setupUser2(page: any, cli: any) {
-        const user2Keys = await page.evaluate(async () => {
-            const Endpoint = window.Endpoint;
-            await Endpoint.setup("../../dist/assets");
-            const cryptoApi = await window.Endpoint.createCryptoApi();
-            const privKey = await cryptoApi.generatePrivateKey();
-            return {
-                privKey: privKey,
-                pubKey: await cryptoApi.derivePublicKey(privKey),
-            };
-        });
-
-        const user2Id = `user2-${Date.now()}`;
-
-        await cli.call("context/addUserToContext", {
-            contextId: testData.contextId,
-            userId: user2Id,
-            userPubKey: user2Keys.pubKey,
-        });
-
-        if (testData.contextId2) {
-            try {
-                await cli.call("context/addUserToContext", {
-                    contextId: testData.contextId2,
-                    userId: user2Id,
-                    userPubKey: user2Keys.pubKey,
-                });
-            } catch (e) {}
-        }
-
-        return { ...user2Keys, userId: user2Id };
-    }
-
     test.beforeEach(async ({ page }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
+        await page.evaluate(async () => {
+            await window.Endpoint.setup("../../dist/assets");
+        });
     });
 
     test("Creating multiple instances of connection", async ({ page, backend, cli }) => {
-        const user2 = await setupUser2(page, cli);
+        const user2 = await setupTestUser(page, cli, [testData.contextId]);
 
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -61,7 +32,6 @@ test.describe("CoreTest: Connection & Contexts", () => {
 
         const result = await page.evaluate(async ({ bridgeUrl, user1, user2, solutionId }) => {
             const Endpoint = window.Endpoint;
-            await Endpoint.setup("../../dist/assets");
 
             const expectError = async (fn: () => Promise<any>) => {
                 try {
@@ -105,7 +75,7 @@ test.describe("CoreTest: Connection & Contexts", () => {
     });
 
     test("Disconnecting multiple instances of connection", async ({ page, backend, cli }) => {
-        const user2 = await setupUser2(page, cli);
+        const user2 = await setupTestUser(page, cli, [testData.contextId]);
         const args = {
             bridgeUrl: backend.bridgeUrl,
             user1: { privKey: testData.userPrivKey, id: testData.userId },
@@ -115,7 +85,6 @@ test.describe("CoreTest: Connection & Contexts", () => {
 
         const result = await page.evaluate(async ({ bridgeUrl, user1, user2, solutionId }) => {
             const Endpoint = window.Endpoint;
-            await Endpoint.setup("../../dist/assets");
 
             const expectError = async (fn: () => Promise<any>) => {
                 try {
@@ -182,7 +151,6 @@ test.describe("CoreTest: Connection & Contexts", () => {
 
         await page.evaluate(async ({ bridgeUrl, solutionId }) => {
             const Endpoint = window.Endpoint;
-            await Endpoint.setup("../../dist/assets");
 
             const expectError = async (fn: () => Promise<any>) => {
                 try {
@@ -214,7 +182,7 @@ test.describe("CoreTest: Connection & Contexts", () => {
 
         await page.evaluate(async ({ bridgeUrl, user }) => {
             const Endpoint = window.Endpoint;
-            await Endpoint.setup("../../dist/assets");
+
             const expectError = async (fn: () => Promise<any>) => {
                 try {
                     await fn();
@@ -263,7 +231,7 @@ test.describe("CoreTest: Connection & Contexts", () => {
 
         const result = await page.evaluate(async ({ bridgeUrl, user }) => {
             const Endpoint = window.Endpoint;
-            await Endpoint.setup("../../dist/assets");
+
             const connection = await Endpoint.connect(user.privKey, user.solutionId, bridgeUrl);
 
             // 1. Skip 3
@@ -293,7 +261,7 @@ test.describe("CoreTest: Connection & Contexts", () => {
     });
 
     test("Listing context and active user status validation", async ({ page, backend, cli }) => {
-        const user2 = await setupUser2(page, cli);
+        const user2 = await setupTestUser(page, cli, [testData.contextId]);
         const args = {
             bridgeUrl: backend.bridgeUrl,
             user1: { privKey: testData.userPrivKey, id: testData.userId },
@@ -305,7 +273,6 @@ test.describe("CoreTest: Connection & Contexts", () => {
         const result = await page.evaluate(
             async ({ bridgeUrl, user1, user2, solutionId, contextId }) => {
                 const Endpoint = window.Endpoint;
-                await Endpoint.setup("../../dist/assets");
 
                 // 1. Connect User 1
                 const conn1 = await Endpoint.connect(user1.privKey, solutionId, bridgeUrl);
@@ -342,10 +309,10 @@ test.describe("CoreTest: Connection & Contexts", () => {
         );
 
         expect(u1_p1).toBeDefined();
-        expect(u1_p1.isActive).toBe(true);
+        expect(u1_p1!.isActive).toBe(true);
 
         expect(u2_p1).toBeDefined();
-        expect(u2_p1.isActive).toBe(false); // User 2 is NOT connected yet
+        expect(u2_p1!.isActive).toBe(false); // User 2 is NOT connected yet
 
         // Check Phase 2 (Both connected)
         const u1_p2 = result.usersInfo_2.readItems.find(
@@ -355,7 +322,7 @@ test.describe("CoreTest: Connection & Contexts", () => {
             (u: any) => u.user.userId === args.user2.userId,
         );
 
-        expect(u1_p2.isActive).toBe(true);
-        expect(u2_p2.isActive).toBe(true); // User 2 IS now connected
+        expect(u1_p2!.isActive).toBe(true);
+        expect(u2_p2!.isActive).toBe(true); // User 2 IS now connected
     });
 });
