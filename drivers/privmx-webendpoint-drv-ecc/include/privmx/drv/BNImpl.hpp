@@ -18,9 +18,8 @@ limitations under the License.
 
 #include <privmx/drv/BNImpl.hpp>
 
-class BNImpl
-{
-public:
+class BNImpl {
+  public:
     using Ptr = std::unique_ptr<BNImpl>;
 
     static BNImpl::Ptr fromBuffer(const std::string& data);
@@ -38,18 +37,14 @@ public:
     BNImpl::Ptr umod(const BNImpl& bn) const;
     bool eq(const BNImpl& bn) const;
 
-private:
+  private:
     void validate() const;
 
     std::string _bn;
 };
 
-inline BNImpl::operator bool() const {
-    return !isEmpty();
-}
+inline BNImpl::operator bool() const { return !isEmpty(); }
 
-inline bool BNImpl::isEmpty() const {
-    return _bn.empty();
-}
+inline bool BNImpl::isEmpty() const { return _bn.empty(); }
 
 #endif // _PRIVMXLIB_CRYPTO_EMSCRIPTEN_BNIMPl_HPP_

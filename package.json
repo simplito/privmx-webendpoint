@@ -46,7 +46,7 @@
     "bundle": "webpack",
     "watch:types": "tsc -w",
     "test:e2e": "playwright test",
-    "format:clang": "find webendpoint-cpp -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) | grep -v -f .clang-format-ignore | xargs clang-format -i"
+    "format:clang": "find webendpoint-cpp drivers -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) | grep -v -f .clang-format-ignore | xargs clang-format -i"
 
   },
   "files": [

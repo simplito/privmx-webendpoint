@@ -10,6 +10,8 @@ limitations under the License.
 */
 #include <privmx/utils/Utils.hpp>
 
+// clang-format off
+
 #ifndef _PRIVMXLIB_WEBENDPOINT_MACROS_HPP_
 #define _PRIVMXLIB_WEBENDPOINT_MACROS_HPP_
 
@@ -32,3 +34,5 @@ void FUNCTION_NAME(SERVICE, NAME) (int taskId, int ptr, emscripten::val args) { 
 }
 
 #endif // _PRIVMXLIB_WEBENDPOINT_MACROS_HPP_
+
+// clang-format on

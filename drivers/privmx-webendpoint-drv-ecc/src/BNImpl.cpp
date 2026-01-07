@@ -28,26 +28,27 @@ using namespace emscripten;
 using namespace privmx::webendpoint;
 
 namespace {
-    
-    template<typename T>
-    T runBnOp(const std::string& method, const Poco::Dynamic::Var& paramsVar) {
-        auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+
+template <typename T> T runBnOp(const std::string& method, const Poco::Dynamic::Var& paramsVar) {
+    auto future = AsyncEngine::getInstance()->callJsAsync(
+        [&](int callId) {
             Poco::Dynamic::Var localParams = paramsVar;
             emscripten::val jsParams = Mapper::map((pson_value*)&localParams);
             performBindingsCall(method, jsParams, callId);
-        }, ThreadTarget::Worker);
+        },
+        ThreadTarget::Worker);
 
-        Poco::Dynamic::Var resultVar = future.get();
-        Poco::JSON::Object::Ptr obj = resultVar.extract<Poco::JSON::Object::Ptr>();
-        int status = obj->getValue<int>("status");
-        
-        if (status < 0) {
-            std::string error = obj->getValue<std::string>("error");
-            throw std::runtime_error("Error: on " + method + ": " + error);
-        }
-        return obj->getValue<T>("buff");
+    Poco::Dynamic::Var resultVar = future.get();
+    Poco::JSON::Object::Ptr obj = resultVar.extract<Poco::JSON::Object::Ptr>();
+    int status = obj->getValue<int>("status");
+
+    if (status < 0) {
+        std::string error = obj->getValue<std::string>("error");
+        throw std::runtime_error("Error: on " + method + ": " + error);
     }
+    return obj->getValue<T>("buff");
 }
+} // namespace
 
 BNImpl::Ptr BNImpl::fromBuffer(const string& data) { return std::make_unique<BNImpl>(data); }
 BNImpl::Ptr BNImpl::getDefault() { return std::make_unique<BNImpl>(); }
@@ -66,9 +67,7 @@ BNImpl& BNImpl::operator=(BNImpl&& obj) {
     return *this;
 }
 
-string BNImpl::toBuffer() const {
-    return _bn;
-}
+string BNImpl::toBuffer() const { return _bn; }
 
 // --- ASYNC IMPLEMENTATIONS ---
 
@@ -81,7 +80,7 @@ std::size_t BNImpl::getBitsLength() const {
 
 BNImpl::Ptr BNImpl::umod(const BNImpl& bn) const {
     validate();
-    
+
     Poco::JSON::Object::Ptr paramsObj = new Poco::JSON::Object();
     paramsObj->set("bn", Pson::BinaryString(_bn));
     paramsObj->set("bn2", Pson::BinaryString(bn.toBuffer()));
@@ -92,7 +91,7 @@ BNImpl::Ptr BNImpl::umod(const BNImpl& bn) const {
 
 bool BNImpl::eq(const BNImpl& bn) const {
     validate();
-    
+
     Poco::JSON::Object::Ptr paramsObj = new Poco::JSON::Object();
     paramsObj->set("bn", Pson::BinaryString(_bn));
     paramsObj->set("bn2", Pson::BinaryString(bn.toBuffer()));

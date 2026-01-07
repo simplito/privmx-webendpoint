@@ -6,11 +6,11 @@ ColumnLimit: 100
 
 # Spaces
 SpacesInParentheses: false
-SpaceBeforeParens: ControlStatements
+SpacesInSquareBrackets: false
 
 # Function formatting
-AllowShortFunctionsOnASingleLine: None
-BreakBeforeBraces: Allman
+AllowShortFunctionsOnASingleLine: All
+BreakBeforeBraces: Attach
 
 # Comments
 ReflowComments: false

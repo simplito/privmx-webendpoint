@@ -16,15 +16,13 @@ limitations under the License.
 #include <privmx/drv/BNImpl.hpp>
 #include <privmx/drv/PointImpl.hpp>
 
-struct Signature
-{
+struct Signature {
     std::unique_ptr<BNImpl> r;
     std::unique_ptr<BNImpl> s;
 };
 
-class ECCImpl
-{
-public:
+class ECCImpl {
+  public:
     using Ptr = std::unique_ptr<ECCImpl>;
     static ECCImpl::Ptr genPair();
     static ECCImpl::Ptr fromPublicKey(const std::string& public_key);
@@ -53,18 +51,14 @@ public:
     static PointImpl::Ptr getEcGenerator();
     bool hasPrivate() const { return _has_priv; }
 
-private:
+  private:
     std::string _privkey;
     std::string _pubkey;
     bool _has_priv = false;
 };
 
-inline ECCImpl::operator bool() const {
-    return !isEmpty();
-}
+inline ECCImpl::operator bool() const { return !isEmpty(); }
 
-inline bool ECCImpl::isEmpty() const {
-    return _privkey.empty() && _pubkey.empty();
-}
+inline bool ECCImpl::isEmpty() const { return _privkey.empty() && _pubkey.empty(); }
 
 #endif // _PRIVMXLIB_CRYPTO_EMSCRIPTEN_ECCIMPL_HPP_
