@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+set -e pipefail
+
+VERSION="21.1.8"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TOOLS_DIR="$ROOT_DIR/tools"
+BIN_DIR="$TOOLS_DIR/bin"
+
+if [[ -x "$BIN_DIR/clang-tidy" ]]; then
+  echo "clang-tidy already installed:"
+  "$BIN_DIR/clang-tidy" --version
+  exit 0
+fi
+
+cd "$TOOLS_DIR"
+
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+if [[ "$OS" == "Darwin" ]]; then
+  if [[ "$ARCH" == "arm64" ]]; then
+    PKG="LLVM-${VERSION}-macOS-ARM64.tar.xz"
+  fi
+elif [[ "$OS" == "Linux" ]]; then
+  if [[ "$ARCH" == "arm64" ]]; then
+    PKG="LLVM-${VERSION}-Linux-ARM64.tar.xz"
+  else
+    PKG="LLVM-${VERSION}-Linux-X64.tar.xz"
+  fi
+else
+  echo "Unsupported OS: $OS"
+  exit 1
+fi
+
+URL="https://github.com/llvm/llvm-project/releases/download/llvmorg-${VERSION}/${PKG}"
+
+echo "Downloading clang-tidy (${VERSION})..."
+curl -L --fail "$URL" -o "$PKG"
+
+echo "Extracting..."
+tar -xf "$PKG"
+
+EXTRACTED_DIR="$(tar -tf "$PKG" | head -1 | cut -d/ -f1)"
+
+if [[ -f "$EXTRACTED_DIR/bin/clang-tidy" ]]; then
+  mv "$EXTRACTED_DIR/bin/clang-tidy" "$BIN_DIR/"
+fi
+
+chmod +x "$BIN_DIR/clang-tidy" || true
+
+rm -rf "$EXTRACTED_DIR" "$PKG"
+
+echo "clang-tidy installed locally in $BIN_DIR:"
+"$BIN_DIR/clang-tidy" --version

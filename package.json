@@ -46,8 +46,9 @@
     "bundle": "webpack",
     "watch:types": "tsc -w",
     "test:e2e": "playwright test",
-    "format:clang": "find webendpoint-cpp drivers -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) | grep -v -f .clang-format-ignore | xargs clang-format -i"
-
+    "format:clang": "find webendpoint-cpp drivers -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) | grep -v -f .clang-format-ignore | xargs clang-format -i",
+    "lint:clang": "find webendpoint-cpp drivers -type f \\( -name '*.c' -o -name '*.cpp' \\) -print0 | xargs -0 ./tools/bin/clang-tidy -p build",
+    "install:clang-tidy": "./scripts/build_clang-tidy"
   },
   "files": [
     "dist",
