@@ -22,12 +22,12 @@ namespace privmx {
 namespace webendpoint {
 
 class Mapper {
-public:
+  public:
     static Poco::Dynamic::Var map(emscripten::val value);
     static emscripten::val map(pson_value* value);
 };
 
-} // namespace webebdpoint
+} // namespace webendpoint
 } // namespace privmx
 
 #endif // _PRIVMXLIB_WEBENDPOINT_MAPPER_HPP_

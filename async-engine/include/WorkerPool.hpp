@@ -13,7 +13,7 @@ namespace privmx {
 namespace webendpoint {
 
 class WorkerPool {
-public:
+  public:
     explicit WorkerPool(size_t numThreads);
     ~WorkerPool();
 
@@ -24,7 +24,7 @@ public:
 
     void enqueue(std::function<void()> task);
 
-private:
+  private:
     void worker_loop();
 
     std::vector<std::thread> workers;

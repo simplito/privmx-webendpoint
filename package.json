@@ -48,8 +48,8 @@
     "test:e2e": "playwright test",
     "lint": "eslint -c eslint.config.mjs .",
     "format": "prettier --write '{src,tests}/**/*.{ts,tsx,css,md}'",
-    "format:clang": "find webendpoint-cpp drivers -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format -i",
-    "lint:clang": "find webendpoint-cpp drivers -type f \\( -name '*.c' -o -name '*.cpp' \\) -print0 | xargs -0 ./tools/bin/clang-tidy -p build",
+    "format:clang": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format -i",
+    "lint:clang": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' \\) -print0 | xargs -0 ./tools/bin/clang-tidy -p build",
     "install:clang-tidy": "./scripts/build_clang-tidy"
   },
   "files": [
