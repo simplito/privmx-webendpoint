@@ -62,7 +62,6 @@ export const test = base.extend<
 
             try { execSync(`docker rm -f ${containerName}`, { stdio: "ignore" }); } catch {}
 
-            console.log(`[Worker ${id}] Creating container ${containerName}...`);
             execSync(
                 `docker run -d --name ${containerName} -p ${hostPort}:3000 \
                 --network tests_default \
