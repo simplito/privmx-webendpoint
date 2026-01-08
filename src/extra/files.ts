@@ -1,7 +1,7 @@
 /**
  * Represents a stream reader for reading a file in chunks.
  */
-import { InboxApi, StoreApi } from '..';
+import { InboxApi, StoreApi } from "..";
 
 export const FILE_DEFAULT_CHUNK_SIZE = 1_048_576;
 
@@ -30,7 +30,7 @@ export class StreamReader {
     static async readFile(
         api: InboxApi | StoreApi,
         fileID: string,
-        chunkSize?: number
+        chunkSize?: number,
     ): Promise<StreamReader> {
         const fileHandle = await api.openFile(fileID);
         const reader = new StreamReader(fileHandle, api, chunkSize);
@@ -111,7 +111,7 @@ interface FileContainerApi {
 
 export class FileUploader {
     private readonly _size: number;
-    private offset:number = 0
+    private offset: number = 0;
     private readonly _api: FileContainerApi;
 
     private _reader: ReadableStreamDefaultReader<Uint8Array>;
@@ -128,7 +128,6 @@ export class FileUploader {
         this._size = file.size;
         this._api = api;
         this._reader = file.stream().getReader();
-
     }
 
     static async uploadStoreFile({
@@ -136,7 +135,7 @@ export class FileUploader {
         storeId,
         file,
         privateMeta,
-        publicMeta
+        publicMeta,
     }: {
         storeId: string;
         file: File;
@@ -146,14 +145,14 @@ export class FileUploader {
     }) {
         const meta = {
             publicMeta: publicMeta || new Uint8Array(),
-            privateMeta: privateMeta || new Uint8Array()
+            privateMeta: privateMeta || new Uint8Array(),
         };
 
         const handle = await storeApi.createFile(
             storeId,
             meta.publicMeta,
             meta.privateMeta,
-            file.size
+            file.size,
         );
 
         const streamer = new FileUploader(file, {
@@ -162,16 +161,15 @@ export class FileUploader {
             },
             writeToFile(chunk) {
                 return storeApi.writeToFile(handle, chunk);
-            }
+            },
         });
         return streamer;
     }
 
-
     static async uploadInboxFile({
         inboxApi,
         inboxHandle,
-        preparedFileUpload
+        preparedFileUpload,
     }: {
         inboxHandle: number;
         preparedFileUpload: { file: File; handle: number };
@@ -179,11 +177,11 @@ export class FileUploader {
     }) {
         const streamer = new FileUploader(preparedFileUpload.file, {
             closeFile() {
-                return Promise.resolve('')
+                return Promise.resolve("");
             },
             writeToFile(chunk) {
                 return inboxApi.writeToFile(inboxHandle, preparedFileUpload.handle, chunk);
-            }
+            },
         });
         return streamer;
     }
@@ -192,7 +190,7 @@ export class FileUploader {
         inboxApi,
         file,
         privateMeta,
-        publicMeta
+        publicMeta,
     }: {
         inboxApi: InboxApi;
         file: File;
@@ -201,13 +199,13 @@ export class FileUploader {
     }) {
         const meta = {
             publicMeta: publicMeta || new Uint8Array(),
-            privateMeta: privateMeta || new Uint8Array()
+            privateMeta: privateMeta || new Uint8Array(),
         };
 
         const handle = await inboxApi.createFileHandle(
             meta.publicMeta,
             meta.privateMeta,
-            file.size
+            file.size,
         );
         return { file: file, handle };
     }
@@ -218,7 +216,7 @@ export class FileUploader {
      * @returns {number} The progress percentage.
      */
     public get progress() {
-        if(this._size === 0) return 100
+        if (this._size === 0) return 100;
         return (this.offset / this._size) * 100;
     }
 
@@ -235,8 +233,8 @@ export class FileUploader {
             return false;
         }
         await this._api.writeToFile(value);
-        this.offset += value?.length
-        return true
+        this.offset += value?.length;
+        return true;
     }
 
     public async uploadFileContent() {
@@ -276,17 +274,17 @@ export class FileUploader {
 export async function downloadFile(
     api: StoreApi | InboxApi,
     fileId: string,
-    targetFileName?: string
+    targetFileName?: string,
 ): Promise<void> {
     const filename = targetFileName || fileId;
     const apiReader = await StreamReader.readFile(api, fileId);
 
-    if ('showSaveFilePicker' in window && window.isSecureContext) {
+    if ("showSaveFilePicker" in window && window.isSecureContext) {
         //@ts-ignore
         const systemHandle = (await window.showSaveFilePicker({
             id: 0,
             suggestedName: filename,
-            startIn: 'downloads'
+            startIn: "downloads",
         })) as FileSystemFileHandle;
 
         const accessHandle = await systemHandle.createWritable();
@@ -298,7 +296,7 @@ export async function downloadFile(
     } else {
         const fileBuffer = await apiReader.getFileContent();
 
-        const anchor = document.createElement('a');
+        const anchor = document.createElement("a");
 
         const reader = new FileReader();
         reader.onload = (e) => {

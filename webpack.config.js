@@ -1,52 +1,52 @@
-const path = require('path');
-const webpack = require('webpack');
+const path = require("path");
+const webpack = require("webpack");
 module.exports = {
   entry: {
-    bundle: './src/bundle.ts'
+    bundle: "./src/bundle.ts",
   },
-  mode: 'production',
+  mode: "production",
   plugins: [
     new webpack.ProvidePlugin({
-        Buffer: ['buffer', 'Buffer'],
+        Buffer: ["buffer", "Buffer"],
     }),
     new webpack.ProvidePlugin({
-      process: 'process/browser',
+      process: "process/browser",
     }),
   ],
   module: {
     rules: [
       {
         test: /\.tsx?$/,
-        use: 'ts-loader',
-        include: path.resolve(__dirname, 'src'),
+        use: "ts-loader",
+        include: path.resolve(__dirname, "src"),
       },
     ],
   },
   resolve: {
-    extensions: ['.tsx', '.ts', '.js'],
+    extensions: [".tsx", ".ts", ".js"],
     fallback: {
-        "crypto": require.resolve('crypto-browserify'), 
-        "assert": require.resolve('assert/'),
+        "crypto": require.resolve("crypto-browserify"), 
+        "assert": require.resolve("assert/"),
         "stream": require.resolve("stream-browserify"),
         "buffer": require.resolve("buffer"),
         "vm": require.resolve("vm-browserify"),
-        'process/browser': require.resolve('process/browser'),
-        
-      } 
+        "process/browser": require.resolve("process/browser"),
+          
+      }, 
   },
   output: {
     filename: (pathData) => {
-      return pathData.chunk.name == 'bundle' ? 'privmx-endpoint-web.js' : 'privmx-endpoint-web.[name].js';
+      return pathData.chunk.name == "bundle" ? "privmx-endpoint-web.js" : "privmx-endpoint-web.[name].js";
     },
-    globalObject: 'this',
-    path: path.resolve(__dirname, 'dist/bundle'),
+    globalObject: "this",
+    path: path.resolve(__dirname, "dist/bundle"),
     library: {
       name: {
-        root: 'PrivmxWebEndpoint',
-        amd: 'privmx-webendoint',
-        commonjs: 'privmx-webendpoint',
+        root: "PrivmxWebEndpoint",
+        amd: "privmx-webendoint",
+        commonjs: "privmx-webendpoint",
       },
-      type: 'umd',
-    }
+      type: "umd",
+    },
   },
 };

@@ -20,11 +20,12 @@ export class BaseApi {
 
     public get servicePtr() {
         if (this._servicePtr < 0) {
-            throw new Error("This API instance is no longer valid because the connection associated with it has been closed.")
+            throw new Error(
+                "This API instance is no longer valid because the connection associated with it has been closed.",
+            );
         }
         return this._servicePtr;
     }
-
 
     public destroyRefs() {
         this._servicePtr = -1;

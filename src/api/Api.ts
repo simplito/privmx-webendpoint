@@ -19,19 +19,19 @@ interface Result {
 }
 
 export class Api {
-    private promises: Map<number,any>;
+    private promises: Map<number, any>;
     private taskIdGenerator: IdGenerator;
 
-    constructor(public lib: any){
+    constructor(public lib: any) {
         this.taskIdGenerator = new IdGenerator();
-        this.promises = new Map<number,any>();
+        this.promises = new Map<number, any>();
         this.setResultsCallback();
     }
 
     async runAsync<T>(func: (taskId: number) => void): Promise<T> {
         return new Promise<T>((resolve, reject) => {
             const taskId = this.generateId();
-            this.promises.set(taskId, {resolve, reject});
+            this.promises.set(taskId, { resolve, reject });
             func(taskId);
         });
     }
@@ -50,6 +50,6 @@ export class Api {
     }
 
     private setResultsCallback() {
-        this.lib.setResultsCallback((result: any)=>this.resolveResult(result));
+        this.lib.setResultsCallback((result: any) => this.resolveResult(result));
     }
 }

@@ -1,5 +1,5 @@
-import { InboxApi } from '..';
-import { FileUploader } from './files';
+import { InboxApi } from "..";
+import { FileUploader } from "./files";
 
 /**
  * Represents payload that is sent to an Inbox.
@@ -44,7 +44,7 @@ export interface InboxEntryPayload {
 export async function sendEntry(
     inboxApi: InboxApi,
     inboxId: string,
-    payload: InboxEntryPayload
+    payload: InboxEntryPayload,
 ): Promise<void> {
     const preparedFiles = payload.files
         ? await Promise.all(
@@ -53,16 +53,16 @@ export async function sendEntry(
                       inboxApi,
                       file: file.content,
                       privateMeta: file.privateMeta,
-                      publicMeta: file.publicMeta
+                      publicMeta: file.publicMeta,
                   });
-              })
+              }),
           )
         : [];
 
     const inboxEntryHandle = await inboxApi.prepareEntry(
         inboxId,
         payload.data,
-        preparedFiles.map((file) => file.handle)
+        preparedFiles.map((file) => file.handle),
     );
 
     const uploaders = await Promise.all(
@@ -70,14 +70,12 @@ export async function sendEntry(
             FileUploader.uploadInboxFile({
                 inboxApi,
                 inboxHandle: inboxEntryHandle,
-                preparedFileUpload: file
-            })
-        )
+                preparedFileUpload: file,
+            }),
+        ),
     );
 
     await Promise.all(uploaders.map((uploader) => uploader.uploadFileContent()));
 
     await inboxApi.sendEntry(inboxEntryHandle);
 }
-
-
