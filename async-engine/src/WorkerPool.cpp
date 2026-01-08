@@ -54,10 +54,9 @@ void WorkerPool::worker_loop() {
 
         try {
             task();
-        } catch (...) {
-        }
+        } catch (...) {}
     }
 }
 
-} // namespace webendpoint
-} // namespace privmx
+}  // namespace webendpoint
+}  // namespace privmx

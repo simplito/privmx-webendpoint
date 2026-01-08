@@ -16,7 +16,7 @@ cd "$PRIVMX_WEB_ASYNC_ENGINE"
 
 if [ ! -d "./build-emscripten" ]; then
     mkdir -p build-emscripten && cd build-emscripten
-    emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
+    emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
 else
     cd build-emscripten
 fi

@@ -1,26 +1,10 @@
-# Base style
+BasedOnStyle: Google
+ColumnLimit: 120
 IndentWidth: 4
-TabWidth: 4
-UseTab: Never
-ColumnLimit: 100
-
-# Spaces
-SpacesInParentheses: false
-SpacesInSquareBrackets: false
-
-# Function formatting
-AllowShortFunctionsOnASingleLine: All
-BreakBeforeBraces: Attach
-
-# Comments
-ReflowComments: false
-
-# Include sorting
-SortIncludes: false
-
-# Alignment
-AlignAfterOpenBracket: DontAlign
-
-# Other
 DerivePointerAlignment: false
 PointerAlignment: Left
+AccessModifierOffset: -4
+SpaceAfterTemplateKeyword: false
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortBlocksOnASingleLine: Empty
+ReflowComments: false

@@ -13,21 +13,19 @@ limitations under the License.
 #define _PRIVMXLIB_WEBENDPOINT_MAPPER_HPP_
 
 #include <Poco/Dynamic/Var.h>
-
 #include <Pson/pson.h>
-
 #include <emscripten/val.h>
 
 namespace privmx {
 namespace webendpoint {
 
 class Mapper {
-  public:
+public:
     static Poco::Dynamic::Var map(emscripten::val value);
     static emscripten::val map(pson_value* value);
 };
 
-} // namespace webendpoint
-} // namespace privmx
+}  // namespace webendpoint
+}  // namespace privmx
 
-#endif // _PRIVMXLIB_WEBENDPOINT_MAPPER_HPP_
+#endif  // _PRIVMXLIB_WEBENDPOINT_MAPPER_HPP_

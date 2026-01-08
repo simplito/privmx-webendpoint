@@ -1,6 +1,7 @@
 #include <emscripten.h>
-#include <emscripten/val.h>
 #include <emscripten/bind.h>
+#include <emscripten/val.h>
+
 #include "AsyncEngine.hpp"
 #include "Mapper.hpp"
 

@@ -1,13 +1,14 @@
-#include <emscripten/threading.h>
-#include <emscripten/proxying.h>
 #include "CustomUserVerifierInterface.hpp"
-#include "privmx/endpoint/core/VarDeserializer.hpp"
-#include "privmx/endpoint/core/VarSerializer.hpp"
+
+#include <Poco/JSON/Array.h>
+#include <Poco/JSON/Object.h>
+#include <emscripten/proxying.h>
+#include <emscripten/threading.h>
 
 #include "AsyncEngine.hpp"
 #include "Mapper.hpp"
-#include <Poco/JSON/Object.h>
-#include <Poco/JSON/Array.h>
+#include "privmx/endpoint/core/VarDeserializer.hpp"
+#include "privmx/endpoint/core/VarSerializer.hpp"
 
 using namespace privmx::webendpoint;
 using namespace privmx::endpoint;
@@ -52,8 +53,8 @@ void CustomUserVerifierInterface::printErrorInJS(const std::string& msg) {
     print_error_main(msg.c_str());
 }
 
-Poco::Dynamic::Var CustomUserVerifierInterface::callVerifierOnJS(
-    const std::string& methodName, const Poco::Dynamic::Var& params) {
+Poco::Dynamic::Var CustomUserVerifierInterface::callVerifierOnJS(const std::string& methodName,
+                                                                 const Poco::Dynamic::Var& params) {
     int bindIdVal = _interfaceBindId;
 
     auto ftr = AsyncEngine::getInstance()->callJsAsync(
@@ -68,8 +69,7 @@ Poco::Dynamic::Var CustomUserVerifierInterface::callVerifierOnJS(
     return ftr.get();
 }
 
-std::vector<bool> CustomUserVerifierInterface::verify(
-    const std::vector<core::VerificationRequest>& request) {
+std::vector<bool> CustomUserVerifierInterface::verify(const std::vector<core::VerificationRequest>& request) {
     core::VarSerializer serializer{core::VarSerializer::Options{
         .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING}};
     Poco::Dynamic::Var serializedRequest = serializer.serialize(request);

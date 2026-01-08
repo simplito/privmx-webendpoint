@@ -9,24 +9,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#include <stdexcept>
-#include <vector>
-#include <string>
-
+#include <Poco/Dynamic/Var.h>
+#include <Poco/JSON/Object.h>
 #include <emscripten/emscripten.h>
 #include <emscripten/val.h>
 #include <secp256k1.h>
 
+#include <AsyncEngine.hpp>
+#include <Pson/BinaryString.hpp>
 #include <privmx/drv/BNImpl.hpp>
 #include <privmx/drv/Bindings.hpp>
 #include <privmx/drv/ECCImpl.hpp>
 #include <privmx/drv/PointImpl.hpp>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
-#include <AsyncEngine.hpp>
 #include "Mapper.hpp"
-#include <Pson/BinaryString.hpp>
-#include <Poco/Dynamic/Var.h>
-#include <Poco/JSON/Object.h>
 
 using namespace std;
 using namespace emscripten;
@@ -36,12 +35,14 @@ namespace {
 val createUint8Array(const std::string& data) {
     return val::global("Uint8Array").new_(typed_memory_view(data.size(), data.data()));
 }
-} // namespace
+}  // namespace
 
 PointImpl::Ptr PointImpl::fromBuffer(const string& data) {
     return std::make_unique<PointImpl>(data);
 }
-PointImpl::Ptr PointImpl::getDefault() { return std::make_unique<PointImpl>(); }
+PointImpl::Ptr PointImpl::getDefault() {
+    return std::make_unique<PointImpl>();
+}
 PointImpl::PointImpl(const PointImpl& obj) : _point(obj._point) {}
 PointImpl::PointImpl(PointImpl&& obj) : _point(std::move(obj._point)) {}
 PointImpl::PointImpl(const std::string& point) : _point(point) {}
@@ -63,12 +64,11 @@ string PointImpl::encode(secp256k1_context* ctx, bool compact) const {
         else if (!compact && _point.size() == 65 && prefix == 0x04)
             return _point;
     }
-    if (ctx == nullptr)
-        throw std::runtime_error("Error: Failed to get secp256k1 context");
+    if (ctx == nullptr) throw std::runtime_error("Error: Failed to get secp256k1 context");
 
     secp256k1_pubkey pubkey;
-    if (!secp256k1_ec_pubkey_parse(
-            ctx, &pubkey, reinterpret_cast<const unsigned char*>(_point.data()), _point.size())) {
+    if (!secp256k1_ec_pubkey_parse(ctx, &pubkey, reinterpret_cast<const unsigned char*>(_point.data()),
+                                   _point.size())) {
         throw std::runtime_error("Error: Failed to parse point data");
     }
     unsigned int flags = compact ? SECP256K1_EC_COMPRESSED : SECP256K1_EC_UNCOMPRESSED;
@@ -78,8 +78,7 @@ string PointImpl::encode(secp256k1_context* ctx, bool compact) const {
     if (!secp256k1_ec_pubkey_serialize(ctx, output_buffer.data(), &output_len, &pubkey, flags)) {
         throw std::runtime_error("Error: Failed to serialize point");
     }
-    if (output_len != output_size)
-        throw std::runtime_error("Error: Serialized point has unexpected length");
+    if (output_len != output_size) throw std::runtime_error("Error: Serialized point has unexpected length");
 
     return std::string(output_buffer.begin(), output_buffer.end());
 }

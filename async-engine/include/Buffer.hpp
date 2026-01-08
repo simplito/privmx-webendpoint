@@ -11,7 +11,7 @@ namespace core {
  * 'Buffer' provides simple string buffer implementation.
  */
 class Buffer {
-  public:
+public:
     /**
      * Creates Buffer from `std::string`.
      * 
@@ -69,14 +69,14 @@ class Buffer {
 
     bool operator==(const Buffer& obj) const { return this->_data == obj._data; }
 
-  private:
+private:
     Buffer(const std::string& str) : _data(str) {}
 
     std::string _data;
 };
 
-} // namespace core
-} // namespace endpoint
-} // namespace privmx
+}  // namespace core
+}  // namespace endpoint
+}  // namespace privmx
 
-#endif // _PRIVMXLIB_ENDPOINT_CORE_BUFFER_HPP_
+#endif  // _PRIVMXLIB_ENDPOINT_CORE_BUFFER_HPP_

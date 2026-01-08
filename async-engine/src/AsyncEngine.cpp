@@ -10,15 +10,16 @@ limitations under the License.
 */
 
 #include "AsyncEngine.hpp"
-#include "Mapper.hpp"
-#include "WorkerPool.hpp"
+
+#include <Poco/JSON/Object.h>
+#include <Pson/pson.h>
+#include <emscripten/eventloop.h>
 
 #include <Pson/BinaryString.hpp>
-#include <Pson/pson.h>
-
-#include <emscripten/eventloop.h>
-#include <Poco/JSON/Object.h>
 #include <stdexcept>
+
+#include "Mapper.hpp"
+#include "WorkerPool.hpp"
 
 using namespace privmx::webendpoint;
 
@@ -26,15 +27,13 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE
 void AsyncEngine_onSuccess(int id, emscripten::EM_VAL result_handle) {
     auto instance = AsyncEngine::getInstance();
-    if (instance)
-        instance->handleJsResult(id, emscripten::val::take_ownership(result_handle));
+    if (instance) instance->handleJsResult(id, emscripten::val::take_ownership(result_handle));
 }
 
 EMSCRIPTEN_KEEPALIVE
 void AsyncEngine_onError(int id, emscripten::EM_VAL error_handle) {
     auto instance = AsyncEngine::getInstance();
-    if (instance)
-        instance->handleJsError(id, emscripten::val::take_ownership(error_handle));
+    if (instance) instance->handleJsError(id, emscripten::val::take_ownership(error_handle));
 }
 }
 
@@ -70,21 +69,21 @@ AsyncEngine::AsyncEngine() {
 
 AsyncEngine::~AsyncEngine() {}
 
-void AsyncEngine::_postWorkerTaskVar(
-    int taskId, const std::function<Poco::Dynamic::Var(void)>& task) {
-    _proxingQueue.proxyAsync(
-        _taskManagerThread.native_handle(), [&, taskId, task] { executeWorkerTask(taskId, task); });
+void AsyncEngine::_postWorkerTaskVar(int taskId, const std::function<Poco::Dynamic::Var(void)>& task) {
+    _proxingQueue.proxyAsync(_taskManagerThread.native_handle(),
+                             [&, taskId, task] { executeWorkerTask(taskId, task); });
 }
 
 void AsyncEngine::_postWorkerTaskVoid(int taskId, const std::function<void(void)>& task) {
-    _proxingQueue.proxyAsync(
-        _taskManagerThread.native_handle(), [&, taskId, task] { executeWorkerTask(taskId, task); });
+    _proxingQueue.proxyAsync(_taskManagerThread.native_handle(),
+                             [&, taskId, task] { executeWorkerTask(taskId, task); });
 }
 
-void AsyncEngine::setResultsCallback(emscripten::val callback) { _callback = callback; }
+void AsyncEngine::setResultsCallback(emscripten::val callback) {
+    _callback = callback;
+}
 
-void AsyncEngine::executeWorkerTask(
-    int taskId, const std::function<Poco::Dynamic::Var(void)>& task) {
+void AsyncEngine::executeWorkerTask(int taskId, const std::function<Poco::Dynamic::Var(void)>& task) {
     auto errorHandler = _errorHandler;
     _pool->enqueue([=] {
         Poco::JSON::Object::Ptr result = new Poco::JSON::Object();
@@ -177,8 +176,8 @@ void AsyncEngine::dispatchToThread(const std::function<void(void)>& task, pthrea
     _proxingQueue.proxySync(target, [&] { task(); });
 }
 
-std::future<Poco::Dynamic::Var> AsyncEngine::callJsAsync(
-    std::function<void(int callId)> starterFunc, ThreadTarget target) {
+std::future<Poco::Dynamic::Var> AsyncEngine::callJsAsync(std::function<void(int callId)> starterFunc,
+                                                         ThreadTarget target) {
     auto prms = std::make_shared<std::promise<Poco::Dynamic::Var>>();
     std::future<Poco::Dynamic::Var> ftr = prms->get_future();
 
@@ -191,8 +190,7 @@ std::future<Poco::Dynamic::Var> AsyncEngine::callJsAsync(
     if (target == ThreadTarget::Main) {
         _proxingQueue.proxyAsync(_mainThread, [starterFunc, id] { starterFunc(id); });
     } else {
-        _proxingQueue.proxyAsync(
-            _taskManagerThread.native_handle(), [starterFunc, id] { starterFunc(id); });
+        _proxingQueue.proxyAsync(_taskManagerThread.native_handle(), [starterFunc, id] { starterFunc(id); });
     }
 
     return ftr;
@@ -217,12 +215,10 @@ void AsyncEngine::handleJsResult(int callId, emscripten::val result) {
         } catch (const std::exception& e) {
             prms->set_exception(std::make_exception_ptr(e));
         } catch (...) {
-            prms->set_exception(
-                std::make_exception_ptr(std::runtime_error("Unknown mapping error")));
+            prms->set_exception(std::make_exception_ptr(std::runtime_error("Unknown mapping error")));
         }
     } else {
-        std::cerr << "[AsyncEngine] Warning: Unknown CallID " << callId << " in handleJsResult"
-                  << std::endl;
+        std::cerr << "[AsyncEngine] Warning: Unknown CallID " << callId << " in handleJsResult" << std::endl;
     }
 }
 
@@ -245,11 +241,9 @@ void AsyncEngine::handleJsError(int callId, emscripten::val error) {
                 msg = error.as<std::string>();
             else
                 msg = error.call<std::string>("toString");
-        } catch (...) {
-        }
+        } catch (...) {}
         prms->set_exception(std::make_exception_ptr(std::runtime_error(msg)));
     } else {
-        std::cerr << "[AsyncEngine] Warning: Unknown CallID " << callId << " in handleJsError"
-                  << std::endl;
+        std::cerr << "[AsyncEngine] Warning: Unknown CallID " << callId << " in handleJsError" << std::endl;
     }
 }

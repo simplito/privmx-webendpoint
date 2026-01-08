@@ -12,9 +12,10 @@ limitations under the License.
 #ifndef _PRIVMXLIB_WEBENDPOINT_ENDPOINT_HPP_
 #define _PRIVMXLIB_WEBENDPOINT_ENDPOINT_HPP_
 
-#include <emscripten/val.h>
 #include <emscripten.h>
 #include <emscripten/bind.h>
+#include <emscripten/val.h>
+
 #include "Macros.hpp"
 #include "Mapper.hpp"
 
@@ -174,8 +175,8 @@ API_FUNCTION_HEADER(ExtKey, getChainCode)
 API_FUNCTION_HEADER(ExtKey, verifyCompactSignatureWithHash)
 API_FUNCTION_HEADER(ExtKey, isPrivate)
 
-} // namespace api
-} // namespace webendpoint
-} // namespace privmx
+}  // namespace api
+}  // namespace webendpoint
+}  // namespace privmx
 
-#endif // _PRIVMXLIB_WEBENDPOINT_ENDPOINT_HPP_
+#endif  // _PRIVMXLIB_WEBENDPOINT_ENDPOINT_HPP_

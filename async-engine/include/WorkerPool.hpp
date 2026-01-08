@@ -1,19 +1,19 @@
 #pragma once
 
-#include <vector>
+#include <atomic>
+#include <condition_variable>
+#include <cstddef>
+#include <functional>
+#include <mutex>
 #include <queue>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <functional>
-#include <atomic>
-#include <cstddef>
+#include <vector>
 
 namespace privmx {
 namespace webendpoint {
 
 class WorkerPool {
-  public:
+public:
     explicit WorkerPool(size_t numThreads);
     ~WorkerPool();
 
@@ -24,7 +24,7 @@ class WorkerPool {
 
     void enqueue(std::function<void()> task);
 
-  private:
+private:
     void worker_loop();
 
     std::vector<std::thread> workers;
@@ -35,5 +35,5 @@ class WorkerPool {
     std::atomic<bool> stop;
 };
 
-} // namespace webendpoint
-} // namespace privmx
+}  // namespace webendpoint
+}  // namespace privmx

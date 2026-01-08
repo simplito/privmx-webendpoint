@@ -1,3 +1,38 @@
-Checks: '-*,clang-analyzer-*'
-WarningsAsErrors: ''
-HeaderFilterRegex: '.*'
+---
+# 1. Base Checks: Enable broadly useful categories
+#    - clang-diagnostic-*: Compiler errors
+#    - clang-analyzer-*:   Deep logic analysis (memory leaks, null dereferences)
+#    - bugprone-*:         Code patterns that usually indicate bugs
+#    - performance-*:      Easy performance wins (e.g. const references)
+#    - modernize-*:        Modern C++ features (nullptr, override)
+#    - readability-*:      Basic readability improvements
+Checks: >
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  modernize-*,
+  readability-*,
+  -modernize-use-trailing-return-type,
+  -modernize-use-auto,
+  -modernize-use-nodiscard,
+  -misc-use-internal-linkage,
+  -performance-noexcept-move-constructor,
+  -readability-identifier-naming,
+  -readability-magic-numbers,
+  -readability-implicit-bool-conversion,
+  -readability-braces-around-statements,
+  -cppcoreguidelines-*,
+  -fuchsia-*,
+  -google-*,
+  -zircon-*,
+  -abseil-*
+
+# 2. Settings
+WarningsAsErrors: ''       # Don't break the build on warnings
+HeaderFilterRegex: ''      # Don't lint 3rd party headers (Poco, Emscripten)
+FormatStyle: none          # Don't try to reformat code
+
+# 3. Standard Enforcement (Matches your setup)
+ExtraArgs:
+  - '-std=c++17'

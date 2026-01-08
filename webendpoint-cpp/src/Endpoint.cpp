@@ -11,26 +11,26 @@ limitations under the License.
 
 #include "Endpoint.hpp"
 
-#include <privmx/endpoint/crypto/varinterface/ExtKeyVarInterface.hpp>
-#include <privmx/endpoint/core/varinterface/EventQueueVarInterface.hpp>
+#include <emscripten/proxying.h>
+#include <emscripten/threading.h>
+
+#include <privmx/endpoint/core/UserVerifierInterface.hpp>
 #include <privmx/endpoint/core/varinterface/ConnectionVarInterface.hpp>
-#include <privmx/endpoint/thread/varinterface/ThreadApiVarInterface.hpp>
-#include <privmx/endpoint/store/varinterface/StoreApiVarInterface.hpp>
+#include <privmx/endpoint/core/varinterface/EventQueueVarInterface.hpp>
+#include <privmx/endpoint/crypto/varinterface/CryptoApiVarInterface.hpp>
+#include <privmx/endpoint/crypto/varinterface/ExtKeyVarInterface.hpp>
+#include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
 #include <privmx/endpoint/inbox/varinterface/InboxApiVarInterface.hpp>
 #include <privmx/endpoint/kvdb/varinterface/KvdbApiVarInterface.hpp>
-#include <privmx/endpoint/crypto/varinterface/CryptoApiVarInterface.hpp>
-#include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
-#include "privmx/endpoint/core/VarDeserializer.hpp"
-#include "privmx/endpoint/core/VarSerializer.hpp"
-#include <privmx/endpoint/core/UserVerifierInterface.hpp>
+#include <privmx/endpoint/store/varinterface/StoreApiVarInterface.hpp>
+#include <privmx/endpoint/thread/varinterface/ThreadApiVarInterface.hpp>
 
+#include "AsyncEngine.hpp"
 #include "CustomUserVerifierInterface.hpp"
-
 #include "Macros.hpp"
 #include "Mapper.hpp"
-#include "AsyncEngine.hpp"
-#include <emscripten/threading.h>
-#include <emscripten/proxying.h>
+#include "privmx/endpoint/core/VarDeserializer.hpp"
+#include "privmx/endpoint/core/VarSerializer.hpp"
 
 using namespace privmx::endpoint;
 using namespace privmx::webendpoint;
@@ -59,9 +59,10 @@ void setResultsCallback(emscripten::val callback) {
 
 void EventQueue_newEventQueue(int taskId) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&] {
-        auto service = new EventQueueVar(core::EventQueue::getInstance(),
-            core::VarSerializer::Options{
-                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        auto service =
+            new EventQueueVar(core::EventQueue::getInstance(),
+                              core::VarSerializer::Options{
+                                  .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
         return (int)service;
     });
 }
@@ -102,16 +103,16 @@ void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int inte
 }
 
 void Connection_deleteUserVerifierInterface(int taskId, int ptr) {
-    AsyncEngine::getInstance()->postWorkerTask(
-        taskId, [&, ptr] { delete (UserVerifierHolder*)ptr; });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (UserVerifierHolder*)ptr; });
 }
 
 void ThreadApi_newThreadApi(int taskId, int connectionPtr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
         auto connection = (ConnectionVar*)connectionPtr;
-        auto threadApi = new ThreadApiVar(connection->getApi(),
-            core::VarSerializer::Options{
-                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        auto threadApi =
+            new ThreadApiVar(connection->getApi(),
+                             core::VarSerializer::Options{
+                                 .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
         return (int)threadApi;
     });
 }
@@ -136,9 +137,10 @@ API_FUNCTION(ThreadApi, buildSubscriptionQuery)
 void StoreApi_newStoreApi(int taskId, int connectionPtr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
         auto connection = (ConnectionVar*)connectionPtr;
-        auto threadApi = new StoreApiVar(connection->getApi(),
-            core::VarSerializer::Options{
-                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        auto threadApi =
+            new StoreApiVar(connection->getApi(),
+                            core::VarSerializer::Options{
+                                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
         return (int)threadApi;
     });
 }
@@ -168,17 +170,16 @@ API_FUNCTION(StoreApi, unsubscribeFrom)
 API_FUNCTION(StoreApi, buildSubscriptionQuery)
 
 void InboxApi_newInboxApi(int taskId, int connectionPtr, int threadApiPtr, int storeApiPtr) {
-    AsyncEngine::getInstance()->postWorkerTask(
-        taskId, [&, connectionPtr, threadApiPtr, storeApiPtr] {
-            auto connection = (ConnectionVar*)connectionPtr;
-            auto threadApi = (ThreadApiVar*)threadApiPtr;
-            auto storeApi = (StoreApiVar*)storeApiPtr;
-            auto inboxApi =
-                new InboxApiVar(connection->getApi(), threadApi->getApi(), storeApi->getApi(),
-                    core::VarSerializer::Options{.addType = false,
-                        .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
-            return (int)inboxApi;
-        });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, threadApiPtr, storeApiPtr] {
+        auto connection = (ConnectionVar*)connectionPtr;
+        auto threadApi = (ThreadApiVar*)threadApiPtr;
+        auto storeApi = (StoreApiVar*)storeApiPtr;
+        auto inboxApi =
+            new InboxApiVar(connection->getApi(), threadApi->getApi(), storeApi->getApi(),
+                            core::VarSerializer::Options{
+                                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)inboxApi;
+    });
 }
 void InboxApi_deleteInboxApi(int taskId, int ptr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (InboxApiVar*)ptr; });
@@ -208,9 +209,10 @@ API_FUNCTION(InboxApi, buildSubscriptionQuery)
 void KvdbApi_newKvdbApi(int taskId, int connectionPtr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
         auto connection = (ConnectionVar*)connectionPtr;
-        auto kvdbApi = new KvdbApiVar(connection->getApi(),
-            core::VarSerializer::Options{
-                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        auto kvdbApi =
+            new KvdbApiVar(connection->getApi(),
+                           core::VarSerializer::Options{
+                               .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
         return (int)kvdbApi;
     });
 }
@@ -309,9 +311,10 @@ API_FUNCTION(ExtKey, isPrivate)
 void EventApi_newEventApi(int taskId, int connectionPtr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
         auto connection = (ConnectionVar*)connectionPtr;
-        auto api = new EventApiVar(connection->getApi(),
-            core::VarSerializer::Options{
-                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        auto api =
+            new EventApiVar(connection->getApi(),
+                            core::VarSerializer::Options{
+                                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
         return (int)api;
     });
 }
@@ -324,6 +327,6 @@ API_FUNCTION(EventApi, subscribeFor)
 API_FUNCTION(EventApi, unsubscribeFrom)
 API_FUNCTION(EventApi, buildSubscriptionQuery)
 
-} // namespace api
-} // namespace webendpoint
-} // namespace privmx
+}  // namespace api
+}  // namespace webendpoint
+}  // namespace privmx

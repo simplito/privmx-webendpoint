@@ -9,20 +9,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#include <stdlib.h>
-#include <string.h>
-#include <string>
-
 #include "privmx/drv/crypto.h"
-#include "AsyncEngine.hpp"
-#include "Mapper.hpp"
 
-#include <emscripten.h>
-#include <emscripten/val.h>
-#include <emscripten/bind.h>
 #include <Poco/Dynamic/Var.h>
 #include <Poco/JSON/Object.h>
+#include <emscripten.h>
+#include <emscripten/bind.h>
+#include <emscripten/val.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include <Pson/BinaryString.hpp>
+#include <string>
+
+#include "AsyncEngine.hpp"
+#include "Mapper.hpp"
 
 using namespace emscripten;
 using namespace privmx::webendpoint;
@@ -75,8 +76,7 @@ EM_JS(bool,checkIfWorker,(void),{
 
 // clang-format on
 
-std::string hmac(const std::string& engine, const char* key, unsigned int keylen, const char* data,
-    int datalen) {
+std::string hmac(const std::string& engine, const char* key, unsigned int keylen, const char* data, int datalen) {
     auto future = AsyncEngine::getInstance()->callJsAsync(
         [&](int callId) {
             val params = val::object();
@@ -92,24 +92,17 @@ std::string hmac(const std::string& engine, const char* key, unsigned int keylen
 }
 
 std::string translateAESConfig(const char* config) {
-    if (strcmp(config, "AES-256-CBC") == 0)
-        return "aes256CbcPkcs7";
-    if (strcmp(config, "AES-256-CBC-NOPAD") == 0)
-        return "aes256CbcNoPad";
-    if (strcmp(config, "AES-256-ECB-NOPAD") == 0)
-        return "aes256Ecb";
+    if (strcmp(config, "AES-256-CBC") == 0) return "aes256CbcPkcs7";
+    if (strcmp(config, "AES-256-CBC-NOPAD") == 0) return "aes256CbcNoPad";
+    if (strcmp(config, "AES-256-ECB-NOPAD") == 0) return "aes256Ecb";
     throw std::runtime_error("Wrong aes256 config");
 }
 
 std::string translateSHAConfig(const char* config) {
-    if (strcmp(config, "SHA1") == 0)
-        return "sha1";
-    if (strcmp(config, "SHA256") == 0)
-        return "sha256";
-    if (strcmp(config, "SHA512") == 0)
-        return "sha512";
-    if (strcmp(config, "RIPEMD160") == 0)
-        return "ripemd160";
+    if (strcmp(config, "SHA1") == 0) return "sha1";
+    if (strcmp(config, "SHA256") == 0) return "sha256";
+    if (strcmp(config, "SHA512") == 0) return "sha512";
+    if (strcmp(config, "RIPEMD160") == 0) return "ripemd160";
     throw std::runtime_error("Wrong hash config");
 }
 
@@ -136,8 +129,7 @@ int privmxDrvCrypto_randomBytes(char* buf, unsigned int len) {
     }
 }
 
-int privmxDrvCrypto_md(
-    const char* data, int datalen, const char* config, char** out, unsigned int* outlen) {
+int privmxDrvCrypto_md(const char* data, int datalen, const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateSHAConfig(config);
 
     auto future = AsyncEngine::getInstance()->callJsAsync(
@@ -159,8 +151,8 @@ int privmxDrvCrypto_md(
     }
 }
 
-int privmxDrvCrypto_hmac(const char* key, unsigned int keylen, const char* data, int datalen,
-    const char* config, char** out, unsigned int* outlen) {
+int privmxDrvCrypto_hmac(const char* key, unsigned int keylen, const char* data, int datalen, const char* config,
+                         char** out, unsigned int* outlen) {
     std::string str_config = translateSHAConfig(config);
     try {
         std::string res = hmac(str_config, key, keylen, data, datalen);
@@ -174,8 +166,8 @@ int privmxDrvCrypto_hmac(const char* key, unsigned int keylen, const char* data,
     }
 }
 
-int privmxDrvCrypto_aesEncrypt(const char* key, const char* iv, const char* data,
-    unsigned int datalen, const char* config, char** out, unsigned int* outlen) {
+int privmxDrvCrypto_aesEncrypt(const char* key, const char* iv, const char* data, unsigned int datalen,
+                               const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateAESConfig(config);
 
     auto future = AsyncEngine::getInstance()->callJsAsync(
@@ -203,8 +195,8 @@ int privmxDrvCrypto_aesEncrypt(const char* key, const char* iv, const char* data
     }
 }
 
-int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data,
-    unsigned int datalen, const char* config, char** out, unsigned int* outlen) {
+int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data, unsigned int datalen,
+                               const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateAESConfig(config);
 
     auto future = AsyncEngine::getInstance()->callJsAsync(
@@ -232,9 +224,8 @@ int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data
     }
 }
 
-int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* salt,
-    unsigned int saltlen, int rounds, unsigned int length, const char* hash, char** out,
-    unsigned int* outlen) {
+int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* salt, unsigned int saltlen, int rounds,
+                           unsigned int length, const char* hash, char** out, unsigned int* outlen) {
     auto future = AsyncEngine::getInstance()->callJsAsync(
         [&](int callId) {
             val params = val::object();

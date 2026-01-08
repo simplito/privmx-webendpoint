@@ -11,18 +11,19 @@ limitations under the License.
 
 #pragma once
 
-#include <emscripten/val.h>
-#include <emscripten/proxying.h>
 #include <Poco/Dynamic/Var.h>
 #include <Poco/JSON/Object.h>
-#include <future>
-#include <map>
-#include <mutex>
+#include <emscripten/proxying.h>
+#include <emscripten/val.h>
+
 #include <atomic>
 #include <functional>
+#include <future>
+#include <map>
 #include <memory>
-#include <vector>
+#include <mutex>
 #include <type_traits>
+#include <vector>
 
 namespace privmx {
 namespace webendpoint {
@@ -34,8 +35,8 @@ class WorkerPool;
  * @brief Specifies the destination thread for asynchronous JavaScript calls.
  */
 enum class ThreadTarget {
-    Main,  ///< The Browser Main Thread.
-    Worker ///< The Background Worker Thread (Task Manager Thread).
+    Main,   ///< The Browser Main Thread.
+    Worker  ///< The Background Worker Thread (Task Manager Thread).
 };
 
 /**
@@ -48,7 +49,7 @@ enum class ThreadTarget {
  * to "await" JS operations in a similar manner as -sAsyncify.
  */
 class AsyncEngine {
-  public:
+public:
     using ErrorHandler = std::function<void(std::exception_ptr, Poco::JSON::Object::Ptr&)>;
     /**
      * @brief Retrieves the singleton instance of the AsyncEngine.
@@ -73,7 +74,8 @@ class AsyncEngine {
      * @param taskId An arbitrary integer ID to track the task (useful for logging or callbacks).
      * @param task The function or lambda to execute on a worker thread.
      */
-    template <typename Callable> void postWorkerTask(int taskId, Callable&& task) {
+    template<typename Callable>
+    void postWorkerTask(int taskId, Callable&& task) {
         using ReturnType = typename std::invoke_result<Callable>::type;
 
         if constexpr (std::is_void<ReturnType>::value) {
@@ -83,7 +85,7 @@ class AsyncEngine {
             // Task returns a value (assumed convertible to Poco::Dynamic::Var)
             // We wrap it to ensure the type signature matches exactly
             _postWorkerTaskVar(taskId,
-                [task = std::forward<Callable>(task)]() -> Poco::Dynamic::Var { return task(); });
+                               [task = std::forward<Callable>(task)]() -> Poco::Dynamic::Var { return task(); });
         }
     }
 
@@ -125,8 +127,8 @@ class AsyncEngine {
      * @return std::future<Poco::Dynamic::Var> A future that will resolve with the result 
      * from JavaScript (converted to a Poco Var).
      */
-    std::future<Poco::Dynamic::Var> callJsAsync(
-        std::function<void(int callId)> starterFunc, ThreadTarget target = ThreadTarget::Main);
+    std::future<Poco::Dynamic::Var> callJsAsync(std::function<void(int callId)> starterFunc,
+                                                ThreadTarget target = ThreadTarget::Main);
 
     /**
      * @brief Internal callback used by the global C-API to resolve a pending JS call.
@@ -142,7 +144,7 @@ class AsyncEngine {
      */
     void handleJsError(int callId, emscripten::val error);
 
-  private:
+private:
     AsyncEngine();
     ~AsyncEngine();
 
@@ -154,12 +156,11 @@ class AsyncEngine {
     static std::mutex _instanceMutex;
     static pthread_t _mainThread;
 
-    ErrorHandler _errorHandler;     ///< Optional custom error handler
-    std::thread _taskManagerThread; ///< Thread responsible for managing the runtime keepalive.
-    emscripten::ProxyingQueue _proxingQueue; ///< Queue for proxying calls between threads.
-    std::unique_ptr<WorkerPool> _pool;       ///< Pool of worker threads for heavy tasks.
-    emscripten::val _callback =
-        emscripten::val::undefined(); ///< Registered JS callback for worker results.
+    ErrorHandler _errorHandler;               ///< Optional custom error handler
+    std::thread _taskManagerThread;           ///< Thread responsible for managing the runtime keepalive.
+    emscripten::ProxyingQueue _proxingQueue;  ///< Queue for proxying calls between threads.
+    std::unique_ptr<WorkerPool> _pool;        ///< Pool of worker threads for heavy tasks.
+    emscripten::val _callback = emscripten::val::undefined();  ///< Registered JS callback for worker results.
 
     // Internal task execution wrappers
     void executeWorkerTask(int taskId, const std::function<Poco::Dynamic::Var(void)>& task);
@@ -172,5 +173,5 @@ class AsyncEngine {
     std::map<int, std::shared_ptr<std::promise<Poco::Dynamic::Var>>> _promises;
 };
 
-} // namespace webendpoint
-} // namespace privmx
+}  // namespace webendpoint
+}  // namespace privmx

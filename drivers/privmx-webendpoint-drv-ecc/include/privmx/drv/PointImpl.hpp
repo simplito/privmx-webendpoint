@@ -12,13 +12,14 @@ limitations under the License.
 #ifndef _PRIVMXLIB_CRYPTO_EMSCRIPTEN_POINTIMPL_HPP_
 #define _PRIVMXLIB_CRYPTO_EMSCRIPTEN_POINTIMPL_HPP_
 
-#include <string>
-#include <privmx/drv/BNImpl.hpp>
-#include <privmx/drv/PointImpl.hpp>
 #include <secp256k1.h>
 
+#include <privmx/drv/BNImpl.hpp>
+#include <privmx/drv/PointImpl.hpp>
+#include <string>
+
 class PointImpl {
-  public:
+public:
     using Ptr = std::unique_ptr<PointImpl>;
     static PointImpl::Ptr fromBuffer(const std::string& data);
     static PointImpl::Ptr getDefault();
@@ -34,14 +35,18 @@ class PointImpl {
     PointImpl::Ptr mul(const BNImpl& bn) const;
     PointImpl::Ptr add(const PointImpl& point) const;
 
-  private:
+private:
     void validate() const;
 
     std::string _point;
 };
 
-inline PointImpl::operator bool() const { return !isEmpty(); }
+inline PointImpl::operator bool() const {
+    return !isEmpty();
+}
 
-inline bool PointImpl::isEmpty() const { return _point.empty(); }
+inline bool PointImpl::isEmpty() const {
+    return _point.empty();
+}
 
-#endif // _PRIVMXLIB_CRYPTO_EMSCRIPTEN_POINTIMPL_HPP_
+#endif  // _PRIVMXLIB_CRYPTO_EMSCRIPTEN_POINTIMPL_HPP_
