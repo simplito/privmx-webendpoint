@@ -49,6 +49,7 @@ test.describe("KvdbTest", () => {
                 enc.encode("p"),
                 enc.encode("p"),
             );
+            
             const expectError = async (fn: any) => {
                 try {
                     await fn();

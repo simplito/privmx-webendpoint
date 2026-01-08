@@ -45,11 +45,15 @@ jobs:
       run: |
         cd tests
         docker compose up -d
-        sleep 10
+        sleep 15
 
     - name: Run e2e tests
       run: npx playwright test
       env:
         CI: true
+
+    - name: Cleanup Backend Services
+      run: |
+        docker compose down
 
    
