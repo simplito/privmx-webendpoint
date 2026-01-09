@@ -108,7 +108,7 @@ Poco::Dynamic::Var Mapper::map(emscripten::val value) {
     if (type == "boolean") {
         return value.as<bool>();
     }
-    if (value.instanceof(emscripten::val::global("Uint8Array"))) {
+    if (value.instanceof (emscripten::val::global("Uint8Array"))) {
         return Pson::BinaryString(value.as<std::string>());
     }
     if (value.isArray()) {
