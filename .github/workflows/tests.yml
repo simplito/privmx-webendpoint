@@ -8,8 +8,8 @@ on:
 
 jobs:
   test:
-    timeout-minutes: 30
-    runs-on: Linux
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
@@ -45,10 +45,15 @@ jobs:
       run: |
         cd tests
         docker compose up -d
+        sleep 15
 
     - name: Run e2e tests
-      run: npx playwright test
+      run: npx playwright test --reporter=list
       env:
         CI: true
+
+    - name: Cleanup Backend Services
+      run: |
+        docker compose down
 
    

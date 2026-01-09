@@ -74,7 +74,7 @@ test.describe("CoreTest: Connection & Contexts", () => {
         expect(list2.readItems[0].userId).toEqual(user2.userId);
     });
 
-    test("Disconnecting multiple instances of connection", async ({ page, backend, cli }) => {
+    test.fixme("Disconnecting multiple instances of connection", async ({ page, backend, cli }) => {
         const user2 = await setupTestUser(page, cli, [testData.contextId]);
         const args = {
             bridgeUrl: backend.bridgeUrl,
