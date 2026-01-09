@@ -83,12 +83,6 @@ EM_JS(emscripten::EM_VAL, convertJsSafeIntegerToCanonicalInteger, (emscripten::E
 }  // namespace webendpoint
 }  // namespace privmx
 
-void testClangTidy() {
-    int* p = 0;        // Bad: Should be nullptr (modernize-use-nullptr)
-    int x;             // Bad: Uninitialized variable (cppcoreguidelines-init-variables)
-    int c_style = (int)p; // Bad: C-style cast (google-readability-casting)
-}
-
 Poco::Dynamic::Var Mapper::map(emscripten::val value) {
     std::string type = value.typeOf().as<std::string>();
     if (value.isNull()) {
