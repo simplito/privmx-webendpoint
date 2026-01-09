@@ -10,21 +10,20 @@ limitations under the License.
 */
 
 #include "Mapper.hpp"
-#include "Buffer.hpp"
-
-#include <emscripten.h>
-#include <emscripten/val.h>
 
 #include <Poco/Dynamic/Var.h>
 #include <Poco/JSON/Object.h>
 #include <Poco/Types.h>
+#include <Pson/pson.h>
+#include <emscripten.h>
+#include <emscripten/val.h>
 
 #include <Pson/BinaryString.hpp>
-#include <Pson/pson.h>
-
 #include <stdexcept>
 
-#define CANONICAL_NUMBER_FACTOR 1073741823 // 0b00111111111111111111111111111111 = 2^30 - 1
+#include "Buffer.hpp"
+
+#define CANONICAL_NUMBER_FACTOR 1073741823  // 0b00111111111111111111111111111111 = 2^30 - 1
 #define MIN_JS_SAFE_INTEGER -9007199254740991
 #define MAX_JS_SAFE_INTEGER 9007199254740991
 
@@ -33,6 +32,8 @@ using namespace privmx::webendpoint;
 namespace privmx {
 namespace webendpoint {
 namespace {
+
+// clang-format off
 
 EM_JS(emscripten::EM_VAL, listKeysOfJsObject, (emscripten::EM_VAL valueHandle), {
     const value = Emval.toValue(valueHandle);
@@ -76,11 +77,13 @@ EM_JS(emscripten::EM_VAL, convertJsSafeIntegerToCanonicalInteger, (emscripten::E
     });
 });
 
-}
-}
-}
+// clang-format on
 
-Poco::Dynamic::Var Mapper::map(emscripten::val value){
+}  // namespace
+}  // namespace webendpoint
+}  // namespace privmx
+
+Poco::Dynamic::Var Mapper::map(emscripten::val value) {
     std::string type = value.typeOf().as<std::string>();
     if (value.isNull()) {
         return Poco::Dynamic::Var();
@@ -90,7 +93,8 @@ Poco::Dynamic::Var Mapper::map(emscripten::val value){
     }
     if (type == "number") {
         if (checkIfJsValueIsSafeInteger(value.as_handle())) {
-            emscripten::val canonicalInteger = emscripten::val::take_ownership(convertJsSafeIntegerToCanonicalInteger(value.as_handle()));
+            emscripten::val canonicalInteger =
+                emscripten::val::take_ownership(convertJsSafeIntegerToCanonicalInteger(value.as_handle()));
             Poco::Int64 result = canonicalInteger["mostPart"].as<long>();
             result = result * CANONICAL_NUMBER_FACTOR + canonicalInteger["leastPart"].as<long>();
             if (canonicalInteger["isNegative"].as<bool>()) {
@@ -104,7 +108,7 @@ Poco::Dynamic::Var Mapper::map(emscripten::val value){
     if (type == "boolean") {
         return value.as<bool>();
     }
-    if (value.instanceof(emscripten::val::global("Uint8Array"))) {
+    if (value.instanceof (emscripten::val::global("Uint8Array"))) {
         return Pson::BinaryString(value.as<std::string>());
     }
     if (value.isArray()) {
@@ -132,100 +136,91 @@ emscripten::val Mapper::map(pson_value* res) {
     switch (type) {
         case PSON_NULL:
             return emscripten::val::null();
-        case PSON_BOOL:
-            {
-                int val;
-                pson_get_bool(res, &val);
-                return emscripten::val((bool)val);
+        case PSON_BOOL: {
+            int val;
+            pson_get_bool(res, &val);
+            return emscripten::val((bool)val);
+        }
+        case PSON_INT32: {
+            int32_t val;
+            pson_get_int32(res, &val);
+            return emscripten::val((int)val);
+        }
+        case PSON_INT64: {
+            int64_t val;
+            pson_get_int64(res, &val);
+            if (val < MIN_JS_SAFE_INTEGER || MAX_JS_SAFE_INTEGER < val) {
+                // CHANGED: Use std::runtime_error instead of custom Exception
+                throw std::runtime_error("Number exceeded js safe integer range");
             }
-        case PSON_INT32:
-            {
-                int32_t val;
-                pson_get_int32(res, &val);
-                return emscripten::val((int)val);
+            bool isNegative = false;
+            if (val < 0) {
+                isNegative = true;
+                val *= -1;
             }
-        case PSON_INT64:
-            {
-                int64_t val;
-                pson_get_int64(res, &val);
-                if (val < MIN_JS_SAFE_INTEGER || MAX_JS_SAFE_INTEGER < val) {
-                    // CHANGED: Use std::runtime_error instead of custom Exception
-                    throw std::runtime_error("Number exceeded js safe integer range");
+            long mostPart = val / CANONICAL_NUMBER_FACTOR;
+            long leastPart = val % CANONICAL_NUMBER_FACTOR;
+            return emscripten::val::take_ownership(
+                convertCanonicalIntegerToJsSafeInteger(isNegative, mostPart, leastPart));
+        }
+        case PSON_FLOAT32: {
+            float val;
+            pson_get_float32(res, &val);
+            return emscripten::val(val);
+        }
+        case PSON_FLOAT64: {
+            double val;
+            pson_get_float64(res, &val);
+            return emscripten::val(val);
+        }
+        case PSON_STRING: {
+            const char* val = pson_get_cstring(res);
+            return emscripten::val::u8string(val);
+        }
+        case PSON_BINARY: {
+            const char* buf;
+            size_t size;
+            pson_inspect_binary(res, &buf, &size);
+            emscripten::val view{emscripten::typed_memory_view(size, buf)};
+            emscripten::val result = emscripten::val::global("Uint8Array").new_(size);
+            result.call<void>("set", view);
+            return result;
+        }
+        case PSON_ARRAY: {
+            size_t size;
+            pson_get_array_size(res, &size);
+            emscripten::val result = emscripten::val::array();
+            for (size_t i = 0; i < size; ++i) {
+                pson_value* element = pson_get_array_value(res, i);
+                result.call<int>("push", map(element));
+            }
+            return result;
+        }
+        case PSON_OBJECT: {
+            emscripten::val object = emscripten::val::object();
+            pson_object_iterator* it;
+            const char* key;
+            pson_value* val;
+            if (pson_open_object_iterator(res, &it)) {
+                while (pson_object_iterator_next(it, &key, &val)) {
+                    object.set(key, map(val));
                 }
-                bool isNegative = false;
-                if (val < 0) {
-                    isNegative = true;
-                    val *= -1;
-                }
-                long mostPart = val / CANONICAL_NUMBER_FACTOR;
-                long leastPart = val % CANONICAL_NUMBER_FACTOR;
-                return emscripten::val::take_ownership(convertCanonicalIntegerToJsSafeInteger(isNegative, mostPart, leastPart));
+                pson_close_object_iterator(it);
             }
-        case PSON_FLOAT32:
-            {
-                float val;
-                pson_get_float32(res, &val);
-                return emscripten::val(val);
-            }
-        case PSON_FLOAT64:
-            {
-                double val;
-                pson_get_float64(res, &val);
-                return emscripten::val(val);
-            }
-        case PSON_STRING:
-            {
-                const char* val = pson_get_cstring(res);
-                return emscripten::val::u8string(val);
-            }
-        case PSON_BINARY:
-            {
-                const char* buf;
-                size_t size;
-                pson_inspect_binary(res, &buf, &size);
-                emscripten::val view{emscripten::typed_memory_view(size, buf)};
-                emscripten::val result = emscripten::val::global("Uint8Array").new_(size);
+            return object;
+        }
+        case PSON_INVALID:
+        default: {
+            // Convert core::Buffer
+            Poco::Dynamic::Var* tmp = (Poco::Dynamic::Var*)res;
+            if (tmp->type() == typeid(privmx::endpoint::core::Buffer)) {
+                auto buf = tmp->extract<privmx::endpoint::core::Buffer>();
+                emscripten::val view{emscripten::typed_memory_view(buf.size(), buf.data())};
+                auto result = emscripten::val::global("Uint8Array").new_(buf.size());
                 result.call<void>("set", view);
                 return result;
             }
-        case PSON_ARRAY:
-            {
-                size_t size;
-                pson_get_array_size(res, &size);
-                emscripten::val result = emscripten::val::array();
-                for (size_t i = 0; i < size; ++i) {
-                    pson_value* element = pson_get_array_value(res, i);
-                    result.call<int>("push", map(element));
-                }
-                return result;
-            }
-        case PSON_OBJECT:
-            {
-                emscripten::val object = emscripten::val::object();
-                pson_object_iterator* it;
-                const char* key;
-                pson_value* val;
-                if (pson_open_object_iterator(res, &it)) {
-                    while (pson_object_iterator_next(it, &key, &val)) {
-                        object.set(key, map(val));
-                    }
-                    pson_close_object_iterator(it);
-                }
-                return object;
-            }
-        case PSON_INVALID:
-        default:
-            {
-                // Convert core::Buffer
-                Poco::Dynamic::Var* tmp = (Poco::Dynamic::Var*)res;
-                if (tmp->type() == typeid(privmx::endpoint::core::Buffer)) {
-                    auto buf = tmp->extract<privmx::endpoint::core::Buffer>();
-                    emscripten::val view{emscripten::typed_memory_view(buf.size(), buf.data())};
-                    auto result = emscripten::val::global("Uint8Array").new_(buf.size());
-                    result.call<void>("set", view);
-                    return result;
-                }
-            }
+        }
             return emscripten::val::undefined();
     }
 }

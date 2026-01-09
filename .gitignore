@@ -9,3 +9,4 @@ pub/
 node_modules/
 dist/
 test-results/
+tools/

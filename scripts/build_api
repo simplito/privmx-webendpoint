@@ -18,5 +18,5 @@ rm -rf ./build-emscripten
 mkdir -p build-emscripten && cd build-emscripten
 echo "EMSDK_DIR PASSED TO CMAKE: $EMSDK_DIR"
 echo "====================================="
-SDK_DIR=$EMSDK_DIR emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
+SDK_DIR=$EMSDK_DIR emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
 SDK_DIR=$EMSDK_DIR emmake make -j20

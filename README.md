@@ -39,6 +39,7 @@ If you want to build the library from source, follow these steps.
 
 * Node.js
 * CMake: Required to build the Wasm core (npm run build:wasm).
+* Clang-format (v18): Required for formatting and linting of C++ code
 
 ### Build Scripts
 

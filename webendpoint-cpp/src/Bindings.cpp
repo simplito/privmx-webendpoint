@@ -9,13 +9,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
 #include <emscripten/bind.h>
 
 #include "Endpoint.hpp"
 #include "Macros.hpp"
 
-EMSCRIPTEN_BINDINGS(webendpoint){
+EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION_MIN(setResultsCallback)
 
     BINDING_FUNCTION(EventQueue, newEventQueue)
@@ -155,7 +154,7 @@ EMSCRIPTEN_BINDINGS(webendpoint){
     BINDING_FUNCTION(ExtKey, fromSeed)
     BINDING_FUNCTION(ExtKey, fromBase58)
     BINDING_FUNCTION(ExtKey, generateRandom)
-    
+
     BINDING_FUNCTION(ExtKey, derive)
     BINDING_FUNCTION(ExtKey, deriveHardened)
     BINDING_FUNCTION(ExtKey, getPrivatePartAsBase58)
