@@ -54,7 +54,3 @@ jobs:
       run: npx playwright test --reporter=list
       env:
         CI: true
-
-    - name: Cleanup Backend Services
-      run: |
-        docker compose down
