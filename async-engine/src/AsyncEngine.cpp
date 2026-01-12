@@ -59,7 +59,7 @@ AsyncEngine *AsyncEngine::getInstance() {
 
 AsyncEngine::AsyncEngine() {
     _pool = std::make_unique<WorkerPool>(2);
-    _taskManagerThread = std::thread([&]{
+    _taskManagerThread = std::thread([=]{
         emscripten_runtime_keepalive_push();
     });
 }
@@ -105,11 +105,11 @@ void AsyncEngine::executeWorkerTask(int taskId, const std::function<Poco::Dynami
             }
             if (!handled || errorObj->size() == 0) {
                  try {
-                     throw;
+                    throw;
                  } catch (const std::exception& e) {
-                     errorObj->set("error", e.what());
+                    errorObj->set("error", e.what());
                  } catch (...) {
-                     errorObj->set("error", "Unknown Error");
+                    errorObj->set("error", "Unknown Error");
                  }
             }
             result->set("error", errorObj);
@@ -167,7 +167,7 @@ void AsyncEngine::postResultToMain(const Poco::Dynamic::Var& result) {
 
 void AsyncEngine::dispatchToMainThread(const std::function<void(void)>& task) {
     if (pthread_self() != _mainThread) {
-        _proxingQueue.proxySync(_mainThread, [&]{
+        _proxingQueue.proxyAsync(_mainThread, [=]{
             task();
         });
     } else {
@@ -176,7 +176,7 @@ void AsyncEngine::dispatchToMainThread(const std::function<void(void)>& task) {
 }
 
 void AsyncEngine::dispatchToThread(const std::function<void(void)>& task, pthread_t target) {
-    _proxingQueue.proxySync(target, [&]{
+    _proxingQueue.proxyAsync(target, [=]{
         task();
     });
 }
@@ -187,13 +187,11 @@ std::future<Poco::Dynamic::Var> AsyncEngine::callJsAsync(
 ) {
     auto prms = std::make_shared<std::promise<Poco::Dynamic::Var>>();
     std::future<Poco::Dynamic::Var> ftr = prms->get_future();
-
     int id = _nextCallId++;
     {
         std::lock_guard<std::mutex> lock(_promiseMutex);
         _promises[id] = prms;
     }
-
     if (target == ThreadTarget::Main) {
         _proxingQueue.proxyAsync(_mainThread, [starterFunc, id] {
              starterFunc(id);

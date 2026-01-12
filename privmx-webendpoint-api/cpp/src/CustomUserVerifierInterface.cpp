@@ -52,7 +52,7 @@ void CustomUserVerifierInterface::printErrorInJS(const std::string& msg) {
 Poco::Dynamic::Var CustomUserVerifierInterface::callVerifierOnJS(const std::string& methodName, const Poco::Dynamic::Var& params) {
     int bindIdVal = _interfaceBindId; 
     
-    auto ftr = AsyncEngine::getInstance()->callJsAsync([&](int id) {
+    auto ftr = AsyncEngine::getInstance()->callJsAsync([=](int id) {
         emscripten::val jsName = emscripten::val::u8string(methodName.c_str());
         emscripten::val jsBindId = emscripten::val(bindIdVal);
         Poco::Dynamic::Var localParams = params; 

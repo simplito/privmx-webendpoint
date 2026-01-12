@@ -18,9 +18,11 @@ import { EventQueueNative } from "../api/EventQueueNative";
 import { InboxApiNative } from "../api/InboxApiNative";
 import { KvdbApiNative } from "../api/KvdbApiNative";
 import { StoreApiNative } from "../api/StoreApiNative";
+import { StreamApiNative } from "../api/StreamApiNative";
 import { ThreadApiNative } from "../api/ThreadApiNative";
 import { FinalizationHelper } from "../FinalizationHelper";
 import { PKIVerificationOptions } from "../Types";
+import { WebRtcClient } from "../webStreams/WebRtcClient";
 import { Connection } from "./Connection";
 import { CryptoApi } from "./CryptoApi";
 import { EventApi } from "./EventApi";
@@ -28,6 +30,7 @@ import { EventQueue } from "./EventQueue";
 import { InboxApi } from "./InboxApi";
 import { KvdbApi } from "./KvdbApi";
 import { StoreApi } from "./StoreApi";
+import { StreamApi } from "./StreamApi";
 import { ThreadApi } from "./ThreadApi";
 
 /**
@@ -41,6 +44,20 @@ declare function endpointWasmModule(): Promise<any>; // Provided by emscripten j
 export class EndpointFactory {
     private static api: Api;
     private static eventQueueInstance: EventQueue;
+    private static assetsBasePath: string;
+
+    public static debugCall() {
+        const origWait = Atomics.wait;
+        Atomics.wait = (typedArray: any, index, value: any, timeout) => {
+        console.log("Atomics.wait", {
+            index,
+            value,
+            timeout,
+            stack: new Error().stack
+        });
+        return origWait(typedArray, index, value, timeout);
+        }
+    }
 
     /**
      * Load the Endpoint's WASM assets and initialize the Endpoint library.
@@ -49,6 +66,8 @@ export class EndpointFactory {
      */
     public static async setup(assetsBasePath?: string): Promise<void> {
         const basePath = assetsBasePath || (document.currentScript as HTMLScriptElement).src.split("/").slice(0, -1).join("/");
+        this.assetsBasePath = basePath;
+        console.log("DEBUG assetsPath (1)", this.assetsBasePath);
         const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
         for (const asset of assets) {
             await this.loadScript(basePath + "/" + asset);
@@ -202,9 +221,10 @@ export class EndpointFactory {
             threadApi.servicePtr,
             storeApi.servicePtr
         );
+        await nativeApi.create(ptr, []);
         connection.apisRefs["inboxes"] = { _apiServicePtr: ptr };
         connection.nativeApisDeps["inboxes"] = nativeApi;
-        await nativeApi.create(ptr, []);
+
         return new InboxApi(nativeApi, ptr);
     }
 
@@ -252,9 +272,37 @@ export class EndpointFactory {
         }
         const nativeApi = new EventApiNative(this.api);
         const ptr = await nativeApi.newApi(connection.servicePtr);
+        await nativeApi.create(ptr, []);
         connection.apisRefs["events"] = { _apiServicePtr: ptr };
         connection.nativeApisDeps["events"] = nativeApi;
-        await nativeApi.create(ptr, []);
         return new EventApi(nativeApi, ptr);
+    }
+
+    /**
+     * Creates an instance of the Stream API.
+     *
+     * @param {Connection} connection instance of Connection
+     * @param {EventApi} eventApi instance of EventApi
+     * @param {StoreApi} storeApi instance of StoreApi
+     * @returns {StreamApi} instance of StreamApi
+     */
+    static async createStreamApi(
+        connection: Connection,
+        eventApi: EventApi,
+    ): Promise<StreamApi> {
+        if ("streams" in connection.apisRefs) {
+            throw new Error("StreamApi already registered for given connection.");
+        }
+        const webRtcClient = new WebRtcClient(this.assetsBasePath);
+        const nativeApi = new StreamApiNative(this.api, webRtcClient);
+                      
+        const ptr = await nativeApi.newApi(
+            connection.servicePtr,
+            eventApi.servicePtr
+        );
+        await nativeApi.create(ptr, []);
+        connection.apisRefs["streams"] = { _apiServicePtr: ptr };
+        connection.nativeApisDeps["streams"] = nativeApi;
+        return new StreamApi(nativeApi, ptr, webRtcClient);
     }
 }

@@ -59,7 +59,7 @@ export class StreamReader {
         return chunk;
     }
 
-    public async getFileContent() {
+    public async getFileContent(): Promise<Uint8Array> {
         const chunks: Uint8Array[] = [];
 
         while (this.hasDataToRead) {

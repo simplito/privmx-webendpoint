@@ -9,6 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include <privmx/utils/Utils.hpp>
+#include <AsyncEngine.hpp>
 
 #ifndef _PRIVMXLIB_WEBENDPOINT_MACROS_HPP_
 #define _PRIVMXLIB_WEBENDPOINT_MACROS_HPP_

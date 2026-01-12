@@ -68,7 +68,7 @@ EM_JS(bool,checkIfWorker,(void),{
 });
 
 std::string hmac(const std::string& engine, const char* key, unsigned int keylen, const char* data, int datalen){
-    auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("engine", engine);
         params.set("data", createUint8Array(data, datalen));
@@ -119,7 +119,7 @@ int privmxDrvCrypto_randomBytes(char* buf, unsigned int len){
 int privmxDrvCrypto_md(const char* data, int datalen, const char* config, char** out, unsigned int* outlen){
     std::string str_config = translateSHAConfig(config);
 
-    auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("data", createUint8Array(data, datalen));
         performCryptoCall(str_config.c_str(), params.as_handle(), callId);
@@ -153,7 +153,7 @@ int privmxDrvCrypto_hmac(const char* key, unsigned int keylen, const char* data,
 int privmxDrvCrypto_aesEncrypt(const char* key, const char* iv, const char* data, unsigned int datalen, const char* config, char** out, unsigned int* outlen){
     std::string str_config = translateAESConfig(config);
     
-    auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("data", createUint8Array(data, datalen));
         params.set("key", createUint8Array(key, 32));
@@ -179,7 +179,7 @@ int privmxDrvCrypto_aesEncrypt(const char* key, const char* iv, const char* data
 int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data, unsigned int datalen, const char* config, char** out, unsigned int* outlen){
     std::string str_config = translateAESConfig(config);
 
-    auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("data", createUint8Array(data, datalen));
         params.set("key", createUint8Array(key, 32));
@@ -203,7 +203,7 @@ int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data
 }
 
 int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* salt, unsigned int saltlen, int rounds, unsigned int length, const char* hash, char** out, unsigned int* outlen){
-    auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("password", std::string(pass,passlen));
         params.set("salt", std::string(salt,saltlen));

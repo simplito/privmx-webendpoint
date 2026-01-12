@@ -175,6 +175,36 @@ namespace api {
     API_FUNCTION_HEADER(ExtKey, verifyCompactSignatureWithHash)
     API_FUNCTION_HEADER(ExtKey, isPrivate)
 
+    // void StreamApi_newWebRtcInterface(int taskId, int apiPtr);
+    // void StreamApi_deleteWebRtcInterface(int taskId, int ptr);
+    void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr, int interfaceBindId);
+    void StreamApi_deleteStreamApi(int taskId, int ptr);
+    API_FUNCTION_HEADER(StreamApi, create)
+    API_FUNCTION_HEADER(StreamApi, createStreamRoom)
+    API_FUNCTION_HEADER(StreamApi, updateStreamRoom)
+    API_FUNCTION_HEADER(StreamApi, deleteStreamRoom)
+    API_FUNCTION_HEADER(StreamApi, getStreamRoom)
+    API_FUNCTION_HEADER(StreamApi, listStreamRooms)
+    API_FUNCTION_HEADER(StreamApi, createStream)
+    API_FUNCTION_HEADER(StreamApi, publishStream)
+    API_FUNCTION_HEADER(StreamApi, updateStream)
+    API_FUNCTION_HEADER(StreamApi, unpublishStream)
+    API_FUNCTION_HEADER(StreamApi, joinStreamRoom)
+    API_FUNCTION_HEADER(StreamApi, listStreams)
+    API_FUNCTION_HEADER(StreamApi, leaveStreamRoom)
+
+    API_FUNCTION_HEADER(StreamApi, subscribeToRemoteStreams)
+    API_FUNCTION_HEADER(StreamApi, modifyRemoteStreamsSubscriptions)
+    API_FUNCTION_HEADER(StreamApi, unsubscribeFromRemoteStreams)
+
+    API_FUNCTION_HEADER(StreamApi, keyManagement)
+    API_FUNCTION_HEADER(StreamApi, getTurnCredentials)
+    API_FUNCTION_HEADER(StreamApi, subscribeFor)
+    API_FUNCTION_HEADER(StreamApi, unsubscribeFrom)
+    API_FUNCTION_HEADER(StreamApi, buildSubscriptionQuery)
+    API_FUNCTION_HEADER(StreamApi, trickle)
+    API_FUNCTION_HEADER(StreamApi, acceptOfferOnReconfigure)
+
 } // namespace api
 } // namespace webendpoint
 } // namespace privmx

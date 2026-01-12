@@ -149,7 +149,6 @@ emscripten::val Mapper::map(pson_value* res) {
                 int64_t val;
                 pson_get_int64(res, &val);
                 if (val < MIN_JS_SAFE_INTEGER || MAX_JS_SAFE_INTEGER < val) {
-                    // CHANGED: Use std::runtime_error instead of custom Exception
                     throw std::runtime_error("Number exceeded js safe integer range");
                 }
                 bool isNegative = false;

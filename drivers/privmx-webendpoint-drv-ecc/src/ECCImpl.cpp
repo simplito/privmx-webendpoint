@@ -33,7 +33,7 @@ namespace {
     
     template<typename T>
     T runEccOp(const std::string& method, const Poco::Dynamic::Var& paramsVar) {
-            auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+            auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
             Poco::Dynamic::Var localParams = paramsVar;
             emscripten::val jsParams = Mapper::map((pson_value*)&localParams);        
             performBindingsCall(method, jsParams, callId);
@@ -54,7 +54,7 @@ namespace {
 
     Poco::JSON::Object::Ptr runEccOpObj(const std::string& method, const Poco::Dynamic::Var& paramsVar) {
         
-        auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+        auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
             Poco::Dynamic::Var localParams = paramsVar;
             emscripten::val jsParams = Mapper::map((pson_value*)&localParams);
             performBindingsCall(method, jsParams, callId);

@@ -94,9 +94,13 @@ export class Connection extends BaseApi {
    *
    */
   async disconnect(): Promise<void> {
+    console.log("native 1");
     await this.native.disconnect(this.servicePtr, []);
+    console.log("native 2");
     await this.freeApis();
+    console.log("native 3");
     await this.native.deleteConnection(this.servicePtr);
+       console.log("native 4");
   }
 
     /**
@@ -114,12 +118,15 @@ export class Connection extends BaseApi {
     }
 
   private async freeApis() {
-    for (const apiId in this.apisRefs) {
-      if (this.nativeApisDeps[apiId]) {
-        await this.nativeApisDeps[apiId].deleteApi(
-          this.apisRefs[apiId]._apiServicePtr
-        );
-      }
-    }
+    console.warn("freeApis disabled for debugging purposes. Please re-enable");
+
+    // for (const apiId in this.apisRefs) {
+    //   if (this.nativeApisDeps[apiId]) {
+
+    //     await this.nativeApisDeps[apiId].deleteApi(
+    //       this.apisRefs[apiId]._apiServicePtr
+    //     );
+    //   }
+    // }
   }
 }
