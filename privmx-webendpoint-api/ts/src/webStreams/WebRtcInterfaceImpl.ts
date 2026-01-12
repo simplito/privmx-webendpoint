@@ -123,17 +123,8 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     }
 
     async close(roomId: StreamRoomId) {
-        const subscriberSession = this.getClient().getConnectionManager().getConnectionWithSession(roomId, "subscriber");
-        if (!("pc" in subscriberSession)) {
-            throw new Error("WebRtcInterfaceImpl: No peerConnection available on close (subscriber)");
-        }
-        subscriberSession.pc.close();
-
-        const publisherSession = this.getClient().getConnectionManager().getConnectionWithSession(roomId, "publisher");
-        if (!("pc" in publisherSession)) {
-            throw new Error("WebRtcInterfaceImpl: No peerConnection available on close (publisher)");
-        }
-        publisherSession.pc.close();
+        this.getClient().getConnectionManager().closePeerConnectionBySessionIfExists(roomId, "subscriber");
+        this.getClient().getConnectionManager().closePeerConnectionBySessionIfExists(roomId, "publisher");
     }
 
     async updateKeys(model: UpdateKeysModel) {

@@ -58,6 +58,15 @@ export class PeerConnectionManager {
         }
         return this.connections[room][connectionType];
     }
+
+    public closePeerConnectionBySessionIfExists(room: StreamRoomId, connectionType: ConnectionType): void {
+        if (room in this.connections && connectionType in this.connections[room]) {
+            const conn = this.connections[room][connectionType];
+            if (conn.pc) {
+                conn.pc.close();
+            }
+        }
+    }
 }
 
 export interface JanusConnection {
