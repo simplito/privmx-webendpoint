@@ -13,11 +13,9 @@ export class Logger {
     log(level: LoggerLevel, ...args: any[]) {
         if (Logger.logLevel === "debug") {
             console.log(...args);
-        }
-        else if (level === "info" && Logger.logLevel === "info") {
+        } else if (level === "info" && Logger.logLevel === "info") {
             console.log(...args);
-        }
-        else if(level === "important-only" && Logger.logLevel === "important-only") {
+        } else if (level === "important-only" && Logger.logLevel === "important-only") {
             console.log(...args);
         }
     }

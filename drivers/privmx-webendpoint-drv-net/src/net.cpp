@@ -24,7 +24,6 @@ limitations under the License.
 #include <memory>
 #include <string>
 #include <thread>
-#include <future>
 #include <vector>
 
 #include "Mapper.hpp"
@@ -73,28 +72,33 @@ EM_JS(void, callJSFetch_async, (emscripten::EM_VAL val_handle, int callId), {
 
 std::thread wsWorker = std::thread([] { emscripten_runtime_keepalive_push(); });
 
-std::future<Poco::Dynamic::Var> HTTPSendAsync(const std::string& data, const std::string& url, const std::string& content_type, bool get, const std::map<std::string,std::string>& request_headers, bool keepAlive) {
-    return AsyncEngine::getInstance()->callJsAsync([=](int callId) {
-        emscripten::val params = emscripten::val::object();
-        emscripten::val headers = emscripten::val::object();
-        
-        params.set("url", url);
-        params.set("method", get ? "GET" : "POST");
-        
-        if (!get) {
-            params.set("body", emscripten::val::global("Uint8Array").new_(emscripten::typed_memory_view(data.size(), data.data())));
-            
-            headers.set("Content-Type", content_type);
-            for (const auto& [key, value]: request_headers){
-                headers.set(key, value);
-            }
-        }
-        if (keepAlive) headers.set("Connection", "Keep-Alive");
-        params.set("headers", headers);
-        
-        callJSFetch_async(params.as_handle(), callId);
+std::future<Poco::Dynamic::Var> HTTPSendAsync(const std::string& data, const std::string& url,
+                                              const std::string& content_type, bool get,
+                                              const std::map<std::string, std::string>& request_headers,
+                                              bool keepAlive) {
+    return AsyncEngine::getInstance()->callJsAsync(
+        [=](int callId) {
+            emscripten::val params = emscripten::val::object();
+            emscripten::val headers = emscripten::val::object();
 
-    }, ThreadTarget::Worker);
+            params.set("url", url);
+            params.set("method", get ? "GET" : "POST");
+
+            if (!get) {
+                params.set("body", emscripten::val::global("Uint8Array")
+                                       .new_(emscripten::typed_memory_view(data.size(), data.data())));
+
+                headers.set("Content-Type", content_type);
+                for (const auto& [key, value] : request_headers) {
+                    headers.set(key, value);
+                }
+            }
+            if (keepAlive) headers.set("Connection", "Keep-Alive");
+            params.set("headers", headers);
+
+            callJSFetch_async(params.as_handle(), callId);
+        },
+        ThreadTarget::Worker);
 }
 
 int privmxDrvNet_version(unsigned int* version) {
@@ -174,21 +178,23 @@ int privmxDrvNet_wsConnect(const privmxDrvNet_WsOptions* options, void (*onopen)
     auto promise = std::make_shared<std::promise<int>>();
     auto future = promise->get_future();
 
-    AsyncEngine::getInstance()->dispatchToThread([=, uri = cpp_str_uri]{
-        try {
-            int id = wsCreateWebSocket(uri.c_str());
-            
-            wsSetUserPointer(id, ctx);
-            wsSetOpenCallback(id, onopen);
-            wsSetErrorCallback(id, onerror);
-            wsSetMessageCallback(id, onmessage);
-            wsSetCloseCallback(id, onclose);
-            
-            promise->set_value(id);
-        } catch (...) {
-            promise->set_value(-1);
-        }
-    }, wsWorker.native_handle());
+    AsyncEngine::getInstance()->dispatchToThread(
+        [=, uri = cpp_str_uri] {
+            try {
+                int id = wsCreateWebSocket(uri.c_str());
+
+                wsSetUserPointer(id, ctx);
+                wsSetOpenCallback(id, onopen);
+                wsSetErrorCallback(id, onerror);
+                wsSetMessageCallback(id, onmessage);
+                wsSetCloseCallback(id, onclose);
+
+                promise->set_value(id);
+            } catch (...) {
+                promise->set_value(-1);
+            }
+        },
+        wsWorker.native_handle());
 
     int websocketId = future.get();
 
@@ -204,11 +210,13 @@ int privmxDrvNet_wsClose(privmxDrvNet_Ws* ws) {
     if (!ws) return 1;
     int id = ws->websocketId;
 
-    AsyncEngine::getInstance()->dispatchToThread([id]{
-        try {
-            wsDeleteWebSocket(id);
-        } catch(...) {}
-    }, wsWorker.native_handle());
+    AsyncEngine::getInstance()->dispatchToThread(
+        [id] {
+            try {
+                wsDeleteWebSocket(id);
+            } catch (...) {}
+        },
+        wsWorker.native_handle());
     return 0;
 }
 
@@ -223,17 +231,19 @@ int privmxDrvNet_wsSend(privmxDrvNet_Ws* ws, const char* data, int datalen) {
     int id = ws->websocketId;
     auto promise = std::make_shared<std::promise<int>>();
     auto future = promise->get_future();
-    AsyncEngine::getInstance()->dispatchToThread([=, dataStr = std::move(dataCopy)]() mutable {
-        try {
-            int res = wsSendMessage(id, dataStr.c_str(), dataStr.size());
-            promise->set_value(res);
-        } catch(...) {
-            promise->set_value(-1);
-        }
-    }, wsWorker.native_handle());
+    AsyncEngine::getInstance()->dispatchToThread(
+        [=, dataStr = std::move(dataCopy)]() mutable {
+            try {
+                int res = wsSendMessage(id, dataStr.c_str(), dataStr.size());
+                promise->set_value(res);
+            } catch (...) {
+                promise->set_value(-1);
+            }
+        },
+        wsWorker.native_handle());
     int result = future.get();
 
-    if(result <= 0){
+    if (result <= 0) {
         return 1;
     }
     return 0;

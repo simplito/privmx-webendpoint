@@ -1,15 +1,17 @@
 #include "WebRtcInterfaceImpl.hpp"
-#include <emscripten.h>
-#include <emscripten/val.h>
-#include <emscripten/bind.h>
-#include <emscripten/threading.h>
-#include <emscripten/proxying.h>
-#include "privmx/endpoint/stream/Types.hpp"
-#include "privmx/endpoint/stream/StreamVarSerializer.hpp"
-#include "privmx/utils/Utils.hpp"
-#include "AsyncEngine.hpp" 
+
 #include <Poco/Dynamic/Var.h>
 #include <Poco/JSON/Object.h>
+#include <emscripten.h>
+#include <emscripten/bind.h>
+#include <emscripten/proxying.h>
+#include <emscripten/threading.h>
+#include <emscripten/val.h>
+
+#include "AsyncEngine.hpp"
+#include "privmx/endpoint/stream/StreamVarSerializer.hpp"
+#include "privmx/endpoint/stream/Types.hpp"
+#include "privmx/utils/Utils.hpp"
 
 using namespace privmx::webendpoint::stream;
 using namespace privmx::endpoint::stream;
@@ -19,6 +21,8 @@ using SdpWithTypeModel = privmx::endpoint::stream::SdpWithTypeModel;
 using SdpWithRoomModel = privmx::endpoint::stream::SdpWithRoomModel;
 using UpdateSessionIdModel = privmx::endpoint::stream::UpdateSessionIdModel;
 using RoomModel = privmx::endpoint::stream::RoomModel;
+
+// clang-format off
 
 // Helper to print errors to JS console
 EM_JS(emscripten::EM_VAL, print_error_webrtc, (const char* msg), {
@@ -56,8 +60,9 @@ EM_JS(emscripten::EM_VAL, webRtcJsHandler, (emscripten::EM_VAL name_handle, emsc
         });
 });
 
-WebRtcInterfaceImpl::WebRtcInterfaceImpl(int interfaceBindId): _interfaceBindId(interfaceBindId) {
-}
+// clang-format on
+
+WebRtcInterfaceImpl::WebRtcInterfaceImpl(int interfaceBindId) : _interfaceBindId(interfaceBindId) {}
 
 void WebRtcInterfaceImpl::printErrorInJS(const std::string& msg) {
     print_error_webrtc(msg.c_str());
@@ -65,8 +70,9 @@ void WebRtcInterfaceImpl::printErrorInJS(const std::string& msg) {
 
 template<typename T>
 emscripten::val WebRtcInterfaceImpl::mapToVal(const T& value) {
-    core::VarSerializer serializer {core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING}};
-    Poco::Dynamic::Var serialized {serializer.serialize(value)};
+    core::VarSerializer serializer{core::VarSerializer::Options{
+        .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING}};
+    Poco::Dynamic::Var serialized{serializer.serialize(value)};
     pson_value* res = (pson_value*)&serialized;
     return Mapper::map(res);
 }
@@ -78,7 +84,9 @@ std::shared_ptr<WebRtcInterfaceImpl> WebRtcInterfaceHolder::getInstance(int inte
     return _webRtcInterface;
 }
 
-WebRtcInterfaceImpl* WebRtcInterfaceHolder::getRawPtr() { return _webRtcInterface.get(); }
+WebRtcInterfaceImpl* WebRtcInterfaceHolder::getRawPtr() {
+    return _webRtcInterface.get();
+}
 
 void WebRtcInterfaceImpl::assertStatus(const std::string& method, const emscripten::val& jsResult) {
     int status = jsResult["status"].as<int>();
@@ -93,15 +101,17 @@ void WebRtcInterfaceImpl::assertStatus(const std::string& method, const emscript
 }
 
 std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription(const std::string& streamRoomId) {
-    auto future = AsyncEngine::getInstance()->callJsAsync([=, bindId = _interfaceBindId](int id) {
-        auto methodName {"createOfferAndSetLocalDescription"};
-        emscripten::val name = emscripten::val::u8string(methodName);
-        
-        RoomModel paramsModel = {.roomId = streamRoomId};
-        emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
-        
-        webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
-    }, ThreadTarget::Main);
+    auto future = AsyncEngine::getInstance()->callJsAsync(
+        [=, bindId = _interfaceBindId](int id) {
+            auto methodName{"createOfferAndSetLocalDescription"};
+            emscripten::val name = emscripten::val::u8string(methodName);
+
+            RoomModel paramsModel = {.roomId = streamRoomId};
+            emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
+
+            webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
+        },
+        ThreadTarget::Main);
 
     Poco::Dynamic::Var result = future.get();
     Poco::JSON::Object::Ptr obj = result.extract<Poco::JSON::Object::Ptr>();
@@ -109,51 +119,61 @@ std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription(const std::st
     return obj->getValue<std::string>("buff");
 }
 
-std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::string& streamRoomId, const std::string& sdp, const std::string& type) {
-    auto future = AsyncEngine::getInstance()->callJsAsync([=, bindId = _interfaceBindId](int id) {
-        auto methodName {"createAnswerAndSetDescriptions"};
-        emscripten::val name = emscripten::val::u8string(methodName);
-        
-        SdpWithRoomModel paramsModel = {.roomId = streamRoomId, .sdp = sdp, .type = type};
-        emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
+std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::string& streamRoomId, const std::string& sdp,
+                                                                const std::string& type) {
+    auto future = AsyncEngine::getInstance()->callJsAsync(
+        [=, bindId = _interfaceBindId](int id) {
+            auto methodName{"createAnswerAndSetDescriptions"};
+            emscripten::val name = emscripten::val::u8string(methodName);
 
-        webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
-    }, ThreadTarget::Main);
+            SdpWithRoomModel paramsModel = {.roomId = streamRoomId, .sdp = sdp, .type = type};
+            emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
+
+            webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
+        },
+        ThreadTarget::Main);
 
     Poco::Dynamic::Var result = future.get();
     Poco::JSON::Object::Ptr obj = result.extract<Poco::JSON::Object::Ptr>();
-    
+
     if (obj->getValue<int>("status") < 0) throw std::runtime_error(obj->getValue<std::string>("error"));
-    
+
     return obj->getValue<std::string>("buff");
 }
 
-void WebRtcInterfaceImpl::setAnswerAndSetRemoteDescription(const std::string& streamRoomId, const std::string& sdp, const std::string& type) {
-    auto future = AsyncEngine::getInstance()->callJsAsync([=, bindId = _interfaceBindId](int id) {
-        auto methodName {"setAnswerAndSetRemoteDescription"};
-        emscripten::val name = emscripten::val::u8string(methodName);
-        
-        SdpWithRoomModel paramsModel = {.roomId = streamRoomId, .sdp = sdp, .type = type};
-        emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
-        
-        webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
-    }, ThreadTarget::Main);
-    
+void WebRtcInterfaceImpl::setAnswerAndSetRemoteDescription(const std::string& streamRoomId, const std::string& sdp,
+                                                           const std::string& type) {
+    auto future = AsyncEngine::getInstance()->callJsAsync(
+        [=, bindId = _interfaceBindId](int id) {
+            auto methodName{"setAnswerAndSetRemoteDescription"};
+            emscripten::val name = emscripten::val::u8string(methodName);
+
+            SdpWithRoomModel paramsModel = {.roomId = streamRoomId, .sdp = sdp, .type = type};
+            emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
+
+            webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
+        },
+        ThreadTarget::Main);
+
     Poco::Dynamic::Var result = future.get();
     Poco::JSON::Object::Ptr obj = result.extract<Poco::JSON::Object::Ptr>();
     if (obj->getValue<int>("status") < 0) throw std::runtime_error(obj->getValue<std::string>("error"));
 }
 
-void WebRtcInterfaceImpl::updateSessionId(const std::string& streamRoomId, const int64_t sessionId, const std::string& connectionType) {
-    auto future = AsyncEngine::getInstance()->callJsAsync([=, bindId = _interfaceBindId](int id) {
-        auto methodName {"updateSessionId"};
-        emscripten::val name = emscripten::val::u8string(methodName);
-        
-        UpdateSessionIdModel paramsModel = {.streamRoomId = streamRoomId, .connectionType = connectionType, .sessionId = sessionId};
-        emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
-        
-        webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
-    }, ThreadTarget::Main);
+void WebRtcInterfaceImpl::updateSessionId(const std::string& streamRoomId, const int64_t sessionId,
+                                          const std::string& connectionType) {
+    auto future = AsyncEngine::getInstance()->callJsAsync(
+        [=, bindId = _interfaceBindId](int id) {
+            auto methodName{"updateSessionId"};
+            emscripten::val name = emscripten::val::u8string(methodName);
+
+            UpdateSessionIdModel paramsModel = {
+                .streamRoomId = streamRoomId, .connectionType = connectionType, .sessionId = sessionId};
+            emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
+
+            webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
+        },
+        ThreadTarget::Main);
 
     Poco::Dynamic::Var result = future.get();
     Poco::JSON::Object::Ptr obj = result.extract<Poco::JSON::Object::Ptr>();
@@ -161,50 +181,55 @@ void WebRtcInterfaceImpl::updateSessionId(const std::string& streamRoomId, const
 }
 
 void WebRtcInterfaceImpl::close(const std::string& streamRoomId) {
-    auto future = AsyncEngine::getInstance()->callJsAsync([=, bindId = _interfaceBindId](int id) {
-        auto methodName {"close"};
-        emscripten::val name = emscripten::val::u8string(methodName);
-        
-        RoomModel paramsModel = {.roomId = streamRoomId};
-        emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
-        
-        webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
-    }, ThreadTarget::Main);
-    
+    auto future = AsyncEngine::getInstance()->callJsAsync(
+        [=, bindId = _interfaceBindId](int id) {
+            auto methodName{"close"};
+            emscripten::val name = emscripten::val::u8string(methodName);
+
+            RoomModel paramsModel = {.roomId = streamRoomId};
+            emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
+
+            webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
+        },
+        ThreadTarget::Main);
+
     Poco::Dynamic::Var result = future.get();
     Poco::JSON::Object::Ptr obj = result.extract<Poco::JSON::Object::Ptr>();
     if (obj->getValue<int>("status") < 0) throw std::runtime_error(obj->getValue<std::string>("error"));
 }
 
-void WebRtcInterfaceImpl::updateKeys(const std::string& streamRoomId, const std::vector<privmx::endpoint::stream::Key>& keys) {
-    auto future = AsyncEngine::getInstance()->callJsAsync([=, keys = keys, bindId = _interfaceBindId](int id) {
-        auto methodName {"updateKeys"};
-        emscripten::val name = emscripten::val::u8string(methodName);
-        
-        emscripten::val streamRoomIdVal = emscripten::val::u8string(streamRoomId.c_str());
-        emscripten::val keysArrayVal = emscripten::val::array();
-        
-        for (const auto& key : keys) {
-            emscripten::val keyObj = emscripten::val::object();
-            keyObj.set("keyId", WebRtcInterfaceImpl::mapToVal(key.keyId)); // Use static call style
+void WebRtcInterfaceImpl::updateKeys(const std::string& streamRoomId,
+                                     const std::vector<privmx::endpoint::stream::Key>& keys) {
+    auto future = AsyncEngine::getInstance()->callJsAsync(
+        [=, keys = keys, bindId = _interfaceBindId](int id) {
+            auto methodName{"updateKeys"};
+            emscripten::val name = emscripten::val::u8string(methodName);
 
-            emscripten::val view { emscripten::typed_memory_view(key.key.size(), key.key.data()) };
-            
-            auto keyView = emscripten::val::global("Uint8Array").new_(key.key.size());
-            keyView.call<void>("set", view);
-            
-            keyObj.set("key", keyView);
-            keyObj.set("type", WebRtcInterfaceImpl::mapToVal(key.type));    
-            keysArrayVal.call<void>("push", keyObj);
-        }
+            emscripten::val streamRoomIdVal = emscripten::val::u8string(streamRoomId.c_str());
+            emscripten::val keysArrayVal = emscripten::val::array();
 
-        emscripten::val params = emscripten::val::object();
-        params.set("streamRoomId", streamRoomIdVal);
-        params.set("keys", keysArrayVal);
-        
-        webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
-    }, ThreadTarget::Main);
-    
+            for (const auto& key : keys) {
+                emscripten::val keyObj = emscripten::val::object();
+                keyObj.set("keyId", WebRtcInterfaceImpl::mapToVal(key.keyId));  // Use static call style
+
+                emscripten::val view{emscripten::typed_memory_view(key.key.size(), key.key.data())};
+
+                auto keyView = emscripten::val::global("Uint8Array").new_(key.key.size());
+                keyView.call<void>("set", view);
+
+                keyObj.set("key", keyView);
+                keyObj.set("type", WebRtcInterfaceImpl::mapToVal(key.type));
+                keysArrayVal.call<void>("push", keyObj);
+            }
+
+            emscripten::val params = emscripten::val::object();
+            params.set("streamRoomId", streamRoomIdVal);
+            params.set("keys", keysArrayVal);
+
+            webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
+        },
+        ThreadTarget::Main);
+
     Poco::Dynamic::Var result = future.get();
     Poco::JSON::Object::Ptr obj = result.extract<Poco::JSON::Object::Ptr>();
     if (obj->getValue<int>("status") < 0) throw std::runtime_error(obj->getValue<std::string>("error"));

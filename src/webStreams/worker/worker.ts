@@ -1,5 +1,4 @@
-
-import {Utils} from "../Utils";
+import { Utils } from "../Utils";
 import {
     encryptWithAES256GCM,
     decryptWithAES256GCM,
@@ -18,7 +17,8 @@ export interface TransformContext {
     keyStore: KeyStore;
 }
 
-export class EncryptTransform { // eslint-disable-line no-unused-vars
+export class EncryptTransform {
+    // eslint-disable-line no-unused-vars
     constructor(private keyStore: KeyStore) {}
 
     private getHeaderSizeByType(type: "key" | "delta" | "undefined") {
@@ -28,16 +28,20 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
         return 0;
     }
 
-    async encryptFrame(encodedFrame: RTCEncodedAudioFrame|RTCEncodedVideoFrame, kind: string, controller: TransformStreamDefaultController<any>) {
-        const headerLen = kind === "video" ? this.getHeaderSizeByType((encodedFrame as any).type) : 1;
+    async encryptFrame(
+        encodedFrame: RTCEncodedAudioFrame | RTCEncodedVideoFrame,
+        kind: string,
+        controller: TransformStreamDefaultController<any>,
+    ) {
+        const headerLen =
+            kind === "video" ? this.getHeaderSizeByType((encodedFrame as any).type) : 1;
         const frameHeader = new Uint8Array(encodedFrame.data, 0, headerLen);
         const frameBody = new Uint8Array(encodedFrame.data, headerLen);
 
         const iv = Utils.genIvAsBuffer();
         const keyEntry = this.keyStore.getEncriptionKey();
-        
 
-        const cryptoResult = await encryptWithAES256GCM(keyEntry.key, iv,  frameBody, frameHeader);
+        const cryptoResult = await encryptWithAES256GCM(keyEntry.key, iv, frameBody, frameHeader);
         if (!isEncryptionSuccess(cryptoResult)) {
             throw new Error("Cannot encrypt frame");
         }
@@ -59,21 +63,34 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
         resultUint8.set(keyIdAsUint8, posOfKeyId);
         logDebug("keyId to payload: " + JSON.stringify(keyIdAsUint8));
         resultUint8.set(Utils.numAsOneByteUint(keyIdAsUint8.byteLength), posOfKeyIdSize);
-        
+
         encodedFrame.data = result;
         controller.enqueue(encodedFrame);
     }
 
-    async decryptFrame(encodedFrame: RTCEncodedVideoFrame|RTCEncodedAudioFrame, kind: string, controller: TransformStreamDefaultController<any>) {
-        const headerLen = kind === "video" ? this.getHeaderSizeByType((encodedFrame as any).type) : 1;
+    async decryptFrame(
+        encodedFrame: RTCEncodedVideoFrame | RTCEncodedAudioFrame,
+        kind: string,
+        controller: TransformStreamDefaultController<any>,
+    ) {
+        const headerLen =
+            kind === "video" ? this.getHeaderSizeByType((encodedFrame as any).type) : 1;
         const data = encodedFrame.data;
         const frameHeader = new Uint8Array(data, 0, headerLen);
 
-        const keyIdLenData = new Uint8Array(data, data.byteLength - NUM_AS_UINT8_SIZE, NUM_AS_UINT8_SIZE);
+        const keyIdLenData = new Uint8Array(
+            data,
+            data.byteLength - NUM_AS_UINT8_SIZE,
+            NUM_AS_UINT8_SIZE,
+        );
 
         const keyIdLen = Utils.oneByteUint8AsNum(keyIdLenData);
 
-        const ivLenData = new Uint8Array(data, data.byteLength - NUM_AS_UINT8_SIZE*2 - keyIdLen, NUM_AS_UINT8_SIZE);
+        const ivLenData = new Uint8Array(
+            data,
+            data.byteLength - NUM_AS_UINT8_SIZE * 2 - keyIdLen,
+            NUM_AS_UINT8_SIZE,
+        );
 
         const ivLen = Utils.oneByteUint8AsNum(ivLenData);
 
@@ -91,8 +108,15 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
                 return;
             }
             const keyEntry = this.keyStore.getKey(keyId);
-            const iv = new Uint8Array(data.slice(headerLen + payloadLen, headerLen + payloadLen + ivLen));
-            const decryptionResult = await decryptWithAES256GCM(keyEntry.key, iv, payload, frameHeader);
+            const iv = new Uint8Array(
+                data.slice(headerLen + payloadLen, headerLen + payloadLen + ivLen),
+            );
+            const decryptionResult = await decryptWithAES256GCM(
+                keyEntry.key,
+                iv,
+                payload,
+                frameHeader,
+            );
             if (!isDecryptionSuccess(decryptionResult)) {
                 // logError({msg: "Decryption failed. Cannot decrypt frame"});
                 controller.enqueue(encodedFrame);
@@ -106,51 +130,43 @@ export class EncryptTransform { // eslint-disable-line no-unused-vars
             writableResult.set(new Uint8Array(plain), frameHeader.byteLength);
 
             encodedFrame.data = result;
-            controller.enqueue(encodedFrame);   
-        }
-        catch (e) {
+            controller.enqueue(encodedFrame);
+        } catch (e) {
             logError(e);
             controller.enqueue(encodedFrame);
         }
     }
-
 }
 
 (self as any).keyStore = new KeyStore();
 
 const getKeyStore = () => {
     return (self as any).keyStore as KeyStore;
-}
+};
 
-self.onmessage = async event  => {
+self.onmessage = async (event) => {
     const { operation, kind } = event.data;
 
-    if (operation === 'initialize') {
-        logDebug("worker initialize call")
-    } 
-    else if (operation === 'init-pipeline') {
+    if (operation === "initialize") {
+        logDebug("worker initialize call");
+    } else if (operation === "init-pipeline") {
         console.log("in worker: 1");
         // zarejestruj pusty pipeline
         pipelines.set(event.data.id, { ready: false });
         // odeślij potwierdzenie
-        self.postMessage({ operation: 'init-pipeline', id: event.data.id });
+        self.postMessage({ operation: "init-pipeline", id: event.data.id });
         return;
-    }    
-    else
-    if (operation === 'encode' || operation === 'decode') {
-        const context: TransformContext = {keyStore: getKeyStore()};
+    } else if (operation === "encode" || operation === "decode") {
+        const context: TransformContext = { keyStore: getKeyStore() };
         const { readableStream, writableStream, id } = event.data;
         // const context = getParticipantContext(participantId);
         handleTransform(context, operation, kind, readableStream, writableStream, id);
-    } 
-    else 
-    if (operation === 'setKeys') {
+    } else if (operation === "setKeys") {
         logDebug("Worker: setting keys...");
         const data = event.data as events.SetKeysEvent;
         getKeyStore().setKeys(data.keys);
-    } 
+    }
 };
-
 
 export declare interface RTCTransformEvent {}
 
@@ -160,15 +176,15 @@ function createSenderTransform(_keyStore: KeyStore, kind: string) {
 
     return new TransformStream({
         start() {},
-    
+
         async transform(encodedFrame, controller) {
             encrypter.encryptFrame(encodedFrame, kind, controller);
         },
-    
-        flush() {}
+
+        flush() {},
     });
 }
-    
+
 // Receiver transform
 function createReceiverTransform(_keyStore: KeyStore, kind: string) {
     const encrypter = new EncryptTransform(_keyStore);
@@ -177,22 +193,25 @@ function createReceiverTransform(_keyStore: KeyStore, kind: string) {
         flush() {},
         async transform(encodedFrame, controller) {
             encrypter.decryptFrame(encodedFrame, kind, controller);
-        }
+        },
     });
 }
 
-function handleTransform(context: TransformContext, operation: string, kind: string, readableStream: any, writableStream: any, id: number) {
+function handleTransform(
+    context: TransformContext,
+    operation: string,
+    kind: string,
+    readableStream: any,
+    writableStream: any,
+    id: number,
+) {
     let transformStream: TransformStream;
     // logDebug("on handleTransform", {key, operation, readableStream, writableStream})
-    logDebug("handleTransform: " + JSON.stringify({operation, context}));
+    logDebug("handleTransform: " + JSON.stringify({ operation, context }));
     if (operation == "encode") {
-        
         transformStream = createSenderTransform(context.keyStore, kind);
-        readableStream
-            .pipeThrough(transformStream)
-            .pipeTo(writableStream);
-    } else
-    if (operation == "decode") {
+        readableStream.pipeThrough(transformStream).pipeTo(writableStream);
+    } else if (operation == "decode") {
         transformStream = createReceiverTransform(context.keyStore, kind);
         const reader = readableStream
             .pipeThrough(transformStream)
@@ -202,11 +221,10 @@ function handleTransform(context: TransformContext, operation: string, kind: str
                 if (!String(err).includes("Destination stream closed")) {
                     console.error("pipeline error", err);
                 }
-            })
+            });
 
-        sessions.set(id, { pipeline: reader })
-    }
-    else if (operation === "stop") {
+        sessions.set(id, { pipeline: reader });
+    } else if (operation === "stop") {
         const s = sessions.get(id);
         if (s) {
             try {
@@ -224,14 +242,14 @@ function logDebug(msg: any) {
     if (!DEBUG) {
         return;
     }
-    postMessage({type: "debug", data: msg});
+    postMessage({ type: "debug", data: msg });
 }
 function logger(msg: any) {
-    postMessage({type: "debug", data: msg});
+    postMessage({ type: "debug", data: msg });
 }
 
 function logError(msg: any) {
-    postMessage({type: "error", data: msg});
+    postMessage({ type: "error", data: msg });
 }
 
 if ((self as any).RTCTransformEvent) {
@@ -240,8 +258,15 @@ if ((self as any).RTCTransformEvent) {
         const transformer = event.transformer;
         const { operation, kind } = transformer.options;
         // logger("operation: " + operation + " / kind: " + kind);
-        logDebug("onrtctransfrom: "+JSON.stringify(event));
-        handleTransform({keyStore: getKeyStore()}, operation, kind, transformer.readable, transformer.writable, 0);
+        logDebug("onrtctransfrom: " + JSON.stringify(event));
+        handleTransform(
+            { keyStore: getKeyStore() },
+            operation,
+            kind,
+            transformer.readable,
+            transformer.writable,
+            0,
+        );
     };
 }
 

@@ -49,14 +49,14 @@ export class EndpointFactory {
     public static debugCall() {
         const origWait = Atomics.wait;
         Atomics.wait = (typedArray: any, index, value: any, timeout) => {
-        console.log("Atomics.wait", {
-            index,
-            value,
-            timeout,
-            stack: new Error().stack
-        });
-        return origWait(typedArray, index, value, timeout);
-        }
+            console.log("Atomics.wait", {
+                index,
+                value,
+                timeout,
+                stack: new Error().stack,
+            });
+            return origWait(typedArray, index, value, timeout);
+        };
     }
 
     /**
@@ -65,7 +65,9 @@ export class EndpointFactory {
      * @param {string} [assetsBasePath] base path/url to the Endpoint's WebAssembly assets (like: endpoint-wasm-module.js, driver-web-context.js and others)
      */
     public static async setup(assetsBasePath?: string): Promise<void> {
-        const basePath = assetsBasePath || (document.currentScript as HTMLScriptElement).src.split("/").slice(0, -1).join("/");
+        const basePath =
+            assetsBasePath ||
+            (document.currentScript as HTMLScriptElement).src.split("/").slice(0, -1).join("/");
         this.assetsBasePath = basePath;
         console.log("DEBUG assetsPath (1)", this.assetsBasePath);
         const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
@@ -295,20 +297,14 @@ export class EndpointFactory {
      * @param {StoreApi} storeApi instance of StoreApi
      * @returns {StreamApi} instance of StreamApi
      */
-    static async createStreamApi(
-        connection: Connection,
-        eventApi: EventApi,
-    ): Promise<StreamApi> {
+    static async createStreamApi(connection: Connection, eventApi: EventApi): Promise<StreamApi> {
         if ("streams" in connection.apisRefs) {
             throw new Error("StreamApi already registered for given connection.");
         }
         const webRtcClient = new WebRtcClient(this.assetsBasePath);
         const nativeApi = new StreamApiNative(this.api, webRtcClient);
-                      
-        const ptr = await nativeApi.newApi(
-            connection.servicePtr,
-            eventApi.servicePtr
-        );
+
+        const ptr = await nativeApi.newApi(connection.servicePtr, eventApi.servicePtr);
         await nativeApi.create(ptr, []);
         connection.apisRefs["streams"] = { _apiServicePtr: ptr };
         connection.nativeApisDeps["streams"] = nativeApi;

@@ -10,6 +10,7 @@ limitations under the License.
 */
 
 import { IdGenerator } from "./IdGenerator";
+import { NativeError, RawCppError } from "./NativeError";
 
 interface Result {
     taskId: number;
@@ -40,7 +41,7 @@ export class Api {
         if (result.status == true) {
             this.promises.get(result.taskId).resolve(result.result);
         } else {
-            this.promises.get(result.taskId).reject(result.error);
+            this.promises.get(result.taskId).reject(this.toNativeError(result.error));
         }
         this.promises.delete(result.taskId);
     }
@@ -51,5 +52,25 @@ export class Api {
 
     private setResultsCallback() {
         this.lib.setResultsCallback((result: any) => this.resolveResult(result));
+    }
+
+    private toNativeError(error: unknown): Error {
+        if (this.isRawCppError(error)) {
+            return new NativeError(error);
+        }
+        if (error instanceof Error) {
+            return error;
+        }
+        return new Error(typeof error === "string" ? error : JSON.stringify(error));
+    }
+
+    private isRawCppError(obj: any): obj is RawCppError {
+        return (
+            typeof obj === "object" &&
+            obj !== null &&
+            "code" in obj &&
+            "name" in obj &&
+            "scope" in obj
+        );
     }
 }

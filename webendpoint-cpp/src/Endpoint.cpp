@@ -29,8 +29,10 @@ limitations under the License.
 #include "CustomUserVerifierInterface.hpp"
 #include "Macros.hpp"
 #include "Mapper.hpp"
+#include "WebRtcInterfaceImpl.hpp"
 #include "privmx/endpoint/core/VarDeserializer.hpp"
 #include "privmx/endpoint/core/VarSerializer.hpp"
+#include "privmx/endpoint/stream/varinterface/StreamApiLowVarInterface.hpp"
 
 using namespace privmx::endpoint;
 using namespace privmx::webendpoint;
@@ -45,6 +47,7 @@ using KvdbApiVar = privmx::endpoint::kvdb::KvdbApiVarInterface;
 using CryptoApiVar = privmx::endpoint::crypto::CryptoApiVarInterface;
 using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
 using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
+using StreamApiVar = privmx::endpoint::stream::StreamApiLowVarInterface;
 
 using UserVerifierInterface = privmx::endpoint::core::UserVerifierInterface;
 using VerificationRequest = privmx::endpoint::core::VerificationRequest;
@@ -326,6 +329,52 @@ API_FUNCTION(EventApi, emitEvent)
 API_FUNCTION(EventApi, subscribeFor)
 API_FUNCTION(EventApi, unsubscribeFrom)
 API_FUNCTION(EventApi, buildSubscriptionQuery)
+
+void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr, int webRtcInterfaceBindId) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, eventsPtr, webRtcInterfaceBindId] {
+        auto connection = (ConnectionVar*)connectionPtr;
+        auto eventApi = (EventApiVar*)eventsPtr;
+
+        auto streamsApi =
+            new StreamApiVar(connection->getApi(), eventApi->getApi(),
+                             core::VarSerializer::Options{
+                                 .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+
+        auto webRtcInterface = std::make_shared<stream::WebRtcInterfaceImpl>(webRtcInterfaceBindId);
+        streamsApi->setWebRtcInterface(webRtcInterface);
+
+        return (int)streamsApi;
+    });
+}
+void StreamApi_deleteStreamApi(int taskId, int ptr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (StreamApiVar*)ptr; });
+}
+
+API_FUNCTION(StreamApi, create)
+API_FUNCTION(StreamApi, createStreamRoom)
+API_FUNCTION(StreamApi, updateStreamRoom)
+API_FUNCTION(StreamApi, deleteStreamRoom)
+API_FUNCTION(StreamApi, getStreamRoom)
+API_FUNCTION(StreamApi, listStreamRooms)
+API_FUNCTION(StreamApi, createStream)
+API_FUNCTION(StreamApi, publishStream)
+API_FUNCTION(StreamApi, updateStream)
+API_FUNCTION(StreamApi, unpublishStream)
+API_FUNCTION(StreamApi, joinStreamRoom)
+API_FUNCTION(StreamApi, listStreams)
+API_FUNCTION(StreamApi, leaveStreamRoom)
+
+API_FUNCTION(StreamApi, subscribeToRemoteStreams)
+API_FUNCTION(StreamApi, modifyRemoteStreamsSubscriptions)
+API_FUNCTION(StreamApi, unsubscribeFromRemoteStreams)
+
+API_FUNCTION(StreamApi, keyManagement)
+API_FUNCTION(StreamApi, getTurnCredentials)
+API_FUNCTION(StreamApi, subscribeFor)
+API_FUNCTION(StreamApi, unsubscribeFrom)
+API_FUNCTION(StreamApi, buildSubscriptionQuery)
+API_FUNCTION(StreamApi, trickle)
+API_FUNCTION(StreamApi, acceptOfferOnReconfigure)
 
 }  // namespace api
 }  // namespace webendpoint

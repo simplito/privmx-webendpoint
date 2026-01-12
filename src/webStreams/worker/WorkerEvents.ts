@@ -1,6 +1,5 @@
 import { Key } from "../../Types";
 
-
 export interface WorkerBaseEvent {
     operation: string;
 }

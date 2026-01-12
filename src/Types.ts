@@ -10,6 +10,7 @@ limitations under the License.
 */
 
 import { ExtKey } from "./service/ExtKey";
+import { StreamRoomId } from "./webStreams/types/ApiTypes";
 
 // export namespace core {
 export type SortOrder = "desc" | "asc";
@@ -622,6 +623,54 @@ export interface ItemPolicy {
     delete?: PolicyEntry;
 }
 
+export interface StreamRoom {
+    contextId: string;
+    streamRoomId: string;
+    createDate: number;
+    creator: string;
+    lastModificationDate: number;
+    lastModifier: string;
+    users: string[];
+    managers: string[];
+    version: number;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    policy: ContainerPolicy;
+    statusCode: number;
+}
+
+export interface StreamInfo {
+    id: number;
+    userId: string;
+    dummy?: boolean;
+    tracks: TrackInfo[];
+    talking?: boolean;
+}
+export interface TrackInfo {
+    type: string;
+    mindex: string;
+    mid: string;
+    disabled?: boolean;
+    codec: string;
+    description?: string;
+    moderated?: boolean;
+    simulcast?: boolean;
+    svc?: boolean;
+    talking?: boolean;
+}
+
+export interface StreamPublishResult {
+    published: boolean;
+    data?: {
+        streamRoomId: StreamRoomId;
+        stream: StreamInfo;
+        userId: string;
+    };
+}
+
+/** reserved for future use */
+export interface StreamSettings {}
+
 /**
  * Holds error details
  *
@@ -684,6 +733,32 @@ export interface BridgeIdentity {
     pubKey?: string;
     instanceId?: string;
 }
+
+// webrtc interface tmp types
+export interface Key {
+    keyId: string;
+    key: Uint8Array;
+    type: number; // 0 - local, 1 - remote
+}
+
+export interface StreamSubscription {
+    streamId: number;
+    streamTrackId?: string;
+}
+
+export interface TurnCredentials {
+    url: string;
+    username: string;
+    password: string;
+    expirationTime: number;
+}
+
+export interface StreamSettings {
+    settings: any;
+    onRemoteTrack: (track: RTCTrackEvent) => void;
+}
+
+export type StreamHandle = number & { _streamHandle: never };
 
 /**
  * PKI Verification options
@@ -777,6 +852,22 @@ export enum KvdbEventSelectorType {
 
 export enum EventsEventSelectorType {
     CONTEXT_ID = 0,
+}
+
+export enum StreamEventType {
+    STREAMROOM_CREATE = 0,
+    STREAMROOM_UPDATE = 1,
+    STREAMROOM_DELETE = 2,
+    STREAM_JOIN = 4,
+    STREAM_LEAVE = 5,
+    STREAM_PUBLISH = 6,
+    STREAM_UNPUBLISH = 7,
+}
+
+export enum StreamEventSelectorType {
+    CONTEXT_ID = 0,
+    STREAMROOM_ID = 1,
+    STREAM_ID = 2,
 }
 
 export type CollectionItemChange = {

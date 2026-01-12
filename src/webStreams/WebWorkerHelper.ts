@@ -19,9 +19,9 @@ import { InitializeEvent, SetKeysEvent } from "./worker/WorkerEvents";
 
 interface WorkerLogEvent {
     data: {
-        data: Object|String;
-        type: "error"|"debug"
-    }
+        data: Object | String;
+        type: "error" | "debug";
+    };
 }
 
 export class WebWorker {
@@ -36,23 +36,20 @@ export class WebWorker {
 
             try {
                 if (event.data.type === "debug") {
-                        console.log("[Worker-LOG/debug]", event.data.data);
-                }
-                else
-                if (event.data.type === "error") {
+                    console.log("[Worker-LOG/debug]", event.data.data);
+                } else if (event.data.type === "error") {
                     console.error("[Worker-LOG/error]", event.data.data);
-                }
-                else {
+                } else {
                     console.log(event.data);
                 }
             } catch (e) {
                 console.error("[Worker]: invalid event");
             }
         };
-        this.worker.onerror = e => console.error(e);
+        this.worker.onerror = (e) => console.error(e);
 
         this.worker.postMessage(<InitializeEvent>{
-            operation: 'initialize'
+            operation: "initialize",
         });
     }
 
@@ -67,20 +64,20 @@ export class WebWorker {
         }
         this.worker.postMessage(<SetKeysEvent>{
             operation: "setKeys",
-            keys
+            keys,
         });
     }
 
     createWorkerFromFunction(workerFunction: Function) {
         const blob = new Blob([`(${workerFunction.toString()})()`], {
-            type: 'application/javascript'
+            type: "application/javascript",
         });
         return new Worker(URL.createObjectURL(blob));
     }
 
     async createWorkerFromScript(scriptUrl: string) {
-        const scriptContent = await fetch(scriptUrl).then(r => r.text());
-        const blob = new Blob([scriptContent], { type: 'application/javascript' });
+        const scriptContent = await fetch(scriptUrl).then((r) => r.text());
+        const blob = new Blob([scriptContent], { type: "application/javascript" });
         const workerUrl = URL.createObjectURL(blob);
         const worker = new Worker(workerUrl);
 
@@ -93,6 +90,5 @@ export class WebWorker {
 // }
 
 function workerScript() {
-    return '';
+    return "";
 }
-

@@ -8,7 +8,7 @@ export interface StreamRoomCreateRequest extends AppRequest {
         managers: Types.UserWithPubKey[];
         privateMeta: Uint8Array;
         publicMeta: Uint8Array;
-    }
+    };
 }
 
 export interface StreamRoomUpdateRequest extends AppRequest {
@@ -19,14 +19,14 @@ export interface StreamRoomUpdateRequest extends AppRequest {
         managers: Types.UserWithPubKey[];
         privateMeta: string;
         publicMeta: string;
-    }
+    };
 }
 
 export interface StreamRoomGetRequest extends AppRequest {
     kind: "streams.streamRoomGet";
     data: {
         streamRoomId: Types.StreamRoomId;
-    }
+    };
 }
 
 export interface StreamRoomListRequest extends AppRequest {
@@ -34,14 +34,14 @@ export interface StreamRoomListRequest extends AppRequest {
     data: {
         contextId: string;
         query: Types.ListQuery;
-    }
+    };
 }
 
 export interface StreamRoomDeleteRequest extends AppRequest {
     kind: "streams.streamRoomDelete";
     data: {
         streamRoomId: Types.StreamRoomId;
-    }
+    };
 }
 
 export interface StreamCreateRequest extends AppRequest {
@@ -49,7 +49,7 @@ export interface StreamCreateRequest extends AppRequest {
     data: {
         streamRoomId: Types.StreamRoomId;
         meta?: Types.StreamCreateMeta;
-    }
+    };
 }
 
 export interface StreamUpdateRequest extends AppRequest {
@@ -57,7 +57,7 @@ export interface StreamUpdateRequest extends AppRequest {
     data: {
         streamId: Types.StreamId;
         meta: Types.StreamCreateMeta;
-    }
+    };
 }
 
 export interface StreamListRequest extends AppRequest {
@@ -65,7 +65,7 @@ export interface StreamListRequest extends AppRequest {
     data: {
         streamRoomId: Types.StreamRoomId;
         query: Types.ListQuery;
-    }
+    };
 }
 
 export interface StreamGetRequest extends AppRequest {
@@ -73,7 +73,7 @@ export interface StreamGetRequest extends AppRequest {
     data: {
         streamRoomId: Types.StreamRoomId;
         streamId: Types.StreamId;
-    }
+    };
 }
 
 export interface StreamDeleteRequest extends AppRequest {
@@ -81,17 +81,17 @@ export interface StreamDeleteRequest extends AppRequest {
     data: {
         streamRoomId: Types.StreamRoomId;
         streamId: Types.StreamId;
-    }
+    };
 }
 
 export interface StreamDataTrackAddRequest extends AppRequest {
     kind: "streams.streamDataTrackAdd";
     data: {
-        streamRoomId: Types.StreamRoomId,
-        streamTrackId: Types.StreamTrackId,
-        streamId: Types.StreamId,
-        meta: Types.DataChannelMeta
-    }
+        streamRoomId: Types.StreamRoomId;
+        streamTrackId: Types.StreamTrackId;
+        streamId: Types.StreamId;
+        meta: Types.DataChannelMeta;
+    };
 }
 
 export interface StreamTrackRemoveRequest extends AppRequest {
@@ -100,7 +100,7 @@ export interface StreamTrackRemoveRequest extends AppRequest {
         streamId: Types.StreamId;
         streamRoomId: Types.StreamRoomId;
         streamTrackId: Types.StreamTrackId;
-    }
+    };
 }
 
 export interface StreamTrackListRequest extends AppRequest {
@@ -108,7 +108,7 @@ export interface StreamTrackListRequest extends AppRequest {
     data: {
         streamId: Types.StreamId;
         streamRoomId: Types.StreamRoomId;
-    }
+    };
 }
 
 export interface StreamTrackSendDataRequest extends AppRequest {
@@ -116,7 +116,7 @@ export interface StreamTrackSendDataRequest extends AppRequest {
     data: {
         streamTrackId: Types.StreamTrackId;
         data: Buffer;
-    }
+    };
 }
 
 export interface StreamPublishRequest extends AppRequest {
@@ -126,7 +126,7 @@ export interface StreamPublishRequest extends AppRequest {
         streamId: Types.StreamId;
         streamMeta?: Types.StreamCreateMeta;
         peerConnectionOffer: any;
-    }
+    };
 }
 
 export interface StreamUnpublishRequest extends AppRequest {
@@ -134,7 +134,7 @@ export interface StreamUnpublishRequest extends AppRequest {
     data: {
         streamRoomId: Types.StreamRoomId;
         streamId: Types.StreamId;
-    }
+    };
 }
 
 export interface StreamJoinRequest extends AppRequest {
@@ -142,14 +142,14 @@ export interface StreamJoinRequest extends AppRequest {
     data: {
         streamRoomId: Types.StreamRoomId;
         streamToJoin: Types.StreamAndTracksSelector;
-    }
+    };
 }
 
 export interface StreamLeaveRequest extends AppRequest {
     kind: "streams.streamLeave";
     data: {
         streamToLeave: Types.StreamAndTracksSelector;
-    }
+    };
 }
 
 export interface StreamDataChannelSendRequest extends AppRequest {
@@ -158,5 +158,5 @@ export interface StreamDataChannelSendRequest extends AppRequest {
         streamRoomId: Types.StreamRoomId;
         streamId: Types.StreamId;
         data: string;
-    }
+    };
 }

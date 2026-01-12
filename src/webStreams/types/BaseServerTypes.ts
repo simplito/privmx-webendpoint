@@ -9,4 +9,3 @@ export interface RequestOpaque {
     clientId?: string;
     request: AppRequest;
 }
-

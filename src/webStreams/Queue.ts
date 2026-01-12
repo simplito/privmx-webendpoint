@@ -64,7 +64,7 @@ export class Queue<T> implements Iterable<T> {
     }
 
     async awaiter() {
-        return new Promise<void>(resolve => setTimeout(() => resolve(), 5000));
+        return new Promise<void>((resolve) => setTimeout(() => resolve(), 5000));
     }
 
     [Symbol.iterator](): Iterator<T> {

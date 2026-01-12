@@ -10,6 +10,7 @@ limitations under the License.
 */
 
 import { EndpointFactory } from "./service/EndpointFactory";
+import { NativeError } from "./api/NativeError";
 import {
     EventQueue,
     StoreApi,
@@ -18,7 +19,7 @@ import {
     KvdbApi,
     Connection,
     CryptoApi,
-    BaseApi, 
+    BaseApi,
     StreamApi,
     ExtKey,
     EventApi,
@@ -27,7 +28,17 @@ import * as Types from "./Types";
 
 export {
     EndpointFactory as Endpoint,
+    NativeError,
     Types,
     EventQueue,
-    StoreApi, ThreadApi, InboxApi, KvdbApi, CryptoApi, StreamApi, Connection, BaseApi, ExtKey, EventApi  
+    StoreApi,
+    ThreadApi,
+    InboxApi,
+    KvdbApi,
+    CryptoApi,
+    StreamApi,
+    Connection,
+    BaseApi,
+    ExtKey,
+    EventApi,
 };

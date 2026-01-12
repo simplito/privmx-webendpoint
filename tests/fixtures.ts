@@ -41,8 +41,9 @@ export const test = base.extend<
             const hostPort = 3001 + id;
             const containerName = `privmx_e2e_worker_${id}`;
             const dbName = `privmx_e2e_db_${id}`;
-            const internalMongoUrl = `mongodb://test_mongodb:27017/${dbName}`; 
-            const localMongoUrl = internalMongoUrl.replace("test_mongodb", "localhost") + "?directConnection=true";
+            const internalMongoUrl = `mongodb://test_mongodb:27017/${dbName}`;
+            const localMongoUrl =
+                internalMongoUrl.replace("test_mongodb", "localhost") + "?directConnection=true";
 
             const envVars = [
                 `PRIVMX_PORT=3000`,
@@ -60,7 +61,9 @@ export const test = base.extend<
             await client.connect();
             const db = client.db(dbName);
 
-            try { execSync(`docker rm -f ${containerName}`, { stdio: "ignore" }); } catch {}
+            try {
+                execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
+            } catch {}
 
             execSync(
                 `docker run -d --name ${containerName} -p ${hostPort}:3000 \
@@ -68,23 +71,25 @@ export const test = base.extend<
                 ${envVars} \
                 --add-host=host.docker.internal:host-gateway \
                 ${dockerImage}`,
-                { stdio: "ignore" }
+                { stdio: "ignore" },
             );
 
             await waitForServerReady(hostPort, containerName);
 
-            await use({ 
-                hostPort, 
-                containerName, 
-                mongoUrl: internalMongoUrl, 
-                db, 
+            await use({
+                hostPort,
+                containerName,
+                mongoUrl: internalMongoUrl,
+                db,
                 mongoClient: client,
                 dockerImage,
-                envVars
+                envVars,
             });
 
             await client.close();
-            try { execSync(`docker rm -f ${containerName}`, { stdio: "ignore" }); } catch {}
+            try {
+                execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
+            } catch {}
         },
         { scope: "worker" },
     ],
@@ -94,12 +99,14 @@ export const test = base.extend<
         const localMongoUrl = mongoUrl.replace("test_mongodb", "localhost");
 
         try {
-            try { execSync(`docker stop ${containerName}`, { stdio: "ignore" }); } catch {}
+            try {
+                execSync(`docker stop ${containerName}`, { stdio: "ignore" });
+            } catch {}
             await db.dropDatabase();
 
             execSync(`docker start ${containerName}`, { stdio: "ignore" });
             await waitForServerReady(hostPort, containerName);
-            
+
             execSync(`docker stop ${containerName}`, { stdio: "ignore" });
 
             const datasetPath = path.resolve(__dirname, "./datasets");
@@ -113,9 +120,10 @@ export const test = base.extend<
                 mongoConnectionString: localMongoUrl,
                 dbName: db.databaseName,
             });
-
         } finally {
-            try { execSync(`docker stop ${containerName}`, { stdio: "ignore" }); } catch {}
+            try {
+                execSync(`docker stop ${containerName}`, { stdio: "ignore" });
+            } catch {}
             await db.dropDatabase();
         }
     },
@@ -147,7 +155,7 @@ export const test = base.extend<
         await use({ call: runCli });
     },
 
-   page: async ({ page }, use) => {
+    page: async ({ page }, use) => {
         await page.route("**/*", async (route) => {
             const request = route.request();
             const requestOrigin = (await request.headerValue("origin")) || "http://localhost:8080";
@@ -207,26 +215,28 @@ async function loadDataset(db: Db, basePath: string, dataSetName: string) {
 async function waitForServerReady(port: number, containerName: string) {
     const url = `http://localhost:${port}/privmx-configuration.json`;
     const deadline = Date.now() + 30000;
-    
+
     while (Date.now() < deadline) {
         try {
-            const isRunning = execSync(`docker inspect -f '{{.State.Running}}' ${containerName}`).toString().trim();
-            if (isRunning !== 'true') {
-                 printContainerLogs(containerName);
-                 throw new Error(`Container ${containerName} stopped unexpectedly.`);
+            const isRunning = execSync(`docker inspect -f '{{.State.Running}}' ${containerName}`)
+                .toString()
+                .trim();
+            if (isRunning !== "true") {
+                printContainerLogs(containerName);
+                throw new Error(`Container ${containerName} stopped unexpectedly.`);
             }
         } catch (e) {
-             throw new Error(`Container check failed: ${e}`);
+            throw new Error(`Container check failed: ${e}`);
         }
 
         try {
             const res = await fetch(url);
             if (res.ok) return;
         } catch {}
-        
+
         await new Promise((r) => setTimeout(r, 200));
     }
-    
+
     printContainerLogs(containerName);
     throw new Error(`Server failed to start on port ${port} within 30s`);
 }

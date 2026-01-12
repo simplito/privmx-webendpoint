@@ -12,31 +12,27 @@ limitations under the License.
 #ifndef _PRIVMXLIB_ENDPOINTWEB_STREAM_WEBRTCINTERFACEIMPL_HPP_
 #define _PRIVMXLIB_ENDPOINTWEB_STREAM_WEBRTCINTERFACEIMPL_HPP_
 
-#include <string>
-#include <vector>
-#include <memory>
-#include <functional>
-#include <emscripten.h>
-#include <emscripten/val.h>
-
-
-#include <emscripten/bind.h>
-#include <emscripten/proxying.h>
-#include <emscripten/emscripten.h>
-#include "Macros.hpp"
-#include "Mapper.hpp"
 #include <Poco/Dynamic/Var.h>
 #include <Poco/JSON/Object.h>
 #include <Poco/Types.h>
+#include <emscripten.h>
+#include <emscripten/bind.h>
+#include <emscripten/emscripten.h>
+#include <emscripten/proxying.h>
+#include <emscripten/val.h>
 
-#include <memory>
+#include <functional>
 #include <future>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "privmx/endpoint/stream/WebRTCInterface.hpp"
+#include "Macros.hpp"
+#include "Mapper.hpp"
 #include "privmx/endpoint/core/VarDeserializer.hpp"
 #include "privmx/endpoint/core/VarSerializer.hpp"
 #include "privmx/endpoint/stream/Types.hpp"
-
+#include "privmx/endpoint/stream/WebRTCInterface.hpp"
 
 namespace privmx {
 namespace webendpoint {
@@ -47,21 +43,22 @@ namespace stream {
 //     std::string type;
 // };
 
-class WebRtcInterfaceImpl : public endpoint::stream::WebRTCInterface
-{
+class WebRtcInterfaceImpl : public endpoint::stream::WebRTCInterface {
 public:
     WebRtcInterfaceImpl(int interfaceBindId);
     ~WebRtcInterfaceImpl() = default;
     std::string createOfferAndSetLocalDescription(const std::string& streamRoomId);
-    std::string createAnswerAndSetDescriptions(const std::string& streamRoomId, const std::string& sdp, const std::string& type);
-    void setAnswerAndSetRemoteDescription(const std::string& streamRoomId, const std::string& sdp, const std::string& type);
+    std::string createAnswerAndSetDescriptions(const std::string& streamRoomId, const std::string& sdp,
+                                               const std::string& type);
+    void setAnswerAndSetRemoteDescription(const std::string& streamRoomId, const std::string& sdp,
+                                          const std::string& type);
     std::string testAsync();
     void updateSessionId(const std::string& streamRoomId, const int64_t sessionId, const std::string& connectionType);
     void close(const std::string& streamRoomId);
     void updateKeys(const std::string& streamRoomId, const std::vector<privmx::endpoint::stream::Key>& keys);
+
 private:
     // void setRemoteDescription(const std::string& sdp, const std::string& type);
-
 
     // copy of verifier methods - to modify
     void printErrorInJS(const std::string& msg);
@@ -76,16 +73,16 @@ private:
 };
 
 class WebRtcInterfaceHolder {
-    public:
-        std::shared_ptr<WebRtcInterfaceImpl> getInstance(int interfaceBindId);
-        WebRtcInterfaceImpl* getRawPtr();
+public:
+    std::shared_ptr<WebRtcInterfaceImpl> getInstance(int interfaceBindId);
+    WebRtcInterfaceImpl* getRawPtr();
 
-    private:
-        std::shared_ptr<WebRtcInterfaceImpl> _webRtcInterface;
+private:
+    std::shared_ptr<WebRtcInterfaceImpl> _webRtcInterface;
 };
 
-} // namespace stream
-} // namespace endpoint
-} // namespace privmx
+}  // namespace stream
+}  // namespace webendpoint
+}  // namespace privmx
 
-#endif // _PRIVMXLIB_ENDPOINTWEB_STREAM_WEBRTCINTERFACEIMPL_HPP_
+#endif  // _PRIVMXLIB_ENDPOINTWEB_STREAM_WEBRTCINTERFACEIMPL_HPP_

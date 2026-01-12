@@ -8,8 +8,8 @@ This software is Licensed under the PrivMX Free License.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-#include <privmx/utils/Utils.hpp>
 #include <AsyncEngine.hpp>
+#include <privmx/utils/Utils.hpp>
 
 // clang-format off
 

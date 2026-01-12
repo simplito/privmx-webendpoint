@@ -136,86 +136,78 @@ emscripten::val Mapper::map(pson_value* res) {
     switch (type) {
         case PSON_NULL:
             return emscripten::val::null();
-        case PSON_BOOL:
-            {
-                int val;
-                pson_get_bool(res, &val);
-                return emscripten::val((bool)val);
+        case PSON_BOOL: {
+            int val;
+            pson_get_bool(res, &val);
+            return emscripten::val((bool)val);
+        }
+        case PSON_INT32: {
+            int32_t val;
+            pson_get_int32(res, &val);
+            return emscripten::val((int)val);
+        }
+        case PSON_INT64: {
+            int64_t val;
+            pson_get_int64(res, &val);
+            if (val < MIN_JS_SAFE_INTEGER || MAX_JS_SAFE_INTEGER < val) {
+                throw std::runtime_error("Number exceeded js safe integer range");
             }
-        case PSON_INT32:
-            {
-                int32_t val;
-                pson_get_int32(res, &val);
-                return emscripten::val((int)val);
+            bool isNegative = false;
+            if (val < 0) {
+                isNegative = true;
+                val *= -1;
             }
-        case PSON_INT64:
-            {
-                int64_t val;
-                pson_get_int64(res, &val);
-                if (val < MIN_JS_SAFE_INTEGER || MAX_JS_SAFE_INTEGER < val) {
-                    throw std::runtime_error("Number exceeded js safe integer range");
+            long mostPart = val / CANONICAL_NUMBER_FACTOR;
+            long leastPart = val % CANONICAL_NUMBER_FACTOR;
+            return emscripten::val::take_ownership(
+                convertCanonicalIntegerToJsSafeInteger(isNegative, mostPart, leastPart));
+        }
+        case PSON_FLOAT32: {
+            float val;
+            pson_get_float32(res, &val);
+            return emscripten::val(val);
+        }
+        case PSON_FLOAT64: {
+            double val;
+            pson_get_float64(res, &val);
+            return emscripten::val(val);
+        }
+        case PSON_STRING: {
+            const char* val = pson_get_cstring(res);
+            return emscripten::val::u8string(val);
+        }
+        case PSON_BINARY: {
+            const char* buf;
+            size_t size;
+            pson_inspect_binary(res, &buf, &size);
+            emscripten::val view{emscripten::typed_memory_view(size, buf)};
+            emscripten::val result = emscripten::val::global("Uint8Array").new_(size);
+            result.call<void>("set", view);
+            return result;
+        }
+        case PSON_ARRAY: {
+            size_t size;
+            pson_get_array_size(res, &size);
+            emscripten::val result = emscripten::val::array();
+            for (size_t i = 0; i < size; ++i) {
+                pson_value* element = pson_get_array_value(res, i);
+                result.call<int>("push", map(element));
+            }
+            return result;
+        }
+        case PSON_OBJECT: {
+            emscripten::val object = emscripten::val::object();
+            pson_object_iterator* it;
+            const char* key;
+            pson_value* val;
+            if (pson_open_object_iterator(res, &it)) {
+                while (pson_object_iterator_next(it, &key, &val)) {
+                    object.set(key, map(val));
                 }
-                bool isNegative = false;
-                if (val < 0) {
-                    isNegative = true;
-                    val *= -1;
-                }
-                long mostPart = val / CANONICAL_NUMBER_FACTOR;
-                long leastPart = val % CANONICAL_NUMBER_FACTOR;
-                return emscripten::val::take_ownership(convertCanonicalIntegerToJsSafeInteger(isNegative, mostPart, leastPart));
+                pson_close_object_iterator(it);
             }
-        case PSON_FLOAT32:
-            {
-                float val;
-                pson_get_float32(res, &val);
-                return emscripten::val(val);
-            }
-        case PSON_FLOAT64:
-            {
-                double val;
-                pson_get_float64(res, &val);
-                return emscripten::val(val);
-            }
-        case PSON_STRING:
-            {
-                const char* val = pson_get_cstring(res);
-                return emscripten::val::u8string(val);
-            }
-        case PSON_BINARY:
-            {
-                const char* buf;
-                size_t size;
-                pson_inspect_binary(res, &buf, &size);
-                emscripten::val view{emscripten::typed_memory_view(size, buf)};
-                emscripten::val result = emscripten::val::global("Uint8Array").new_(size);
-                result.call<void>("set", view);
-                return result;
-            }
-        case PSON_ARRAY:
-            {
-                size_t size;
-                pson_get_array_size(res, &size);
-                emscripten::val result = emscripten::val::array();
-                for (size_t i = 0; i < size; ++i) {
-                    pson_value* element = pson_get_array_value(res, i);
-                    result.call<int>("push", map(element));
-                }
-                return result;
-            }
-        case PSON_OBJECT:
-            {
-                emscripten::val object = emscripten::val::object();
-                pson_object_iterator* it;
-                const char* key;
-                pson_value* val;
-                if (pson_open_object_iterator(res, &it)) {
-                    while (pson_object_iterator_next(it, &key, &val)) {
-                        object.set(key, map(val));
-                    }
-                    pson_close_object_iterator(it);
-                }
-                return object;
-            }
+            return object;
+        }
         case PSON_INVALID:
         default: {
             // Convert core::Buffer

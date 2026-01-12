@@ -1,14 +1,14 @@
-export type SessionId = string & {_sessionId: never};
-export type TransactionId = string & {_transactionId: never};
+export type SessionId = string & { _sessionId: never };
+export type TransactionId = string & { _transactionId: never };
 
-export type PluginHandleId = number & {_pluginHandleId: never};
-export type PluginId = string & {_pluginId: never};
-export type UserToken = string & {_userToken: never};
+export type PluginHandleId = number & { _pluginHandleId: never };
+export type PluginId = string & { _pluginId: never };
+export type UserToken = string & { _userToken: never };
 
-export type VideoRoomRequestStatus = string & {_videoRoomStatus: never};
-export type VideoRoomId = number & {_videoRoomId: never};
-export type VideoRoomParticipantId = number & {_videoRoomParticipantId: never};
-export type VideoRoomPublisherId = number & {_videoRoomPublisherId: never};
+export type VideoRoomRequestStatus = string & { _videoRoomStatus: never };
+export type VideoRoomId = number & { _videoRoomId: never };
+export type VideoRoomParticipantId = number & { _videoRoomParticipantId: never };
+export type VideoRoomPublisherId = number & { _videoRoomPublisherId: never };
 
 export interface JanusSession {
     id: SessionId;
@@ -31,8 +31,8 @@ export interface JanusPluginHandle {
 }
 
 export interface VideoRoom {
-    room: VideoRoomId;          //<unique numeric ID, optional, chosen by plugin if missing>,  // <true|false, whether the room should be saved in the config file, default=false>,
-    description: string;   // "<pretty name of the room, optional>",
+    room: VideoRoomId; //<unique numeric ID, optional, chosen by plugin if missing>,  // <true|false, whether the room should be saved in the config file, default=false>,
+    description: string; // "<pretty name of the room, optional>",
     pin_required: boolean; // <true|false, whether a PIN is required to join this room>,
     is_private: boolean; // <true|false, whether this room is 'private' (as in hidden) or not>,
     max_publishers: number; // <how many publishers can actually publish via WebRTC at the same time>,
@@ -58,7 +58,6 @@ export interface VideoRoom {
     videoorient_ext: boolean; // <true|false, whether the video-orientation extension must be negotiated or not for new publishers>,
     playoutdelay_ext: boolean; //<true|false, whether the playout-delay extension must be negotiated or not for new publishers>,
     transport_wide_cc_ext: boolean; // <true|false, whether the transport wide cc extension must be negotiated or not for new publishers>
-
 }
 
 export interface PublisherInfo {
@@ -73,7 +72,7 @@ export interface StreamInfo {
     type: string; //"<type of published stream #1 (audio|video|data)">,
     mindex: string; // "<unique mindex of published stream #1>",
     mid: string; //"<unique mid of of published stream #1>",
-    disabled: boolean;  //<if true, it means this stream is currently inactive/disabled (and so codec, description, etc. will be missing)>,
+    disabled: boolean; //<if true, it means this stream is currently inactive/disabled (and so codec, description, etc. will be missing)>,
     codec: string; //"<codec used for published stream #1>",
     description: string; //"<text description of published stream #1, if any>",
     moderated: boolean; //<true if this stream audio has been moderated for this participant>,
@@ -90,14 +89,14 @@ export interface VideoRoomParticipant {
 }
 
 export interface CreateRoomOptions {
-    room?: string;          //<unique numeric ID, optional, chosen by plugin if missing>,
-    permanent?: boolean;    // <true|false, whether the room should be saved in the config file, default=false>,
-    description?: string;   // "<pretty name of the room, optional>",
-    secret?: string;        // "<password required to edit/destroy the room, optional>",
-    pin?: string;           // "<password required to join the room, optional>",
-    is_private?: boolean;   // <true|false, whether the room should appear in a list request>,
-    allowed?: UserToken[];  // [ array of string tokens users can use to join this room, optional],
-    publishers?: number;    
+    room?: string; //<unique numeric ID, optional, chosen by plugin if missing>,
+    permanent?: boolean; // <true|false, whether the room should be saved in the config file, default=false>,
+    description?: string; // "<pretty name of the room, optional>",
+    secret?: string; // "<password required to edit/destroy the room, optional>",
+    pin?: string; // "<password required to join the room, optional>",
+    is_private?: boolean; // <true|false, whether the room should appear in a list request>,
+    allowed?: UserToken[]; // [ array of string tokens users can use to join this room, optional],
+    publishers?: number;
     // TODO - dodac pozostale opcje
 }
 
@@ -108,16 +107,16 @@ export interface CreateRoomResult {
 }
 
 export interface EditRoomOptions {
-    room: VideoRoomId;          //<unique numeric ID, optional, chosen by plugin if missing>,
+    room: VideoRoomId; //<unique numeric ID, optional, chosen by plugin if missing>,
 
-//     permanent?: boolean;    // <true|false, whether the room should be saved in the config file, default=false>,
-    new_description?: string;   // "<pretty name of the room, optional>",
-//     secret?: string;        // "<password required to edit/destroy the room, optional>",
-//     pin?: string;           // "<password required to join the room, optional>",
-//     is_private?: boolean;   // <true|false, whether the room should appear in a list request>,
-//     allowed?: UserToken[];  // [ array of string tokens users can use to join this room, optional],
-//     publishers?: number;
-//  TODO - dodac pozostale opcje    
+    //     permanent?: boolean;    // <true|false, whether the room should be saved in the config file, default=false>,
+    new_description?: string; // "<pretty name of the room, optional>",
+    //     secret?: string;        // "<password required to edit/destroy the room, optional>",
+    //     pin?: string;           // "<password required to join the room, optional>",
+    //     is_private?: boolean;   // <true|false, whether the room should appear in a list request>,
+    //     allowed?: UserToken[];  // [ array of string tokens users can use to join this room, optional],
+    //     publishers?: number;
+    //  TODO - dodac pozostale opcje
 }
 
 export interface EditRoomResult {
@@ -168,15 +167,15 @@ export interface RoomAccessResult {
 export interface RoomKickOptions {
     secret?: string;
     room: VideoRoomId;
-    id: VideoRoomParticipantId; 
+    id: VideoRoomParticipantId;
 }
 
 export interface RoomModerateOptions {
     secret?: string;
     room: VideoRoomId;
     id: VideoRoomParticipantId;
-    mid: string;    // <mid of the m-line to refer to for this moderate request>,
-    mute: boolean;  // <true|false, depending on whether the media addressed by the above mid should be muted by the moderator>
+    mid: string; // <mid of the m-line to refer to for this moderate request>,
+    mute: boolean; // <true|false, depending on whether the media addressed by the above mid should be muted by the moderator>
 }
 
 export interface RoomListParticipantsOptions {
@@ -214,12 +213,10 @@ export interface RoomJoinStreamOptions {
     crossrefid?: string; // : "<id to map this subscription with entries in streams list; optional>"
 }
 
-
 export interface VideoRoomDescription {
     mid: string; //"<unique mid of a stream being published>"
     description?: string; //"<text description of the stream (e.g., My front webcam)>"
 }
-
 
 export interface RoomPublishOptions {
     videocodec?: string; // "<video codec to prefer among the negotiated ones; optional>",
@@ -251,11 +248,15 @@ export interface JoinedEvent {
     description: string;
     id: number;
     private_id: number;
-    publishers: NewPublisherEvent[]
+    publishers: NewPublisherEvent[];
 }
 
 // WebRTC-specific events (Media Server signalling)
-export type MediaServerSignallingEvent = WebRTCMediaEvent | WebRTCSHangupEvent | WebRTCSlowLinkEvent | WebRTCUpEvent;
+export type MediaServerSignallingEvent =
+    | WebRTCMediaEvent
+    | WebRTCSHangupEvent
+    | WebRTCSlowLinkEvent
+    | WebRTCUpEvent;
 export interface WebRTCUpEvent {
     eventType: "webrtcup";
     session_id: string;
@@ -266,7 +267,7 @@ export interface WebRTCMediaEvent {
     eventType: "media";
     session_id: string;
     sender: string;
-    type : "audio" | "video" | "data";
+    type: "audio" | "video" | "data";
     receiving: boolean;
 }
 

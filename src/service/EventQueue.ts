@@ -14,16 +14,18 @@ import { EventQueueNative } from "../api/EventQueueNative";
 import { Event } from "../Types";
 
 export class EventQueue extends BaseApi {
-
     private deferedPromise: Promise<Event>;
-    constructor(private native: EventQueueNative, ptr: number) {
+    constructor(
+        private native: EventQueueNative,
+        ptr: number,
+    ) {
         super(ptr);
     }
 
     async waitEvent(): Promise<Event> {
         if (!this.deferedPromise) {
-            this.deferedPromise = this.native.waitEvent(this.servicePtr, [])
-            this.deferedPromise.finally(() => this.deferedPromise = null);
+            this.deferedPromise = this.native.waitEvent(this.servicePtr, []);
+            this.deferedPromise.finally(() => (this.deferedPromise = null));
         }
         return this.deferedPromise;
     }

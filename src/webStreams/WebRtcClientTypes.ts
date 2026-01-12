@@ -35,9 +35,9 @@ export interface VideoStream {
 
 export type RemoteStreamListener = (stream: RTCTrackEvent) => void;
 
-export type PluginHandleId = number & {_pluginHandleId: never};
-export type PluginId = string & {_pluginId: never};
-export type SessionId = number & {_sessionId: never};
+export type PluginHandleId = number & { _pluginHandleId: never };
+export type PluginId = string & { _pluginId: never };
+export type SessionId = number & { _sessionId: never };
 export interface JanusPluginHandle {
     id: PluginHandleId;
     pluginId: PluginId;
@@ -52,17 +52,19 @@ export interface Publisher extends NewPublisherEvent {
 }
 
 export type EncPair = {
-  readable: ReadableStream<any>;
-  writable: WritableStream<any>;
-  id: string;
-  posted: boolean;
+    readable: ReadableStream<any>;
+    writable: WritableStream<any>;
+    id: string;
+    posted: boolean;
 };
 
-export interface RTCEncodedStream  {
-  readable: ReadableStream<EncodedAudioChunk | EncodedVideoChunk>;
-  writable: WritableStream<EncodedAudioChunk | EncodedVideoChunk>;
+export interface RTCEncodedStream {
+    readable: ReadableStream<EncodedAudioChunk | EncodedVideoChunk>;
+    writable: WritableStream<EncodedAudioChunk | EncodedVideoChunk>;
 }
 
 export interface QueueItem {
-    taskId: number, _room: StreamRoomId, offer: any;
+    taskId: number;
+    _room: StreamRoomId;
+    offer: any;
 }

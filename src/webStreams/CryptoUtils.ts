@@ -29,39 +29,39 @@ async function encryptWithAES256GCM(
     key: BufferLike,
     iv: BufferLike,
     data: BufferLike,
-    header: BufferLike
+    header: BufferLike,
 ): Promise<EncryptionResponse> {
     try {
         // Import the key for AES-GCM
         const cryptoKey: CryptoKey = await crypto.subtle.importKey(
-            'raw',
+            "raw",
             key,
-            { name: 'AES-GCM' },
+            { name: "AES-GCM" },
             false,
-            ['encrypt']
+            ["encrypt"],
         );
 
         // Encrypt the data
         const encrypted: ArrayBuffer = await crypto.subtle.encrypt(
             {
-                name: 'AES-GCM',
+                name: "AES-GCM",
                 iv: iv,
                 additionalData: header,
-                tagLength: 128 // 16 bytes * 8 = 128 bits (TAG_LEN equivalent)
+                tagLength: 128, // 16 bytes * 8 = 128 bits (TAG_LEN equivalent)
             },
             cryptoKey,
-            data
+            data,
         );
 
         // The encrypted result contains both ciphertext and authentication tag
         return {
             success: true,
-            data: new Uint8Array(encrypted)
+            data: new Uint8Array(encrypted),
         };
     } catch (error: unknown) {
         return {
             success: false,
-            error: 'EncryptionFailed'
+            error: "EncryptionFailed",
         };
     }
 }
@@ -70,40 +70,39 @@ async function decryptWithAES256GCM(
     key: BufferLike,
     iv: BufferLike,
     encryptedData: BufferLike,
-    header: BufferLike
+    header: BufferLike,
 ): Promise<DecryptionResponse> {
     try {
         const cryptoKey: CryptoKey = await crypto.subtle.importKey(
-            'raw',
+            "raw",
             key,
-            { name: 'AES-GCM' },
+            { name: "AES-GCM" },
             false,
-            ['decrypt']
+            ["decrypt"],
         );
 
         const decrypted: ArrayBuffer = await crypto.subtle.decrypt(
             {
-                name: 'AES-GCM',
+                name: "AES-GCM",
                 iv: iv,
                 additionalData: header,
-                tagLength: 128
+                tagLength: 128,
             },
             cryptoKey,
-            encryptedData
+            encryptedData,
         );
 
         return {
             success: true,
-            data: new Uint8Array(decrypted)
+            data: new Uint8Array(decrypted),
         };
     } catch (error: unknown) {
         return {
             success: false,
-            error: 'DecryptionFailed'
+            error: "DecryptionFailed",
         };
     }
 }
-
 
 // Type guard functions for better type safety
 function isEncryptionSuccess(result: EncryptionResponse): result is EncryptionResult {
@@ -121,5 +120,5 @@ export {
     isDecryptionSuccess,
     type EncryptionResponse,
     type DecryptionResponse,
-    type BufferLike
+    type BufferLike,
 };

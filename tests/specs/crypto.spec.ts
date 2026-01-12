@@ -49,6 +49,9 @@ const BIP39_DATA = {
 
 test.describe("CryptoTest", () => {
     test.beforeEach(async ({ page }) => {
+        page.on('console', (msg) => {
+            console.log(msg);
+        });
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
         await page.evaluate(async () => {
@@ -214,22 +217,28 @@ test.describe("CryptoTest", () => {
 
     test("Deriving BIP39 key form Entropy", async ({ page }) => {
         const result = await page.evaluate(async (data) => {
+            console.log("0")
             const cryptoApi = await window.Endpoint.createCryptoApi();
 
             // Helper: Hex String -> Uint8Array
             const fromHex = (hex: string) =>
                 new Uint8Array(hex.match(/.{1,2}/g)!.map((byte) => parseInt(byte, 16)));
-
+            console.log("1")
             const BIP39_entropy_UInt8 = fromHex(data.entropy_hex);
-
+            console.log("2s")
             const bip39 = await cryptoApi.fromEntropy(BIP39_entropy_UInt8);
+            console.log("3")
             const bip39_p = await cryptoApi.fromEntropy(BIP39_entropy_UInt8, data.password);
-
+            console.log("4")
+            const private_part_1 = await bip39.extKey.getPrivatePartAsBase58();
+            console.log("5");
+            const private_part_2 = await bip39_p.extKey.getPrivatePartAsBase58();
+            console.log("6");
             return {
                 bip39_mnemonic: bip39.mnemonic,
                 bip39_p_mnemonic: bip39_p.mnemonic,
-                bip39_PrivatePartAsBase58: await bip39.extKey.getPrivatePartAsBase58(),
-                bip39_p_PrivatePartAsBase58: await bip39_p.extKey.getPrivatePartAsBase58(),
+                bip39_PrivatePartAsBase58:private_part_1,
+                bip39_p_PrivatePartAsBase58: private_part_2,
             };
         }, BIP39_DATA);
 

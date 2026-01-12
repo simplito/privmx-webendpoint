@@ -2,7 +2,6 @@ import { TurnCredentials } from "../Types";
 import { PeerCredentials } from "./WebRtcClientTypes";
 
 export class WebRtcConfig {
-
     // TMP IV
     private static iv: string = "uMuF0aaCZ6+kLrwp";
     // TMP key
@@ -10,7 +9,7 @@ export class WebRtcConfig {
 
     private static iceTransportPolicy: RTCIceTransportPolicy = "all";
     private static appServer: string = "localhost:8810";
-    
+
     public static getIV() {
         return this.iv;
     }
@@ -20,9 +19,7 @@ export class WebRtcConfig {
 
     // Default turn servers
     public static getTurnServers(): string[] {
-        return [
-            "turn:172.16.238.1:3478"
-        ];
+        return ["turn:172.16.238.1:3478"];
     }
 
     public static getRTCIceTransportPolicy() {
@@ -32,8 +29,8 @@ export class WebRtcConfig {
     // public static generateTurnConfiguration(credentials: PeerCredentials|undefined) {
     //     const servers: RTCIceServer[] = this.getTurnServers().map(x => (
     //         {
-    //             urls: x, 
-    //             username: credentials && credentials.username ? credentials.username : undefined, 
+    //             urls: x,
+    //             username: credentials && credentials.username ? credentials.username : undefined,
     //             credential: credentials && credentials.password ? credentials.password : undefined
     //         }
     //     ));
@@ -45,15 +42,15 @@ export class WebRtcConfig {
 
     public static generateTurnConfiguration(credentials: TurnCredentials[]) {
         return {
-            iceServers: credentials.map(x => {
+            iceServers: credentials.map((x) => {
                 return {
                     urls: x.url,
                     username: x.username,
-                    credential: x.password
-                }
+                    credential: x.password,
+                };
             }),
-            iceTransportPolicy: this.iceTransportPolicy
-        }
+            iceTransportPolicy: this.iceTransportPolicy,
+        };
     }
 
     public static getAppServerAddress() {

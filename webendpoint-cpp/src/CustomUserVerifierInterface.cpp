@@ -53,16 +53,19 @@ void CustomUserVerifierInterface::printErrorInJS(const std::string& msg) {
     print_error_main(msg.c_str());
 }
 
-Poco::Dynamic::Var CustomUserVerifierInterface::callVerifierOnJS(const std::string& methodName, const Poco::Dynamic::Var& params) {
-    int bindIdVal = _interfaceBindId; 
-    
-    auto ftr = AsyncEngine::getInstance()->callJsAsync([=](int id) {
-        emscripten::val jsName = emscripten::val::u8string(methodName.c_str());
-        emscripten::val jsBindId = emscripten::val(bindIdVal);
-        Poco::Dynamic::Var localParams = params; 
-        emscripten::val jsParams = Mapper::map((pson_value*)&localParams);
-        verifier_caller(jsName.as_handle(), jsParams.as_handle(), jsBindId.as_handle(), id);
-    }, ThreadTarget::Worker);
+Poco::Dynamic::Var CustomUserVerifierInterface::callVerifierOnJS(const std::string& methodName,
+                                                                 const Poco::Dynamic::Var& params) {
+    int bindIdVal = _interfaceBindId;
+
+    auto ftr = AsyncEngine::getInstance()->callJsAsync(
+        [=](int id) {
+            emscripten::val jsName = emscripten::val::u8string(methodName.c_str());
+            emscripten::val jsBindId = emscripten::val(bindIdVal);
+            Poco::Dynamic::Var localParams = params;
+            emscripten::val jsParams = Mapper::map((pson_value*)&localParams);
+            verifier_caller(jsName.as_handle(), jsParams.as_handle(), jsBindId.as_handle(), id);
+        },
+        ThreadTarget::Worker);
     return ftr.get();
 }
 

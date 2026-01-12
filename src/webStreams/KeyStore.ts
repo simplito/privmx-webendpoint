@@ -3,7 +3,7 @@ import { Key } from "../Types";
 export class KeyStore {
     private _keys: Map<string, Key> = new Map<string, Key>();
     private _encryptionKeyId: string = undefined;
-    
+
     setKeys(keys: Key[]) {
         this._keys.clear();
         for (const k of keys) {
