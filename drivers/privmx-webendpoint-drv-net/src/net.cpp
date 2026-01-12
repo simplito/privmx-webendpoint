@@ -24,6 +24,8 @@ limitations under the License.
 #include <memory>
 #include <string>
 #include <thread>
+#include <future>
+#include <vector>
 
 #include "Mapper.hpp"
 #include "privmx/drv/websocket.h"
@@ -52,6 +54,7 @@ EM_JS(emscripten::EM_VAL, getOrigin, (const char* url), {
 EM_JS(void, callJSFetch_async, (emscripten::EM_VAL val_handle, int callId), {
     let params = Emval.toValue(val_handle);
     let result = {status: -1, data: "", error: ""};
+    
     fetch(params.url, params)
         .then(response => {
             return Promise.all([response.status, response.arrayBuffer()]);
@@ -70,32 +73,28 @@ EM_JS(void, callJSFetch_async, (emscripten::EM_VAL val_handle, int callId), {
 
 std::thread wsWorker = std::thread([] { emscripten_runtime_keepalive_push(); });
 
-std::future<Poco::Dynamic::Var> HTTPSendAsync(const std::string& data, const std::string& url,
-                                              const std::string& content_type, bool get,
-                                              const std::map<std::string, std::string>& request_headers,
-                                              bool keepAlive) {
-    return AsyncEngine::getInstance()->callJsAsync(
-        [&](int callId) {
-            emscripten::val params = emscripten::val::object();
-            emscripten::val headers = emscripten::val::object();
-
-            params.set("url", url);
-            params.set("method", get ? "GET" : "POST");
-
-            if (!get) {
-                params.set("body", emscripten::val::global("Uint8Array")
-                                       .new_(emscripten::typed_memory_view(data.size(), data.data())));
-
-                headers.set("Content-Type", content_type);
-                for (const auto& [key, value] : request_headers) {
-                    headers.set(key, value);
-                }
+std::future<Poco::Dynamic::Var> HTTPSendAsync(const std::string& data, const std::string& url, const std::string& content_type, bool get, const std::map<std::string,std::string>& request_headers, bool keepAlive) {
+    return AsyncEngine::getInstance()->callJsAsync([=](int callId) {
+        emscripten::val params = emscripten::val::object();
+        emscripten::val headers = emscripten::val::object();
+        
+        params.set("url", url);
+        params.set("method", get ? "GET" : "POST");
+        
+        if (!get) {
+            params.set("body", emscripten::val::global("Uint8Array").new_(emscripten::typed_memory_view(data.size(), data.data())));
+            
+            headers.set("Content-Type", content_type);
+            for (const auto& [key, value]: request_headers){
+                headers.set(key, value);
             }
-            if (keepAlive) headers.set("Connection", "Keep-Alive");
-            params.set("headers", headers);
-            callJSFetch_async(params.as_handle(), callId);
-        },
-        ThreadTarget::Worker);
+        }
+        if (keepAlive) headers.set("Connection", "Keep-Alive");
+        params.set("headers", headers);
+        
+        callJSFetch_async(params.as_handle(), callId);
+
+    }, ThreadTarget::Worker);
 }
 
 int privmxDrvNet_version(unsigned int* version) {
@@ -172,34 +171,44 @@ int privmxDrvNet_wsConnect(const privmxDrvNet_WsOptions* options, void (*onopen)
     std::string cpp_str_uri("ws");
     cpp_str_uri.append(std::string(options->url).substr(4));
 
-    // Use callJsAsync to run wsCreateWebSocket on the Main Thread
-    int websocketId;
-    AsyncEngine::getInstance()->dispatchToThread(
-        [&] {
-            try {
-                // --- RUNS ON MAIN THREAD ---
-                websocketId = wsCreateWebSocket(cpp_str_uri.c_str());
-                wsSetUserPointer(websocketId, ctx);
-                wsSetOpenCallback(websocketId, onopen);
-                wsSetErrorCallback(websocketId, onerror);
-                wsSetMessageCallback(websocketId, onmessage);
-                wsSetCloseCallback(websocketId, onclose);
-            } catch (...) {}
-        },
-        wsWorker.native_handle());
+    auto promise = std::make_shared<std::promise<int>>();
+    auto future = promise->get_future();
+
+    AsyncEngine::getInstance()->dispatchToThread([=, uri = cpp_str_uri]{
+        try {
+            int id = wsCreateWebSocket(uri.c_str());
+            
+            wsSetUserPointer(id, ctx);
+            wsSetOpenCallback(id, onopen);
+            wsSetErrorCallback(id, onerror);
+            wsSetMessageCallback(id, onmessage);
+            wsSetCloseCallback(id, onclose);
+            
+            promise->set_value(id);
+        } catch (...) {
+            promise->set_value(-1);
+        }
+    }, wsWorker.native_handle());
+
+    int websocketId = future.get();
+
+    if (websocketId < 0) {
+        return 1;
+    }
 
     *res = new privmxDrvNet_Ws{.websocketId = websocketId};
     return 0;
 }
 
 int privmxDrvNet_wsClose(privmxDrvNet_Ws* ws) {
-    AsyncEngine::getInstance()->dispatchToThread(
-        [&] {
-            try {
-                wsDeleteWebSocket(ws->websocketId);
-            } catch (...) {}
-        },
-        wsWorker.native_handle());
+    if (!ws) return 1;
+    int id = ws->websocketId;
+
+    AsyncEngine::getInstance()->dispatchToThread([id]{
+        try {
+            wsDeleteWebSocket(id);
+        } catch(...) {}
+    }, wsWorker.native_handle());
     return 0;
 }
 
@@ -209,15 +218,22 @@ int privmxDrvNet_wsFree(privmxDrvNet_Ws* ws) {
 }
 
 int privmxDrvNet_wsSend(privmxDrvNet_Ws* ws, const char* data, int datalen) {
-    int result = -1;
-    AsyncEngine::getInstance()->dispatchToThread(
-        [&] {
-            try {
-                result = wsSendMessage(ws->websocketId, data, datalen);
-            } catch (...) {}
-        },
-        wsWorker.native_handle());
-    if (result <= 0) {
+    if (!ws) return 1;
+    std::string dataCopy(data, datalen);
+    int id = ws->websocketId;
+    auto promise = std::make_shared<std::promise<int>>();
+    auto future = promise->get_future();
+    AsyncEngine::getInstance()->dispatchToThread([=, dataStr = std::move(dataCopy)]() mutable {
+        try {
+            int res = wsSendMessage(id, dataStr.c_str(), dataStr.size());
+            promise->set_value(res);
+        } catch(...) {
+            promise->set_value(-1);
+        }
+    }, wsWorker.native_handle());
+    int result = future.get();
+
+    if(result <= 0){
         return 1;
     }
     return 0;

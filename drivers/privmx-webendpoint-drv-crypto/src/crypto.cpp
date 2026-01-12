@@ -74,15 +74,12 @@ EM_JS(bool,checkIfWorker,(void),{
     }
 });
 
-// clang-format on
-
-std::string hmac(const std::string& engine, const char* key, unsigned int keylen, const char* data, int datalen) {
-    auto future = AsyncEngine::getInstance()->callJsAsync(
-        [&](int callId) {
-            val params = val::object();
-            params.set("engine", engine);
-            params.set("data", createUint8Array(data, datalen));
-            params.set("key", createUint8Array(key, keylen));
+std::string hmac(const std::string& engine, const char* key, unsigned int keylen, const char* data, int datalen){
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
+        val params = val::object();
+        params.set("engine", engine);
+        params.set("data", createUint8Array(data, datalen));
+        params.set("key", createUint8Array(key, keylen));
 
             performCryptoCall("hmac", params.as_handle(), callId);
         },
@@ -132,13 +129,11 @@ int privmxDrvCrypto_randomBytes(char* buf, unsigned int len) {
 int privmxDrvCrypto_md(const char* data, int datalen, const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateSHAConfig(config);
 
-    auto future = AsyncEngine::getInstance()->callJsAsync(
-        [&](int callId) {
-            val params = val::object();
-            params.set("data", createUint8Array(data, datalen));
-            performCryptoCall(str_config.c_str(), params.as_handle(), callId);
-        },
-        CRYPTO_THREAD);
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
+        val params = val::object();
+        params.set("data", createUint8Array(data, datalen));
+        performCryptoCall(str_config.c_str(), params.as_handle(), callId);
+    }, CRYPTO_THREAD);
 
     try {
         std::string res = extractCryptoResult(future);
@@ -169,20 +164,18 @@ int privmxDrvCrypto_hmac(const char* key, unsigned int keylen, const char* data,
 int privmxDrvCrypto_aesEncrypt(const char* key, const char* iv, const char* data, unsigned int datalen,
                                const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateAESConfig(config);
-
-    auto future = AsyncEngine::getInstance()->callJsAsync(
-        [&](int callId) {
-            val params = val::object();
-            params.set("data", createUint8Array(data, datalen));
-            params.set("key", createUint8Array(key, 32));
-
-            if (str_config != "aes256Ecb" && iv != nullptr) {
-                params.set("iv", createUint8Array(iv, 16));
-            }
-
-            performCryptoCall((str_config + "Encrypt").c_str(), params.as_handle(), callId);
-        },
-        CRYPTO_THREAD);
+    
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
+        val params = val::object();
+        params.set("data", createUint8Array(data, datalen));
+        params.set("key", createUint8Array(key, 32));
+        
+        if (str_config != "aes256Ecb" && iv != nullptr) {
+            params.set("iv", createUint8Array(iv, 16));
+        }
+        
+        performCryptoCall((str_config + "Encrypt").c_str(), params.as_handle(), callId);
+    }, CRYPTO_THREAD);
 
     try {
         std::string res = extractCryptoResult(future);
@@ -199,19 +192,17 @@ int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data
                                const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateAESConfig(config);
 
-    auto future = AsyncEngine::getInstance()->callJsAsync(
-        [&](int callId) {
-            val params = val::object();
-            params.set("data", createUint8Array(data, datalen));
-            params.set("key", createUint8Array(key, 32));
-
-            if (str_config != "aes256Ecb" && iv != nullptr) {
-                params.set("iv", createUint8Array(iv, 16));
-            }
-
-            performCryptoCall((str_config + "Decrypt").c_str(), params.as_handle(), callId);
-        },
-        CRYPTO_THREAD);
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
+        val params = val::object();
+        params.set("data", createUint8Array(data, datalen));
+        params.set("key", createUint8Array(key, 32));
+        
+        if (str_config != "aes256Ecb" && iv != nullptr) {
+            params.set("iv", createUint8Array(iv, 16));
+        }
+        
+        performCryptoCall((str_config + "Decrypt").c_str(), params.as_handle(), callId);
+    }, CRYPTO_THREAD);
 
     try {
         std::string res = extractCryptoResult(future);
@@ -224,20 +215,17 @@ int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data
     }
 }
 
-int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* salt, unsigned int saltlen, int rounds,
-                           unsigned int length, const char* hash, char** out, unsigned int* outlen) {
-    auto future = AsyncEngine::getInstance()->callJsAsync(
-        [&](int callId) {
-            val params = val::object();
-            params.set("password", std::string(pass, passlen));
-            params.set("salt", std::string(salt, saltlen));
-            params.set("rounds", rounds);
-            params.set("length", length);
-            params.set("hash", std::string(hash));
-
-            performCryptoCall("pbkdf2", params.as_handle(), callId);
-        },
-        CRYPTO_THREAD);
+int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* salt, unsigned int saltlen, int rounds, unsigned int length, const char* hash, char** out, unsigned int* outlen){
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
+        val params = val::object();
+        params.set("password", std::string(pass,passlen));
+        params.set("salt", std::string(salt,saltlen));
+        params.set("rounds", rounds);
+        params.set("length", length);
+        params.set("hash", std::string(hash));
+        
+        performCryptoCall("pbkdf2", params.as_handle(), callId);
+    }, CRYPTO_THREAD);
 
     try {
         std::string res = extractCryptoResult(future);

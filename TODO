@@ -1,0 +1,6 @@
+Klucze:
+    ✔ zamiast przekazywac pojedynczy klucz do workera, trzeba po jego stronie utowrzyc keyStore i zbindowac go przy pomocy postMessage() z keyStore z webrtcClient @done(25-07-16 17:11)
+    ✔ dodac encrypt/decrypt i cala klase szyfrowania jak w C++ (kod dostepny na cloude) @done(25-07-16 17:11)
+
+    - dodac UI do zmiany usera, bo serwer blokuje sluchanie samego siebie
+    

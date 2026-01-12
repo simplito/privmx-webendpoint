@@ -9,6 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 #include <privmx/utils/Utils.hpp>
+#include <AsyncEngine.hpp>
 
 // clang-format off
 

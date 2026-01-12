@@ -18,7 +18,8 @@ import {
     KvdbApi,
     Connection,
     CryptoApi,
-    BaseApi,
+    BaseApi, 
+    StreamApi,
     ExtKey,
     EventApi,
 } from "./service";
@@ -28,13 +29,5 @@ export {
     EndpointFactory as Endpoint,
     Types,
     EventQueue,
-    StoreApi,
-    ThreadApi,
-    InboxApi,
-    KvdbApi,
-    CryptoApi,
-    Connection,
-    BaseApi,
-    ExtKey,
-    EventApi,
+    StoreApi, ThreadApi, InboxApi, KvdbApi, CryptoApi, StreamApi, Connection, BaseApi, ExtKey, EventApi  
 };

@@ -29,11 +29,10 @@ using namespace emscripten;
 using namespace privmx::webendpoint;
 
 namespace {
-
-template<typename T>
-T runEccOp(const std::string& method, const Poco::Dynamic::Var& paramsVar) {
-    auto future = AsyncEngine::getInstance()->callJsAsync(
-        [&](int callId) {
+    
+    template<typename T>
+    T runEccOp(const std::string& method, const Poco::Dynamic::Var& paramsVar) {
+            auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
             Poco::Dynamic::Var localParams = paramsVar;
             emscripten::val jsParams = Mapper::map((pson_value*)&localParams);
             performBindingsCall(method, jsParams, callId);
@@ -53,9 +52,9 @@ T runEccOp(const std::string& method, const Poco::Dynamic::Var& paramsVar) {
     return obj->getValue<T>("buff");
 }
 
-Poco::JSON::Object::Ptr runEccOpObj(const std::string& method, const Poco::Dynamic::Var& paramsVar) {
-    auto future = AsyncEngine::getInstance()->callJsAsync(
-        [&](int callId) {
+    Poco::JSON::Object::Ptr runEccOpObj(const std::string& method, const Poco::Dynamic::Var& paramsVar) {
+        
+        auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
             Poco::Dynamic::Var localParams = paramsVar;
             emscripten::val jsParams = Mapper::map((pson_value*)&localParams);
             performBindingsCall(method, jsParams, callId);

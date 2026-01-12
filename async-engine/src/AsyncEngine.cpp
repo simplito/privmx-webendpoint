@@ -64,7 +64,7 @@ AsyncEngine* AsyncEngine::getInstance() {
 
 AsyncEngine::AsyncEngine() {
     _pool = std::make_unique<WorkerPool>(4);
-    _taskManagerThread = std::thread([&] { emscripten_runtime_keepalive_push(); });
+    _taskManagerThread = std::thread([=] { emscripten_runtime_keepalive_push(); });
 }
 
 AsyncEngine::~AsyncEngine() {}
@@ -104,13 +104,13 @@ void AsyncEngine::executeWorkerTask(int taskId, const std::function<Poco::Dynami
                 }
             }
             if (!handled || errorObj->size() == 0) {
-                try {
+                 try {
                     throw;
-                } catch (const std::exception& e) {
+                 } catch (const std::exception& e) {
                     errorObj->set("error", e.what());
-                } catch (...) {
+                 } catch (...) {
                     errorObj->set("error", "Unknown Error");
-                }
+                 }
             }
             result->set("error", errorObj);
         }
@@ -166,27 +166,29 @@ void AsyncEngine::postResultToMain(const Poco::Dynamic::Var& result) {
 
 void AsyncEngine::dispatchToMainThread(const std::function<void(void)>& task) {
     if (pthread_self() != _mainThread) {
-        _proxingQueue.proxySync(_mainThread, [&] { task(); });
+        _proxingQueue.proxyAsync(_mainThread, [=]{
+            task();
+        });
     } else {
         task();
     }
 }
 
 void AsyncEngine::dispatchToThread(const std::function<void(void)>& task, pthread_t target) {
-    _proxingQueue.proxySync(target, [&] { task(); });
+    _proxingQueue.proxyAsync(target, [=]{
+        task();
+    });
 }
 
 std::future<Poco::Dynamic::Var> AsyncEngine::callJsAsync(std::function<void(int callId)> starterFunc,
                                                          ThreadTarget target) {
     auto prms = std::make_shared<std::promise<Poco::Dynamic::Var>>();
     std::future<Poco::Dynamic::Var> ftr = prms->get_future();
-
     int id = _nextCallId++;
     {
         std::lock_guard<std::mutex> lock(_promiseMutex);
         _promises[id] = prms;
     }
-
     if (target == ThreadTarget::Main) {
         _proxingQueue.proxyAsync(_mainThread, [starterFunc, id] { starterFunc(id); });
     } else {
