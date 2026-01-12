@@ -1,8 +1,8 @@
 import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
-import { ThreadEventSelectorType, ThreadEventType } from "../../dist/Types";
-import type { Endpoint } from "../../dist";
+import { ThreadEventSelectorType, ThreadEventType } from "../../src/Types";
+import type { Endpoint } from "../../src";
 import { setupUsers } from "../test-utils";
 
 declare global {

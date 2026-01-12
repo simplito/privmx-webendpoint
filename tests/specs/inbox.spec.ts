@@ -1,9 +1,9 @@
 import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
-import type { Endpoint } from "../../dist";
+import type { Endpoint } from "../../src";
 import { setupUsers } from "../test-utils";
-import { ContainerPolicy, SortOrder } from "../../dist/Types";
+import { ContainerPolicy, SortOrder } from "../../src/Types";
 
 declare global {
     interface Window {

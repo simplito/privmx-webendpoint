@@ -1,7 +1,7 @@
 import { CliContext, test } from "../fixtures";
 import { expect, Page } from "@playwright/test";
 import { testData } from "../datasets/testData";
-import type { Endpoint } from "../../dist";
+import type { Endpoint } from "../../src";
 import { setupTestUser } from "../test-utils";
 
 declare global {

@@ -1,6 +1,6 @@
 import { test } from "../fixtures";
 import { expect } from "@playwright/test";
-import type { Endpoint, Types } from "../../dist";
+import type { Endpoint, Types } from "../../src";
 import { testData } from "../datasets/testData";
 
 // 1. Extend Window interface globally for TypeScript support inside evaluate
