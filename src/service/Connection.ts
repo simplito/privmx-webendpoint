@@ -115,13 +115,9 @@ export class Connection extends BaseApi {
      *
      */
     async disconnect(): Promise<void> {
-        console.log("native 1");
         await this.native.disconnect(this.servicePtr, []);
-        console.log("native 2");
         await this.freeApis();
-        console.log("native 3");
         await this.native.deleteConnection(this.servicePtr);
-        console.log("native 4");
     }
 
     /**

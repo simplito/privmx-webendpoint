@@ -1139,7 +1139,7 @@ test.describe("KvdbTest", () => {
         }, args);
     });
 
-    test.fixme("Trying to accessing data using publicAccount", async ({ page, backend, cli }) => {
+    test("Trying to accessing data using publicAccount", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,

@@ -616,7 +616,7 @@ test.describe("StoreTest", () => {
         expect(result.file).toBeDefined();
     });
 
-    test.fixme("Access Control: Unauthorized & Public Access", async ({ page, backend, cli }) => {
+    test("Access Control: Unauthorized & Public Access", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,

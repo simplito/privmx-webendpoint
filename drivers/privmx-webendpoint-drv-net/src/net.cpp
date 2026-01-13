@@ -77,7 +77,7 @@ std::future<Poco::Dynamic::Var> HTTPSendAsync(const std::string& data, const std
                                               const std::map<std::string, std::string>& request_headers,
                                               bool keepAlive) {
     return AsyncEngine::getInstance()->callJsAsync(
-        [=](int callId) {
+        [&](int callId) {
             emscripten::val params = emscripten::val::object();
             emscripten::val headers = emscripten::val::object();
 

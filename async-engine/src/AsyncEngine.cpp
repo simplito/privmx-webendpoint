@@ -166,14 +166,14 @@ void AsyncEngine::postResultToMain(const Poco::Dynamic::Var& result) {
 
 void AsyncEngine::dispatchToMainThread(const std::function<void(void)>& task) {
     if (pthread_self() != _mainThread) {
-        _proxingQueue.proxyAsync(_mainThread, [=] { task(); });
+        _proxingQueue.proxySync(_mainThread, [&] { task(); });
     } else {
         task();
     }
 }
 
 void AsyncEngine::dispatchToThread(const std::function<void(void)>& task, pthread_t target) {
-    _proxingQueue.proxyAsync(target, [=] { task(); });
+    _proxingQueue.proxySync(target, [&] { task(); });
 }
 
 std::future<Poco::Dynamic::Var> AsyncEngine::callJsAsync(std::function<void(int callId)> starterFunc,

@@ -620,7 +620,7 @@ test.describe("InboxTest", () => {
         expect(result.entryMeta.files).toHaveLength(2);
     });
 
-    test.fixme("Sending entry as Public user", async ({ page, backend, cli }) => {
+    test("Sending entry as Public user", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -654,12 +654,7 @@ test.describe("InboxTest", () => {
             const apiPub = await Endpoint.createInboxApi(connPub, threadApiPub, storeApiPub);
 
             const fh = await apiPub.createFileHandle(enc.encode("p"), enc.encode("p"), 0);
-            const h = await apiPub.prepareEntry(
-                iId,
-                enc.encode("pub_entry"),
-                [fh],
-                users.u1.pubKey,
-            ); // Encrypting for target (User1)
+            const h = await apiPub.prepareEntry(iId, enc.encode("pub_entry"), [fh]); // Encrypting for target (User1)
             await apiPub.sendEntry(h);
 
             // User 1 Verifies
@@ -735,7 +730,7 @@ test.describe("InboxTest", () => {
     // PERMISSIONS & POLICIES
     // =========================================================================
 
-    test.fixme("Access Control: Unauthorized & Public", async ({ page, backend, cli }) => {
+    test("Access Control: Unauthorized & Public", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
