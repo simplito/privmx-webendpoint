@@ -50,6 +50,7 @@ else
             echo "Checked out local branch $VERSION."
         elif git ls-remote --heads origin "$VERSION" | grep -q "$VERSION"; then
             git checkout -b "$VERSION" "origin/$VERSION"
+            git pull
             echo "Checked out remote branch $VERSION."
         elif git rev-parse --verify "refs/tags/$VERSION" >/dev/null 2>&1; then
             git checkout "tags/$VERSION"
@@ -70,7 +71,6 @@ else
 fi
 
 cd "$PRIVMX_ENDPOINT_DIR"
-
 rm -rf ./build-emscripten
 if [ -d "build-emscripten" ];
 then

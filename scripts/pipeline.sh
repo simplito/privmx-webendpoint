@@ -3,7 +3,7 @@ set -e
 set -o pipefail
 
 SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
-source "$SCRIPT_PATH/build-manifest.sh"
+source "$SCRIPT_PATH/../build-manifest.sh"
 
 # ==============================================================================
 # CONFIGURATION

@@ -40,4 +40,4 @@ PRIVMX_WEBENDPOINT_DRV_NET_SRC="$DRIVERS_DIR/privmx-webendpoint-drv-net"
 PRIVMX_WEBENDPOINT_DRV_CRYPTO_SRC="$DRIVERS_DIR/privmx-webendpoint-drv-crypto"
 PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC="$DRIVERS_DIR/privmx-webendpoint-drv-context"
 
-NPM_ASSETS_DIR="$BASE_DIR/dist/assets/"
+NPM_ASSETS_DIR="$BASE_DIR/assets/"
