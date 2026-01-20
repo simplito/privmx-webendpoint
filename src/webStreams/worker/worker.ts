@@ -12,7 +12,9 @@ const NUM_AS_UINT8_SIZE = 1;
 const DEBUG = false;
 const sessions = new Map();
 const pipelines = new Map();
-
+let lastRMS = -99;
+let recvRMS = -99;
+let recvRMSTimestamp = Date.now();
 export interface TransformContext {
     keyStore: KeyStore;
 }
@@ -53,7 +55,10 @@ export class EncryptTransform {
         const posOfKeyId = posOfIvSize + NUM_AS_UINT8_SIZE;
         const posOfKeyIdSize = posOfKeyId + keyIdAsUint8.byteLength;
 
-        const result = new ArrayBuffer(posOfKeyIdSize + NUM_AS_UINT8_SIZE);
+        // rms
+        const posOfRMS = posOfKeyIdSize + NUM_AS_UINT8_SIZE;
+
+        const result = new ArrayBuffer(posOfRMS + NUM_AS_UINT8_SIZE);
         const resultUint8 = new Uint8Array(result);
 
         resultUint8.set(frameHeader);
@@ -61,9 +66,13 @@ export class EncryptTransform {
         resultUint8.set(iv, posOfIv);
         resultUint8.set(Utils.numAsOneByteUint(iv.byteLength), posOfIvSize);
         resultUint8.set(keyIdAsUint8, posOfKeyId);
-        logDebug("keyId to payload: " + JSON.stringify(keyIdAsUint8));
         resultUint8.set(Utils.numAsOneByteUint(keyIdAsUint8.byteLength), posOfKeyIdSize);
-
+        // logError({msg: "rms before", lastRMS});
+        resultUint8.set(Utils.numAsOneByteUint(lastRMS + 100), posOfRMS);
+        // logError({
+        //     msg: "RMS written byte",
+        //     rms: resultUint8[posOfRMS] - 100
+        // });
         encodedFrame.data = result;
         controller.enqueue(encodedFrame);
     }
@@ -78,29 +87,69 @@ export class EncryptTransform {
         const data = encodedFrame.data;
         const frameHeader = new Uint8Array(data, 0, headerLen);
 
-        const keyIdLenData = new Uint8Array(
-            data,
-            data.byteLength - NUM_AS_UINT8_SIZE,
-            NUM_AS_UINT8_SIZE,
+        // const keyIdLenData = new Uint8Array(
+        //     data,
+        //     data.byteLength - NUM_AS_UINT8_SIZE,
+        //     NUM_AS_UINT8_SIZE,
+        // );
+
+        // const keyIdLen = Utils.oneByteUint8AsNum(keyIdLenData);
+
+        // const ivLenData = new Uint8Array(
+        //     data,
+        //     data.byteLength - NUM_AS_UINT8_SIZE * 2 - keyIdLen,
+        //     NUM_AS_UINT8_SIZE,
+        // );
+
+        // const ivLen = Utils.oneByteUint8AsNum(ivLenData);
+
+        // const complementLen = headerLen + keyIdLen + ivLen + 2;
+        // const payloadLen = data.byteLength - complementLen;
+        // const payload = data.slice(headerLen, headerLen + payloadLen);
+        // const keyIdPos = headerLen + payloadLen + ivLen + 1;
+        // const keyIdArray = data.slice(keyIdPos, keyIdPos + keyIdLen);
+        // const keyId = new TextDecoder().decode(keyIdArray);
+        // const rmsPos = headerLen + payloadLen + ivLen + keyIdLen + 1;
+        // const rmsArray = data.slice(rmsPos, rmsPos + NUM_AS_UINT8_SIZE);
+        
+
+        const rmsPos = data.byteLength - 1;
+        recvRMS = new Uint8Array(data, rmsPos, 1)[0] - 100;
+        const currTime = Date.now();
+        if (recvRMSTimestamp + 100 < currTime) {
+            recvRMSTimestamp = currTime;
+            self.postMessage({ operation: "rms", rms: recvRMS });
+        }
+
+
+        const keyIdLenPos = rmsPos - 1;
+        const keyIdLen = new Uint8Array(data, keyIdLenPos, 1)[0];
+
+        const keyIdPos = keyIdLenPos - keyIdLen;
+        const keyId = new TextDecoder().decode(
+            new Uint8Array(data, keyIdPos, keyIdLen)
         );
 
-        const keyIdLen = Utils.oneByteUint8AsNum(keyIdLenData);
+        const ivLenPos = keyIdPos - 1;
+        const ivLen = new Uint8Array(data, ivLenPos, 1)[0];
 
-        const ivLenData = new Uint8Array(
-            data,
-            data.byteLength - NUM_AS_UINT8_SIZE * 2 - keyIdLen,
-            NUM_AS_UINT8_SIZE,
-        );
+        const ivPos = ivLenPos - ivLen;
+        const iv = new Uint8Array(data, ivPos, ivLen);
 
-        const ivLen = Utils.oneByteUint8AsNum(ivLenData);
+        const payloadPos = headerLen;
+        const payloadLen = ivPos - headerLen;
+        const payload = data.slice(payloadPos, payloadPos + payloadLen);
 
-        const complementLen = headerLen + keyIdLen + ivLen + 2;
-        const payloadLen = data.byteLength - complementLen;
-        const payload = data.slice(headerLen, headerLen + payloadLen);
-        const keyIdPos = headerLen + payloadLen + ivLen + 1;
-        const keyIdArray = data.slice(keyIdPos, keyIdPos + keyIdLen);
-        const keyId = new TextDecoder().decode(keyIdArray);
 
+
+
+
+
+
+        // const rms = new DataView(rmsArray).getUint8(0);
+        // if (Number.isFinite(rms)) {
+        //     self.postMessage({ operation: "rms", rms });
+        // }
         try {
             if (!this.keyStore.hasKey(keyId)) {
                 // logError({msg: "Decryption failed. Cannot find key", keyId, store: this.keyStore});
@@ -108,9 +157,9 @@ export class EncryptTransform {
                 return;
             }
             const keyEntry = this.keyStore.getKey(keyId);
-            const iv = new Uint8Array(
-                data.slice(headerLen + payloadLen, headerLen + payloadLen + ivLen),
-            );
+            // const iv = new Uint8Array(
+            //     data.slice(headerLen + payloadLen, headerLen + payloadLen + ivLen),
+            // );
             const decryptionResult = await decryptWithAES256GCM(
                 keyEntry.key,
                 iv,
@@ -149,22 +198,27 @@ self.onmessage = async (event) => {
 
     if (operation === "initialize") {
         logDebug("worker initialize call");
-    } else if (operation === "init-pipeline") {
-        console.log("in worker: 1");
+    } else 
+    if (operation === "init-pipeline") {
         // zarejestruj pusty pipeline
         pipelines.set(event.data.id, { ready: false });
         // odeślij potwierdzenie
         self.postMessage({ operation: "init-pipeline", id: event.data.id });
         return;
-    } else if (operation === "encode" || operation === "decode") {
+    } else 
+    if (operation === "encode" || operation === "decode") {
         const context: TransformContext = { keyStore: getKeyStore() };
         const { readableStream, writableStream, id } = event.data;
         // const context = getParticipantContext(participantId);
         handleTransform(context, operation, kind, readableStream, writableStream, id);
-    } else if (operation === "setKeys") {
+    } else 
+    if (operation === "setKeys") {
         logDebug("Worker: setting keys...");
         const data = event.data as events.SetKeysEvent;
         getKeyStore().setKeys(data.keys);
+    } else 
+    if (operation === "rms") {
+        lastRMS = Math.round(event.data.rms as number);
     }
 };
 

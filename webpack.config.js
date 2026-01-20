@@ -1,5 +1,7 @@
 const path = require("path");
 const webpack = require("webpack");
+const CopyPlugin = require("copy-webpack-plugin");
+
 module.exports = {
   entry: {
     bundle: "./src/bundle.ts",
@@ -11,6 +13,14 @@ module.exports = {
     }),
     new webpack.ProvidePlugin({
       process: "process/browser",
+    }),
+    new CopyPlugin({
+      patterns: [
+        {
+          from: "src/webStreams/audio/rms-processor.js",
+          to: "rms-processor.js",
+        },
+      ],
     }),
   ],
   module: {

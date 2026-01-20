@@ -21,20 +21,35 @@ interface WorkerLogEvent {
     data: {
         data: Object | String;
         type: "error" | "debug";
-    };
+    } | {
+        type: "rms";
+        rms: number;
+    }
+}
+
+export interface FrameInfo {
+    rms: number;
+    kind: "audio";
 }
 
 export class WebWorker {
     worker: Worker | undefined;
-    constructor(private assetsDir: string) {}
+    constructor(private assetsDir: string, private onFrame: (frameInfo: FrameInfo) => void) {
+    }
 
     async init_e2ee() {
         // this.worker = await this.createWorkerFromScript(this.assetsDir + "/e2ee-worker.js");
+        console.log("assetsDir in Worker: ", this.assetsDir);
         this.worker = new Worker(this.assetsDir + "/e2ee-worker.js");
         this.worker.onmessage = (event: WorkerLogEvent) => {
             // console.log("worker: ", event);
 
             try {
+                if (event.data.type === "rms") {
+                    if (this.onFrame !== undefined && typeof this.onFrame === "function") {
+                        this.onFrame({rms: event.data.rms, kind: "audio"});
+                    }     
+                } else
                 if (event.data.type === "debug") {
                     console.log("[Worker-LOG/debug]", event.data.data);
                 } else if (event.data.type === "error") {

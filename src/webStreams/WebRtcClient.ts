@@ -7,7 +7,7 @@ import {
     RemoteStreamListener,
     SessionId,
 } from "./WebRtcClientTypes";
-import { WebWorker } from "./WebWorkerHelper";
+import { FrameInfo, WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
 import { Key, TurnCredentials } from "../Types";
 import { KeyStore } from "./KeyStore";
@@ -16,6 +16,7 @@ import { Logger } from "./Logger";
 import { StreamRoomId } from "./types/ApiTypes";
 import { Queue } from "./Queue";
 import { Jsep } from "../service/WebRtcInterface";
+import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
 
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
@@ -132,11 +133,17 @@ export class WebRtcClient {
 
     protected async getWorkerApi(): Promise<WebWorker> {
         if (!this.webWorkerApi) {
-            this.webWorkerApi = new WebWorker(this.assetsDir);
+            this.webWorkerApi = new WebWorker(this.assetsDir, (frameInfo => {
+                this.onFrameInfo(frameInfo);
+            }));
             console.log("Init e2ee worker ...");
             await this.webWorkerApi.init_e2ee();
         }
         return this.webWorkerApi;
+    }
+
+    protected onFrameInfo(info: FrameInfo) {
+        console.log("onFrameInfo", info);
     }
 
     protected getPeerConnectionConfiguration(): RTCConfiguration {
@@ -214,9 +221,19 @@ export class WebRtcClient {
         if (stream.getTracks().length > 0) {
             const tracks = stream.getTracks();
             this.e2eeWorker = await this.getWorker();
-
             console.log("adding track to peerConnection...");
             for (const track of tracks) {
+                if (track.kind === "audio") {
+                    // add RMSProcessor
+                    console.log("Creating AudioLevelMeter instance for track...");
+                    const audioLevelMeter = await (new LocalAudioLevelMeter(track, onRms => {
+                        this.e2eeWorker.postMessage({operation: "rms", rms: onRms})
+                    })
+                    ).init(
+                        this.assetsDir + '/rms-processor.js'
+                    );
+                }
+
                 const videoSender = pc.addTrack(track, stream);
 
                 if ((window as any).RTCRtpScriptTransform) {

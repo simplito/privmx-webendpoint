@@ -5,7 +5,7 @@ module.exports = {
   entry: "./src/webStreams/worker/worker.ts",
         mode: "production",
   output: {
-    filename: "e2ee-worker.js",
+    filename: "assets/e2ee-worker.js",
     path: path.resolve(__dirname, "dist"),
   },
   target: "webworker", // important for web workers

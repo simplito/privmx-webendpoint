@@ -48,28 +48,54 @@ else
     tar -xf gmp.tar.xz
 fi
 
-cd "$GMP_DIR"
 
-if [ ! -d "$GMP_DIR/build-emscripten" ]; then
-    mkdir -p build-emscripten && cd build-emscripten
-    
-    echo "Running Configure..."
-    emconfigure ../configure \
-        --disable-assembly \
-        --host none \
-        --enable-cxx \
-        --prefix=$SYSROOT_DIR \
-        CC_FOR_BUILD="$CC_FOR_BUILD" \
-        CPPFLAGS_FOR_BUILD="$CPPFLAGS_FOR_BUILD" \
-        CFLAGS_FOR_BUILD="$CFLAGS_FOR_BUILD" \
-        CFLAGS="-Os" \
-        CXXFLAGS="-Os"
-else
-    cd build-emscripten
-fi
+echo "Checking checksum: $GMP_DIR ..."
+set +e
+$SCRIPT_PATH/check_dir_checksum "$GMP_DIR"
+RESULT=$?
+set -e
+case "$RESULT" in
+    0)
+        echo "No changes - skipping build"
+        ;;
+    1)
+        echo "changes - rebuild..."
+        cd "$GMP_DIR"
 
-echo "Running Make..."
-emmake make -j20
-emmake make check || echo "WARNING: Tests failed (Expected during cross-compilation)"
-emmake make install
-echo "Build Complete."
+        if [ ! -d "$GMP_DIR/build-emscripten" ]; then
+            mkdir -p build-emscripten && cd build-emscripten
+            
+            echo "Running Configure..."
+            emconfigure ../configure \
+                --disable-assembly \
+                --host none \
+                --enable-cxx \
+                --prefix=$SYSROOT_DIR \
+                CC_FOR_BUILD="$CC_FOR_BUILD" \
+                CPPFLAGS_FOR_BUILD="$CPPFLAGS_FOR_BUILD" \
+                CFLAGS_FOR_BUILD="$CFLAGS_FOR_BUILD" \
+                CFLAGS="-Os" \
+                CXXFLAGS="-Os"
+        else
+            cd build-emscripten
+        fi
+
+        echo "Running Make..."
+        emmake make -j20
+        emmake make check || echo "WARNING: Tests failed (Expected during cross-compilation)"
+        emmake make install
+        echo "Build Complete."
+
+        set +e
+        $SCRIPT_PATH/check_dir_checksum "$GMP_DIR"
+        set -e
+        ;;
+    2)
+        echo "\n\n\nBłąd wejścia" >&2
+        exit 2
+        ;;
+    *)
+        echo "\n\n\nNieznany kod wyjścia: $RESULT" >&2
+        exit 3
+        ;;
+esac

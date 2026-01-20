@@ -7,19 +7,39 @@ SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 source "$SCRIPT_PATH/config.sh"
 source "$EMSDK_DIR/emsdk_env.sh"
 
-sep() {
-    echo "=========================== $1 =========================="
-}
+echo "Checking checksum: $PRIVMX_WEB_ASYNC_ENGINE ..."
+set +e
+$SCRIPT_PATH/check_dir_checksum "$PRIVMX_WEB_ASYNC_ENGINE"
+RESULT=$?
+set -e
+case "$RESULT" in
+    0)
+        echo "No changes - skipping build"
+        ;;
+    1)
+        echo "changes - rebuild..."
+        cd "$PRIVMX_WEB_ASYNC_ENGINE"
 
-sep "PRIVMX_WEBENDPOINT_DRV_CRYPTO_SRC"
-cd "$PRIVMX_WEB_ASYNC_ENGINE"
+        if [ ! -d "./build-emscripten" ]; then
+            mkdir -p build-emscripten && cd build-emscripten
+            emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
+        else
+            cd build-emscripten
+        fi
 
-if [ ! -d "./build-emscripten" ]; then
-    mkdir -p build-emscripten && cd build-emscripten
-    emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
-else
-    cd build-emscripten
-fi
+        emmake make -j20
+        emmake make install
 
-emmake make -j20
-emmake make install
+        set +e
+        $SCRIPT_PATH/check_dir_checksum "$PRIVMX_WEB_ASYNC_ENGINE"
+        set -e
+        ;;
+    2)
+        echo "\n\n\nBłąd wejścia" >&2
+        exit 2
+        ;;
+    *)
+        echo "\n\n\nNieznany kod wyjścia: $RESULT" >&2
+        exit 3
+        ;;
+esac
