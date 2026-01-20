@@ -232,16 +232,16 @@ export class SearchApi extends BaseApi {
   /**
    * Gets a list of documents (e.g., messages, threads, or custom documents) from a Search Index.
    * 
-   * @param {string} indexId ID of the Search Index to list documents from
+   * @param {string} indexHandle Handle of the Index containing documents
    * @param {PagingQuery} pagingQuery struct with list query parameters (can include search terms)
    * @return struct containing a list of documents
    */
   async listDocuments(
-    indexId: string,
+    indexHandle: number,
     pagingQuery: PagingQuery
   ): Promise<PagingList<Document>> {
      return this.native.listDocuments(this.servicePtr, [
-        indexId,
+        indexHandle,
         pagingQuery
      ]);
   };
