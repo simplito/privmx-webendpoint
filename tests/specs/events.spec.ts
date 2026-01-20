@@ -15,7 +15,7 @@ test.describe("CoreTest: Events", () => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
         await page.evaluate(async () => {
-            await window.Endpoint.setup("../../dist/assets");
+            await window.Endpoint.setup("../../assets");
         });
     });
 
@@ -30,7 +30,7 @@ test.describe("CoreTest: Events", () => {
 
         const result = await page.evaluate(async ({ bridgeUrl, user }) => {
             const Endpoint = window.Endpoint;
-            await Endpoint.setup("../../dist/assets");
+            await Endpoint.setup("../../assets");
 
             // 1. Get Event Queue (Native API)
             const eventQueue = await Endpoint.getEventQueue();
@@ -59,7 +59,7 @@ test.describe("CoreTest: Events", () => {
         // We need to do this first to get the Public Key for the CLI
         const generatedUser = await page.evaluate(async () => {
             const Endpoint = window.Endpoint;
-            await Endpoint.setup("../../dist/assets");
+            await Endpoint.setup("../../assets");
 
             const cryptoApi = await Endpoint.createCryptoApi();
             const privKey = await cryptoApi.generatePrivateKey();
@@ -96,7 +96,7 @@ test.describe("CoreTest: Events", () => {
         const result = await page.evaluate(async ({ bridgeUrl, user1, user2 }) => {
             const Endpoint = window.Endpoint;
             // Setup is likely already done in Step 1, but safe to ensure
-            if (!window.wasmReady) await Endpoint.setup("../../dist/assets");
+            if (!window.wasmReady) await Endpoint.setup("../../assets");
 
             const eventQueue = await Endpoint.getEventQueue();
 
@@ -139,7 +139,7 @@ test.describe("CoreTest: Events", () => {
 
         const result = await page.evaluate(async ({ bridgeUrl, user }) => {
             const Endpoint = window.Endpoint;
-            await Endpoint.setup("../../dist/assets");
+            await Endpoint.setup("../../assets");
 
             const eventQueue = await Endpoint.getEventQueue();
 
@@ -166,7 +166,7 @@ test.describe("CoreTest: Events", () => {
     test("Listening on LibEmitBreakEvent after emitBreakEvent", async ({ page, backend }) => {
         const result = await page.evaluate(async () => {
             const Endpoint = window.Endpoint;
-            await Endpoint.setup("../../dist/assets");
+            await Endpoint.setup("../../assets");
 
             const eventQueue = await Endpoint.getEventQueue();
 

@@ -5,7 +5,7 @@ import { testData } from "./datasets/testData";
 export async function setupTestUser(page: Page, cli: CliContext, contextIds: string[]) {
     const userKeys = await page.evaluate(async () => {
         const Endpoint = (window as any).Endpoint;
-        await Endpoint.setup("../../dist/assets");
+        await Endpoint.setup("../../assets");
         const cryptoApi = await Endpoint.createCryptoApi();
         const privKey = await cryptoApi.generatePrivateKey();
 

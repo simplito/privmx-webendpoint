@@ -16,7 +16,7 @@ test.describe("Core Functionality", () => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
         await page.evaluate(async () => {
-            await window.Endpoint.setup("../../dist/assets");
+            await window.Endpoint.setup("../../assets");
         });
     });
 
