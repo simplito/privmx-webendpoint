@@ -1,6 +1,6 @@
 import { Types } from "../ServerTypes";
 import { Utils } from "../webStreams/Utils";
-import { WebRtcClient } from "../webStreams/WebRtcClient";
+import { AudioLevelsStats, WebRtcClient } from "../webStreams/WebRtcClient";
 import {
     DataChannelMeta,
     StreamCreateMeta,
@@ -49,6 +49,7 @@ export class StreamApi extends BaseApi {
     private streams: Map<StreamHandle, Types.Stream> = new Map();
     private streamTracks: Map<string, StreamTrack> = new Map();
     private dataChannels: Map<string, RTCDataChannel> = new Map();
+    private audioLevelStatsCallback: (stats: AudioLevelsStats) => void;
 
     public async createStreamRoom(
         contextId: string,
@@ -509,5 +510,11 @@ export class StreamApi extends BaseApi {
             selectorType,
             selectorId,
         ]);
+    }
+
+    async addAudioLevelStatsListener(onStats: (stats: AudioLevelsStats) => void) {
+        if (onStats && typeof onStats === "function") {
+            this.client.setAudioLevelCallback(onStats);
+        }
     }
 }

@@ -17,6 +17,8 @@ let recvRMS = -99;
 let recvRMSTimestamp = Date.now();
 export interface TransformContext {
     keyStore: KeyStore;
+    id: number;
+    publisherId: number;
 }
 
 export class EncryptTransform {
@@ -81,36 +83,13 @@ export class EncryptTransform {
         encodedFrame: RTCEncodedVideoFrame | RTCEncodedAudioFrame,
         kind: string,
         controller: TransformStreamDefaultController<any>,
+        receiverId: number,
+        publisherId: number
     ) {
         const headerLen =
             kind === "video" ? this.getHeaderSizeByType((encodedFrame as any).type) : 1;
         const data = encodedFrame.data;
         const frameHeader = new Uint8Array(data, 0, headerLen);
-
-        // const keyIdLenData = new Uint8Array(
-        //     data,
-        //     data.byteLength - NUM_AS_UINT8_SIZE,
-        //     NUM_AS_UINT8_SIZE,
-        // );
-
-        // const keyIdLen = Utils.oneByteUint8AsNum(keyIdLenData);
-
-        // const ivLenData = new Uint8Array(
-        //     data,
-        //     data.byteLength - NUM_AS_UINT8_SIZE * 2 - keyIdLen,
-        //     NUM_AS_UINT8_SIZE,
-        // );
-
-        // const ivLen = Utils.oneByteUint8AsNum(ivLenData);
-
-        // const complementLen = headerLen + keyIdLen + ivLen + 2;
-        // const payloadLen = data.byteLength - complementLen;
-        // const payload = data.slice(headerLen, headerLen + payloadLen);
-        // const keyIdPos = headerLen + payloadLen + ivLen + 1;
-        // const keyIdArray = data.slice(keyIdPos, keyIdPos + keyIdLen);
-        // const keyId = new TextDecoder().decode(keyIdArray);
-        // const rmsPos = headerLen + payloadLen + ivLen + keyIdLen + 1;
-        // const rmsArray = data.slice(rmsPos, rmsPos + NUM_AS_UINT8_SIZE);
         
 
         const rmsPos = data.byteLength - 1;
@@ -118,7 +97,7 @@ export class EncryptTransform {
         const currTime = Date.now();
         if (recvRMSTimestamp + 100 < currTime) {
             recvRMSTimestamp = currTime;
-            self.postMessage({ operation: "rms", rms: recvRMS });
+            self.postMessage({ type: "rms", rms: recvRMS, receiverId, publisherId });
         }
 
 
@@ -140,16 +119,6 @@ export class EncryptTransform {
         const payloadLen = ivPos - headerLen;
         const payload = data.slice(payloadPos, payloadPos + payloadLen);
 
-
-
-
-
-
-
-        // const rms = new DataView(rmsArray).getUint8(0);
-        // if (Number.isFinite(rms)) {
-        //     self.postMessage({ operation: "rms", rms });
-        // }
         try {
             if (!this.keyStore.hasKey(keyId)) {
                 // logError({msg: "Decryption failed. Cannot find key", keyId, store: this.keyStore});
@@ -207,10 +176,9 @@ self.onmessage = async (event) => {
         return;
     } else 
     if (operation === "encode" || operation === "decode") {
-        const context: TransformContext = { keyStore: getKeyStore() };
-        const { readableStream, writableStream, id } = event.data;
-        // const context = getParticipantContext(participantId);
-        handleTransform(context, operation, kind, readableStream, writableStream, id);
+        const { readableStream, writableStream, id, publisherId } = event.data;
+        const context: TransformContext = { keyStore: getKeyStore(), id, publisherId};
+        handleTransform(context, operation, kind, readableStream, writableStream);
     } else 
     if (operation === "setKeys") {
         logDebug("Worker: setting keys...");
@@ -240,13 +208,13 @@ function createSenderTransform(_keyStore: KeyStore, kind: string) {
 }
 
 // Receiver transform
-function createReceiverTransform(_keyStore: KeyStore, kind: string) {
-    const encrypter = new EncryptTransform(_keyStore);
+function createReceiverTransform(context: TransformContext, kind: string) {
+    const encrypter = new EncryptTransform(context.keyStore);
     return new TransformStream({
         start() {},
         flush() {},
         async transform(encodedFrame, controller) {
-            encrypter.decryptFrame(encodedFrame, kind, controller);
+            encrypter.decryptFrame(encodedFrame, kind, controller, context.id, context.publisherId);
         },
     });
 }
@@ -257,7 +225,6 @@ function handleTransform(
     kind: string,
     readableStream: any,
     writableStream: any,
-    id: number,
 ) {
     let transformStream: TransformStream;
     // logDebug("on handleTransform", {key, operation, readableStream, writableStream})
@@ -266,7 +233,7 @@ function handleTransform(
         transformStream = createSenderTransform(context.keyStore, kind);
         readableStream.pipeThrough(transformStream).pipeTo(writableStream);
     } else if (operation == "decode") {
-        transformStream = createReceiverTransform(context.keyStore, kind);
+        transformStream = createReceiverTransform(context, kind);
         const reader = readableStream
             .pipeThrough(transformStream)
             .pipeTo(writableStream)
@@ -277,15 +244,15 @@ function handleTransform(
                 }
             });
 
-        sessions.set(id, { pipeline: reader });
+        sessions.set(context.id, { pipeline: reader });
     } else if (operation === "stop") {
-        const s = sessions.get(id);
+        const s = sessions.get(context.id);
         if (s) {
             try {
                 // abort pipeline if working
                 s.pipeline.abort && s.pipeline.abort();
             } catch {}
-            sessions.delete(id);
+            sessions.delete(context.id);
         }
     } else {
         logError(`Invalid operation: ${operation}`);
@@ -314,12 +281,11 @@ if ((self as any).RTCTransformEvent) {
         // logger("operation: " + operation + " / kind: " + kind);
         logDebug("onrtctransfrom: " + JSON.stringify(event));
         handleTransform(
-            { keyStore: getKeyStore() },
+            { keyStore: getKeyStore(), id: event.data.id, publisherId: event.data.publisherId },
             operation,
             kind,
             transformer.readable,
-            transformer.writable,
-            0,
+            transformer.writable
         );
     };
 }

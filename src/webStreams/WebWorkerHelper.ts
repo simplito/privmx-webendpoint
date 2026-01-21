@@ -24,12 +24,16 @@ interface WorkerLogEvent {
     } | {
         type: "rms";
         rms: number;
+        receiverId: number;
+        publisherId: number;
     }
 }
 
 export interface FrameInfo {
     rms: number;
     kind: "audio";
+    receiverId: number;
+    publisherId: number;
 }
 
 export class WebWorker {
@@ -47,7 +51,7 @@ export class WebWorker {
             try {
                 if (event.data.type === "rms") {
                     if (this.onFrame !== undefined && typeof this.onFrame === "function") {
-                        this.onFrame({rms: event.data.rms, kind: "audio"});
+                        this.onFrame({rms: event.data.rms, kind: "audio", receiverId: event.data.receiverId, publisherId: event.data.publisherId});
                     }     
                 } else
                 if (event.data.type === "debug") {
@@ -55,7 +59,7 @@ export class WebWorker {
                 } else if (event.data.type === "error") {
                     console.error("[Worker-LOG/error]", event.data.data);
                 } else {
-                    console.log(event.data);
+                    console.log("unrecognized event from worker", event.data);
                 }
             } catch (e) {
                 console.error("[Worker]: invalid event");

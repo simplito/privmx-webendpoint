@@ -17,6 +17,7 @@ import { StreamRoomId } from "./types/ApiTypes";
 import { Queue } from "./Queue";
 import { Jsep } from "../service/WebRtcInterface";
 import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
+import { ActiveSpeakerDetector, DEFAULTS, SpeakerState } from "./audio/ActiveSpeakerDetector";
 
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
@@ -27,11 +28,20 @@ export interface StreamsCallbackInterface {
     trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void>;
     acceptOffer(sessionId: SessionId, sdp: Jsep): Promise<void>;
 }
+
+export interface UserAudioStats {
+    streamId: number;  
+    rms: number;
+    active: boolean;
+}
+ 
+export interface AudioLevelsStats {
+    levels: SpeakerState[];
+}
+
+type AudioLevelFuncCallback = (changes: AudioLevelsStats) => void;
 export class WebRtcClient {
     public uniqId: string;
-    private receiverPeerConnection: RTCPeerConnection | undefined;
-
-    private iceCandidates: RTCIceCandidate[] = [];
     private e2eeWorker: Worker | undefined;
     private webWorkerApi: WebWorker;
 
@@ -41,13 +51,13 @@ export class WebRtcClient {
     private keyStore: KeyStore = new KeyStore();
 
     // to moze byc uzyte kiedy wymagany jest update credentials (jak straca waznosc)
-    private clientId: string | undefined;
     private peerCredentials: TurnCredentials[] | undefined;
-    private initOptions: InitOptions | undefined;
 
     private onRemoteTrackListeners: { [roomId: StreamRoomId]: RemoteStreamListener } = {};
     private peerConnectionsManager: PeerConnectionManager;
     private streamsApiInterface: StreamsCallbackInterface;
+    private activeSpeakerDetector: ActiveSpeakerDetector;
+    private audioLevelCallback: AudioLevelFuncCallback;
 
     // private mediaServerAvailPublishers: {[publisherId: number]: Publisher} = {};
     private encByReceiver = new WeakMap<RTCRtpReceiver, EncPair>();
@@ -55,6 +65,7 @@ export class WebRtcClient {
 
     private peerConnectionReconfigureQueue: Queue<QueueItem> | undefined;
     public lastProcessedAnswer: { [roomId: string]: Jsep } = {};
+    private lastMeasuredLocalRMS: number = -99;
     // private subscriberAttachedProcessing: boolean = false;
 
     constructor(private assetsDir: string) {
@@ -80,6 +91,12 @@ export class WebRtcClient {
             // await this.reconfigure(_item);
             await this.reconfigureSingle(_item._room, _item.offer);
         });
+
+        this.activeSpeakerDetector = new ActiveSpeakerDetector(DEFAULTS);
+    }
+
+    public setAudioLevelCallback(func: AudioLevelFuncCallback) {
+        this.audioLevelCallback = func;
     }
 
     public bindApiInterface(streamsApiInterface: StreamsCallbackInterface) {
@@ -134,16 +151,27 @@ export class WebRtcClient {
     protected async getWorkerApi(): Promise<WebWorker> {
         if (!this.webWorkerApi) {
             this.webWorkerApi = new WebWorker(this.assetsDir, (frameInfo => {
-                this.onFrameInfo(frameInfo);
+                if (this.audioLevelCallback && typeof this.audioLevelCallback === "function") {
+                    // report local rms to activeSpeakerDetector to have notifications for local streams
+                    this.activeSpeakerDetector.onFrame({
+                        id: 0,
+                        rms: this.lastMeasuredLocalRMS,
+                        timestamp: Date.now()
+                    });
+                    const speakers = this.activeSpeakerDetector.onFrame({
+                        id: frameInfo.publisherId,
+                        rms: frameInfo.rms,
+                        timestamp: Date.now()
+                    })
+                    // if (laudestParticipant === frameInfo.publisherId) {
+                        this.audioLevelCallback({levels: speakers})
+                    // }
+                }
             }));
             console.log("Init e2ee worker ...");
             await this.webWorkerApi.init_e2ee();
         }
         return this.webWorkerApi;
-    }
-
-    protected onFrameInfo(info: FrameInfo) {
-        console.log("onFrameInfo", info);
     }
 
     protected getPeerConnectionConfiguration(): RTCConfiguration {
@@ -227,7 +255,8 @@ export class WebRtcClient {
                     // add RMSProcessor
                     console.log("Creating AudioLevelMeter instance for track...");
                     const audioLevelMeter = await (new LocalAudioLevelMeter(track, onRms => {
-                        this.e2eeWorker.postMessage({operation: "rms", rms: onRms})
+                        this.e2eeWorker.postMessage({operation: "rms", rms: onRms});
+                        this.lastMeasuredLocalRMS = onRms;
                     })
                     ).init(
                         this.assetsDir + '/rms-processor.js'
@@ -274,52 +303,6 @@ export class WebRtcClient {
         session.pc.close();
         session.pc = undefined;
     }
-
-    // async updatePeerConnectionWithLocalStream(streamRoomId: StreamRoomId, newStream: MediaStream, tracksToRemove: MediaStreamTrack[]): Promise<RTCPeerConnection> {
-    //     this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
-    //     const peerConnManager = this.getConnectionManager();
-    //     peerConnManager.initialize(streamRoomId, "publisher");
-
-    //     const pc = this.getConnectionManager().getConnectionWithSession(streamRoomId, "publisher").pc;
-
-    //     if (newStream.getTracks().length > 0) {
-    //         const tracks = newStream.getTracks();
-    //         this.e2eeWorker = await this.getWorker();
-
-    //         console.log("adding track to peerConnection...");
-    //         for (const track of tracks) {
-    //             const videoSender = pc.addTrack(track, newStream);
-    //             console.log("PEER_CONNECTION: addTrack", track);
-
-    //             if ((window as any).RTCRtpScriptTransform) {
-    //                 const options = {
-    //                     operation: 'encode',
-    //                 };
-    //                 console.log("======> set e2ee worker for frame encoding (RTCRtpScriptTransform).");
-    //                 (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
-    //             } else {
-
-    //                 const senderStreams = (videoSender as any).createEncodedStreams();
-    //                 console.log("post 'encode' frame to the e2ee worker..");
-    //                 this.e2eeWorker.postMessage({
-    //                     operation: 'encode',
-    //                     readableStream: senderStreams.readable,
-    //                     writableStream: senderStreams.writable,
-    //                 }, [ senderStreams.readable, senderStreams.writable ]);
-    //             }
-    //         }
-
-    //         // remove marked tracks
-    //         const senders = pc.getSenders();
-    //         for (const oldTrack of tracksToRemove) {
-    //             const sender = senders.find(s => s.track === oldTrack);
-    //             if (sender) {
-    //                 pc.removeTrack(sender);
-    //             }
-    //         }
-    //     }
-    //     return pc;
-    // }
 
     async updatePeerConnectionWithLocalStream(
         streamRoomId: StreamRoomId,
@@ -655,7 +638,7 @@ export class WebRtcClient {
         (await this.getWorkerApi()).setKeys(keys);
     }
 
-    private async setupReceiverTransform(receiver: RTCRtpReceiver, worker: Worker) {
+    private async setupReceiverTransform(receiver: RTCRtpReceiver, publisherId: number, worker: Worker) {
         console.group("on setupReceiverTransform");
         if ("RTCRtpScriptTransform" in window && !(receiver as any).transform) {
             this.logger.log("important-only", "-> using RtpScriptTransform");
@@ -663,6 +646,7 @@ export class WebRtcClient {
             (receiver as any).transform = new (window as any).RTCRtpScriptTransform(worker, {
                 operation: "decode",
                 id,
+                publisherId
             });
             console.groupEnd();
             return;
@@ -673,7 +657,7 @@ export class WebRtcClient {
         if (!this.encByReceiver.has(receiver)) {
             this.logger.log("important-only", "-> call for createEncodedStreams()");
             const { readable, writable } = await (receiver as any).createEncodedStreams();
-            const enc = { readable, writable, id: (receiver as any).track.id, posted: false };
+            const enc = { readable, writable, id: (receiver as any).track.id, publisherId: publisherId, posted: false };
             this.encByReceiver.set(receiver, enc);
 
             this.logger.log(
@@ -687,6 +671,7 @@ export class WebRtcClient {
                 {
                     operation: "decode",
                     id: enc.id,
+                    publisherId: publisherId,
                     readableStream: enc.readable,
                     writableStream: enc.writable,
                 },
@@ -745,8 +730,8 @@ export class WebRtcClient {
         const worker = await this.getWorker();
         const track = event.track;
         const receiver = event.receiver;
+        const publisherId = Number(event.streams[0].id);
         const key = this.getEncKey();
-        console.log({ receiver, track, key });
 
         const peerConnection = this.getConnectionManager().getConnectionWithSession(
             roomId,
@@ -756,7 +741,7 @@ export class WebRtcClient {
         await this.waitUntilConnected(peerConnection);
 
         this.logger.log("important-only", "setupReceiverTransform...");
-        await this.setupReceiverTransform(receiver, worker);
+        await this.setupReceiverTransform(receiver, publisherId, worker);
         track.addEventListener("ended", async () => await this.teardownReceiver(receiver, worker));
 
         // if ((window as any).RTCRtpScriptTransform) {
