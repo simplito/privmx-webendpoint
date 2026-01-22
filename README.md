@@ -83,11 +83,18 @@ Maintain code quality using ESLint and Prettier:
 
 ```bash
 # Check for linting errors
+
+# Typescript
 npm run lint
+# C++
+npm run lint:clang-format
 
 # Auto-format code
-npm run format
 
+# Typescript
+npm run format
+# C++
+npm run format:clang
 ```
 
 ## License
