@@ -9,20 +9,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#include <stdlib.h>
-#include <string.h>
-#include <string>
-
 #include "privmx/drv/crypto.h"
-#include "AsyncEngine.hpp"
-#include "Mapper.hpp"
 
-#include <emscripten.h>
-#include <emscripten/val.h>
-#include <emscripten/bind.h>
 #include <Poco/Dynamic/Var.h>
 #include <Poco/JSON/Object.h>
+#include <emscripten.h>
+#include <emscripten/bind.h>
+#include <emscripten/val.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include <Pson/BinaryString.hpp>
+#include <string>
+
+#include "AsyncEngine.hpp"
+#include "Mapper.hpp"
 
 using namespace emscripten;
 using namespace privmx::webendpoint;
@@ -32,6 +33,8 @@ const ThreadTarget CRYPTO_THREAD = ThreadTarget::Worker;
 emscripten::memory_view<unsigned char> createUint8Array(const char* data, size_t datalen) {
     return emscripten::typed_memory_view(datalen, reinterpret_cast<const unsigned char*>(data));
 }
+
+// clang-format off
 
 EM_JS(void, performCryptoCall, (const char* method_str, emscripten::EM_VAL params_handle, int callId), {
     let method = UTF8ToString(method_str);
@@ -48,6 +51,8 @@ EM_JS(void, performCryptoCall, (const char* method_str, emscripten::EM_VAL param
     });
 });
 
+// clang-format on
+
 std::string extractCryptoResult(std::future<Poco::Dynamic::Var>& future) {
     Poco::Dynamic::Var resultVar = future.get();
     Poco::JSON::Object::Ptr obj = resultVar.extract<Poco::JSON::Object::Ptr>();
@@ -59,6 +64,8 @@ std::string extractCryptoResult(std::future<Poco::Dynamic::Var>& future) {
     return obj->getValue<Pson::BinaryString>("buff");
 }
 
+// clang-format off
+
 EM_JS(bool,checkIfWorker,(void),{
     if (typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope) {
         return true;
@@ -68,14 +75,15 @@ EM_JS(bool,checkIfWorker,(void),{
 });
 
 std::string hmac(const std::string& engine, const char* key, unsigned int keylen, const char* data, int datalen){
-    auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("engine", engine);
         params.set("data", createUint8Array(data, datalen));
         params.set("key", createUint8Array(key, keylen));
 
-        performCryptoCall("hmac", params.as_handle(), callId);
-    }, CRYPTO_THREAD);
+            performCryptoCall("hmac", params.as_handle(), callId);
+        },
+        CRYPTO_THREAD);
 
     return extractCryptoResult(future);
 }
@@ -87,12 +95,12 @@ std::string translateAESConfig(const char* config) {
     throw std::runtime_error("Wrong aes256 config");
 }
 
-std::string translateSHAConfig(const char* config){
-     if (strcmp(config, "SHA1") == 0) return "sha1";
-     if (strcmp(config, "SHA256") == 0) return "sha256";
-     if (strcmp(config, "SHA512") == 0) return "sha512";
-     if (strcmp(config, "RIPEMD160") == 0) return "ripemd160";
-     throw std::runtime_error("Wrong hash config");
+std::string translateSHAConfig(const char* config) {
+    if (strcmp(config, "SHA1") == 0) return "sha1";
+    if (strcmp(config, "SHA256") == 0) return "sha256";
+    if (strcmp(config, "SHA512") == 0) return "sha512";
+    if (strcmp(config, "RIPEMD160") == 0) return "ripemd160";
+    throw std::runtime_error("Wrong hash config");
 }
 
 int privmxDrvCrypto_version(unsigned int* version) {
@@ -100,26 +108,28 @@ int privmxDrvCrypto_version(unsigned int* version) {
     return 0;
 }
 
-int privmxDrvCrypto_randomBytes(char* buf, unsigned int len){
-    auto future = AsyncEngine::getInstance()->callJsAsync([len](int callId) {
-        val params = val::object();
-        params.set("length", len);
-        performCryptoCall("randomBytes", params.as_handle(), callId);
-    }, CRYPTO_THREAD);
+int privmxDrvCrypto_randomBytes(char* buf, unsigned int len) {
+    auto future = AsyncEngine::getInstance()->callJsAsync(
+        [len](int callId) {
+            val params = val::object();
+            params.set("length", len);
+            performCryptoCall("randomBytes", params.as_handle(), callId);
+        },
+        CRYPTO_THREAD);
 
     try {
         std::string res = extractCryptoResult(future);
-        memcpy(buf, res.data(), len); 
+        memcpy(buf, res.data(), len);
         return 0;
-    } catch(...) {
+    } catch (...) {
         return 1;
     }
 }
 
-int privmxDrvCrypto_md(const char* data, int datalen, const char* config, char** out, unsigned int* outlen){
+int privmxDrvCrypto_md(const char* data, int datalen, const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateSHAConfig(config);
 
-    auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("data", createUint8Array(data, datalen));
         performCryptoCall(str_config.c_str(), params.as_handle(), callId);
@@ -131,12 +141,13 @@ int privmxDrvCrypto_md(const char* data, int datalen, const char* config, char**
         *outlen = res.size();
         memcpy(*out, res.data(), res.size());
         return 0;
-    } catch(...) {
+    } catch (...) {
         return 1;
     }
 }
 
-int privmxDrvCrypto_hmac(const char* key, unsigned int keylen, const char* data, int datalen, const char* config, char** out, unsigned int* outlen){
+int privmxDrvCrypto_hmac(const char* key, unsigned int keylen, const char* data, int datalen, const char* config,
+                         char** out, unsigned int* outlen) {
     std::string str_config = translateSHAConfig(config);
     try {
         std::string res = hmac(str_config, key, keylen, data, datalen);
@@ -144,16 +155,17 @@ int privmxDrvCrypto_hmac(const char* key, unsigned int keylen, const char* data,
         *outlen = res.size();
         memcpy(*out, res.data(), res.size());
         return 0;
-    } catch(std::exception& e){
+    } catch (std::exception& e) {
         std::cerr << "_Hmac exception: " << e.what() << std::endl;
         return 1;
     }
 }
 
-int privmxDrvCrypto_aesEncrypt(const char* key, const char* iv, const char* data, unsigned int datalen, const char* config, char** out, unsigned int* outlen){
+int privmxDrvCrypto_aesEncrypt(const char* key, const char* iv, const char* data, unsigned int datalen,
+                               const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateAESConfig(config);
     
-    auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("data", createUint8Array(data, datalen));
         params.set("key", createUint8Array(key, 32));
@@ -171,15 +183,16 @@ int privmxDrvCrypto_aesEncrypt(const char* key, const char* iv, const char* data
         *outlen = res.size();
         memcpy(*out, res.data(), res.size());
         return 0;
-    } catch(...) {
+    } catch (...) {
         return 1;
     }
 }
 
-int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data, unsigned int datalen, const char* config, char** out, unsigned int* outlen){
+int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data, unsigned int datalen,
+                               const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateAESConfig(config);
 
-    auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("data", createUint8Array(data, datalen));
         params.set("key", createUint8Array(key, 32));
@@ -197,13 +210,13 @@ int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data
         *outlen = res.size();
         memcpy(*out, res.data(), res.size());
         return 0;
-    } catch(...) {
+    } catch (...) {
         return 1;
     }
 }
 
 int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* salt, unsigned int saltlen, int rounds, unsigned int length, const char* hash, char** out, unsigned int* outlen){
-    auto future = AsyncEngine::getInstance()->callJsAsync([&](int callId) {
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("password", std::string(pass,passlen));
         params.set("salt", std::string(salt,saltlen));
@@ -220,7 +233,7 @@ int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* s
         *outlen = res.size();
         memcpy(*out, res.data(), res.size());
         return 0;
-    } catch(...) {
+    } catch (...) {
         return 1;
     }
 }

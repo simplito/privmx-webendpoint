@@ -9,6 +9,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// clang-format off
+
 #ifndef __PRIVMX_DRIVER_CRYPTO_H__
 #define __PRIVMX_DRIVER_CRYPTO_H__
 
@@ -30,3 +32,5 @@ int privmxDrvCrypto_freeMem(void* ptr);
 #endif
 
 #endif // __PRIVMX_DRIVER_CRYPTO_H__
+
+// clang-format on

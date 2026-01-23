@@ -23,14 +23,13 @@ typedef struct privmxDrvEcc_Point privmxDrvEcc_Point;
 struct privmxDrvEcc_ECC;
 typedef struct privmxDrvEcc_ECC privmxDrvEcc_ECC;
 
-struct privmxDrvEcc_Signature
-{
+struct privmxDrvEcc_Signature {
     const privmxDrvEcc_BN* r;
     const privmxDrvEcc_BN* s;
 };
 typedef struct privmxDrvEcc_Signature privmxDrvEcc_Signature;
 
-int privmxDrvEcc_version(unsigned int* version); // version 1
+int privmxDrvEcc_version(unsigned int* version);  // version 1
 
 int privmxDrvEcc_bnBin2bn(const char* bin, int binlen, privmxDrvEcc_BN** res);
 int privmxDrvEcc_bnBn2bin(privmxDrvEcc_BN* bn, char** out, int* outlen);
@@ -55,7 +54,8 @@ int privmxDrvEcc_eccFromPrivateKey(const char* key, int keylen, privmxDrvEcc_ECC
 int privmxDrvEcc_eccGetPublicKey(const privmxDrvEcc_ECC* ecc, privmxDrvEcc_Point** res);
 int privmxDrvEcc_eccGetPrivateKey(const privmxDrvEcc_ECC* ecc, privmxDrvEcc_BN** res);
 int privmxDrvEcc_eccSign(privmxDrvEcc_ECC* ecc, const char* msg, int msglen, privmxDrvEcc_Signature* res);
-int privmxDrvEcc_eccVerify(privmxDrvEcc_ECC* ecc, const char* msg, int msglen, const privmxDrvEcc_Signature* sig, int* res);
+int privmxDrvEcc_eccVerify(privmxDrvEcc_ECC* ecc, const char* msg, int msglen, const privmxDrvEcc_Signature* sig,
+                           int* res);
 int privmxDrvEcc_eccDerive(const privmxDrvEcc_ECC* ecc, const privmxDrvEcc_ECC* pub, char** res, int* reslen);
 int privmxDrvEcc_eccGetOrder(privmxDrvEcc_BN** res);
 int privmxDrvEcc_eccGetGenerator(privmxDrvEcc_Point** res);
@@ -69,4 +69,4 @@ int privmxDrvEcc_freeMem(void* ptr);
 }
 #endif
 
-#endif // __PRIVMX_DRIVER_ECC_H__
+#endif  // __PRIVMX_DRIVER_ECC_H__

@@ -1,8 +1,14 @@
 .vscode/
 emsdk/
-/src
 out/
 build-emscripten/
 examples/*/node_modules/
-
-
+dependency_sources
+assets/
+pub/
+node_modules/
+dist/
+test-results/
+tools/
+builds/
+assets/

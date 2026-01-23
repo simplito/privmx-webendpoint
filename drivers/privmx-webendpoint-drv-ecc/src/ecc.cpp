@@ -9,19 +9,22 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+#include "privmx/drv/ecc.h"
+
+#include <emscripten.h>
+#include <emscripten/bind.h>
+#include <emscripten/val.h>
+#include <secp256k1.h>
+#include <secp256k1_ecdh.h>
+#include <string.h>
+
 #include <cstdlib>
 #include <memory>
 #include <string>
+
 #include "privmx/drv/BNImpl.hpp"
-#include "privmx/drv/PointImpl.hpp"
 #include "privmx/drv/ECCImpl.hpp"
-#include <secp256k1.h>
-#include <secp256k1_ecdh.h>
-#include <emscripten.h>
-#include <emscripten/val.h>
-#include <emscripten/bind.h>
-#include "privmx/drv/ecc.h"
-#include <string.h>
+#include "privmx/drv/PointImpl.hpp"
 
 using namespace std;
 using namespace emscripten;
@@ -50,7 +53,6 @@ int privmxDrvEcc_version(unsigned int* version) {
     return 0;
 }
 
-
 int privmxDrvEcc_bnBin2bn(const char* bin, int binlen, privmxDrvEcc_BN** res) {
     if (!bin || !res) return 1;
     try {
@@ -66,7 +68,7 @@ int privmxDrvEcc_bnBn2bin(privmxDrvEcc_BN* bn, char** out, int* outlen) {
     if (!bn || !bn->impl || !out || !outlen) {
         return 1;
     }
-    
+
     std::string cpp_str = bn->impl->toBuffer();
     *outlen = cpp_str.length();
     *out = reinterpret_cast<char*>(malloc(*outlen));
@@ -83,7 +85,7 @@ int privmxDrvEcc_bnBitsLength(const privmxDrvEcc_BN* bn, int* res) {
     if (!bn || !bn->impl || !res) {
         return 1;
     }
-    *res = 256; // bn->impl->getBitsLength();
+    *res = 256;  // bn->impl->getBitsLength();
     return 0;
 }
 
@@ -201,7 +203,8 @@ int privmxDrvEcc_pointMul(const privmxDrvEcc_Point* point, const privmxDrvEcc_BN
     return 0;
 }
 
-int privmxDrvEcc_pointAdd(const privmxDrvEcc_Point* point1, const privmxDrvEcc_Point* point2, privmxDrvEcc_Point** res) {
+int privmxDrvEcc_pointAdd(const privmxDrvEcc_Point* point1, const privmxDrvEcc_Point* point2,
+                          privmxDrvEcc_Point** res) {
     if (!point1 || !point1->impl) {
         return 1;
     }
@@ -337,7 +340,7 @@ int privmxDrvEcc_eccSign(privmxDrvEcc_ECC* ecc, const char* msg, int msglen, pri
 
     std::string private_key_str;
     try {
-       private_key_str = ecc->impl->getPrivateKey();
+        private_key_str = ecc->impl->getPrivateKey();
     } catch (...) {
         return 5;
     }
@@ -347,10 +350,8 @@ int privmxDrvEcc_eccSign(privmxDrvEcc_ECC* ecc, const char* msg, int msglen, pri
     }
 
     secp256k1_ecdsa_signature sig;
-    if (!secp256k1_ecdsa_sign(ctx, &sig,
-                              reinterpret_cast<const unsigned char*>(msg),
-                              reinterpret_cast<const unsigned char*>(private_key_str.data()),
-                              NULL, NULL)) {
+    if (!secp256k1_ecdsa_sign(ctx, &sig, reinterpret_cast<const unsigned char*>(msg),
+                              reinterpret_cast<const unsigned char*>(private_key_str.data()), NULL, NULL)) {
         return 6;
     }
 
@@ -363,17 +364,18 @@ int privmxDrvEcc_eccSign(privmxDrvEcc_ECC* ecc, const char* msg, int msglen, pri
     try {
         auto r_bn = std::make_unique<privmxDrvEcc_BN>(privmxDrvEcc_BN{std::make_unique<BNImpl>(r_bytes)});
         auto s_bn = std::make_unique<privmxDrvEcc_BN>(privmxDrvEcc_BN{std::make_unique<BNImpl>(s_bytes)});
-        
+
         res->r = r_bn.release();
         res->s = s_bn.release();
     } catch (...) {
         return 7;
     }
-    
+
     return 0;
 }
 
-int privmxDrvEcc_eccVerify(privmxDrvEcc_ECC* ecc, const char* msg, int msglen, const privmxDrvEcc_Signature* sig, int* res) {
+int privmxDrvEcc_eccVerify(privmxDrvEcc_ECC* ecc, const char* msg, int msglen, const privmxDrvEcc_Signature* sig,
+                           int* res) {
     if (!ecc || !ecc->impl) return 1;
     if (!msg) return 2;
     if (!sig || !sig->r || !sig->r->impl || !sig->s || !sig->s->impl) return 3;
@@ -417,7 +419,7 @@ int privmxDrvEcc_eccVerify(privmxDrvEcc_ECC* ecc, const char* msg, int msglen, c
     return 0;
 }
 
-int ecdh_x_coordinate_copy_fn(unsigned char *output, const unsigned char *x, const unsigned char *y, void *data) {
+int ecdh_x_coordinate_copy_fn(unsigned char* output, const unsigned char* x, const unsigned char* y, void* data) {
     (void)y;
     (void)data;
     memcpy(output, x, 32);
@@ -455,12 +457,14 @@ int privmxDrvEcc_eccDerive(const privmxDrvEcc_ECC* ecc, const privmxDrvEcc_ECC* 
     }
 
     secp256k1_pubkey pubkey_struct;
-    if (secp256k1_ec_pubkey_parse(ctx, &pubkey_struct, reinterpret_cast<const unsigned char*>(pub_key_str.data()), pub_key_str.length()) != 1) {
+    if (secp256k1_ec_pubkey_parse(ctx, &pubkey_struct, reinterpret_cast<const unsigned char*>(pub_key_str.data()),
+                                  pub_key_str.length()) != 1) {
         return 6;
     }
 
     unsigned char shared_secret[32] = {0};
-    if (secp256k1_ecdh(ctx, shared_secret, &pubkey_struct, reinterpret_cast<const unsigned char*>(priv_key_str.data()), ecdh_x_coordinate_copy_fn, NULL) != 1) {
+    if (secp256k1_ecdh(ctx, shared_secret, &pubkey_struct, reinterpret_cast<const unsigned char*>(priv_key_str.data()),
+                       ecdh_x_coordinate_copy_fn, NULL) != 1) {
         return 7;
     }
 
@@ -527,7 +531,6 @@ int privmxDrvEcc_eccFree(privmxDrvEcc_ECC* ecc) {
     delete ecc;
     return 0;
 }
-
 
 int privmxDrvEcc_freeMem(void* ptr) {
     free(ptr);

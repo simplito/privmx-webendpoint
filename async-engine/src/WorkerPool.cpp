@@ -5,13 +5,9 @@
 namespace privmx {
 namespace webendpoint {
 
-WorkerPool::WorkerPool(size_t numThreads)
-    : stop(false) 
-{
+WorkerPool::WorkerPool(size_t numThreads) : stop(false) {
     for (size_t i = 0; i < numThreads; ++i) {
-        workers.emplace_back([this] {
-            this->worker_loop();
-        });
+        workers.emplace_back([this] { this->worker_loop(); });
     }
 }
 
@@ -23,7 +19,7 @@ WorkerPool::~WorkerPool() {
 
     condition.notify_all();
 
-    for (std::thread &worker : workers) {
+    for (std::thread& worker : workers) {
         if (worker.joinable()) {
             worker.join();
         }
@@ -46,9 +42,7 @@ void WorkerPool::worker_loop() {
         std::function<void()> task;
         {
             std::unique_lock<std::mutex> lock(queue_mutex);
-            condition.wait(lock, [this] {
-                return this->stop || !this->tasks.empty();
-            });
+            condition.wait(lock, [this] { return this->stop || !this->tasks.empty(); });
 
             if (this->stop && this->tasks.empty()) {
                 return;
@@ -57,13 +51,12 @@ void WorkerPool::worker_loop() {
             task = std::move(tasks.front());
             tasks.pop();
         }
-        
+
         try {
             task();
-        } catch (...) {
-        }
+        } catch (...) {}
     }
 }
 
-} // namespace webendpoint
-} // namespace privmx
+}  // namespace webendpoint
+}  // namespace privmx

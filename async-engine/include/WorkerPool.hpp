@@ -1,13 +1,13 @@
 #pragma once
 
-#include <vector>
+#include <atomic>
+#include <condition_variable>
+#include <cstddef>
+#include <functional>
+#include <mutex>
 #include <queue>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <functional>
-#include <atomic>
-#include <cstddef>
+#include <vector>
 
 namespace privmx {
 namespace webendpoint {
@@ -35,5 +35,5 @@ private:
     std::atomic<bool> stop;
 };
 
-} // namespace webendpoint
-} // namespace privmx
+}  // namespace webendpoint
+}  // namespace privmx
