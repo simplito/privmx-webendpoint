@@ -34,24 +34,50 @@ else
 fi
 
 
-cd "$PSON_DIR"
-
-# apply config patches for emscripte
+echo "Checking checksum: $PSON_DIR ..."
 set +e
-patch_out=$(patch --forward -d "$PSON_DIR" -p1 -i "$BASE_DIR/patches/pson-cpp.patch")
-status=$?
-if [ $status -eq 1 ]; then
-    if [[ $patch_out == *"FAILED"* ]]; then
-        echo "Patching PSON FAILED"; exit -1;
-    fi
-fi
+$SCRIPT_PATH/check_dir_checksum "$PSON_DIR"
+RESULT=$?
 set -e
+case "$RESULT" in
+    0)
+        echo "No changes - skipping build"
+        ;;
+    1)
+        echo "changes - rebuild..."
+        cd "$PSON_DIR"
 
-if [ ! -d "./build-emscripten" ]; then
-    mkdir -p build-emscripten && cd build-emscripten
-    emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
-else
-    cd build-emscripten
-fi
-emmake make -j20
-emmake make install
+        # apply config patches for emscripte
+        set +e
+        patch_out=$(patch --forward -d "$PSON_DIR" -p1 -i "$BASE_DIR/patches/pson-cpp.patch")
+        status=$?
+        if [ $status -eq 1 ]; then
+            if [[ $patch_out == *"FAILED"* ]]; then
+                echo "Patching PSON FAILED"; exit -1;
+            fi
+        fi
+        set -e
+
+        if [ ! -d "./build-emscripten" ]; then
+            mkdir -p build-emscripten && cd build-emscripten
+            emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
+        else
+            cd build-emscripten
+        fi
+        emmake make -j20
+        emmake make install
+
+        set +e
+        $SCRIPT_PATH/check_dir_checksum "$PSON_DIR"
+        set -e
+        ;;
+    2)
+        echo "\n\n\nBłąd wejścia" >&2
+        exit 2
+        ;;
+    *)
+        echo "\n\n\nNieznany kod wyjścia: $RESULT" >&2
+        exit 3
+        ;;
+esac
+

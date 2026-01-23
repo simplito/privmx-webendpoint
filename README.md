@@ -1,9 +1,103 @@
 # PrivMX Web Endpoint
-PrivMX Web Endpoint is a JavaScript library designed to work in browser environment. It is used by applications and devices which are the ends of PrivMX secure communication channels. It encrypts and decrypts data, manages network connections and provides a functional API on the top of the WebAssembly build made of the native PrivMX Endpoint library written in C++. This allows applications to build their E2EE communication channels based on a few universal, client-side encrypted tools: Threads, Stores, and Inboxes. 
 
-## How to start
-A full guide how to start using our Web Endpoint library can be found at: https://docs.privmx.dev/docs/latest/js/introduction
+**PrivMX Web Endpoint** is a robust JavaScript library designed for the browser environment. It serves as the client-side gateway to PrivMX Bridge secure communication channels, enabling applications to encrypt, decrypt, and manage data securely.
 
-A set of example projects with a complete source code can be found at: https://github.com/simplito/privmx-webendpoint/tree/main/examples.
+Under the hood, it wraps the native **PrivMX Endpoint** library (written in C++) using **WebAssembly (Wasm)**. This architecture ensures high-performance cryptography while providing a developer-friendly JavaScript API.
 
-For more detailed information about API functions, visit our [API Reference](https://docs.privmx.dev/docs/latest/reference/webendpoint/api-reference/connection).
+## Key Features
+
+* **End-to-End Encryption (E2EE):** Client-side encryption for all data transfers.
+* **Universal Tools:** Build complex communication logic using simple primitives:
+* **Threads:** For contextual messaging and collaboration.
+* **Stores:** For secure file and data storage.
+* **Inboxes:** For secure, one-way communication with external or anonymous users (e.g., public forms)
+* **Kvdbs:** For encrypted key-value database storage
+* **Events queue:** For real-time updates and system event handling.
+
+* **Performance:** Powered by a C++ core compiled to WebAssembly.
+* **Type-Safe:** Fully typed with TypeScript definitions included.
+
+## Installation
+
+Install the package via npm:
+
+```bash
+npm install @simplito/privmx-webendpoint
+
+```
+
+### Documentation & Examples
+
+* **Getting Started Guide:** [Introduction to PrivMX JS](https://docs.privmx.dev/docs/latest/js/introduction)
+* **API Reference:** [Full API Documentation](https://docs.privmx.dev/docs/latest/reference/webendpoint/api-reference/connection)
+
+## Building
+
+If you want to build the library from source, follow these steps.
+
+### Prerequisites
+
+* Node.js
+* CMake: Required to build the Wasm core (npm run build:wasm).
+* Clang-format (v18): Required for formatting and linting of C++ code
+
+### Build Scripts
+
+The project uses a combined pipeline to compile the C++ core to Wasm and bundle the TypeScript code.
+
+| Command | Description |
+| --- | --- |
+| `npm run build` | Runs the full pipeline: Clean -> Build Wasm -> Compile TS -> Bundle Webpack. |
+| `npm run build:wasm` | Compiles the C++ source code to WebAssembly using `scripts/pipeline.sh`. |
+| `npm run build:js` | Compiles TypeScript (`tsc`) and bundles assets (`webpack`). |
+| `npm run watch:types` | Watches for TypeScript changes. |
+
+## Testing
+
+The project employs a dual testing strategy: **Jest** for unit logic and **Playwright** for End-to-End (E2E) integration testing.
+
+### Unit Tests
+
+Run standard unit tests using Jest:
+
+```bash
+npm test
+
+```
+
+### End-to-End (E2E) Tests
+
+E2E tests require a running Docker backend (PrivMX Bridge). The tests use **Playwright** to spin up browser instances and execute scenarios against the local backend.
+
+```bash
+# Run all E2E tests
+npm run test:e2e
+
+```
+
+*Note: Ensure Docker is running before executing E2E tests.*
+
+## Linting & Formatting
+
+Maintain code quality using ESLint and Prettier:
+
+```bash
+# Check for linting errors
+
+# Typescript
+npm run lint
+# C++
+npm run lint:clang-format
+
+# Auto-format code
+
+# Typescript
+npm run format
+# C++
+npm run format:clang
+```
+
+## License
+
+This software is licensed under the **PrivMX Free License**.
+Copyright © Simplito. All rights reserved.

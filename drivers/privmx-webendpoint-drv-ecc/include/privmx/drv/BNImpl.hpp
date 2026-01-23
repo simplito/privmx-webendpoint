@@ -14,12 +14,10 @@ limitations under the License.
 
 #include <functional>
 #include <memory>
+#include <privmx/drv/BNImpl.hpp>
 #include <string>
 
-#include <privmx/drv/BNImpl.hpp>
-
-class BNImpl
-{
+class BNImpl {
 public:
     using Ptr = std::unique_ptr<BNImpl>;
 
@@ -52,4 +50,4 @@ inline bool BNImpl::isEmpty() const {
     return _bn.empty();
 }
 
-#endif // _PRIVMXLIB_CRYPTO_EMSCRIPTEN_BNIMPl_HPP_
+#endif  // _PRIVMXLIB_CRYPTO_EMSCRIPTEN_BNIMPl_HPP_

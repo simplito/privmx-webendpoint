@@ -1,1 +1,0 @@
-this.dispatchEvent(new CustomEvent('wasmLoaded'));
