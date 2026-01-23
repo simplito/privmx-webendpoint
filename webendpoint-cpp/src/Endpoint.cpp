@@ -383,7 +383,7 @@ void SearchApi_newSearchApi(int taskId, int connectionPtr, int storeApiPtr, int 
         auto connection = (ConnectionVar*)connectionPtr;
         auto storeApi = (StoreApiVar*)storeApiPtr;
         auto kvdbApi = (KvdbApiVar*)kvdbApiPtr;
-        auto searchApi = new SearchApiVar(connection->getApi(), storeApiPtr->getApi(), kvdbApiPtr->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+        auto searchApi = new SearchApiVar(connection->getApi(), storeApi->getApi(), kvdbApi->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
         return (int)searchApi;
     });
 }
