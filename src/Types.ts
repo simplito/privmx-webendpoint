@@ -705,23 +705,25 @@ export enum IndexMode
  * @param {ContainerPolicy} policy Thread's policies
  * @param {IndexMode} mode The operating mode of the Index, defining how document content is handled.
  * @param {number} statusCode status code of retrieval and decryption of the Thread
+ * @param {number} schemaVersion Version of the Search Index data structure and how it is encoded/encrypted
  */
 export interface SearchIndex
 {
-    contextId: string,
-    indexId: string,
-    createDate: number,
-    creator: string,
-    lastModificationDate: number,
-    lastModifier: string,
-    users: string[],
-    managers: string[],
-    version: number,
-    publicMeta: Uint8Array,
-    privateMeta: Uint8Array,
-    policy: ContainerPolicy,
-    mode: IndexMode,
-    statusCode: number
+    contextId: string;
+    indexId: string;
+    createDate: number;
+    creator: string;
+    lastModificationDate: number;
+    lastModifier: string;
+    users: string[];
+    managers: string[];
+    version: number;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    policy: ContainerPolicy;
+    mode: IndexMode;
+    statusCode: number;
+    schemaVersion: number;
 }
 
 /**
