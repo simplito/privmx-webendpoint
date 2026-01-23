@@ -17,18 +17,18 @@ let recvRMS = -99;
 let recvRMSTimestamp = Date.now();
 export interface TransformContext {
     keyStore: KeyStore;
-    id: number;
-    publisherId: number;
+    id?: string;
+    publisherId?: number;
 }
 
 export class EncryptTransform {
     // eslint-disable-line no-unused-vars
     constructor(private keyStore: KeyStore) {}
 
-    private getHeaderSizeByType(type: "key" | "delta" | "undefined") {
+    private getHeaderSizeByType(type: RTCEncodedVideoFrameType) {
         if (type === "key") return 10;
         if (type === "delta") return 3;
-        if (type === "undefined") return 1;
+        if (type === "empty") return 1;
         return 0;
     }
 
@@ -83,11 +83,11 @@ export class EncryptTransform {
         encodedFrame: RTCEncodedVideoFrame | RTCEncodedAudioFrame,
         kind: string,
         controller: TransformStreamDefaultController<any>,
-        receiverId: number,
+        receiverId: string,
         publisherId: number
     ) {
         const headerLen =
-            kind === "video" ? this.getHeaderSizeByType((encodedFrame as any).type) : 1;
+            kind === "video" ? this.getHeaderSizeByType((encodedFrame as RTCEncodedVideoFrame).type) : 1;
         const data = encodedFrame.data;
         const frameHeader = new Uint8Array(data, 0, headerLen);
         
@@ -280,8 +280,12 @@ if ((self as any).RTCTransformEvent) {
         const { operation, kind } = transformer.options;
         // logger("operation: " + operation + " / kind: " + kind);
         logDebug("onrtctransfrom: " + JSON.stringify(event));
+        const context = kind === "encode" 
+            ? { keyStore: getKeyStore() }
+            : { keyStore: getKeyStore(), id: event.data.id as string, publisherId: event.data.publisherId as number };
+
         handleTransform(
-            { keyStore: getKeyStore(), id: event.data.id, publisherId: event.data.publisherId },
+            context,
             operation,
             kind,
             transformer.readable,

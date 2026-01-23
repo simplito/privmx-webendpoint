@@ -55,6 +55,7 @@ export type EncPair = {
     readable: ReadableStream<any>;
     writable: WritableStream<any>;
     id: string;
+    publisherId: number;
     posted: boolean;
 };
 

@@ -132,7 +132,7 @@ export class WebRtcClient {
         return this.e2eeWorker;
     }
 
-    protected async initPipeline(receiverTrackId: string): Promise<void> {
+    protected async initPipeline(receiverTrackId: string, publisherId: number): Promise<void> {
         const worker = await this.getWorker();
         const waitPromise = new Promise<void>((resolve) => {
             const listener = (ev: MessageEvent) => {
@@ -142,7 +142,7 @@ export class WebRtcClient {
                 }
             };
             worker.addEventListener("message", listener);
-            worker.postMessage({ operation: "init-pipeline", id: receiverTrackId });
+            worker.postMessage({ operation: "init-pipeline", id: receiverTrackId, publisherId: publisherId });
         });
 
         return waitPromise;
@@ -263,36 +263,9 @@ export class WebRtcClient {
                     );
                 }
 
-                const videoSender = pc.addTrack(track, stream);
-
-                if ((window as any).RTCRtpScriptTransform) {
-                    const options = {
-                        operation: "encode",
-                    };
-                    console.log(
-                        "======> set e2ee worker for frame encoding (RTCRtpScriptTransform).",
-                    );
-                    (videoSender as any).transform = new RTCRtpScriptTransform(
-                        this.e2eeWorker,
-                        options,
-                    );
-                } else {
-                    const senderStreams = (videoSender as any).createEncodedStreams();
-                    console.log("post 'encode' frame to the e2ee worker..");
-                    this.e2eeWorker.postMessage(
-                        {
-                            operation: "encode",
-                            readableStream: senderStreams.readable,
-                            writableStream: senderStreams.writable,
-                        },
-                        [senderStreams.readable, senderStreams.writable],
-                    );
-                }
+                const streamSender = pc.addTrack(track, stream);
+                this.setupSenderTransform(streamSender);
             }
-
-            console.log("this.e2eeWorker", this.e2eeWorker);
-
-            console.log("Transform streams added.");
         }
         return pc;
     }
@@ -638,12 +611,40 @@ export class WebRtcClient {
         (await this.getWorkerApi()).setKeys(keys);
     }
 
+
+    /// INSERTABLE STREAMS
+
+    private setupSenderTransform(videoSender: RTCRtpSender) {
+        if ((window as any).RTCRtpScriptTransform) {
+            this.logger.log("important-only", "Worker - encoding frames using RTCRtpScriptTransform");
+            const options = {
+                operation: "encode",
+            };
+            (videoSender as any).transform = new RTCRtpScriptTransform(
+                this.e2eeWorker,
+                options,
+            );
+        } else {
+            this.logger.log("important-only", "Worker - encoding frames using EncodedStreams");
+            const senderStreams = (videoSender as any).createEncodedStreams();
+            this.e2eeWorker.postMessage(
+                {
+                    operation: "encode",
+                    readableStream: senderStreams.readable,
+                    writableStream: senderStreams.writable,
+                },
+                [senderStreams.readable, senderStreams.writable],
+            );
+        }
+    }
+
     private async setupReceiverTransform(receiver: RTCRtpReceiver, publisherId: number, worker: Worker) {
         console.group("on setupReceiverTransform");
-        if ("RTCRtpScriptTransform" in window && !(receiver as any).transform) {
+
+        if ("RTCRtpScriptTransform" in window && !receiver.transform) {
             this.logger.log("important-only", "-> using RtpScriptTransform");
-            const id = (receiver as any).track.id;
-            (receiver as any).transform = new (window as any).RTCRtpScriptTransform(worker, {
+            const id = receiver.track.id;
+            receiver.transform = new window.RTCRtpScriptTransform(worker, {
                 operation: "decode",
                 id,
                 publisherId
@@ -654,10 +655,10 @@ export class WebRtcClient {
         this.logger.log("important-only", "-> using EncodedStreams");
 
         // Fallback: Encoded Streams
-        if (!this.encByReceiver.has(receiver)) {
+        if (!this.encByReceiver.has(receiver) && "createEncodedStreams" in receiver && typeof (receiver.createEncodedStreams) === "function") {
             this.logger.log("important-only", "-> call for createEncodedStreams()");
-            const { readable, writable } = await (receiver as any).createEncodedStreams();
-            const enc = { readable, writable, id: (receiver as any).track.id, publisherId: publisherId, posted: false };
+            const { readable, writable } = await receiver.createEncodedStreams();
+            const enc = { readable, writable, id: receiver.track.id, publisherId: publisherId, posted: false };
             this.encByReceiver.set(receiver, enc);
 
             this.logger.log(
@@ -665,13 +666,13 @@ export class WebRtcClient {
                 "-> posting EncodedStreams to worker (should happen only once)",
             );
 
-            await this.initPipeline(enc.id);
+            await this.initPipeline(enc.id, enc.publisherId);
 
             worker.postMessage(
                 {
                     operation: "decode",
                     id: enc.id,
-                    publisherId: publisherId,
+                    publisherId: enc.publisherId,
                     readableStream: enc.readable,
                     writableStream: enc.writable,
                 },
