@@ -44,7 +44,7 @@ then
 else
     echo "$GMP_DIR directory does not exist. Get sources..."
     cd "$SOURCE_DIR"
-    curl "https://gmplib.org/download/gmp/gmp-$VERSION.tar.xz" --output gmp.tar.xz
+    curl "https://builds.simplito.com/cpp/gmp-$VERSION.tar.xz" --output gmp.tar.xz
     tar -xf gmp.tar.xz
 fi
 
