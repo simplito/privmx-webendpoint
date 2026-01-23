@@ -363,6 +363,7 @@ API_FUNCTION(StreamApi, unpublishStream)
 API_FUNCTION(StreamApi, joinStreamRoom)
 API_FUNCTION(StreamApi, listStreams)
 API_FUNCTION(StreamApi, leaveStreamRoom)
+API_FUNCTION(StreamApi, enableStreamRoomRecording)
 
 API_FUNCTION(StreamApi, subscribeToRemoteStreams)
 API_FUNCTION(StreamApi, modifyRemoteStreamsSubscriptions)

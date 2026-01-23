@@ -109,6 +109,11 @@ export class StreamApi extends BaseApi {
         return this.native.leaveStreamRoom(this.servicePtr, [streamRoomId]);
     }
 
+    public async enableStreamRoomRecording(streamRoomId: Types.StreamRoomId): Promise<void> {
+        return this.native.enableStreamRoomRecording(this.servicePtr, [streamRoomId]);
+    }
+
+
     public async getStreamRoom(streamRoomId: Types.StreamRoomId): Promise<StreamRoom> {
         return this.native.getStreamRoom(this.servicePtr, [streamRoomId]);
     }
