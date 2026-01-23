@@ -50,10 +50,10 @@ if [ ! -d build-emscripten ]; then
 
     echo "Running Configure..."
     emconfigure ../configure \
-        --disable-assembly \
         --host=none \
         --prefix="$SYSROOT_DIR" \
-        CFLAGS="-DSQLITE_ENABLE_FTS -O3" \
+        --fts5 \
+        CFLAGS="-O3 -pthread" \
         CC_FOR_BUILD="$CC_FOR_BUILD" \
         CPPFLAGS_FOR_BUILD="$CPPFLAGS_FOR_BUILD" \
         CFLAGS_FOR_BUILD="$CFLAGS_FOR_BUILD"
