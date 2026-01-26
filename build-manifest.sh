@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PRIVMX_ENDPOINT="237b0b21fe198cec7ec9e32264781d3e71dea3df"
+PRIVMX_ENDPOINT="rc-2.8"
 PSON_CPP="v1.0.7"
 GMP="6.3.0"
 POCO="1.10.1"
