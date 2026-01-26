@@ -142,6 +142,12 @@ export class StreamApiNative extends BaseNative {
         );
     }
 
+    async enableStreamRoomRecording(ptr: number, args: [string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_enableStreamRoomRecording(taskId, ptr, args),
+        );
+    }
+
     async publishStream(ptr: number, args: [number]): Promise<Types.StreamPublishResult> {
         const ret = await this.runAsync<Types.StreamPublishResult>((taskId) =>
             this.api.lib.StreamApi_publishStream(taskId, ptr, args),

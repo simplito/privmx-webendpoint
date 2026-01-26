@@ -7,11 +7,12 @@ if [ -z "$1" ]; then
     exit -1;
 fi
 VERSION=$1
+VERSION_AS_DIR="${VERSION//\//_}"
 
 source "$SCRIPT_PATH/config.sh"
 source "$EMSDK_DIR/emsdk_env.sh"
 
-PRIVMX_ENDPOINT_DIR="$SOURCE_DIR/privmx-endpoint-$VERSION"
+PRIVMX_ENDPOINT_DIR="$SOURCE_DIR/privmx-endpoint-$VERSION_AS_DIR"
 
 if [ -d "$PRIVMX_ENDPOINT_DIR" ]; then
     echo "$PRIVMX_ENDPOINT_DIR directory exists. Skip download of sources."
