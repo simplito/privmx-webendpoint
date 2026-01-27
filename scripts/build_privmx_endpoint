@@ -81,6 +81,9 @@ case "$RESULT" in
         ;;
     1)
         echo "Enpoint Core changes - rebuild..."
+            ## notify webendpoint to rebuild after
+            touch "$PRIVMX_WEBENDPOINT_API_SRC/need_rebuild"
+
             cd "$PRIVMX_ENDPOINT_DIR"
             rm -rf ./build-emscripten
 

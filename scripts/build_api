@@ -17,6 +17,10 @@ set +e
 $SCRIPT_PATH/check_dir_checksum "$PRIVMX_WEBENDPOINT_API_SRC"
 RESULT=$?
 set -e
+if [ -f "$PRIVMX_WEBENDPOINT_API_SRC/need_rebuild" ]; then
+    RESULT=1;
+    rm -f "$PRIVMX_WEBENDPOINT_API_SRC/need_rebuild"
+fi
 case "$RESULT" in
     0)
         echo "No changes on Endpoint API Interface- skipping build"
