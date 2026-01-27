@@ -881,3 +881,8 @@ export type CollectionChangedEventData = {
     affectedItemsCount: number;
     items: CollectionItemChange[];
 };
+
+export interface RecordingEncKey {
+    id: string;
+    key: Uint8Array;
+}

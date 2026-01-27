@@ -1,4 +1,5 @@
 import { Types } from "../ServerTypes";
+import * as EndpointTypes  from "../Types";
 import { Utils } from "../webStreams/Utils";
 import { AudioLevelsStats, WebRtcClient } from "../webStreams/WebRtcClient";
 import {
@@ -113,6 +114,9 @@ export class StreamApi extends BaseApi {
         return this.native.enableStreamRoomRecording(this.servicePtr, [streamRoomId]);
     }
 
+    public async getStreamRoomRecordingKeys(streamRoomId: Types.StreamRoomId): Promise<EndpointTypes.RecordingEncKey[]> {
+        return this.native.getStreamRoomRecordingKeys(this.servicePtr, [streamRoomId]);
+    }
 
     public async getStreamRoom(streamRoomId: Types.StreamRoomId): Promise<StreamRoom> {
         return this.native.getStreamRoom(this.servicePtr, [streamRoomId]);
