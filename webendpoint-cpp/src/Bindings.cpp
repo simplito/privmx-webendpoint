@@ -183,6 +183,7 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(StreamApi, listStreams)
     BINDING_FUNCTION(StreamApi, leaveStreamRoom)
     BINDING_FUNCTION(StreamApi, enableStreamRoomRecording)
+    BINDING_FUNCTION(StreamApi, getStreamRoomRecordingKeys)
 
     BINDING_FUNCTION(StreamApi, subscribeToRemoteStreams)
     BINDING_FUNCTION(StreamApi, modifyRemoteStreamsSubscriptions)
