@@ -38,7 +38,7 @@ export class SearchApi extends BaseApi {
     publicMeta: Uint8Array,
     privateMeta: Uint8Array,
     mode: IndexMode,
-    policies: ContainerPolicy
+    policies?: ContainerPolicy
   ): Promise<string> {
     return this.native.createSearchIndex(this.servicePtr, [
         contextId,
