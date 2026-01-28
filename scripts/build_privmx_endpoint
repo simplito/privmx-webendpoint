@@ -77,6 +77,11 @@ $SCRIPT_PATH/check_dir_checksum "$PRIVMX_ENDPOINT_DIR"
 RESULT=$?
 set -e
 
+echo "Checking if build exists.."
+if [ ! -d "$PRIVMX_ENDPOINT_DIR/build-emscripten" ]; then
+    RESULT=1
+fi
+
 echo "Checking last built version/branch..."
 LAST_BUILT_VERSION=""
 if [ -f $LAST_BUILT_VERSION_CHECK_FILE ]; then
