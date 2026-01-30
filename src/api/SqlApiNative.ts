@@ -35,8 +35,8 @@ export class SqlApiNative extends BaseNative {
     async getSqlDatabase(ptr: number, args: [string]): Promise<SqlDatabase> {
         return this.runAsync<SqlDatabase>((taskId)=>this.api.lib.SqlApi_getSqlDatabase(taskId, ptr, args));
     }
-    async listSqlDatabasees(ptr: number, args: [string, PagingQuery]): Promise<PagingList<SqlDatabase>> {
-        return this.runAsync<PagingList<SqlDatabase>>((taskId)=>this.api.lib.SqlApi_listSqlDatabasees(taskId, ptr, args));
+    async listSqlDatabases(ptr: number, args: [string, PagingQuery]): Promise<PagingList<SqlDatabase>> {
+        return this.runAsync<PagingList<SqlDatabase>>((taskId)=>this.api.lib.SqlApi_listSqlDatabases(taskId, ptr, args));
     }
     async openSqlDatabase(ptr: number, args: [string]): Promise<SqlDatabaseHandlePointer> {
         return this.runAsync<SqlDatabaseHandlePointer>((taskId)=>this.api.lib.SqlApi_openSqlDatabase(taskId, ptr, args));
@@ -85,6 +85,9 @@ export class SqlApiNative extends BaseNative {
     }
     async queryReset(ptr: number, args: [SqlQueryPointer]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.SqlApi_queryReset(taskId, ptr, args));
+    }
+    async queryFinalize(ptr: number, args: [SqlQueryPointer]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.SqlApi_queryFinalize(taskId, ptr, args));
     }
     async freeQuery(ptr: number, args: [SqlQueryPointer]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.SqlApi_freeQuery(taskId, ptr, args));

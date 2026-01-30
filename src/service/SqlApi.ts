@@ -114,17 +114,17 @@ export class SqlApi extends BaseApi {
   };
 
   /**
-   * Gets a list of SQL Databasees in given Context.
+   * Gets a list of SQL Databases in given Context.
    * 
-   * @param {string} contextId ID of the Context to get the SQL Databasees from
+   * @param {string} contextId ID of the Context to get the SQL Databases from
    * @param {PagingQuery} pagingQuery struct with list query parameters
-   * @return {PagingList<SqlDatabase>} struct containing a list of SQL Databasees
+   * @return {PagingList<SqlDatabase>} struct containing a list of SQL Databases
    */
-  async listSqlDatabasees(
+  async listSqlDatabases(
     contextId: string,
     pagingQuery: PagingQuery
   ): Promise<PagingList<SqlDatabase>> {
-     return this.native.listSqlDatabasees(this.servicePtr, [
+     return this.native.listSqlDatabases(this.servicePtr, [
         contextId,
         pagingQuery
      ]);
@@ -148,7 +148,7 @@ export class SqlApi extends BaseApi {
 }
 
 // TODO: free resources
-class DatabaseHandle {
+export class DatabaseHandle {
    constructor(private readonly native: SqlApiNative, private readonly servicePtr: number, private readonly ptr: SqlDatabaseHandlePointer) {}
    async beginTransaction(): Promise<Transaction> {
       const ptr = await this.native.databaseHandleBeginTransaction(this.servicePtr, [this.ptr]);
@@ -163,7 +163,7 @@ class DatabaseHandle {
    }
 }
 
-class Transaction {
+export class Transaction {
    constructor(private readonly native: SqlApiNative, private readonly servicePtr: number, private readonly ptr: SqlTransactionPointer) {}
    async query(sqlQuery: string): Promise<Query> {
       const ptr = await this.native.transactionQuery(this.servicePtr, [this.ptr, sqlQuery]);
@@ -177,7 +177,7 @@ class Transaction {
    }
 }
 
-class Query {
+export class Query {
    constructor(private readonly native: SqlApiNative, private readonly servicePtr: number, private readonly ptr: SqlQueryPointer) {}
    async bindInt64(index: number, value: number): Promise<void> {
       return this.native.queryBindInt64(this.servicePtr, [this.ptr, index, value]);
@@ -201,9 +201,12 @@ class Query {
    async reset(): Promise<void> {
       return this.native.queryReset(this.servicePtr, [this.ptr]);
    }
+   async finalize(): Promise<void> {
+      return this.native.queryFinalize(this.servicePtr, [this.ptr]);
+   }
 }
 
-class Row {
+export class Row {
    constructor(private readonly native: SqlApiNative, private readonly servicePtr: number, private readonly ptr: SqlRowPointer) {}
    async getStatus(): Promise<SqlEvaluationStatus> {
       return this.native.rowGetStatus(this.servicePtr, [this.ptr]);
@@ -217,7 +220,7 @@ class Row {
    }
 }
 
-class Column {
+export class Column {
    constructor(private readonly native: SqlApiNative, private readonly servicePtr: number, private readonly ptr: SqlColumnPointer) {}
    async getName(): Promise<string> {
       return this.native.columnGetName(this.servicePtr, [this.ptr]);

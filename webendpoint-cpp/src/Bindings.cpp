@@ -236,6 +236,7 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(SqlApi, queryBindNull)
     BINDING_FUNCTION(SqlApi, queryStep)
     BINDING_FUNCTION(SqlApi, queryReset)
+    BINDING_FUNCTION(SqlApi, queryFinalize)
     BINDING_FUNCTION(SqlApi, freeQuery)
     BINDING_FUNCTION(SqlApi, rowGetStatus)
     BINDING_FUNCTION(SqlApi, rowGetColumnCount)

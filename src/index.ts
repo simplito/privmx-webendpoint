@@ -23,6 +23,7 @@ import {
     StreamApi,
     SearchApi,
     SqlApi,
+    Sql,
     ExtKey,
     EventApi,
 } from "./service";
@@ -41,6 +42,7 @@ export {
     StreamApi,
     SearchApi,
     SqlApi,
+    Sql,
     Connection,
     BaseApi,
     ExtKey,
