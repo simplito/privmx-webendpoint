@@ -34,6 +34,8 @@ import { StreamApi } from "./StreamApi";
 import { ThreadApi } from "./ThreadApi";
 import { SearchApi } from "./SearchApi";
 import { SearchApiNative } from "../api/SearchApiNative";
+import { SqlApi } from "./SqlApi";
+import { SqlApiNative } from "../api/SqlApiNative";
 
 /**
  * //doc-gen:ignore
@@ -339,5 +341,33 @@ export class EndpointFactory {
         connection.nativeApisDeps["searches"] = nativeApi;
         await nativeApi.create(ptr, []);
         return new SearchApi(nativeApi, ptr);
+    }
+
+    /**
+    * Creates an instance of the SQL API.
+     *
+     * @param {Connection} connection instance of Connection
+     * @param {StoreApi} storeApi instance of ThreadApi
+     * @param {KvdbApi} kvdbApi instance of StoreApi
+     * @returns {SqlApi} instance of SqlApi
+     */
+    static async createSqlApi(
+        connection: Connection,
+        storeApi: StoreApi,
+        kvdbApi: KvdbApi
+    ): Promise<SqlApi> {
+        if ("sqls" in connection.apisRefs) {
+            throw new Error("SqlApi already registered for given connection.");
+        }
+        const nativeApi = new SqlApiNative(this.api);
+        const ptr = await nativeApi.newApi(
+            connection.servicePtr,
+            storeApi.servicePtr,
+            kvdbApi.servicePtr
+        );
+        connection.apisRefs["sqls"] = { _apiServicePtr: ptr };
+        connection.nativeApisDeps["sqls"] = nativeApi;
+        await nativeApi.create(ptr, []);
+        return new SqlApi(nativeApi, ptr);
     }
 }
