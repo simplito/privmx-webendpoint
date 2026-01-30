@@ -22,6 +22,7 @@ limitations under the License.
 #include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
 #include <privmx/endpoint/inbox/varinterface/InboxApiVarInterface.hpp>
 #include <privmx/endpoint/search/varinterface/SearchApiVarInterface.hpp>
+#include <privmx/endpoint/sql/varinterface/SqlApiVarInterface.hpp>
 #include <privmx/endpoint/kvdb/varinterface/KvdbApiVarInterface.hpp>
 #include <privmx/endpoint/store/varinterface/StoreApiVarInterface.hpp>
 #include <privmx/endpoint/thread/varinterface/ThreadApiVarInterface.hpp>
@@ -50,6 +51,7 @@ using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
 using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
 using StreamApiVar = privmx::endpoint::stream::StreamApiLowVarInterface;
 using SearchApiVar = privmx::endpoint::search::SearchApiVarInterface;
+using SqlApiVar = privmx::endpoint::sql::SqlApiVarInterface;
 
 using UserVerifierInterface = privmx::endpoint::core::UserVerifierInterface;
 using VerificationRequest = privmx::endpoint::core::VerificationRequest;
@@ -406,6 +408,55 @@ API_FUNCTION(SearchApi, deleteDocument)
 API_FUNCTION(SearchApi, getDocument)
 API_FUNCTION(SearchApi, listDocuments)
 API_FUNCTION(SearchApi, searchDocuments)
+
+void SqlApi_newSqlApi(int taskId, int connectionPtr, int storeApiPtr, int kvdbApiPtr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, storeApiPtr, kvdbApiPtr]{
+        auto connection = (ConnectionVar*)connectionPtr;
+        auto storeApi = (StoreApiVar*)storeApiPtr;
+        auto kvdbApi = (KvdbApiVar*)kvdbApiPtr;
+        auto sqlApi = new SqlApiVar(connection->getApi(), storeApi->getApi(), kvdbApi->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)sqlApi;
+    });
+}
+void SqlApi_deleteSqlApi(int taskId, int ptr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
+        delete (SqlApiVar*)ptr;
+    });
+}
+API_FUNCTION(SqlApi, create)
+API_FUNCTION(SqlApi, createSqlDatabase)
+API_FUNCTION(SqlApi, updateSqlDatabase)
+API_FUNCTION(SqlApi, deleteSqlDatabase)
+API_FUNCTION(SqlApi, getSqlDatabase)
+API_FUNCTION(SqlApi, listSqlDatabases)
+API_FUNCTION(SqlApi, openSqlDatabase)
+API_FUNCTION(SqlApi, databaseHandleBeginTransaction)
+API_FUNCTION(SqlApi, databaseHandleQuery)
+API_FUNCTION(SqlApi, databaseHandleClose)
+API_FUNCTION(SqlApi, freeDatabaseHandle)
+API_FUNCTION(SqlApi, transactionQuery)
+API_FUNCTION(SqlApi, transactionCommit)
+API_FUNCTION(SqlApi, transactionRollback)
+API_FUNCTION(SqlApi, freeTransaction)
+API_FUNCTION(SqlApi, queryBindInt64)
+API_FUNCTION(SqlApi, queryBindDouble)
+API_FUNCTION(SqlApi, queryBindText)
+API_FUNCTION(SqlApi, queryBindBlob)
+API_FUNCTION(SqlApi, queryBindNull)
+API_FUNCTION(SqlApi, queryStep)
+API_FUNCTION(SqlApi, queryReset)
+API_FUNCTION(SqlApi, freeQuery)
+API_FUNCTION(SqlApi, rowGetStatus)
+API_FUNCTION(SqlApi, rowGetColumnCount)
+API_FUNCTION(SqlApi, rowGetColumn)
+API_FUNCTION(SqlApi, freeRow)
+API_FUNCTION(SqlApi, columnGetName)
+API_FUNCTION(SqlApi, columnGetType)
+API_FUNCTION(SqlApi, columnGetInt64)
+API_FUNCTION(SqlApi, columnGetDouble)
+API_FUNCTION(SqlApi, columnGetText)
+API_FUNCTION(SqlApi, columnGetBlob)
+API_FUNCTION(SqlApi, freeColumn)
 
 }  // namespace api
 }  // namespace webendpoint

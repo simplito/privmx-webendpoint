@@ -11,6 +11,7 @@ import { EventQueue } from "./EventQueue";
 import { BaseApi } from "./BaseApi";
 import { ExtKey } from "./ExtKey";
 import { SearchApi } from "./SearchApi";
+import { SqlApi } from "./SqlApi";
 
 export {
     EndpointFactory,
@@ -21,6 +22,7 @@ export {
     CryptoApi,
     StreamApi,
     SearchApi,
+    SqlApi,
     Connection,
     EventQueue,
     BaseApi,

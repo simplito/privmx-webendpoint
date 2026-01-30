@@ -8,7 +8,7 @@ target_include_directories(endpoint-wasm-module PUBLIC ${PROJECT_SOURCE_DIR}/inc
 find_package(Threads REQUIRED)
 find_package(SQLite3 REQUIRED)
 find_package(Poco REQUIRED COMPONENTS Foundation JSON)
-target_link_libraries(endpoint-wasm-module secp256k1 Threads::Threads Poco::Foundation Poco::JSON Pson gmp privmx privmxendpointcore privmxendpointcrypto privmxendpointthread privmxendpointstore privmxendpointinbox privmxendpointkvdb privmxendpointevent embind privmxdrvcrypto privmxdrvecc privmxdrvnet privmxendpointstream SQLite::SQLite3 privmxendpointsearch asyncengine)
+target_link_libraries(endpoint-wasm-module secp256k1 Threads::Threads Poco::Foundation Poco::JSON Pson gmp privmx privmxendpointcore privmxendpointcrypto privmxendpointthread privmxendpointstore privmxendpointinbox privmxendpointkvdb privmxendpointevent embind privmxdrvcrypto privmxdrvecc privmxdrvnet privmxendpointstream SQLite::SQLite3 privmxendpointsearch privmxendpointsql asyncengine)
 set(CMAKE_CXX_FLAGS "-std=c++17 -fexceptions -pthread -flto")
 target_compile_options(endpoint-wasm-module PUBLIC 
     -O3

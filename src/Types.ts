@@ -741,7 +741,66 @@ export interface Document
     name: string,
     content: string
 };
-// }
+
+/**
+ * Holds all available information about a SQL Database.
+ * 
+ * @type {SqlDatabase}
+ * 
+ * @param {string} contextId ID of the Context
+ * @param {string} sqlDatabaseId ID of the SQL Database
+ * @param {number} createDate Index creation timestamp
+ * @param {string} creator ID of user who created the SQL Database
+ * @param {number} lastModificationDate SQL Database last modification timestamp
+ * @param {string} lastModifier ID of the user who last modified the SQL Database
+ * @param {string[]} users list of users (their IDs) with access to the SQL Database
+ * @param {string[]} managers list of users (their IDs) with management rights
+ * @param {number} version Version number (changes on updates)
+ * @param {Uint8Array} publicMeta SQL Database public metadata
+ * @param {Uint8Array} privateMeta SQL Database privateMeta metadata
+ * @param {ContainerPolicy} policy SQL Database policies
+ * @param {number} statusCode status code of retrieval and decryption of the Thread
+ * @param {number} schemaVersion Version of the Search Index data structure and how it is encoded/encrypted
+ */
+export interface SqlDatabase
+{
+    contextId: string;
+    sqlDatabaseId: string;
+    createDate: number;
+    creator: string;
+    lastModificationDate: number;
+    lastModifier: string;
+    users: string[];
+    managers: string[];
+    version: number;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    policy: ContainerPolicy;
+    statusCode: number;
+    schemaVersion: number;
+}
+
+export enum SqlDataType
+{
+    T_INTEGER = 1,
+    T_DOUBLE = 2,
+    T_TEXT = 3,
+    T_BLOB = 4,
+    T_NULL = 5,
+};
+
+export enum SqlEvaluationStatus
+{
+    T_ERROR = 0,
+    T_ROW = 1,
+    T_DONE = 2,
+};
+
+export type SqlDatabaseHandlePointer = number & { __ptr: "DatabaseHandle" }
+export type SqlTransactionPointer = number & { __ptr: "Transaction" }
+export type SqlQueryPointer = number & { __ptr: "Query" }
+export type SqlRowPointer = number & { __ptr: "Row" }
+export type SqlColumnPointer = number & { __ptr: "Column" }
 
 /**
  * Holds error details
