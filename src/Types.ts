@@ -668,9 +668,6 @@ export interface StreamPublishResult {
     };
 }
 
-/** reserved for future use */
-export interface StreamSettings {}
-
 /**
  * Holds error details
  *

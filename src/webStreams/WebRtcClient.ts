@@ -30,11 +30,11 @@ export interface StreamsCallbackInterface {
 }
 
 export interface UserAudioStats {
-    streamId: number;  
+    streamId: number;
     rms: number;
     active: boolean;
 }
- 
+
 export interface AudioLevelsStats {
     levels: SpeakerState[];
 }
@@ -142,7 +142,11 @@ export class WebRtcClient {
                 }
             };
             worker.addEventListener("message", listener);
-            worker.postMessage({ operation: "init-pipeline", id: receiverTrackId, publisherId: publisherId });
+            worker.postMessage({
+                operation: "init-pipeline",
+                id: receiverTrackId,
+                publisherId: publisherId,
+            });
         });
 
         return waitPromise;
@@ -150,24 +154,24 @@ export class WebRtcClient {
 
     protected async getWorkerApi(): Promise<WebWorker> {
         if (!this.webWorkerApi) {
-            this.webWorkerApi = new WebWorker(this.assetsDir, (frameInfo => {
+            this.webWorkerApi = new WebWorker(this.assetsDir, (frameInfo) => {
                 if (this.audioLevelCallback && typeof this.audioLevelCallback === "function") {
                     // report local rms to activeSpeakerDetector to have notifications for local streams
                     this.activeSpeakerDetector.onFrame({
                         id: 0,
                         rms: this.lastMeasuredLocalRMS,
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
                     });
                     const speakers = this.activeSpeakerDetector.onFrame({
                         id: frameInfo.publisherId,
                         rms: frameInfo.rms,
-                        timestamp: Date.now()
-                    })
+                        timestamp: Date.now(),
+                    });
                     // if (laudestParticipant === frameInfo.publisherId) {
-                        this.audioLevelCallback({levels: speakers})
+                    this.audioLevelCallback({ levels: speakers });
                     // }
                 }
-            }));
+            });
             console.log("Init e2ee worker ...");
             await this.webWorkerApi.init_e2ee();
         }
@@ -254,13 +258,10 @@ export class WebRtcClient {
                 if (track.kind === "audio") {
                     // add RMSProcessor
                     console.log("Creating AudioLevelMeter instance for track...");
-                    const audioLevelMeter = await (new LocalAudioLevelMeter(track, onRms => {
-                        this.e2eeWorker.postMessage({operation: "rms", rms: onRms});
+                    const audioLevelMeter = await new LocalAudioLevelMeter(track, (onRms) => {
+                        this.e2eeWorker.postMessage({ operation: "rms", rms: onRms });
                         this.lastMeasuredLocalRMS = onRms;
-                    })
-                    ).init(
-                        this.assetsDir + '/rms-processor.js'
-                    );
+                    }).init(this.assetsDir + "/rms-processor.js");
                 }
 
                 const streamSender = pc.addTrack(track, stream);
@@ -611,19 +612,18 @@ export class WebRtcClient {
         (await this.getWorkerApi()).setKeys(keys);
     }
 
-
     /// INSERTABLE STREAMS
 
     private setupSenderTransform(videoSender: RTCRtpSender) {
         if ((window as any).RTCRtpScriptTransform) {
-            this.logger.log("important-only", "Worker - encoding frames using RTCRtpScriptTransform");
+            this.logger.log(
+                "important-only",
+                "Worker - encoding frames using RTCRtpScriptTransform",
+            );
             const options = {
                 operation: "encode",
             };
-            (videoSender as any).transform = new RTCRtpScriptTransform(
-                this.e2eeWorker,
-                options,
-            );
+            (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
         } else {
             this.logger.log("important-only", "Worker - encoding frames using EncodedStreams");
             const senderStreams = (videoSender as any).createEncodedStreams();
@@ -638,7 +638,11 @@ export class WebRtcClient {
         }
     }
 
-    private async setupReceiverTransform(receiver: RTCRtpReceiver, publisherId: number, worker: Worker) {
+    private async setupReceiverTransform(
+        receiver: RTCRtpReceiver,
+        publisherId: number,
+        worker: Worker,
+    ) {
         console.group("on setupReceiverTransform");
 
         if ("RTCRtpScriptTransform" in window && !receiver.transform) {
@@ -647,7 +651,7 @@ export class WebRtcClient {
             receiver.transform = new window.RTCRtpScriptTransform(worker, {
                 operation: "decode",
                 id,
-                publisherId
+                publisherId,
             });
             console.groupEnd();
             return;
@@ -655,10 +659,20 @@ export class WebRtcClient {
         this.logger.log("important-only", "-> using EncodedStreams");
 
         // Fallback: Encoded Streams
-        if (!this.encByReceiver.has(receiver) && "createEncodedStreams" in receiver && typeof (receiver.createEncodedStreams) === "function") {
+        if (
+            !this.encByReceiver.has(receiver) &&
+            "createEncodedStreams" in receiver &&
+            typeof receiver.createEncodedStreams === "function"
+        ) {
             this.logger.log("important-only", "-> call for createEncodedStreams()");
             const { readable, writable } = await receiver.createEncodedStreams();
-            const enc = { readable, writable, id: receiver.track.id, publisherId: publisherId, posted: false };
+            const enc = {
+                readable,
+                writable,
+                id: receiver.track.id,
+                publisherId: publisherId,
+                posted: false,
+            };
             this.encByReceiver.set(receiver, enc);
 
             this.logger.log(

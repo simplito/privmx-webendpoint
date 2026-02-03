@@ -137,6 +137,7 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         await peerConnection.setRemoteDescription(
             new RTCSessionDescription({ sdp: model.sdp, type: model.type as RTCSdpType }),
         );
+        console.log("PEER CONNECTION: ", peerConnection);
     }
 
     async close(roomId: StreamRoomId) {

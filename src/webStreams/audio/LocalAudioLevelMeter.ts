@@ -4,8 +4,8 @@ export class LocalAudioLevelMeter {
 
     constructor(
         private track: MediaStreamTrack,
-        private onLevel: (rmsDb: number) => void
-    ) { }
+        private onLevel: (rmsDb: number) => void,
+    ) {}
 
     async init(workletUrl: string) {
         console.log("++++ Initializing RMS Audio Context: ", workletUrl);
@@ -13,12 +13,10 @@ export class LocalAudioLevelMeter {
 
         await this.ctx.audioWorklet.addModule(workletUrl);
 
-        const source = this.ctx.createMediaStreamSource(
-            new MediaStream([this.track])
-        );
+        const source = this.ctx.createMediaStreamSource(new MediaStream([this.track]));
 
-        this.node = new AudioWorkletNode(this.ctx, 'rms-processor');
-        this.node.port.onmessage = e => this.onLevel(e.data.rmsDb);
+        this.node = new AudioWorkletNode(this.ctx, "rms-processor");
+        this.node.port.onmessage = (e) => this.onLevel(e.data.rmsDb);
 
         source.connect(this.node);
         console.log("++++ Initializing RMS Audio Context DONE");

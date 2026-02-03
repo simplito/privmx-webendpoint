@@ -10,10 +10,11 @@ find_package(Poco REQUIRED COMPONENTS Foundation JSON)
 target_link_libraries(endpoint-wasm-module secp256k1 Threads::Threads Poco::Foundation Poco::JSON Pson gmp privmx privmxendpointcore privmxendpointcrypto privmxendpointthread privmxendpointstore privmxendpointinbox privmxendpointkvdb privmxendpointevent embind privmxdrvcrypto privmxdrvecc privmxdrvnet privmxendpointstream asyncengine)
 set(CMAKE_CXX_FLAGS "-std=c++17 -fexceptions -pthread -flto")
 target_compile_options(endpoint-wasm-module PUBLIC 
-    -O3
+    # -O0
 )
 target_link_options(endpoint-wasm-module PUBLIC
     -L $ENV{SDK_DIR}/upstream/emscripten/cache/sysroot/lib
+    # -g
     -flto                
     -sASSERTIONS=0 -sEXPORT_EXCEPTION_HANDLING_HELPERS -sLLD_REPORT_UNDEFINED -sUSE_PTHREADS -sSAFE_HEAP=0
     -sNO_EXIT_RUNTIME -sWASM=1 -sMODULARIZE -sEXPORT_NAME=endpointWasmModule
