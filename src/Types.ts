@@ -883,6 +883,6 @@ export type CollectionChangedEventData = {
 };
 
 export interface RecordingEncKey {
-    id: string;
+    id: Uint8Array;
     key: Uint8Array;
 }
