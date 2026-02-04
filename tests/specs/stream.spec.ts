@@ -2,29 +2,39 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
-import type { Endpoint } from "../../src";
-import {
-    StreamRoomId,
-    StreamTrackMeta,
-} from "../../src/webStreams/types/ApiTypes";
-import { SortOrder, StreamHandle, StreamSettings } from "../../src/Types";
+import type { Endpoint, StreamApi } from "../../src";
+import { StreamRoomId, StreamTrackMeta } from "../../src/webStreams/types/ApiTypes";
+import { SortOrder, StreamHandle, StreamInfo, StreamSettings } from "../../src/Types";
+
+interface TestUser {
+    id: string;
+    privKey: string;
+    pubKey: string;
+}
 
 declare global {
     interface Window {
         Endpoint: typeof Endpoint;
         wasmReady: boolean;
+
+        streamApi?: StreamApi;
+        currentUser?: TestUser;
+
+        myHandle?: StreamHandle;
+
+        remoteTracksCount?: number;
+        trackEnded?: boolean;
+        trackMuted?: boolean;
     }
 }
 
 test.use({
     launchOptions: {
         args: [
-            // Chrome/Chromium: Fake media args
             "--use-fake-device-for-media-stream",
             "--use-fake-ui-for-media-stream",
             "--headless",
         ],
-        // Firefox: Fake media preferences
         firefoxUserPrefs: {
             "media.navigator.streams.fake": true,
             "media.navigator.permission.disabled": true,
@@ -35,7 +45,7 @@ test.use({
 test.describe("StreamTest", () => {
     test.beforeEach(async ({ page }) => {
         page.on("console", (msg) => {
-            if (msg.type() === "error") console.error(`[BROWSER]: ${msg.text()}`);
+            console.error(`[BROWSER]: ${msg.text()}`);
         });
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
@@ -43,6 +53,42 @@ test.describe("StreamTest", () => {
             await window.Endpoint.setup("../../assets");
         });
     });
+
+    const initPage = async (page: any) => {
+        await page.goto("/tests/harness/index.html");
+        await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
+        await page.evaluate(async () => {
+            try {
+                await window.Endpoint.setup("../../assets");
+            } catch {}
+        });
+    };
+
+    const connectUserToBridge = async (
+        page: any,
+        user: TestUser,
+        bridgeUrl: string,
+        solutionId: string,
+    ) => {
+        page.on("console", (msg: any) => {
+            if (msg.type() === "error") console.error(`[${user.id}]: ${msg.text()}`);
+        });
+
+        await page.evaluate(
+            async ({ bridgeUrl, solutionId, user }) => {
+                const Endpoint = window.Endpoint;
+                const connection = await Endpoint.connect(user.privKey, solutionId, bridgeUrl);
+                const streamApi = await Endpoint.createStreamApi(
+                    connection,
+                    await Endpoint.createEventApi(connection),
+                );
+
+                window.streamApi = streamApi;
+                window.currentUser = user;
+            },
+            { bridgeUrl, solutionId, user },
+        );
+    };
 
     // =========================================================================
     // STREAM ROOM CRUD
@@ -65,7 +111,6 @@ test.describe("StreamTest", () => {
             const enc = new TextEncoder();
             const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
 
-            // Setup
             const sId = await streamApi.createStreamRoom(
                 contextId,
                 [u1Obj],
@@ -91,7 +136,7 @@ test.describe("StreamTest", () => {
         }, args);
 
         expect(result.room.streamRoomId).toEqual(result.sId);
-        // expect(result.room.statusCode).toEqual(0); TODO
+        expect(result.room.statusCode).toEqual(0);
         expect(result.room.version).toEqual(1);
     });
 
@@ -517,7 +562,11 @@ test.describe("StreamTest", () => {
     // STREAM HANDLE / TRACKS
     // =========================================================================
 
-    test.skip("Stream Lifecycle: Join, Leave, Create, Media Devices", async ({ page, backend, cli }) => {
+    test.skip("Stream Lifecycle: Join, Leave, Create, Media Devices", async ({
+        page,
+        backend,
+        cli,
+    }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -763,8 +812,6 @@ test.describe("StreamTest", () => {
 
             await streamApi.addStreamTrack(handle, { track: track });
 
-            // TS Implementation explicitly FORBIDS adding the same track object again.
-            // C++ Test expected success, but here we expect failure based on TS code logic.
             const expectError = async (fn: any) => {
                 try {
                     await fn();
@@ -961,15 +1008,10 @@ test.describe("StreamTest", () => {
             await streamApi.addStreamTrack(handle, { track: audioT });
             await streamApi.publishStream(handle);
 
-            // Remove Track
             await streamApi.removeStreamTrack(handle, { track: audioT });
 
             await streamApi.updateStream(handle);
 
-            // Remove All (Already removed 1, now remove none? or assume we add back?)
-            // Logic: removeStreamTrack marks for removal. updateStream commits.
-
-            // Add Track
             await streamApi.addStreamTrack(handle, { track: videoT });
 
             await streamApi.updateStream(handle);
@@ -1023,8 +1065,6 @@ test.describe("StreamTest", () => {
             await streamApi.publishStream(handle);
             await new Promise((resolve) => setTimeout(resolve, 3000));
 
-            // 1. Failed add (invalid track) shouldn't break update
-            // TS API throws on invalid input, so we catch it.
             try {
                 await streamApi.addStreamTrack(handle, {
                     track: null as unknown as MediaStreamTrack,
@@ -1048,7 +1088,11 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("modifyRemoteStreamsSubscriptions: various scenarios", async ({ page, backend, cli }) => {
+    test.skip("modifyRemoteStreamsSubscriptions: various scenarios", async ({
+        page,
+        backend,
+        cli,
+    }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -1128,8 +1172,7 @@ test.describe("StreamTest", () => {
 
             // After Unpublish (Remote stream gone)
             await streamApi.unpublishStream(handle);
-            // This call usually succeeds locally but server might complain if we subscribe to non-existent.
-            // C++ test expects NO_THROW for modify after unpublish (locally handling state).
+
             await streamApi.modifyRemoteStreamsSubscriptions(sId, [], sub, settings);
 
             return { success: true };
@@ -1138,61 +1181,34 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("E2E: Two users exchange video streams", async ({ createContextPage, backend, cli }) => {
-        const initPage = async (page: any) => {
-            await page.goto("/tests/harness/index.html");
-            await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-            await page.evaluate(async () => {
-                await window.Endpoint.setup("../../assets");
-            });
-        };
-
+    test.skip("E2E: Two users exchange video streams", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
         const page1 = await createContextPage();
         await initPage(page1);
-
         const users = await setupUsers(page1, cli);
 
         const page2 = await createContextPage();
         await initPage(page2);
 
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+
         const contextId = testData.contextId;
-        const bridgeUrl = backend.bridgeUrl;
-        const solutionId = testData.solutionId;
+        let roomId: StreamRoomId;
 
-        const connectUser = async (page: any, user: any) => {
-            page.on("console", (msg: any) => {
-                if (msg.type() === "error") console.error(`[${user.id}]: ${msg.text()}`);
-            });
-
-            await page.evaluate(
-                async ({ bridgeUrl, solutionId, user }) => {
-                    const Endpoint = window.Endpoint;
-                    const connection = await Endpoint.connect(user.privKey, solutionId, bridgeUrl);
-                    const streamApi = await Endpoint.createStreamApi(
-                        connection,
-                        await Endpoint.createEventApi(connection),
-                    );
-                    // Expose for step evaluation
-                    (window as any).streamApi = streamApi;
-                    (window as any).currentUser = user;
-                },
-                { bridgeUrl, solutionId, user },
-            );
-        };
-
-        await connectUser(page1, users.u1);
-        await connectUser(page2, users.u2);
-
-        const enc = new TextEncoder();
-        const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
-        const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
-        let roomId: string = "";
-
+        // --- STEP 1: U1 Creates Room & Publishes ---
         await test.step("User 1: Create Room, Join, Publish", async () => {
             roomId = await page1.evaluate(
-                async ({ contextId, u1Obj, u2Obj }) => {
-                    const api = (window as any).streamApi;
+                async ({ contextId, users }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 1");
+                    const api = window.streamApi;
                     const enc = new TextEncoder();
+
+                    const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+                    const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
 
                     const sId = await api.createStreamRoom(
                         contextId,
@@ -1213,21 +1229,22 @@ test.describe("StreamTest", () => {
                     await api.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
 
                     await api.publishStream(handle);
-                    // Give server time to register
                     await new Promise((r) => setTimeout(r, 1000));
                     return sId;
                 },
-                { contextId, u1Obj, u2Obj },
+                { contextId, users },
             );
         });
 
+        // --- STEP 2: U2 Subscribes ---
         await test.step("User 2: Join and Subscribe", async () => {
             await page2.evaluate(
                 async ({ roomId }) => {
-                    const api = (window as any).streamApi;
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
+                    const api = window.streamApi;
+
                     await api.joinStreamRoom(roomId);
 
-                    // Wait for remote stream
                     let remoteStreams: any[] = [];
                     for (let i = 0; i < 20; i++) {
                         remoteStreams = await api.listStreams(roomId);
@@ -1247,18 +1264,15 @@ test.describe("StreamTest", () => {
                         onRemoteTrack: (event: RTCTrackEvent) => {
                             const track = event.track;
                             const stream = event.streams[0];
-
                             const elementId = `remote-${track.kind}`;
-                            if (document.getElementById(elementId)) return;
 
-                            console.log(`Creating element: ${elementId}`);
+                            if (document.getElementById(elementId)) return;
 
                             const mediaEl = document.createElement("video");
                             mediaEl.id = elementId;
                             mediaEl.autoplay = true;
                             mediaEl.playsInline = true;
                             mediaEl.srcObject = stream || new MediaStream([track]);
-
                             document.body.appendChild(mediaEl);
                         },
                     });
@@ -1267,12 +1281,11 @@ test.describe("StreamTest", () => {
             );
         });
 
+        // --- STEP 3: Verify ---
         await test.step("User 2: Verify Video Playback", async () => {
             const videoLoc = page2.locator("#remote-video");
-
             await videoLoc.waitFor({ state: "attached", timeout: 15000 });
 
-            // Verify Video specific stats
             await page2.waitForFunction(
                 () => {
                     const video = document.getElementById("remote-video") as HTMLVideoElement;
@@ -1282,7 +1295,6 @@ test.describe("StreamTest", () => {
                 { timeout: 10000 },
             );
 
-            // 2. Check Playback Progress (Time Update)
             const isMoving = await page2.evaluate(async () => {
                 const video = document.getElementById("remote-video") as HTMLVideoElement;
                 const start = video.currentTime;
@@ -1290,10 +1302,418 @@ test.describe("StreamTest", () => {
                 return video.currentTime > start;
             });
 
-            if (!isMoving)
-                console.warn(
-                    "Video element is stuck (currentTime not advancing). Check fake-device args.",
-                );
+            if (!isMoving) console.warn("Video stuck. Check fake-device args.");
         });
+    });
+
+    test.skip("E2E: Renegotiation - Add Video Mid-Call", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        const page1 = await createContextPage();
+        const page2 = await createContextPage();
+
+        const initPage = async (p: any) => {
+            await p.goto("/tests/harness/index.html");
+            await p.waitForFunction(() => window.wasmReady === true);
+            await p.evaluate(async () => {
+                try {
+                    await window.Endpoint.setup("../../assets");
+                } catch {}
+            });
+        };
+        await initPage(page1);
+        await initPage(page2);
+
+        const users = await setupUsers(page1, cli);
+        const { u1, u2 } = users;
+
+        const connect = async (page: any, user: any) => {
+            page.on("console", (msg: any) => {
+                if (msg.type() === "error") console.error(`[${user.id}]: ${msg.text()}`);
+            });
+            await page.evaluate(
+                async ({ bridgeUrl, solutionId, user }) => {
+                    const conn = await window.Endpoint.connect(user.privKey, solutionId, bridgeUrl);
+                    const streamApi = await window.Endpoint.createStreamApi(
+                        conn,
+                        await window.Endpoint.createEventApi(conn),
+                    );
+                    window.streamApi = streamApi;
+                },
+                { bridgeUrl: backend.bridgeUrl, solutionId: testData.solutionId, user },
+            );
+        };
+        await connect(page1, u1);
+        await connect(page2, u2);
+
+        let roomId: StreamRoomId;
+
+        // --- STEP 1: U1 Publishes AUDIO ONLY ---
+        await test.step("Phase 1: Audio Only", async () => {
+            roomId = await page1.evaluate(
+                async ({ contextId, u1, u2 }) => {
+                    const api = window.streamApi!;
+                    const enc = new TextEncoder();
+                    const u1Obj = { userId: u1.id, pubKey: u1.pubKey };
+                    const u2Obj = { userId: u2.id, pubKey: u2.pubKey };
+
+                    const sId = await api.createStreamRoom(
+                        contextId,
+                        [u1Obj, u2Obj],
+                        [u1Obj, u2Obj],
+                        enc.encode("p"),
+                        enc.encode("p"),
+                    );
+                    await api.joinStreamRoom(sId);
+                    const handle = await api.createStream(sId);
+
+                    window.myHandle = handle;
+
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: true,
+                        video: false,
+                    });
+                    await api.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+                    await api.publishStream(handle);
+                    return sId;
+                },
+                { contextId: testData.contextId, u1, u2 },
+            );
+        });
+
+        // --- STEP 2: U2 Subscribes ---
+        await test.step("Phase 2: Subscribe to Audio", async () => {
+            await page2.evaluate(
+                async ({ roomId }) => {
+                    const api = window.streamApi!;
+                    await api.joinStreamRoom(roomId);
+
+                    let remote: any[] = [];
+                    for (let i = 0; i < 10; i++) {
+                        remote = await api.listStreams(roomId);
+                        if (remote.length > 0) break;
+                        await new Promise((r) => setTimeout(r, 500));
+                    }
+
+                    const s = remote[0];
+                    const subs = s.tracks.map((t: any) => ({ streamId: s.id, trackId: t.mid }));
+
+                    await api.subscribeToRemoteStreams(roomId, subs, {
+                        settings: {},
+                        onRemoteTrack: (event: RTCTrackEvent) => {
+                            const el = document.createElement(
+                                event.track.kind === "video" ? "video" : "audio",
+                            );
+                            el.id = `remote-${event.track.kind}`;
+                            el.autoplay = true;
+                            if (event.streams[0]) el.srcObject = event.streams[0];
+                            else el.srcObject = new MediaStream([event.track]);
+                            document.body.appendChild(el);
+                        },
+                    });
+                },
+                { roomId },
+            );
+
+            await page2.locator("#remote-audio").waitFor({ state: "attached" });
+            await expect(page2.locator("#remote-video")).toHaveCount(0);
+        });
+
+        // --- STEP 3: U1 Adds Video (Renegotiation) ---
+        await test.step("Phase 3: Add Video Track", async () => {
+            await page1.evaluate(async () => {
+                const api = window.streamApi!;
+
+                if (window.myHandle === undefined) throw new Error("Handle lost (undefined)");
+
+                const handle = window.myHandle;
+
+                const vStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const vTrack = vStream.getVideoTracks()[0];
+
+                await api.addStreamTrack(handle, { track: vTrack });
+                await api.updateStream(handle);
+            });
+            await page1.waitForTimeout(2000);
+        });
+
+        // --- STEP 4: U2 Updates Subscription ---
+        await test.step("Phase 4: Receive Video", async () => {
+            await page2.evaluate(
+                async ({ roomId }) => {
+                    const api = window.streamApi!;
+
+                    const remote = await api.listStreams(roomId);
+                    const vTrack = remote[0].tracks.find((t: any) => t.type === "video");
+
+                    if (vTrack) {
+                        await api.modifyRemoteStreamsSubscriptions(
+                            roomId,
+                            [{ streamId: remote[0].id, streamTrackId: vTrack.mid }],
+                            [],
+                            {
+                                settings: {},
+                                onRemoteTrack: (e: any) => {
+                                    const el = document.createElement("video");
+                                    el.id = "remote-video";
+                                    el.autoplay = true;
+                                    el.srcObject = e.streams[0] || new MediaStream([e.track]);
+                                    document.body.appendChild(el);
+                                },
+                            },
+                        );
+                    }
+                },
+                { roomId },
+            );
+
+            const vid = page2.locator("#remote-video");
+            await vid.waitFor({ state: "attached", timeout: 10000 });
+
+            await page2.waitForFunction(() => {
+                const v = document.getElementById("remote-video") as HTMLVideoElement;
+                return v && v.readyState === 4 && v.videoWidth > 0 && !v.paused;
+            });
+        });
+    });
+
+    test.skip("E2E: Edge Case - Page Reload & Recovery", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(90000);
+
+        const page1 = await createContextPage();
+        const page2 = await createContextPage();
+
+        await initPage(page1);
+        await initPage(page2);
+
+        const users = await setupUsers(page1, cli);
+
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+
+        // --- STEP 1: INITIAL CALL ---
+        const roomId = await page1.evaluate(
+            async ({ contextId, users }) => {
+                const api = window.streamApi!;
+                const enc = new TextEncoder();
+                const uObjs = [users.u1, users.u2].map((u: any) => ({
+                    userId: u.id,
+                    pubKey: u.pubKey,
+                }));
+
+                const sId = await api.createStreamRoom(
+                    contextId,
+                    uObjs,
+                    uObjs,
+                    enc.encode("p"),
+                    enc.encode("p"),
+                );
+                await api.joinStreamRoom(sId);
+                const handle = await api.createStream(sId);
+                const s = await navigator.mediaDevices.getUserMedia({ video: true });
+                await api.addStreamTrack(handle, { track: s.getVideoTracks()[0] });
+                await api.publishStream(handle);
+                return sId;
+            },
+            { contextId: testData.contextId, users },
+        );
+
+        // --- STEP 2: U2 Subscribes (Old Stream) ---
+        const oldStreamId = await page2.evaluate(
+            async ({ roomId }) => {
+                const api = window.streamApi!;
+                await api.joinStreamRoom(roomId);
+
+                let remote: any[] = [];
+                while (remote.length === 0) {
+                    remote = await api.listStreams(roomId);
+                    await new Promise((r) => setTimeout(r, 200));
+                }
+
+                const firstStream = remote[0];
+
+                await api.subscribeToRemoteStreams(
+                    roomId,
+                    [{ streamId: firstStream.id, streamTrackId: firstStream.tracks[0].mid }],
+                    {
+                        settings: {},
+                        onRemoteTrack: (e: RTCTrackEvent) => {
+                            let v = document.getElementById("remote-video") as HTMLVideoElement;
+                            if (!v) {
+                                v = document.createElement("video");
+                                v.id = "remote-video";
+                                v.autoplay = true;
+                                v.playsInline = true;
+                                document.body.appendChild(v);
+                            }
+                            v.srcObject = e.streams[0];
+                        },
+                    },
+                );
+                return firstStream.id;
+            },
+            { roomId },
+        );
+
+        await page2.locator("#remote-video").waitFor({ state: "attached" });
+
+        // --- STEP 3: RELOAD USER 1 ---
+        await page1.reload();
+        await initPage(page1);
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+
+        // --- STEP 4: RE-PUBLISH ---
+        await page1.evaluate(
+            async ({ roomId }) => {
+                const api = window.streamApi!;
+                await api.joinStreamRoom(roomId);
+                const handle = await api.createStream(roomId);
+                const s = await navigator.mediaDevices.getUserMedia({ video: true });
+                await api.addStreamTrack(handle, { track: s.getVideoTracks()[0] });
+                await api.publishStream(handle);
+                await new Promise((r) => setTimeout(r, 2000));
+            },
+            { roomId },
+        );
+
+        // --- STEP 5: VERIFY RECOVERY ---
+
+        const expectedNewStreamId = await page2.evaluate(
+            async ({ roomId, oldStreamId }) => {
+                const api = window.streamApi!;
+
+                let newStream: any;
+                for (let i = 0; i < 60; i++) {
+                    const streams = await api.listStreams(roomId);
+                    newStream = streams.find((s: any) => s.id !== oldStreamId);
+                    if (newStream) break;
+                    await new Promise((r) => setTimeout(r, 500));
+                }
+
+                if (!newStream) throw new Error("New stream never appeared");
+
+                await api.subscribeToRemoteStreams(
+                    roomId,
+                    [{ streamId: newStream.id, streamTrackId: newStream.tracks[0].mid }],
+                    {
+                        settings: {},
+                        onRemoteTrack: () => {},
+                    },
+                );
+                return newStream.id;
+            },
+            { roomId, oldStreamId },
+        );
+
+        await page2.waitForFunction(
+            (expectedIdNum) => {
+                const v = document.getElementById("remote-video") as HTMLVideoElement;
+
+                if (!v || !v.srcObject) return false;
+
+                const currentStreamId = (v.srcObject as MediaStream).id;
+                const expectedIdStr = String(expectedIdNum);
+                return currentStreamId === expectedIdStr && v.readyState === 4 && !v.paused;
+            },
+            expectedNewStreamId,
+            { timeout: 30000 },
+        );
+    });
+
+    test.skip("E2E: Edge Case - Zombie Publisher (Abrupt Close)", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        const page1 = await createContextPage();
+        const page2 = await createContextPage();
+
+        await initPage(page1);
+        await initPage(page2);
+        const users = await setupUsers(page1, cli);
+
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+
+        // U1 Publishes
+        const roomId = await page1.evaluate(
+            async ({ contextId, users }) => {
+                const api = window.streamApi!;
+                const enc = new TextEncoder();
+                const uObjs = [users.u1, users.u2].map((u: any) => ({
+                    userId: u.id,
+                    pubKey: u.pubKey,
+                }));
+
+                const sId = await api.createStreamRoom(
+                    contextId,
+                    uObjs,
+                    uObjs,
+                    enc.encode("p"),
+                    enc.encode("p"),
+                );
+                await api.joinStreamRoom(sId);
+                const handle = await api.createStream(sId);
+                const s = await navigator.mediaDevices.getUserMedia({ video: true });
+                await api.addStreamTrack(handle, { track: s.getVideoTracks()[0] });
+                await api.publishStream(handle);
+                return sId;
+            },
+            { contextId: testData.contextId, users },
+        );
+
+        // U2 Subscribes
+        await page2.evaluate(
+            async ({ roomId }) => {
+                const api = window.streamApi!;
+                window.remoteTracksCount = 0;
+
+                await api.joinStreamRoom(roomId);
+                let remote: any[] = [];
+                while (remote.length === 0) {
+                    remote = await api.listStreams(roomId);
+                    await new Promise((r) => setTimeout(r, 200));
+                }
+
+                await api.subscribeToRemoteStreams(
+                    roomId,
+                    [{ streamId: remote[0].id, trackId: remote[0].tracks[0].mid }],
+                    {
+                        settings: {},
+                        onRemoteTrack: (e: any) => {
+                            if (window.remoteTracksCount !== undefined) window.remoteTracksCount++;
+
+                            e.track.onended = () => {
+                                window.trackEnded = true;
+                            };
+                        },
+                    },
+                );
+            },
+            { roomId },
+        );
+
+        await page2.waitForFunction(() => (window.remoteTracksCount || 0) > 0);
+
+        await page1.close();
+
+        // Verify Cleanup
+        await page2.waitForFunction(
+            async ({ roomId }) => {
+                if (!window.streamApi) return false;
+                const api = window.streamApi;
+                const remote = await api.listStreams(roomId);
+                const trackEnded = window.trackEnded === true;
+                return remote.length === 0 || trackEnded;
+            },
+            { roomId },
+            { timeout: 30000 },
+        );
     });
 });

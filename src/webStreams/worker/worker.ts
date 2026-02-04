@@ -8,8 +8,6 @@ import {
 import * as events from "./WorkerEvents";
 import { KeyStore } from "../KeyStore";
 
-/** * TYPES & CONSTANTS
- */
 const NUM_AS_UINT8_SIZE = 1;
 const DEBUG = false;
 const sessions = new Map<string, { pipeline: Promise<void> }>();
@@ -25,7 +23,6 @@ export interface TransformContext {
     publisherId?: number;
 }
 
-// Interface for the modern RTCRtpScriptTransformer options
 interface TransformerOptions {
     operation: "encode" | "decode";
     kind: "audio" | "video";
@@ -33,9 +30,6 @@ interface TransformerOptions {
     publisherId?: number;
 }
 
-/**
- * CORE LOGIC
- */
 export class EncryptTransform {
     constructor(private keyStore: KeyStore) {}
 
@@ -163,15 +157,9 @@ export class EncryptTransform {
     }
 }
 
-/**
- * GLOBAL KEYSTORE SETUP
- */
 (self as any).keyStore = new KeyStore();
 const getKeyStore = () => (self as any).keyStore as KeyStore;
 
-/**
- * MESSAGE HANDLING (Legacy/Manual Stream Transfer)
- */
 self.onmessage = async (event: MessageEvent) => {
     const { operation, kind } = event.data;
 
@@ -192,9 +180,6 @@ self.onmessage = async (event: MessageEvent) => {
     }
 };
 
-/**
- * TRANSFORMS & PIPELINES
- */
 function createSenderTransform(keyStore: KeyStore, kind: string) {
     const encrypter = new EncryptTransform(keyStore);
     return new TransformStream({
@@ -249,13 +234,9 @@ function handleTransform(
     }
 }
 
-/**
- * MODERN WEBRTC INSERTABLE STREAMS (onrtctransform)
- */
 if ((self as any).RTCTransformEvent) {
     (self as any).onrtctransform = (event: any) => {
         const transformer = event.transformer;
-        // Fix: Use transformer.options instead of event.data
         const options = transformer.options as TransformerOptions;
 
         if (!options) {

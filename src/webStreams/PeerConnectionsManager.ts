@@ -7,7 +7,6 @@ export interface JanusConnection {
     pc: RTCPeerConnection;
     sessionId: SessionId;
     hasSubscriptions: boolean;
-    // 🟢 ADDED: Queue to store candidates generated before SessionId is ready
     candidateQueue: RTCIceCandidate[];
 }
 
@@ -56,7 +55,6 @@ export class PeerConnectionManager {
         // Assign immediately so the listener has access to the reference
         this.connections[room][connectionType] = newConnection;
 
-        // 🟢 FIXED: Listener with Buffering Logic
         pc.addEventListener("icecandidate", (event) => {
             // 1. Handle "End of Gathering" (null candidate) gracefully
             if (!event.candidate) {
@@ -101,9 +99,7 @@ export class PeerConnectionManager {
         // 1. Update the Session ID
         conn!.sessionId = session;
 
-        // 2. 🟢 FLUSH QUEUE: Send any candidates that were buffered while waiting for SessionId
         if (conn!.candidateQueue.length > 0) {
-            // console.log(`Flushing ${conn!.candidateQueue.length} buffered candidates for session ${session}`);
             conn!.candidateQueue.forEach((candidate) => {
                 try {
                     this.onTrickle(session, candidate);

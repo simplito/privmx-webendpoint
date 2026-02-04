@@ -5,8 +5,6 @@ import * as path from "path";
 import * as fs from "fs";
 import { testData } from "./datasets/testData";
 
-// --- Configuration ---
-// 🟢 SET THESE TO MATCH YOUR DOCKER COMPOSE SETUP
 const COMPOSE_NETWORK = "tests_default";
 const COMPOSE_PROJECT = "tests";
 
@@ -97,30 +95,34 @@ function printContainerLogs(containerName: string) {
 
 async function applyCorsProtection(target: Page | BrowserContext) {
     await target.route("**/*", async (route) => {
-        const request = route.request();
-        const requestOrigin = (await request.headerValue("origin")) || "http://localhost:8080";
-
-        const corsHeaders = {
-            "Cross-Origin-Opener-Policy": "same-origin",
-            "Cross-Origin-Embedder-Policy": "require-corp",
-            "Access-Control-Allow-Origin": requestOrigin,
-            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH",
-            "Access-Control-Allow-Headers": "*",
-            "Access-Control-Allow-Credentials": "true",
-        };
-
-        if (request.method() === "OPTIONS") {
-            await route.fulfill({ status: 200, headers: corsHeaders });
-            return;
-        }
-
         try {
+            const request = route.request();
+            const requestOrigin =
+                (await request.headerValue("origin").catch(() => null)) || "http://localhost:8080";
+
+            const corsHeaders = {
+                "Cross-Origin-Opener-Policy": "same-origin",
+                "Cross-Origin-Embedder-Policy": "require-corp",
+                "Access-Control-Allow-Origin": requestOrigin,
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, HEAD, PATCH",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Allow-Credentials": "true",
+            };
+
+            if (request.method() === "OPTIONS") {
+                await route.fulfill({ status: 200, headers: corsHeaders });
+                return;
+            }
+
             const response = await route.fetch();
             await route.fulfill({
                 response,
                 headers: { ...response.headers(), ...corsHeaders },
             });
-        } catch (e) {
+        } catch (e: any) {
+            if (e.message.includes("Target page, context or browser has been closed")) {
+                return;
+            }
             try {
                 await route.continue();
             } catch (ignore) {}
@@ -148,7 +150,6 @@ export const test = base.extend<
             const containerName = `privmx_e2e_worker_${id}`;
             const dbName = `privmx_e2e_db_${id}`;
 
-            // 🟢 NETWORK CONFIG
             const internalMongoUrl = `mongodb://test_mongodb:27017/${dbName}`;
             const localMongoUrl = `mongodb://localhost:27017/${dbName}?directConnection=true`;
 
@@ -240,7 +241,8 @@ export const test = base.extend<
         }
     },
 
-    cli: async ({ workerBackend }, use) => {
+    cli: async ({ workerBackend, backend }, use) => {
+        // backend may be seen as unused but in reality it makes sure that backend will be loaded before cli will be calle
         const runCli = async (method: string, params: object) => {
             const jsonParams = JSON.stringify(params).replace(/'/g, "'\\''");
             const cmd = `docker exec \
