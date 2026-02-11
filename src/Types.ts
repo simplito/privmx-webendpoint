@@ -637,6 +637,7 @@ export interface StreamRoom {
     privateMeta: Uint8Array;
     policy: ContainerPolicy;
     statusCode: number;
+    closed: boolean;
 }
 
 export interface StreamInfo {
