@@ -148,7 +148,10 @@ export class StreamApiNative extends BaseNative {
         );
     }
 
-    async getStreamRoomRecordingKeys(ptr: number, args: [string]): Promise<Types.RecordingEncKey[]> {
+    async getStreamRoomRecordingKeys(
+        ptr: number,
+        args: [string],
+    ): Promise<Types.RecordingEncKey[]> {
         return this.runAsync<Types.RecordingEncKey[]>((taskId) =>
             this.api.lib.StreamApi_getStreamRoomRecordingKeys(taskId, ptr, args),
         );
