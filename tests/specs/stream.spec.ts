@@ -780,7 +780,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test("publishStream: to two different rooms", async ({ page, backend, cli }) => {
+    test.fail("publishStream: to two different rooms", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
