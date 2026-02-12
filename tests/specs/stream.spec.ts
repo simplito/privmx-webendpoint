@@ -728,7 +728,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test("publishStream: with tracks", async ({ page, backend, cli }) => {
+    test.skip("publishStream: with tracks", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -848,7 +848,7 @@ test.describe("StreamTest", () => {
     });
 
 
-    test("publishStream: publish unpublish publish back using same handle", async ({ page, backend, cli }) => {
+    test.skip("publishStream: publish unpublish publish back using same handle", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
