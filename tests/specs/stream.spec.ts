@@ -728,7 +728,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("publishStream: with tracks", async ({ page, backend, cli }) => {
+    test("publishStream: with tracks", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -779,6 +779,177 @@ test.describe("StreamTest", () => {
 
         expect(result.success).toBe(true);
     });
+
+    test("publishStream: to two different rooms (AA)", async ({ page, backend, cli }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const streamApi = await Endpoint.createStreamApi(
+                connection,
+                await Endpoint.createEventApi(connection),
+            );
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const sId = await streamApi.createStreamRoom(
+                contextId,
+                [u1Obj],
+                [u1Obj],
+                new TextEncoder().encode("p"),
+                new TextEncoder().encode("p"),
+            );
+
+            await streamApi.joinStreamRoom(sId);
+
+            const handle = await streamApi.createStream(sId);
+            const expectError = async (fn: any) => {
+                try {
+                    await fn();
+                } catch {
+                    return;
+                }
+                throw new Error("Expected error");
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            await streamApi.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+            await streamApi.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+            await streamApi.publishStream(handle);
+
+
+            ///// ROOM 2 /////
+            const sId2 = await streamApi.createStreamRoom(
+                contextId,
+                [u1Obj],
+                [u1Obj],
+                new TextEncoder().encode("p"),
+                new TextEncoder().encode("p"),
+            );
+
+            await streamApi.joinStreamRoom(sId2);
+
+            const handle2 = await streamApi.createStream(sId2);
+
+            await streamApi.addStreamTrack(handle2, { track: stream.getAudioTracks()[0] });
+            await streamApi.addStreamTrack(handle2, { track: stream.getVideoTracks()[0] });
+            await streamApi.publishStream(handle2);
+
+
+            return { success: true };
+        }, args);
+
+        expect(result.success).toBe(true);
+    });
+
+
+    test("publishStream: publish unpublish publish back using same handle (AA)", async ({ page, backend, cli }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const streamApi = await Endpoint.createStreamApi(
+                connection,
+                await Endpoint.createEventApi(connection),
+            );
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const sId = await streamApi.createStreamRoom(
+                contextId,
+                [u1Obj],
+                [u1Obj],
+                new TextEncoder().encode("p"),
+                new TextEncoder().encode("p"),
+            );
+
+            await streamApi.joinStreamRoom(sId);
+            const handle = await streamApi.createStream(sId);
+            const expectError = async (fn: any) => {
+                try {
+                    await fn();
+                } catch {
+                    return;
+                }
+                throw new Error("Expected error");
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            await streamApi.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+            await streamApi.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+            await streamApi.publishStream(handle);
+            await new Promise<void>(resolve => setTimeout(() => {resolve()}, 3000));
+            await streamApi.unpublishStream(handle);
+
+            await expectError(async () => {
+                await streamApi.publishStream(handle);
+            });
+
+            return { success: true };
+        }, args);
+
+        expect(result.success).toBe(true);
+    });
+
+    test("publishStream: publish unpublish publish back using new handle", async ({ page, backend, cli }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const streamApi = await Endpoint.createStreamApi(
+                connection,
+                await Endpoint.createEventApi(connection),
+            );
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const sId = await streamApi.createStreamRoom(
+                contextId,
+                [u1Obj],
+                [u1Obj],
+                new TextEncoder().encode("p"),
+                new TextEncoder().encode("p"),
+            );
+
+            await streamApi.joinStreamRoom(sId);
+
+            const handle = await streamApi.createStream(sId);
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            await streamApi.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+            await streamApi.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+            await streamApi.publishStream(handle);
+            await new Promise<void>(resolve => setTimeout(() => {resolve()}, 3000));
+            await streamApi.unpublishStream(handle);
+            
+            // NEW HANDLE
+            const handle2 = await streamApi.createStream(sId);
+            await streamApi.addStreamTrack(handle2, { track: stream.getAudioTracks()[0] });
+            await streamApi.addStreamTrack(handle2, { track: stream.getVideoTracks()[0] });
+            await streamApi.publishStream(handle2);
+            await new Promise<void>(resolve => setTimeout(() => {resolve()}, 3000));
+            await streamApi.unpublishStream(handle2);
+
+            return { success: true };
+        }, args);
+
+        expect(result.success).toBe(true);
+    });
+
 
     test.skip("publishStream: multiple instances of same track", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
