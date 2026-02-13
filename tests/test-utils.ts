@@ -35,25 +35,29 @@ export async function setupTestUser(page: Page, cli: CliContext, contextIds: str
 }
 
 export async function setupUsers(page: any, cli: CliContext) {
-    const user2Keys = await page.evaluate(async () => {
+    const users = await page.evaluate(async () => {
         const cryptoApi = await window.Endpoint.createCryptoApi();
-        const privKey = await cryptoApi.generatePrivateKey();
-        return {
-            privKey: privKey,
-            pubKey: await cryptoApi.derivePublicKey(privKey),
-        };
+        const users: {privKey: string, id: string, pubKey: string}[] = [];
+
+        for (let i = 0; i < 3; ++i) {
+            const privKey = await cryptoApi.generatePrivateKey();
+            const pubKey = await cryptoApi.derivePublicKey(privKey);
+            const id = `user-${i+1}-${Date.now()}`;
+            users.push({privKey, id, pubKey})
+        }
+        return users;
     });
 
-    const user2Id = `user2-${Date.now()}`;
-
-    await cli.call("context/addUserToContext", {
-        contextId: testData.contextId,
-        userId: user2Id,
-        userPubKey: user2Keys.pubKey,
-    });
-
-    return {
-        u1: { privKey: testData.userPrivKey, id: testData.userId, pubKey: testData.userPubKey },
-        u2: { privKey: user2Keys.privKey, id: user2Id, pubKey: user2Keys.pubKey },
-    };
+    for (const u of users) {
+        await cli.call("context/addUserToContext", {
+            contextId: testData.contextId,
+            userId: u.id,
+            userPubKey: u.pubKey,
+        });
+    }
+    const usersObj: {[id: string]: any} = {};
+    for (const [key, value] of users.entries()) {
+        usersObj[`u${key+1}`] = value;
+    }
+    return usersObj;
 }
