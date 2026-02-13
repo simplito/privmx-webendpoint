@@ -1887,4 +1887,258 @@ test.describe("StreamTest", () => {
             { timeout: 30000 },
         );
     });
+
+
+    test("Stream Room Lifecycle: Auto-close after all users leave (Two Browsers)", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        // Extended timeout because we wait for server-side room closure (usually ~10-30s)
+        test.setTimeout(60000);
+
+        // 1. Setup Environment
+        const page1 = await createContextPage();
+        const page2 = await createContextPage();
+
+        await initPage(page1);
+        await initPage(page2);
+
+        // 2. Setup Users & Connections
+        // We use page1 to generate keys/users via CLI helper
+        const users = await setupUsers(page1, cli);
+
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+
+        const contextId = testData.contextId;
+        let roomId: StreamRoomId;
+
+        // --- STEP 1: Create Room (User 1) ---
+        roomId = await page1.evaluate(
+            async ({ contextId, users }) => {
+                const api = window.streamApi!;
+                const enc = new TextEncoder();
+
+                const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+                const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+                const sId = await api.createStreamRoom(
+                    contextId,
+                    [u1Obj, u2Obj],
+                    [u1Obj],
+                    enc.encode("LifecycleTest"),
+                    enc.encode("LifecycleTest"),
+                );
+
+                // Verify initial state
+                const room = await api.getStreamRoom(sId);
+                if (room.closed) throw new Error("Room should be initially OPEN");
+
+                return sId;
+            },
+            { contextId, users },
+        );
+
+        console.log(`[Test] Room Created: ${roomId}`);
+
+        // --- STEP 2: Join Both Users ---
+        await test.step("Join Users", async () => {
+            // User 1 Joins
+            await page1.evaluate(
+                async ({ roomId }) => {
+                    await window.streamApi!.joinStreamRoom(roomId);
+                },
+                { roomId },
+            );
+
+            // User 2 Joins
+            await page2.evaluate(
+                async ({ roomId }) => {
+                    await window.streamApi!.joinStreamRoom(roomId);
+                },
+                { roomId },
+            );
+        });
+
+        // --- STEP 3: Publish Stream (User 1) ---
+        // This ensures the room is "active" with media flowing
+        await test.step("Publish Stream", async () => {
+            await page1.evaluate(
+                async ({ roomId }) => {
+                    const api = window.streamApi!;
+                    const handle = await api.createStream(roomId);
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                    await api.publishStream(handle);
+                },
+                { roomId },
+            );
+        });
+
+        // --- STEP 4: Both Users Leave ---
+        await test.step("Leave Users", async () => {
+            console.log("[Test] User 1 leaving...");
+            await page1.evaluate(
+                async ({ roomId }) => {
+                    await window.streamApi!.leaveStreamRoom(roomId);
+                },
+                { roomId },
+            );
+
+            console.log("[Test] User 2 leaving...");
+            await page2.evaluate(
+                async ({ roomId }) => {
+                    await window.streamApi!.leaveStreamRoom(roomId);
+                },
+                { roomId },
+            );
+        });
+
+        // --- STEP 5: Wait & Verify Closure ---
+        await test.step("Verify Room Closure", async () => {
+            console.log("[Test] Waiting for room to close (Polling)...");
+
+            // We use page1 to poll status (assuming API client is still valid after leave)
+            // If strictly disconnected, we might need a fresh connection or check via HTTP if available.
+            // Assuming `getStreamRoom` works without being inside the room (which is standard).
+            const isClosed = await page1.evaluate(
+                async ({ roomId }) => {
+                    const api = window.streamApi!;
+                    const start = Date.now();
+
+                    // Poll for up to 30 seconds
+                    while (Date.now() - start < 30000) {
+                        try {
+                            const room = await api.getStreamRoom(roomId);
+                            if (room.closed) {
+                                return true;
+                            }
+                        } catch (e) {
+                            console.warn("Error fetching room info:", e);
+                        }
+                        console.log(Date.now() - start)
+                        // Wait 2s between checks
+                        await new Promise((r) => setTimeout(r, 2000));
+                    }
+                    return false;
+                },
+                { roomId },
+            );
+
+            if (!isClosed) {
+                throw new Error(`Room ${roomId} did not close automatically within 30 seconds.`);
+            }
+            console.log("[Test] SUCCESS: Room is closed.");
+        });
+    });
+
+    test("Security: Room lifecycle (Active -> Abandoned -> Closed) enforces locks", async ({ page, backend, cli }) => {
+        // Increase timeout to accommodate server-side auto-close delay (usually ~15s)
+        test.setTimeout(60000);
+
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            
+            // --- HELPER: Expect Action to Fail ---
+            const expectFailure = async (actionName: string, promise: Promise<any>) => {
+                try {
+                    await promise;
+                } catch (e: any) {
+                    // We expect the server to throw an exception containing "STREAM_ROOM_CLOSED"
+                    // or a generic "Active room required" error depending on the exact path.
+                    const msg = e.message || e.code || JSON.stringify(e);
+                    if (msg.includes("STREAM_ROOM_CLOSED") || msg.includes("CLOSED")) {
+                        console.log(`[PASS] ${actionName} blocked as expected.`);
+                        return;
+                    }
+                }
+                throw new Error(`[FAIL] ${actionName} SUCCEEDED but should have been BLOCKED.`);
+            };
+
+            // 1. Setup & Connect
+            const conn = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const api = await Endpoint.createStreamApi(conn, await Endpoint.createEventApi(conn));
+            const enc = new TextEncoder();
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+
+            // 2. Create Room
+            console.log("[Test] Creating Room...");
+            const sId = await api.createStreamRoom(
+                contextId,
+                [u1Obj],
+                [u1Obj],
+                enc.encode("lifecycle-test"),
+                enc.encode("lifecycle-test")
+            );
+
+            // 3. Make it ACTIVE (Publish Stream)
+            console.log("[Test] Joining & Publishing to make room ACTIVE...");
+            await api.joinStreamRoom(sId);
+            
+            const handle = await api.createStream(sId);
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+            await api.publishStream(handle);
+
+            // Wait a moment to ensure server registers the activity
+            await new Promise(r => setTimeout(r, 2000));
+
+            // 4. Abandon Room (Leave)
+            console.log("[Test] Leaving room to trigger auto-close...");
+            await api.leaveStreamRoom(sId);
+
+            // 5. Wait for Server Auto-Close (Polling)
+            console.log("[Test] Polling for room closure...");
+            const start = Date.now();
+            let isClosed = false;
+            
+            // Wait up to 45s for the background job to run
+            while (Date.now() - start < 45000) {
+                const room = await api.getStreamRoom(sId);
+                if (room.closed) {
+                    isClosed = true;
+                    console.log(`[Test] Room ${sId} is now CLOSED.`);
+                    break;
+                }
+                await new Promise(r => setTimeout(r, 2000));
+            }
+
+            if (!isClosed) throw new Error("Timeout: Room did not close automatically after being abandoned.");
+
+            // =========================================================
+            // 6. VERIFY SECURITY LOCKS (The "Restricted Actions")
+            // =========================================================
+
+            // A. Attempt to LIST STREAMS (Explicit check in server code)
+            await expectFailure("List Streams", api.listStreams(sId));
+
+            // B. Attempt to JOIN (The gatekeeper for Publish/Subscribe)
+            // Server: ensureActiveStreamRoom -> throws STREAM_ROOM_CLOSED
+            await expectFailure("Join Room", api.joinStreamRoom(sId));
+
+            // C. Attempt to SUBSCRIBE (Direct call check)
+            // Server: subscribeToRemoteStreams -> ensureActiveStreamRoom -> throws STREAM_ROOM_CLOSED
+            // We pass dummy args just to hit the server check
+            await expectFailure(
+                "Subscribe", 
+                api.subscribeToRemoteStreams(sId, [], { settings: {}, onRemoteTrack: () => {} })
+            );
+
+            // Note: We cannot test "Publish" directly here because `publishStream` requires 
+            // a valid `handle` from `createStream`, which requires `joinStreamRoom` to succeed first.
+            // Since `joinStreamRoom` fails (Test B), `publishStream` is effectively unreachable 
+            // and thus secured.
+
+            return { success: true };
+        }, args);
+    });
 });
