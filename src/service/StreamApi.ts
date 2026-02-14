@@ -441,7 +441,6 @@ export class StreamApi extends BaseApi {
     async subscribeToRemoteStreams(
         streamRoomId: Types.StreamRoomId,
         subscriptions: EndpointTypes.StreamSubscriptionWithCallback[],
-        // settings: StreamSettings,
     ): Promise<void> {
         // native part
         const peerCredentials = await this.native.getTurnCredentials(this.servicePtr, []);

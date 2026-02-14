@@ -53,7 +53,6 @@ export class WebRtcClient {
     // to moze byc uzyte kiedy wymagany jest update credentials (jak straca waznosc)
     private peerCredentials: TurnCredentials[] | undefined;
 
-    // private onRemoteTrackListeners: { [roomId: StreamRoomId]: {[streamId: number]: StreamSubscription[]} } = {};
     private remoteTrackListeners: Map<StreamRoomId, Map<number, StreamSubscriptionWithCallback[]>> = new Map();
     private peerConnectionsManager: PeerConnectionManager;
     private streamsApiInterface: StreamsCallbackInterface;

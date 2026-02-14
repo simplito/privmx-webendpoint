@@ -1479,8 +1479,7 @@ test.describe("StreamTest", () => {
         const page1 = await createContextPage();
         await initPage(page1);
         const users = await setupUsers(page1, cli);
-        console.log("users", users);
-      
+
         const page2 = await createContextPage();
         await initPage(page2);
 
@@ -1585,15 +1584,11 @@ test.describe("StreamTest", () => {
                         streamId: remoteStreams[1].id,
                         onRemoteTrack: (event: RTCTrackEvent) => recvTracksFromUser.push(2)    
                     };
-
-                    console.log("subs for user3", [sub1, sub2]);
                     await api.subscribeToRemoteStreams(roomId, [sub1, sub2]);
-
                     await new Promise((r) => setTimeout(r, 5000))
                     // test
                     if (recvTracksFromUser.length > 1) {
                         if (new Set(recvTracksFromUser).size < 2) {
-                            console.error("recvTracksFromUser", recvTracksFromUser);
                             throw new Error("Just one callback fired on two subscriptions")
                         }
                     }
