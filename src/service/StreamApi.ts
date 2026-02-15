@@ -167,7 +167,11 @@ export class StreamApi extends BaseApi {
 
         let alreadyAddedId = "";
 
-        for (const [key, streamTrack] of this.streamTracks.entries()) {
+        const tracksByHandle = Array.from(this.streamTracks.values()).filter(
+            (x) => x.streamHandle === streamHandle,
+        );
+
+        for (const streamTrack of tracksByHandle) {
             if (streamTrack.track && streamTrack.track?.id === meta.track?.id) {
                 if (streamTrack.markedToRemove === true) {
                     streamTrack.markedToRemove === undefined;
