@@ -7,17 +7,18 @@ import {
     RemoteStreamListener,
     SessionId,
 } from "./WebRtcClientTypes";
-import { FrameInfo, WebWorker } from "./WebWorkerHelper";
+import { WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
-import { Key, StreamSubscription, StreamSubscriptionWithCallback, TurnCredentials } from "../Types";
+import { Key, StreamSubscription, StreamSubscriptionWithCallback, TurnCredentials, StreamHandle } from "../Types";
 import { KeyStore } from "./KeyStore";
 import { PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
-import { StreamRoomId } from "./types/ApiTypes";
+import { StreamId, StreamRoomId } from "./types/ApiTypes";
 import { Queue } from "./Queue";
 import { Jsep } from "../service/WebRtcInterface";
 import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
 import { ActiveSpeakerDetector, DEFAULTS, SpeakerState } from "./audio/ActiveSpeakerDetector";
+import { StateChangeDispatcher } from "../service/EventDispatcher";
 
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
@@ -35,9 +36,14 @@ export interface UserAudioStats {
     active: boolean;
 }
 
+export interface WebRtcStateEvents {
+    connected: {streamId: StreamId};
+}
+
 export interface AudioLevelsStats {
     levels: SpeakerState[];
 }
+
 
 type AudioLevelFuncCallback = (changes: AudioLevelsStats) => void;
 export class WebRtcClient {
@@ -49,6 +55,8 @@ export class WebRtcClient {
 
     private configuration: RTCConfiguration | undefined;
     private keyStore: KeyStore = new KeyStore();
+
+    private publishStreamHandle: StreamHandle;
 
     // to moze byc uzyte kiedy wymagany jest update credentials (jak straca waznosc)
     private peerCredentials: TurnCredentials[] | undefined;
@@ -66,7 +74,7 @@ export class WebRtcClient {
     private peerConnectionReconfigureQueue: Queue<QueueItem> | undefined;
     public lastProcessedAnswer: { [roomId: string]: Jsep } = {};
     private lastMeasuredLocalRMS: number = -99;
-    // private subscriberAttachedProcessing: boolean = false;
+    private eventsDispatcher: StateChangeDispatcher = new StateChangeDispatcher();
 
     constructor(private assetsDir: string) {
         this.uniqId = "" + Math.random() + "-" + Math.random();
@@ -123,11 +131,19 @@ export class WebRtcClient {
         }
     }
 
+    public getStreamStateChangeDispatcher() {
+        return this.eventsDispatcher;
+    }
+
     public getConnectionManager() {
         if (!this.peerConnectionsManager) {
             throw new Error("No peerConnectionManager initialized.");
         }
         return this.peerConnectionsManager;
+    }
+
+    public getWebRtcEventDispatcher() {
+        return this.eventsDispatcher;
     }
 
     protected getEncKey(): Key {
@@ -247,9 +263,11 @@ export class WebRtcClient {
     // }
 
     async createPeerConnectionWithLocalStream(
+        streamHandle: StreamHandle,
         streamRoomId: StreamRoomId,
         stream: MediaStream,
     ): Promise<RTCPeerConnection> {
+        this.publishStreamHandle = streamHandle;
         // this.peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
 
@@ -525,6 +543,7 @@ export class WebRtcClient {
             } else {
                 this.logger.log("info", "connection state: ", connection.connectionState);
             }
+            this.eventsDispatcher.emit({streamHandle: this.publishStreamHandle, state: connection.connectionState});
         });
         connection.addEventListener("datachannel", (event) => {
             this.logger.log("info", "datachannel: ", event);

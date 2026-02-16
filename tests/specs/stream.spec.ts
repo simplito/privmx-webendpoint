@@ -950,6 +950,62 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
+    test.skip("publishStream: on publish callback", async ({ page, backend, cli }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const streamApi = await Endpoint.createStreamApi(
+                connection,
+                await Endpoint.createEventApi(connection),
+            );
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const sId = await streamApi.createStreamRoom(
+                contextId,
+                [u1Obj],
+                [u1Obj],
+                new TextEncoder().encode("p"),
+                new TextEncoder().encode("p"),
+            );
+
+            await streamApi.joinStreamRoom(sId);
+            const handle = await streamApi.createStream(sId);
+
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            await streamApi.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+            await streamApi.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+
+            const publishStates: string[] = [];
+
+            await streamApi.publishStream(handle, onStateChange => {
+                publishStates.push(onStateChange);
+            });
+
+            for (let retries = 0; retries < 3; ++retries) {
+                if (publishStates.length === 0) {
+                    await new Promise((r) => setTimeout(r, 3000));
+                } else {
+                    break;
+                }
+            }
+            
+            if (publishStates.length === 0) {
+                throw new Error("Did not receive state change on publishStream() callback..");
+            }
+            return { success: true };
+        }, args);
+
+        expect(result.success).toBe(true);
+    });
+
 
     test.skip("publishStream: multiple instances of same track", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
