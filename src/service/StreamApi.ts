@@ -19,7 +19,6 @@ import {
     StreamEventType,
     StreamRoom,
     UserWithPubKey,
-    StreamSettings,
     StreamHandle,
     StreamSubscription,
     StreamPublishResult,
@@ -338,46 +337,41 @@ export class StreamApi extends BaseApi {
 
     async subscribeToRemoteStreams(
         streamRoomId: Types.StreamRoomId,
-        subscriptions: StreamSubscription[],
-        settings: StreamSettings,
+        subscriptions: EndpointTypes.StreamSubscriptionWithCallback[],
     ): Promise<void> {
         // native part
         const peerCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(peerCredentials);
-        this.client.addRemoteStreamListener(streamRoomId, settings.onRemoteTrack);
+        this.client.addRemoteStreamListener(streamRoomId, subscriptions);
 
         // server / core part
         await this.native.subscribeToRemoteStreams(this.servicePtr, [
             streamRoomId,
             subscriptions,
-            settings,
         ]);
         this.client.getConnectionManager().initialize(streamRoomId, "subscriber");
     }
 
     async modifyRemoteStreamsSubscriptions(
         streamRoomId: Types.StreamRoomId,
-        subscriptionsToAdd: StreamSubscription[],
+        subscriptionsToAdd: EndpointTypes.StreamSubscriptionWithCallback[],
         subscriptionsToRemove: StreamSubscription[],
-        settings: StreamSettings,
     ): Promise<void> {
+        this.client.addRemoteStreamListener(streamRoomId, subscriptionsToAdd);
         await this.native.modifyRemoteStreamsSubscriptions(this.servicePtr, [
             streamRoomId,
             subscriptionsToAdd,
             subscriptionsToRemove,
-            settings,
         ]);
     }
 
     async unsubscribeFromRemoteStreams(
         streamRoomId: Types.StreamRoomId,
-        subscriptions: StreamSubscription[],
-        settings: StreamSettings,
+        subscriptions: StreamSubscription[]
     ): Promise<void> {
         await this.native.unsubscribeFromRemoteStreams(this.servicePtr, [
             streamRoomId,
             subscriptions,
-            settings,
         ]);
     }
 

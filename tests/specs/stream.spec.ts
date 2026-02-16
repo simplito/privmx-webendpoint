@@ -4,7 +4,7 @@ import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
 import type { Endpoint, StreamApi } from "../../src";
 import { StreamRoomId, StreamTrackMeta } from "../../src/webStreams/types/ApiTypes";
-import { SortOrder, StreamHandle, StreamInfo, StreamSettings } from "../../src/Types";
+import { SortOrder, StreamHandle } from "../../src/Types";
 
 interface TestUser {
     id: string;
@@ -1082,7 +1082,6 @@ test.describe("StreamTest", () => {
             );
 
             await streamApi.joinStreamRoom(sId);
-            const settings: StreamSettings = { onRemoteTrack: () => {}, settings: {} };
             const expectError = async (fn: any) => {
                 try {
                     await fn();
@@ -1094,7 +1093,7 @@ test.describe("StreamTest", () => {
 
             // Empty
             await expectError(
-                async () => await streamApi.subscribeToRemoteStreams(sId, [], settings),
+                async () => await streamApi.subscribeToRemoteStreams(sId, []),
             );
 
             // Invalid
@@ -1102,8 +1101,7 @@ test.describe("StreamTest", () => {
                 async () =>
                     await streamApi.subscribeToRemoteStreams(
                         sId,
-                        [{ streamId: -1, streamTrackId: "inv" }],
-                        settings,
+                        [{ streamId: -1, streamTrackId: "inv", onRemoteTrack: () => {} }],
                     ),
             );
 
@@ -1118,8 +1116,7 @@ test.describe("StreamTest", () => {
                 const s = streams[0];
                 await streamApi.subscribeToRemoteStreams(
                     sId,
-                    [{ streamId: s.id, streamTrackId: s.tracks[0].mid }],
-                    settings,
+                    [{ streamId: s.id, streamTrackId: s.tracks[0].mid, onRemoteTrack: () => {} }],
                 );
             }
 
@@ -1153,7 +1150,6 @@ test.describe("StreamTest", () => {
                 new TextEncoder().encode("p"),
                 new TextEncoder().encode("p"),
             );
-            const settings: StreamSettings = { onRemoteTrack: () => {}, settings: {} };
 
             await streamApi.joinStreamRoom(sId);
             const expectError = async (fn: any) => {
@@ -1167,7 +1163,7 @@ test.describe("StreamTest", () => {
 
             // Empty
             await expectError(
-                async () => await streamApi.unsubscribeFromRemoteStreams(sId, [], settings),
+                async () => await streamApi.unsubscribeFromRemoteStreams(sId, []),
             );
 
             // Publish & Subscribe first
@@ -1178,8 +1174,8 @@ test.describe("StreamTest", () => {
 
             const streams = await streamApi.listStreams(sId);
             if (streams.length > 0) {
-                const sub = [{ streamId: streams[0].id, trackId: streams[0].tracks[0].mid }];
-                await streamApi.subscribeToRemoteStreams(sId, sub, settings);
+                const sub = [{ streamId: streams[0].id, trackId: streams[0].tracks[0].mid, onRemoteTrack: () => {} }];
+                await streamApi.subscribeToRemoteStreams(sId, sub);
 
                 // Invalid Unsub
                 await expectError(
@@ -1187,12 +1183,11 @@ test.describe("StreamTest", () => {
                         await streamApi.unsubscribeFromRemoteStreams(
                             sId,
                             [{ streamId: -1, streamTrackId: "inv" }],
-                            settings,
                         ),
                 );
 
                 // Valid Unsub
-                await streamApi.unsubscribeFromRemoteStreams(sId, sub, settings);
+                await streamApi.unsubscribeFromRemoteStreams(sId, sub);
             }
 
             return { success: true };
@@ -1352,8 +1347,7 @@ test.describe("StreamTest", () => {
 
             const streams = await streamApi.listStreams(sId);
             if (streams.length === 0) return { success: true };
-            const sub = [{ streamId: streams[0].id, trackId: streams[0].tracks[0].mid }];
-            const settings: StreamSettings = { onRemoteTrack: () => {}, settings: {} };
+            const sub = [{ streamId: streams[0].id, trackId: streams[0].tracks[0].mid, onRemoteTrack: () => {} }];
             const expectError = async (fn: any) => {
                 try {
                     await fn();
@@ -1363,19 +1357,18 @@ test.describe("StreamTest", () => {
                 throw new Error("Expected error");
             };
 
-            await streamApi.subscribeToRemoteStreams(sId, sub, settings);
+            await streamApi.subscribeToRemoteStreams(sId, sub);
 
             // Invalid scenarios
             await expectError(
-                async () => await streamApi.modifyRemoteStreamsSubscriptions(sId, [], [], settings),
+                async () => await streamApi.modifyRemoteStreamsSubscriptions(sId, [], []),
             );
             await expectError(
                 async () =>
                     await streamApi.modifyRemoteStreamsSubscriptions(
                         sId,
-                        [{ streamId: -1, streamTrackId: "inv" }],
+                        [{ streamId: -1, streamTrackId: "inv", onRemoteTrack: () => {} }],
                         [],
-                        settings,
                     ),
             );
             await expectError(
@@ -1384,23 +1377,22 @@ test.describe("StreamTest", () => {
                         sId,
                         [],
                         [{ streamId: -1, streamTrackId: "inv" }],
-                        settings,
                     ),
             );
 
             // Valid: Remove All
-            await streamApi.modifyRemoteStreamsSubscriptions(sId, [], sub, settings);
+            await streamApi.modifyRemoteStreamsSubscriptions(sId, [], sub);
 
             // Valid: Add New
-            await streamApi.modifyRemoteStreamsSubscriptions(sId, sub, [], settings);
+            await streamApi.modifyRemoteStreamsSubscriptions(sId, sub, []);
 
             // Valid: Add and Remove Same (Logic check)
-            await streamApi.modifyRemoteStreamsSubscriptions(sId, sub, sub, settings);
+            await streamApi.modifyRemoteStreamsSubscriptions(sId, sub, sub);
 
             // After Unpublish (Remote stream gone)
             await streamApi.unpublishStream(handle);
 
-            await streamApi.modifyRemoteStreamsSubscriptions(sId, [], sub, settings);
+            await streamApi.modifyRemoteStreamsSubscriptions(sId, [], sub);
 
             return { success: true };
         }, args);
@@ -1481,28 +1473,29 @@ test.describe("StreamTest", () => {
                     if (remoteStreams.length === 0) throw new Error("Stream not found");
 
                     const targetStream = remoteStreams[0];
+
+                    const onRemoteTrack = (event: RTCTrackEvent) => {
+                        const track = event.track;
+                        const stream = event.streams[0];
+                        const elementId = `remote-${track.kind}`;
+
+                        if (document.getElementById(elementId)) return;
+
+                        const mediaEl = document.createElement("video");
+                        mediaEl.id = elementId;
+                        mediaEl.autoplay = true;
+                        mediaEl.playsInline = true;
+                        mediaEl.srcObject = stream || new MediaStream([track]);
+                        document.body.appendChild(mediaEl);
+                    };
+
                     const subs = targetStream.tracks.map((t: any) => ({
                         streamId: targetStream.id,
                         trackId: t.mid,
+                        onRemoteTrack: onRemoteTrack
                     }));
 
-                    await api.subscribeToRemoteStreams(roomId, subs, {
-                        settings: {},
-                        onRemoteTrack: (event: RTCTrackEvent) => {
-                            const track = event.track;
-                            const stream = event.streams[0];
-                            const elementId = `remote-${track.kind}`;
-
-                            if (document.getElementById(elementId)) return;
-
-                            const mediaEl = document.createElement("video");
-                            mediaEl.id = elementId;
-                            mediaEl.autoplay = true;
-                            mediaEl.playsInline = true;
-                            mediaEl.srcObject = stream || new MediaStream([track]);
-                            document.body.appendChild(mediaEl);
-                        },
-                    });
+                    await api.subscribeToRemoteStreams(roomId, subs);
                 },
                 { roomId },
             );
@@ -1532,6 +1525,138 @@ test.describe("StreamTest", () => {
             if (!isMoving) console.warn("Video stuck. Check fake-device args.");
         });
     });
+
+    test.skip("E2E: Three users exchange video streams and expect remte streams callbacks separation", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(60_000);
+        const page1 = await createContextPage();
+        await initPage(page1);
+        const users = await setupUsers(page1, cli);
+
+        const page2 = await createContextPage();
+        await initPage(page2);
+
+        const page3 = await createContextPage();
+        await initPage(page3);
+
+
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page3, users.u3, backend.bridgeUrl, testData.solutionId);
+
+        const contextId = testData.contextId;
+        let roomId: StreamRoomId;
+
+        // --- STEP 1: U1 Creates Room & Publishes ---
+        await test.step("User 1: Create Room, Join, Publish", async () => {
+            roomId = await page1.evaluate(
+                async ({ contextId, users }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 1");
+                    const api = window.streamApi;
+                    const enc = new TextEncoder();
+
+                    const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+                    const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+                    const u3Obj = { userId: users.u3.id, pubKey: users.u3.pubKey };
+
+                    const accessList = [u1Obj, u2Obj, u3Obj];
+
+                    const sId = await api.createStreamRoom(
+                        contextId,
+                        accessList,
+                        accessList,
+                        enc.encode("p"),
+                        enc.encode("p"),
+                    );
+
+                    await api.joinStreamRoom(sId);
+                    const handle = await api.createStream(sId);
+
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: true,
+                        video: true,
+                    });
+                    await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                    await api.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+
+                    await api.publishStream(handle);
+                    await new Promise((r) => setTimeout(r, 1000));
+                    return sId;
+                },
+                { contextId, users },
+            );
+        });
+
+        // --- STEP 2: U2 publishes ---
+        await test.step("User 2: Publishes", async () => {
+            await page2.evaluate(
+                async ({ roomId }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
+                    const api = window.streamApi;
+
+                    await api.joinStreamRoom(roomId);
+                    const handle = await api.createStream(roomId);
+
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: true,
+                        video: true,
+                    });
+                    await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                    await api.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+
+                    await api.publishStream(handle);
+                    await new Promise((r) => setTimeout(r, 1000));
+                },
+                { roomId },
+            );
+        });
+
+        await test.step("User 3: Join and Subscribe", async () => {
+            await page3.evaluate(
+                async ({ roomId }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
+                    const api = window.streamApi;
+
+                    await api.joinStreamRoom(roomId);
+
+                    let remoteStreams: any[] = [];
+                    for (let i = 0; i < 20; i++) {
+                        remoteStreams = await api.listStreams(roomId);
+                        if (remoteStreams.length > 0) break;
+                        await new Promise((r) => setTimeout(r, 500));
+                    }
+                    if (remoteStreams.length === 0) throw new Error("Stream not found");
+
+                    let recvTracksFromUser: number[] = [];
+
+                    const sub1 = {
+                        streamId: remoteStreams[0].id,
+                        onRemoteTrack: (event: RTCTrackEvent) => recvTracksFromUser.push(1)    
+                    };
+                    const sub2 = {
+                        streamId: remoteStreams[1].id,
+                        onRemoteTrack: (event: RTCTrackEvent) => recvTracksFromUser.push(2)    
+                    };
+                    await api.subscribeToRemoteStreams(roomId, [sub1, sub2]);
+                    await new Promise((r) => setTimeout(r, 5000))
+                    // test
+                    if (recvTracksFromUser.length > 1) {
+                        if (new Set(recvTracksFromUser).size < 2) {
+                            throw new Error("Just one callback fired on two subscriptions")
+                        }
+                    }
+
+                },
+                { roomId },
+            );
+        });        
+
+    });
+
+
 
     test.skip("E2E: Renegotiation - Add Video Mid-Call", async ({
         createContextPage,
@@ -1624,22 +1749,19 @@ test.describe("StreamTest", () => {
                         await new Promise((r) => setTimeout(r, 500));
                     }
 
-                    const s = remote[0];
-                    const subs = s.tracks.map((t: any) => ({ streamId: s.id, trackId: t.mid }));
+                    const onRemoteTrack = (event: RTCTrackEvent) => {
+                        const el = document.createElement(
+                            event.track.kind === "video" ? "video" : "audio",
+                        );
+                        el.id = `remote-${event.track.kind}`;
+                        el.autoplay = true;
+                        if (event.streams[0]) el.srcObject = event.streams[0];
+                        else el.srcObject = new MediaStream([event.track]);
+                        document.body.appendChild(el);
+                    };
 
-                    await api.subscribeToRemoteStreams(roomId, subs, {
-                        settings: {},
-                        onRemoteTrack: (event: RTCTrackEvent) => {
-                            const el = document.createElement(
-                                event.track.kind === "video" ? "video" : "audio",
-                            );
-                            el.id = `remote-${event.track.kind}`;
-                            el.autoplay = true;
-                            if (event.streams[0]) el.srcObject = event.streams[0];
-                            else el.srcObject = new MediaStream([event.track]);
-                            document.body.appendChild(el);
-                        },
-                    });
+                    const s = remote[0];
+                    const subs = s.tracks.map((t: any) => ({ streamId: s.id, trackId: t.mid, onRemoteTrack: onRemoteTrack }));
                 },
                 { roomId },
             );
@@ -1675,21 +1797,19 @@ test.describe("StreamTest", () => {
                     const remote = await api.listStreams(roomId);
                     const vTrack = remote[0].tracks.find((t: any) => t.type === "video");
 
+                    const onRemoteTrack = (e: any) => {
+                        const el = document.createElement("video");
+                        el.id = "remote-video";
+                        el.autoplay = true;
+                        el.srcObject = e.streams[0] || new MediaStream([e.track]);
+                        document.body.appendChild(el);
+                    };
+
                     if (vTrack) {
                         await api.modifyRemoteStreamsSubscriptions(
                             roomId,
-                            [{ streamId: remote[0].id, streamTrackId: vTrack.mid }],
+                            [{ streamId: remote[0].id, streamTrackId: vTrack.mid, onRemoteTrack }],
                             [],
-                            {
-                                settings: {},
-                                onRemoteTrack: (e: any) => {
-                                    const el = document.createElement("video");
-                                    el.id = "remote-video";
-                                    el.autoplay = true;
-                                    el.srcObject = e.streams[0] || new MediaStream([e.track]);
-                                    document.body.appendChild(el);
-                                },
-                            },
                         );
                     }
                 },
@@ -1764,24 +1884,21 @@ test.describe("StreamTest", () => {
                 }
 
                 const firstStream = remote[0];
+                const onRemoteTrack = (e: RTCTrackEvent) => {
+                    let v = document.getElementById("remote-video") as HTMLVideoElement;
+                    if (!v) {
+                        v = document.createElement("video");
+                        v.id = "remote-video";
+                        v.autoplay = true;
+                        v.playsInline = true;
+                        document.body.appendChild(v);
+                    }
+                    v.srcObject = e.streams[0];
+                };
 
                 await api.subscribeToRemoteStreams(
                     roomId,
-                    [{ streamId: firstStream.id, streamTrackId: firstStream.tracks[0].mid }],
-                    {
-                        settings: {},
-                        onRemoteTrack: (e: RTCTrackEvent) => {
-                            let v = document.getElementById("remote-video") as HTMLVideoElement;
-                            if (!v) {
-                                v = document.createElement("video");
-                                v.id = "remote-video";
-                                v.autoplay = true;
-                                v.playsInline = true;
-                                document.body.appendChild(v);
-                            }
-                            v.srcObject = e.streams[0];
-                        },
-                    },
+                    [{ streamId: firstStream.id, streamTrackId: firstStream.tracks[0].mid, onRemoteTrack }],
                 );
                 return firstStream.id;
             },
@@ -1827,11 +1944,7 @@ test.describe("StreamTest", () => {
 
                 await api.subscribeToRemoteStreams(
                     roomId,
-                    [{ streamId: newStream.id, streamTrackId: newStream.tracks[0].mid }],
-                    {
-                        settings: {},
-                        onRemoteTrack: () => {},
-                    },
+                    [{ streamId: newStream.id, streamTrackId: newStream.tracks[0].mid, onRemoteTrack: () => {} }],
                 );
                 return newStream.id;
             },
@@ -1908,19 +2021,17 @@ test.describe("StreamTest", () => {
                     await new Promise((r) => setTimeout(r, 200));
                 }
 
+                const onRemoteTrack = (e: any) => {
+                    if (window.remoteTracksCount !== undefined) window.remoteTracksCount++;
+
+                    e.track.onended = () => {
+                        window.trackEnded = true;
+                    };
+                };
+
                 await api.subscribeToRemoteStreams(
                     roomId,
-                    [{ streamId: remote[0].id, trackId: remote[0].tracks[0].mid }],
-                    {
-                        settings: {},
-                        onRemoteTrack: (e: any) => {
-                            if (window.remoteTracksCount !== undefined) window.remoteTracksCount++;
-
-                            e.track.onended = () => {
-                                window.trackEnded = true;
-                            };
-                        },
-                    },
+                    [{ streamId: remote[0].id, streamTrackId: remote[0].tracks[0].mid, onRemoteTrack: onRemoteTrack }],
                 );
             },
             { roomId },
