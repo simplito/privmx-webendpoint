@@ -9,7 +9,7 @@ import {
 } from "./WebRtcClientTypes";
 import { FrameInfo, WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
-import { Key, TurnCredentials } from "../Types";
+import { Key, StreamSubscription, StreamSubscriptionWithCallback, TurnCredentials } from "../Types";
 import { KeyStore } from "./KeyStore";
 import { PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
@@ -53,7 +53,7 @@ export class WebRtcClient {
     // to moze byc uzyte kiedy wymagany jest update credentials (jak straca waznosc)
     private peerCredentials: TurnCredentials[] | undefined;
 
-    private onRemoteTrackListeners: { [roomId: StreamRoomId]: RemoteStreamListener } = {};
+    private remoteTrackListeners: Map<StreamRoomId, Map<number, StreamSubscriptionWithCallback[]>> = new Map();
     private peerConnectionsManager: PeerConnectionManager;
     private streamsApiInterface: StreamsCallbackInterface;
     private activeSpeakerDetector: ActiveSpeakerDetector;
@@ -103,11 +103,24 @@ export class WebRtcClient {
         this.streamsApiInterface = streamsApiInterface;
     }
 
-    public addRemoteStreamListener(roomId: StreamRoomId, listener: RemoteStreamListener) {
-        if (roomId in this.onRemoteTrackListeners) {
-            return;
+    public addRemoteStreamListener(roomId: StreamRoomId, subscriptions: StreamSubscriptionWithCallback[]) {
+        let roomMap = this.remoteTrackListeners.get(roomId);
+
+        if (!roomMap) {
+            roomMap = new Map();
+            this.remoteTrackListeners.set(roomId, roomMap);
         }
-        this.onRemoteTrackListeners[roomId] = listener;
+
+        for (const sub of subscriptions) {
+            let list = roomMap.get(sub.streamId);
+
+            if (!list) {
+                list = [];
+                roomMap.set(sub.streamId, list);
+            }
+
+            list.push(sub);
+        }
     }
 
     public getConnectionManager() {
@@ -759,29 +772,25 @@ export class WebRtcClient {
         await this.setupReceiverTransform(receiver, publisherId, worker);
         track.addEventListener("ended", async () => await this.teardownReceiver(receiver, worker));
 
-        // if ((window as any).RTCRtpScriptTransform) {
-        //     const options = {
-        //         operation: 'decode',
-        //         kind: track.kind
-        //     };
+        this.callRegisteredListeners(roomId, event);
+    }
 
-        //     (receiver as any).transform = new RTCRtpScriptTransform(worker, options);
-        // } else {
-        //     console.log("receiver", receiver);
-        //     const receiverStreams = (receiver as any).createEncodedStreams();
-
-        //     worker.postMessage({
-        //         operation: 'decode',
-        //         readableStream: receiverStreams.readable,
-        //         writableStream: receiverStreams.writable,
-        //     }, [ receiverStreams.readable, receiverStreams.writable ]);
-
-        //     console.log({receiver, receiverStreams, track, key});
-        // }
-        if (!(roomId in this.onRemoteTrackListeners)) {
-            throw new Error("No remoteTrack listener registered for room: " + roomId);
+    private callRegisteredListeners(roomId: StreamRoomId, event: RTCTrackEvent) {
+        const remoteStreamId = Number(event.streams[0].id);
+        const listeners = this.remoteTrackListeners.get(roomId);
+        if (!listeners) {
+            this.logger.log("info", "No remoteTrack listener registered for room: " + roomId);
+            return;
         }
-        this.onRemoteTrackListeners[roomId](event);
+        const streamListeners = listeners.get(remoteStreamId);
+        if (!streamListeners) {
+            return;
+        }
+        for (const subscription of streamListeners) {
+            if (subscription.onRemoteTrack && typeof(subscription.onRemoteTrack) === "function") {
+                subscription.onRemoteTrack(event);
+            }
+        }
     }
 
     // test

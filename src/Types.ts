@@ -744,16 +744,15 @@ export interface StreamSubscription {
     streamTrackId?: string;
 }
 
+export interface StreamSubscriptionWithCallback extends StreamSubscription {
+    onRemoteTrack: (track: RTCTrackEvent) => void;
+}
+
 export interface TurnCredentials {
     url: string;
     username: string;
     password: string;
     expirationTime: number;
-}
-
-export interface StreamSettings {
-    settings: any;
-    onRemoteTrack: (track: RTCTrackEvent) => void;
 }
 
 export type StreamHandle = number & { _streamHandle: never };
