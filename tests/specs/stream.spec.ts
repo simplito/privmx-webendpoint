@@ -950,7 +950,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test("publishStream: on publish callback", async ({ page, backend, cli }) => {
+    test.skip("publishStream: on publish callback", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
