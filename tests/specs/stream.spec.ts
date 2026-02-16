@@ -44,9 +44,6 @@ test.use({
 
 test.describe("StreamTest", () => {
     test.beforeEach(async ({ page }) => {
-        // page.on("console", (msg) => {
-        //     console.error(`[BROWSER]: ${msg.text()}`);
-        // });
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
         await page.evaluate(async () => {
@@ -70,10 +67,6 @@ test.describe("StreamTest", () => {
         bridgeUrl: string,
         solutionId: string,
     ) => {
-        page.on("console", (msg: any) => {
-            if (msg.type() === "error") console.error(`[${user.id}]: ${msg.text()}`);
-        });
-
         await page.evaluate(
             async ({
                 bridgeUrl,
@@ -854,9 +847,6 @@ test.describe("StreamTest", () => {
         backend,
         cli,
     }) => {
-        // Increased timeout since we are waiting 3000ms a few times
-        test.setTimeout(30000);
-
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -868,36 +858,54 @@ test.describe("StreamTest", () => {
         const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
             const Endpoint = window.Endpoint;
 
+            console.log("1");
             // Setup User 1 (The Publisher)
             const connection1 = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
             const api1 = await Endpoint.createStreamApi(
                 connection1,
                 await Endpoint.createEventApi(connection1),
             );
-
-            // Setup User 2 (The Watcher - keeps room alive)
+            console.log("2");
+            // Setup User 2 (The Watcher/Publisher - keeps room alive)
             const connection2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
             const api2 = await Endpoint.createStreamApi(
                 connection2,
                 await Endpoint.createEventApi(connection2),
             );
+            console.log("3");
 
             const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
             const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+            console.log("4");
 
             const sId = await api1.createStreamRoom(
                 contextId,
                 [u1Obj, u2Obj],
-                [u1Obj],
+                [u1Obj, u2Obj], // Made u2 a manager as well to ensure publish rights
                 new TextEncoder().encode("p"),
                 new TextEncoder().encode("p"),
             );
+            console.log("5");
 
-            // User 2 joins to keep the room alive
+            // User 2 joins AND publishes to keep the room alive
             await api2.joinStreamRoom(sId);
-
+            console.log("6");
+            const u2Handle = await api2.createStream(sId);
+            console.log("6.1");
+            const u2Stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: true,
+            });
+            console.log("6.2");
+            await api2.addStreamTrack(u2Handle, { track: u2Stream.getAudioTracks()[0] });
+            console.log("6.3");
+            await api2.addStreamTrack(u2Handle, { track: u2Stream.getVideoTracks()[0] });
+            console.log("6.4");
+            await api2.publishStream(u2Handle);
+            console.log("6.5");
             // User 1 operations
             await api1.joinStreamRoom(sId);
+            console.log("6.6");
             const handle = await api1.createStream(sId);
 
             const expectError = async (fn: any) => {
@@ -909,16 +917,20 @@ test.describe("StreamTest", () => {
                 throw new Error("Expected error");
             };
 
+            console.log("7");
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
             await api1.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
             await api1.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+            console.log("8");
 
             // Publish
             await api1.publishStream(handle);
             await new Promise<void>((resolve) => setTimeout(resolve, 3000));
+            console.log("9");
 
             // Unpublish
             await api1.unpublishStream(handle);
+            console.log("10");
 
             // Expect Error when publishing on the same destroyed handle
             await expectError(async () => {
@@ -956,7 +968,7 @@ test.describe("StreamTest", () => {
                 await Endpoint.createEventApi(connection1),
             );
 
-            // Setup User 2 (The Watcher)
+            // Setup User 2 (The Watcher/Publisher)
             const connection2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
             const api2 = await Endpoint.createStreamApi(
                 connection2,
@@ -969,15 +981,22 @@ test.describe("StreamTest", () => {
             const sId = await api1.createStreamRoom(
                 contextId,
                 [u1Obj, u2Obj],
-                [u1Obj],
+                [u1Obj, u2Obj],
                 new TextEncoder().encode("p"),
                 new TextEncoder().encode("p"),
             );
 
-            // User 2 joins to keep the room alive
+            // User 2 joins AND publishes to keep the room alive
             await api2.joinStreamRoom(sId);
+            const u2Handle = await api2.createStream(sId);
+            const u2Stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: true,
+            });
+            await api2.addStreamTrack(u2Handle, { track: u2Stream.getAudioTracks()[0] });
+            await api2.addStreamTrack(u2Handle, { track: u2Stream.getVideoTracks()[0] });
+            await api2.publishStream(u2Handle);
 
-            // User 1 joins
             await api1.joinStreamRoom(sId);
 
             // --- FIRST HANDLE ---
@@ -989,6 +1008,9 @@ test.describe("StreamTest", () => {
             await api1.publishStream(handle1);
             await new Promise<void>((resolve) => setTimeout(resolve, 3000));
             await api1.unpublishStream(handle1);
+
+            await api1.leaveStreamRoom(sId);
+            await api1.joinStreamRoom(sId);
 
             // --- NEW HANDLE ---
             const handle2 = await api1.createStream(sId);
@@ -1543,11 +1565,16 @@ test.describe("StreamTest", () => {
         const { u1, u2 } = users;
 
         const connect = async (page: any, user: any) => {
-            page.on("console", (msg: any) => {
-                if (msg.type() === "error") console.error(`[${user.id}]: ${msg.text()}`);
-            });
             await page.evaluate(
-                async ({ bridgeUrl, solutionId, user }) => {
+                async ({
+                    bridgeUrl,
+                    solutionId,
+                    user,
+                }: {
+                    bridgeUrl: string;
+                    solutionId: string;
+                    user: TestUser;
+                }) => {
                     const conn = await window.Endpoint.connect(user.privKey, solutionId, bridgeUrl);
                     const streamApi = await window.Endpoint.createStreamApi(
                         conn,
@@ -1733,12 +1760,13 @@ test.describe("StreamTest", () => {
             { contextId: testData.contextId, users },
         );
 
-        // --- STEP 2: U2 Subscribes (Old Stream) ---
-        const oldStreamId = await page2.evaluate(
+        // --- STEP 2: U2 Subscribes AND Publishes (Keep-Alive) ---
+        const { oldStreamId, initialStreamIds } = await page2.evaluate(
             async ({ roomId }) => {
                 const api = window.streamApi!;
                 await api.joinStreamRoom(roomId);
 
+                // 1. Wait for U1's stream (Since U2 hasn't published yet, it's the only one)
                 let remote: any[] = [];
                 while (remote.length === 0) {
                     remote = await api.listStreams(roomId);
@@ -1747,6 +1775,7 @@ test.describe("StreamTest", () => {
 
                 const firstStream = remote[0];
 
+                // 2. Subscribe to U1
                 await api.subscribeToRemoteStreams(
                     roomId,
                     [{ streamId: firstStream.id, streamTrackId: firstStream.tracks[0].mid }],
@@ -1765,7 +1794,24 @@ test.describe("StreamTest", () => {
                         },
                     },
                 );
-                return firstStream.id;
+
+                // 3. User 2 PUBLISHES to keep the room alive during U1's crash/reload
+                const u2Handle = await api.createStream(roomId);
+                const u2Stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                await api.addStreamTrack(u2Handle, { track: u2Stream.getVideoTracks()[0] });
+                await api.publishStream(u2Handle);
+
+                // 4. Record all stream IDs so we know what to ignore in Step 5
+                let allStreams = await api.listStreams(roomId);
+                while (allStreams.length < 2) {
+                    allStreams = await api.listStreams(roomId);
+                    await new Promise((r) => setTimeout(r, 200));
+                }
+
+                return {
+                    oldStreamId: firstStream.id,
+                    initialStreamIds: allStreams.map((s) => s.id),
+                };
             },
             { roomId },
         );
@@ -1773,6 +1819,7 @@ test.describe("StreamTest", () => {
         await page2.locator("#remote-video").waitFor({ state: "attached" });
 
         // --- STEP 3: RELOAD USER 1 ---
+        // Room stays alive because User 2 is actively publishing
         await page1.reload();
         await initPage(page1);
         await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
@@ -1792,15 +1839,14 @@ test.describe("StreamTest", () => {
         );
 
         // --- STEP 5: VERIFY RECOVERY ---
-
         const expectedNewStreamId = await page2.evaluate(
-            async ({ roomId, oldStreamId }) => {
+            async ({ roomId, initialStreamIds }) => {
                 const api = window.streamApi!;
 
                 let newStream: any;
                 for (let i = 0; i < 60; i++) {
                     const streams = await api.listStreams(roomId);
-                    newStream = streams.find((s: any) => s.id !== oldStreamId);
+                    newStream = streams.find((s: any) => !initialStreamIds.includes(s.id));
                     if (newStream) break;
                     await new Promise((r) => setTimeout(r, 500));
                 }
@@ -1817,7 +1863,7 @@ test.describe("StreamTest", () => {
                 );
                 return newStream.id;
             },
-            { roomId, oldStreamId },
+            { roomId, initialStreamIds },
         );
 
         await page2.waitForFunction(
@@ -2267,255 +2313,260 @@ test.describe("StreamTest", () => {
             return true;
         }, args);
     });
+    test("Stream Room Cleanup: Room stays open until the LAST user leaves (Multi-User)", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(90000);
 
-    test.fail(
-        "Stream Room Cleanup: Room stays open until the LAST user leaves (Multi-User)",
-        async ({
-            // We need to decide what about join/leave without a publish
-            createContextPage,
-            backend,
-            cli,
-        }) => {
-            test.setTimeout(90000);
+        const page1 = await createContextPage();
+        const page2 = await createContextPage();
 
-            const page1 = await createContextPage();
-            const page2 = await createContextPage();
+        await initPage(page1);
+        await initPage(page2);
 
-            await initPage(page1);
-            await initPage(page2);
+        const users = await setupUsers(page1, cli);
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
 
-            const users = await setupUsers(page1, cli);
-            await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
-            await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+        let sharedRoomId: StreamRoomId;
+        let controlRoomId: StreamRoomId;
 
-            let sharedRoomId: StreamRoomId;
-            let controlRoomId: StreamRoomId;
+        // --- STEP 1: U1 creates two rooms ---
+        await test.step("Setup Rooms", async () => {
+            const ids = await page1.evaluate(
+                async ({ contextId, users }) => {
+                    const api = window.streamApi!;
+                    const enc = new TextEncoder();
+                    const uObjs = [users.u1, users.u2].map((u: any) => ({
+                        userId: u.id,
+                        pubKey: u.pubKey,
+                    }));
 
-            // --- STEP 1: U1 creates two rooms ---
-            await test.step("Setup Rooms", async () => {
-                const ids = await page1.evaluate(
-                    async ({ contextId, users }) => {
-                        const api = window.streamApi!;
-                        const enc = new TextEncoder();
-                        const uObjs = [users.u1, users.u2].map((u: any) => ({
-                            userId: u.id,
-                            pubKey: u.pubKey,
-                        }));
-
-                        // Shared room (both will join)
-                        const sId1 = await api.createStreamRoom(
-                            contextId,
-                            uObjs,
-                            uObjs,
-                            enc.encode("Shared"),
-                            enc.encode("Shared"),
-                        );
-                        // Control room (only U2 will join)
-                        const sId2 = await api.createStreamRoom(
-                            contextId,
-                            uObjs,
-                            uObjs,
-                            enc.encode("Control"),
-                            enc.encode("Control"),
-                        );
-
-                        return { sharedRoomId: sId1, controlRoomId: sId2 };
-                    },
-                    { contextId: testData.contextId, users },
-                );
-
-                sharedRoomId = ids.sharedRoomId;
-                controlRoomId = ids.controlRoomId;
-            });
-
-            // --- STEP 2: Join logic ---
-            await test.step("Populate Rooms", async () => {
-                // U1 joins Shared Room
-                await page1.evaluate(
-                    async ({ sharedRoomId }) => {
-                        await window.streamApi!.joinStreamRoom(sharedRoomId);
-                    },
-                    { sharedRoomId },
-                );
-
-                // U2 joins BOTH rooms
-                await page2.evaluate(
-                    async ({ sharedRoomId, controlRoomId }) => {
-                        await window.streamApi!.joinStreamRoom(sharedRoomId);
-                        await window.streamApi!.joinStreamRoom(controlRoomId);
-                    },
-                    { sharedRoomId, controlRoomId },
-                );
-            });
-
-            // --- STEP 3: U1 Leaves Shared Room (Should NOT close) ---
-            await test.step("User 1 leaves, Room stays open", async () => {
-                await page1.evaluate(
-                    async ({ sharedRoomId }) => {
-                        await window.streamApi!.leaveStreamRoom(sharedRoomId);
-                    },
-                    { sharedRoomId },
-                );
-
-                console.log("Waiting 20s to ensure server sweep passes...");
-                await page1.waitForTimeout(20000); // Give the 15s job time to run
-
-                // Verify it is STILL OPEN because U2 is inside
-                const isClosed = await page2.evaluate(
-                    async ({ sharedRoomId }) => {
-                        return (await window.streamApi!.getStreamRoom(sharedRoomId)).closed;
-                    },
-                    { sharedRoomId },
-                );
-
-                if (isClosed)
-                    throw new Error(
-                        "FAIL: Shared room closed prematurely while U2 was still inside!",
+                    // Shared room (both will join)
+                    const sId1 = await api.createStreamRoom(
+                        contextId,
+                        uObjs,
+                        uObjs,
+                        enc.encode("Shared"),
+                        enc.encode("Shared"),
                     );
-            });
+                    // Control room (only U2 will join)
+                    const sId2 = await api.createStreamRoom(
+                        contextId,
+                        uObjs,
+                        uObjs,
+                        enc.encode("Control"),
+                        enc.encode("Control"),
+                    );
 
-            // --- STEP 4: U2 Leaves Shared Room (Should NOW close) ---
-            await test.step("User 2 leaves, Room closes", async () => {
-                await page2.evaluate(
-                    async ({ sharedRoomId }) => {
-                        await window.streamApi!.leaveStreamRoom(sharedRoomId);
-                    },
-                    { sharedRoomId },
+                    return { sharedRoomId: sId1, controlRoomId: sId2 };
+                },
+                { contextId: testData.contextId, users },
+            );
+
+            sharedRoomId = ids.sharedRoomId;
+            controlRoomId = ids.controlRoomId;
+        });
+
+        // --- STEP 2: Join AND Publish logic ---
+        await test.step("Populate Rooms (Both Users Publish)", async () => {
+            // U1 joins and PUBLISHES in Shared Room
+            await page1.evaluate(
+                async ({ sharedRoomId }) => {
+                    const api = window.streamApi!;
+                    await api.joinStreamRoom(sharedRoomId);
+
+                    const handle = await api.createStream(sharedRoomId);
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                    await api.publishStream(handle);
+                },
+                { sharedRoomId },
+            );
+
+            // U2 joins and PUBLISHES in BOTH rooms
+            await page2.evaluate(
+                async ({ sharedRoomId, controlRoomId }) => {
+                    const api = window.streamApi!;
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+                    // 1. Publish to Shared Room
+                    await api.joinStreamRoom(sharedRoomId);
+                    const handleShared = await api.createStream(sharedRoomId);
+                    await api.addStreamTrack(handleShared, { track: stream.getVideoTracks()[0] });
+                    await api.publishStream(handleShared);
+
+                    // 2. Publish to Control Room
+                    await api.joinStreamRoom(controlRoomId);
+                    const handleControl = await api.createStream(controlRoomId);
+                    await api.addStreamTrack(handleControl, { track: stream.getVideoTracks()[0] });
+                    await api.publishStream(handleControl);
+                },
+                { sharedRoomId, controlRoomId },
+            );
+        });
+
+        // --- STEP 3: U1 Leaves Shared Room (Should NOT close) ---
+        await test.step("User 1 leaves, Room stays open", async () => {
+            await page1.evaluate(
+                async ({ sharedRoomId }) => {
+                    await window.streamApi!.leaveStreamRoom(sharedRoomId);
+                },
+                { sharedRoomId },
+            );
+
+            console.log("Waiting 20s to ensure server sweep passes...");
+            await page1.waitForTimeout(20000); // Give the 15s job time to run
+
+            // Verify it is STILL OPEN because U2 is inside and publishing
+            const isClosed = await page2.evaluate(
+                async ({ sharedRoomId }) => {
+                    return (await window.streamApi!.getStreamRoom(sharedRoomId)).closed;
+                },
+                { sharedRoomId },
+            );
+
+            if (isClosed)
+                throw new Error("FAIL: Shared room closed prematurely while U2 was still inside!");
+        });
+
+        // --- STEP 4: U2 Leaves Shared Room (Should NOW close) ---
+        await test.step("User 2 leaves, Room closes", async () => {
+            await page2.evaluate(
+                async ({ sharedRoomId }) => {
+                    await window.streamApi!.leaveStreamRoom(sharedRoomId);
+                },
+                { sharedRoomId },
+            );
+
+            console.log("Polling for final closure...");
+            const isClosed = await page2.evaluate(
+                async ({ sharedRoomId }) => {
+                    const start = Date.now();
+                    while (Date.now() - start < 30000) {
+                        if ((await window.streamApi!.getStreamRoom(sharedRoomId)).closed)
+                            return true;
+                        await new Promise((r) => setTimeout(r, 2000));
+                    }
+                    return false;
+                },
+                { sharedRoomId },
+            );
+
+            if (!isClosed)
+                throw new Error("FAIL: Shared room did not close after the last user (U2) left.");
+        });
+
+        // --- STEP 5: Verify Control Room is untouched ---
+        await test.step("Verify Control Room is still open", async () => {
+            const isControlClosed = await page2.evaluate(
+                async ({ controlRoomId }) => {
+                    return (await window.streamApi!.getStreamRoom(controlRoomId)).closed;
+                },
+                { controlRoomId },
+            );
+
+            if (isControlClosed)
+                throw new Error("FAIL: Control room was incorrectly closed by the cleanup job!");
+        });
+    });
+
+    test("Stream Room Cleanup: Abrupt disconnect (hangup) triggers auto-close", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(90000);
+
+        // --- SETUP ---
+        const page1 = await createContextPage();
+        await initPage(page1);
+        const users = await setupUsers(page1, cli);
+
+        // User connects on Device 1
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+
+        // --- STEP 1: Connect, Join, and Publish (Device 1) ---
+        const roomId = await page1.evaluate(
+            async ({ contextId, users }) => {
+                const api = window.streamApi!;
+                const enc = new TextEncoder();
+                const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+
+                // Create Room
+                const sId = await api.createStreamRoom(
+                    contextId,
+                    [u1Obj],
+                    [u1Obj],
+                    enc.encode("HangupTest"),
+                    enc.encode("HangupTest"),
                 );
 
-                console.log("Polling for final closure...");
-                const isClosed = await page2.evaluate(
-                    async ({ sharedRoomId }) => {
-                        const start = Date.now();
-                        while (Date.now() - start < 30000) {
-                            if ((await window.streamApi!.getStreamRoom(sharedRoomId)).closed)
-                                return true;
-                            await new Promise((r) => setTimeout(r, 2000));
+                // Join & Publish Media
+                await api.joinStreamRoom(sId);
+                const handle = await api.createStream(sId);
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                await api.publishStream(handle);
+
+                return sId;
+            },
+            { contextId: testData.contextId, users },
+        );
+
+        console.log(`[Test] Room ${roomId} created and ACTIVE. Simulating crash...`);
+
+        // Give the server a moment to fully register the publisher state
+        await page1.waitForTimeout(2000);
+
+        // --- STEP 2: Abrupt Hangup (Browser Crash/Close) ---
+        // We close the page abruptly. NO leaveStreamRoom is called.
+        // This drops the WebSocket connection instantly.
+        await page1.close();
+        console.log("[Test] Page 1 closed abruptly (WebSocket connection dropped).");
+
+        // --- STEP 3: Reconnect & Verify (Device 2) ---
+        // User opens a new tab or restarts the app
+        const page2 = await createContextPage();
+        await initPage(page2);
+
+        console.log("[Test] Reconnecting from a new session...");
+        await connectUserToBridge(page2, users.u1, backend.bridgeUrl, testData.solutionId);
+
+        // --- STEP 4: Poll for server-side cleanup ---
+        console.log("[Test] Polling for room closure. Waiting for server cleanup job...");
+
+        const isClosed = await page2.evaluate(
+            async ({ roomId }) => {
+                const api = window.streamApi!;
+                const start = Date.now();
+
+                // Poll for up to 20 seconds
+                while (Date.now() - start < 20000) {
+                    try {
+                        const room = await api.getStreamRoom(roomId);
+                        if (room.closed) {
+                            return true;
                         }
-                        return false;
-                    },
-                    { sharedRoomId },
-                );
-
-                if (!isClosed)
-                    throw new Error(
-                        "FAIL: Shared room did not close after the last user (U2) left.",
-                    );
-            });
-
-            // --- STEP 5: Verify Control Room is untouched ---
-            await test.step("Verify Control Room is still open", async () => {
-                const isControlClosed = await page2.evaluate(
-                    async ({ controlRoomId }) => {
-                        return (await window.streamApi!.getStreamRoom(controlRoomId)).closed;
-                    },
-                    { controlRoomId },
-                );
-
-                if (isControlClosed)
-                    throw new Error(
-                        "FAIL: Control room was incorrectly closed by the cleanup job!",
-                    );
-            });
-
-            test("Stream Room Cleanup: Abrupt disconnect (hangup) triggers auto-close", async ({
-                createContextPage,
-                backend,
-                cli,
-            }) => {
-                // Generous timeout to allow for WebSocket ping timeouts + the 15s server sweep job
-                test.setTimeout(90000);
-
-                // --- SETUP ---
-                const page1 = await createContextPage();
-                await initPage(page1);
-                const users = await setupUsers(page1, cli);
-
-                // User connects on Device 1
-                await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
-
-                // --- STEP 1: Connect, Join, and Publish (Device 1) ---
-                const roomId = await page1.evaluate(
-                    async ({ contextId, users }) => {
-                        const api = window.streamApi!;
-                        const enc = new TextEncoder();
-                        const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
-
-                        // Create Room
-                        const sId = await api.createStreamRoom(
-                            contextId,
-                            [u1Obj],
-                            [u1Obj],
-                            enc.encode("HangupTest"),
-                            enc.encode("HangupTest"),
-                        );
-
-                        // Join & Publish Media
-                        await api.joinStreamRoom(sId);
-                        const handle = await api.createStream(sId);
-                        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                        await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
-                        await api.publishStream(handle);
-
-                        return sId;
-                    },
-                    { contextId: testData.contextId, users },
-                );
-
-                console.log(`[Test] Room ${roomId} created and ACTIVE. Simulating crash...`);
-
-                // Give the server a moment to fully register the publisher state
-                await page1.waitForTimeout(2000);
-
-                // --- STEP 2: Abrupt Hangup (Browser Crash/Close) ---
-                // We close the page abruptly. NO leaveStreamRoom is called.
-                // This drops the WebSocket connection instantly.
-                await page1.close();
-                console.log("[Test] Page 1 closed abruptly (WebSocket connection dropped).");
-
-                // --- STEP 3: Reconnect & Verify (Device 2) ---
-                // User opens a new tab or restarts the app
-                const page2 = await createContextPage();
-                await initPage(page2);
-
-                console.log("[Test] Reconnecting from a new session...");
-                await connectUserToBridge(page2, users.u1, backend.bridgeUrl, testData.solutionId);
-
-                // --- STEP 4: Poll for server-side cleanup ---
-                console.log("[Test] Polling for room closure. Waiting for server cleanup job...");
-
-                const isClosed = await page2.evaluate(
-                    async ({ roomId }) => {
-                        const api = window.streamApi!;
-                        const start = Date.now();
-
-                        // Poll for up to 20 seconds
-                        // (Server needs to detect WS drop, remove sessions, then 15s sweep job runs)
-                        while (Date.now() - start < 20000) {
-                            try {
-                                const room = await api.getStreamRoom(roomId);
-                                if (room.closed) {
-                                    return true;
-                                }
-                            } catch (e) {
-                                console.warn("Error fetching room info:", e);
-                            }
-                            // Check every 2 seconds
-                            await new Promise((r) => setTimeout(r, 2000));
-                        }
-                        return false;
-                    },
-                    { roomId },
-                );
-
-                if (!isClosed) {
-                    throw new Error(
-                        `Room ${roomId} did not close automatically after an abrupt disconnect within 45 seconds. The cleanup job may have failed.`,
-                    );
+                    } catch (e) {
+                        console.warn("Error fetching room info:", e);
+                    }
+                    // Check every 2 seconds
+                    await new Promise((r) => setTimeout(r, 2000));
                 }
+                return false;
+            },
+            { roomId },
+        );
 
-                console.log("[Test] SUCCESS: Room correctly auto-closed after hangup.");
-            });
-        },
-    );
+        if (!isClosed) {
+            throw new Error(
+                `Room ${roomId} did not close automatically after an abrupt disconnect within 45 seconds. The cleanup job may have failed.`,
+            );
+        }
+
+        console.log("[Test] SUCCESS: Room correctly auto-closed after hangup.");
+    });
 });
