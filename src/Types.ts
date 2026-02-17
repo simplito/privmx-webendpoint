@@ -10,7 +10,8 @@ limitations under the License.
 */
 
 import { ExtKey } from "./service/ExtKey";
-import { StreamRoomId } from "./webStreams/types/ApiTypes";
+import * as StreamsApiTypes from "./webStreams/types/ApiTypes";
+
 
 // export namespace core {
 export type SortOrder = "desc" | "asc";
@@ -623,6 +624,10 @@ export interface ItemPolicy {
     delete?: PolicyEntry;
 }
 
+export type StreamId = StreamsApiTypes.StreamId;
+export type StreamRoomId = StreamsApiTypes.StreamRoomId;
+export type StreamHandle = number & { _streamHandle: never };
+
 export interface StreamRoom {
     contextId: string;
     streamRoomId: string;
@@ -744,10 +749,6 @@ export interface StreamSubscription {
     streamTrackId?: string;
 }
 
-export interface StreamSubscriptionWithCallback extends StreamSubscription {
-    onRemoteTrack: (track: RTCTrackEvent) => void;
-}
-
 export interface TurnCredentials {
     url: string;
     username: string;
@@ -755,7 +756,11 @@ export interface TurnCredentials {
     expirationTime: number;
 }
 
-export type StreamHandle = number & { _streamHandle: never };
+export interface RemoteStreamListener {
+    streamRoomId: StreamRoomId;
+    streamId?: StreamId;
+    onRemoteStreamTrack: (event: RTCTrackEvent) => void;
+}
 
 /**
  * PKI Verification options
