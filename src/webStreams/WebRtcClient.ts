@@ -7,17 +7,18 @@ import {
     RemoteStreamListener,
     SessionId,
 } from "./WebRtcClientTypes";
-import { FrameInfo, WebWorker } from "./WebWorkerHelper";
+import { WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
-import { Key, TurnCredentials } from "../Types";
+import { Key, StreamSubscription, StreamSubscriptionWithCallback, TurnCredentials, StreamHandle } from "../Types";
 import { KeyStore } from "./KeyStore";
 import { PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
-import { StreamRoomId } from "./types/ApiTypes";
+import { StreamId, StreamRoomId } from "./types/ApiTypes";
 import { Queue } from "./Queue";
 import { Jsep } from "../service/WebRtcInterface";
 import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
 import { ActiveSpeakerDetector, DEFAULTS, SpeakerState } from "./audio/ActiveSpeakerDetector";
+import { StateChangeDispatcher } from "../service/EventDispatcher";
 
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
@@ -35,9 +36,14 @@ export interface UserAudioStats {
     active: boolean;
 }
 
+export interface WebRtcStateEvents {
+    connected: {streamId: StreamId};
+}
+
 export interface AudioLevelsStats {
     levels: SpeakerState[];
 }
+
 
 type AudioLevelFuncCallback = (changes: AudioLevelsStats) => void;
 export class WebRtcClient {
@@ -50,10 +56,12 @@ export class WebRtcClient {
     private configuration: RTCConfiguration | undefined;
     private keyStore: KeyStore = new KeyStore();
 
+    private publishStreamHandle: StreamHandle;
+
     // to moze byc uzyte kiedy wymagany jest update credentials (jak straca waznosc)
     private peerCredentials: TurnCredentials[] | undefined;
 
-    private onRemoteTrackListeners: { [roomId: StreamRoomId]: RemoteStreamListener } = {};
+    private remoteTrackListeners: Map<StreamRoomId, Map<number, StreamSubscriptionWithCallback[]>> = new Map();
     private peerConnectionsManager: PeerConnectionManager;
     private streamsApiInterface: StreamsCallbackInterface;
     private activeSpeakerDetector: ActiveSpeakerDetector;
@@ -66,7 +74,7 @@ export class WebRtcClient {
     private peerConnectionReconfigureQueue: Queue<QueueItem> | undefined;
     public lastProcessedAnswer: { [roomId: string]: Jsep } = {};
     private lastMeasuredLocalRMS: number = -99;
-    // private subscriberAttachedProcessing: boolean = false;
+    private eventsDispatcher: StateChangeDispatcher = new StateChangeDispatcher();
 
     constructor(private assetsDir: string) {
         this.uniqId = "" + Math.random() + "-" + Math.random();
@@ -103,11 +111,28 @@ export class WebRtcClient {
         this.streamsApiInterface = streamsApiInterface;
     }
 
-    public addRemoteStreamListener(roomId: StreamRoomId, listener: RemoteStreamListener) {
-        if (roomId in this.onRemoteTrackListeners) {
-            return;
+    public addRemoteStreamListener(roomId: StreamRoomId, subscriptions: StreamSubscriptionWithCallback[]) {
+        let roomMap = this.remoteTrackListeners.get(roomId);
+
+        if (!roomMap) {
+            roomMap = new Map();
+            this.remoteTrackListeners.set(roomId, roomMap);
         }
-        this.onRemoteTrackListeners[roomId] = listener;
+
+        for (const sub of subscriptions) {
+            let list = roomMap.get(sub.streamId);
+
+            if (!list) {
+                list = [];
+                roomMap.set(sub.streamId, list);
+            }
+
+            list.push(sub);
+        }
+    }
+
+    public getStreamStateChangeDispatcher() {
+        return this.eventsDispatcher;
     }
 
     public getConnectionManager() {
@@ -115,6 +140,10 @@ export class WebRtcClient {
             throw new Error("No peerConnectionManager initialized.");
         }
         return this.peerConnectionsManager;
+    }
+
+    public getWebRtcEventDispatcher() {
+        return this.eventsDispatcher;
     }
 
     protected getEncKey(): Key {
@@ -234,9 +263,11 @@ export class WebRtcClient {
     // }
 
     async createPeerConnectionWithLocalStream(
+        streamHandle: StreamHandle,
         streamRoomId: StreamRoomId,
         stream: MediaStream,
     ): Promise<RTCPeerConnection> {
+        this.publishStreamHandle = streamHandle;
         // this.peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
 
@@ -512,6 +543,7 @@ export class WebRtcClient {
             } else {
                 this.logger.log("info", "connection state: ", connection.connectionState);
             }
+            this.eventsDispatcher.emit({streamHandle: this.publishStreamHandle, state: connection.connectionState});
         });
         connection.addEventListener("datachannel", (event) => {
             this.logger.log("info", "datachannel: ", event);
@@ -759,29 +791,25 @@ export class WebRtcClient {
         await this.setupReceiverTransform(receiver, publisherId, worker);
         track.addEventListener("ended", async () => await this.teardownReceiver(receiver, worker));
 
-        // if ((window as any).RTCRtpScriptTransform) {
-        //     const options = {
-        //         operation: 'decode',
-        //         kind: track.kind
-        //     };
+        this.callRegisteredListeners(roomId, event);
+    }
 
-        //     (receiver as any).transform = new RTCRtpScriptTransform(worker, options);
-        // } else {
-        //     console.log("receiver", receiver);
-        //     const receiverStreams = (receiver as any).createEncodedStreams();
-
-        //     worker.postMessage({
-        //         operation: 'decode',
-        //         readableStream: receiverStreams.readable,
-        //         writableStream: receiverStreams.writable,
-        //     }, [ receiverStreams.readable, receiverStreams.writable ]);
-
-        //     console.log({receiver, receiverStreams, track, key});
-        // }
-        if (!(roomId in this.onRemoteTrackListeners)) {
-            throw new Error("No remoteTrack listener registered for room: " + roomId);
+    private callRegisteredListeners(roomId: StreamRoomId, event: RTCTrackEvent) {
+        const remoteStreamId = Number(event.streams[0].id);
+        const listeners = this.remoteTrackListeners.get(roomId);
+        if (!listeners) {
+            this.logger.log("info", "No remoteTrack listener registered for room: " + roomId);
+            return;
         }
-        this.onRemoteTrackListeners[roomId](event);
+        const streamListeners = listeners.get(remoteStreamId);
+        if (!streamListeners) {
+            return;
+        }
+        for (const subscription of streamListeners) {
+            if (subscription.onRemoteTrack && typeof(subscription.onRemoteTrack) === "function") {
+                subscription.onRemoteTrack(event);
+            }
+        }
     }
 
     // test
