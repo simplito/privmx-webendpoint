@@ -187,23 +187,17 @@ export class StreamApiNative extends BaseNative {
         ptr: number,
         args: [string, Types.StreamSubscription[]],
     ): Promise<void> {
-        const extArgs = [...args, {}];
         return this.runAsync<void>((taskId) =>
-            this.api.lib.StreamApi_subscribeToRemoteStreams(taskId, ptr, extArgs),
+            this.api.lib.StreamApi_subscribeToRemoteStreams(taskId, ptr, args),
         );
     }
 
     async modifyRemoteStreamsSubscriptions(
         ptr: number,
-        args: [
-            string,
-            Types.StreamSubscription[],
-            Types.StreamSubscription[],
-        ],
+        args: [string, Types.StreamSubscription[], Types.StreamSubscription[]],
     ): Promise<void> {
-        const extArgs = [...args, {}];
         return this.runAsync<void>((taskId) =>
-            this.api.lib.StreamApi_modifyRemoteStreamsSubscriptions(taskId, ptr, extArgs),
+            this.api.lib.StreamApi_modifyRemoteStreamsSubscriptions(taskId, ptr, args),
         );
     }
 
@@ -211,9 +205,8 @@ export class StreamApiNative extends BaseNative {
         ptr: number,
         args: [string, Types.StreamSubscription[]],
     ): Promise<void> {
-        const extArgs = [...args, {}];
         return this.runAsync<void>((taskId) =>
-            this.api.lib.StreamApi_unsubscribeFromRemoteStreams(taskId, ptr, extArgs),
+            this.api.lib.StreamApi_unsubscribeFromRemoteStreams(taskId, ptr, args),
         );
     }
 

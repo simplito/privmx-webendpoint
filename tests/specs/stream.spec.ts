@@ -2,9 +2,9 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
-import type { Endpoint, StreamApi } from "../../src";
+import type { Endpoint, StreamApi, Types } from "../../src";
 import { StreamRoomId, StreamTrackMeta } from "../../src/webStreams/types/ApiTypes";
-import { SortOrder, StreamHandle } from "../../src/Types";
+import { SortOrder, StreamHandle, StreamInfo } from "../../src/Types";
 
 interface TestUser {
     id: string;
@@ -819,7 +819,6 @@ test.describe("StreamTest", () => {
             await streamApi.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
             await streamApi.publishStream(handle);
 
-
             ///// ROOM 2 /////
             const sId2 = await streamApi.createStreamRoom(
                 contextId,
@@ -836,7 +835,6 @@ test.describe("StreamTest", () => {
             await streamApi.addStreamTrack(handle2, { track: stream.getAudioTracks()[0] });
             await streamApi.addStreamTrack(handle2, { track: stream.getVideoTracks()[0] });
             await streamApi.publishStream(handle2);
-
 
             return { success: true };
         }, args);
@@ -872,14 +870,13 @@ test.describe("StreamTest", () => {
             await streamApi.joinStreamRoom(sId);
             const handle = await streamApi.createStream(sId);
 
-
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
             await streamApi.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
             await streamApi.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
 
             const publishStates: string[] = [];
 
-            await streamApi.publishStream(handle, onStateChange => {
+            await streamApi.publishStream(handle, (onStateChange) => {
                 publishStates.push(onStateChange);
             });
 
@@ -890,7 +887,7 @@ test.describe("StreamTest", () => {
                     break;
                 }
             }
-            
+
             if (publishStates.length === 0) {
                 throw new Error("Did not receive state change on publishStream() callback..");
             }
@@ -916,25 +913,21 @@ test.describe("StreamTest", () => {
         const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
             const Endpoint = window.Endpoint;
 
-            console.log("1");
             // Setup User 1 (The Publisher)
             const connection1 = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
             const api1 = await Endpoint.createStreamApi(
                 connection1,
                 await Endpoint.createEventApi(connection1),
             );
-            console.log("2");
             // Setup User 2 (The Watcher/Publisher - keeps room alive)
             const connection2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
             const api2 = await Endpoint.createStreamApi(
                 connection2,
                 await Endpoint.createEventApi(connection2),
             );
-            console.log("3");
 
             const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
             const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
-            console.log("4");
 
             const sId = await api1.createStreamRoom(
                 contextId,
@@ -943,27 +936,19 @@ test.describe("StreamTest", () => {
                 new TextEncoder().encode("p"),
                 new TextEncoder().encode("p"),
             );
-            console.log("5");
 
             // User 2 joins AND publishes to keep the room alive
             await api2.joinStreamRoom(sId);
-            console.log("6");
             const u2Handle = await api2.createStream(sId);
-            console.log("6.1");
             const u2Stream = await navigator.mediaDevices.getUserMedia({
                 audio: true,
                 video: true,
             });
-            console.log("6.2");
             await api2.addStreamTrack(u2Handle, { track: u2Stream.getAudioTracks()[0] });
-            console.log("6.3");
             await api2.addStreamTrack(u2Handle, { track: u2Stream.getVideoTracks()[0] });
-            console.log("6.4");
             await api2.publishStream(u2Handle);
-            console.log("6.5");
             // User 1 operations
             await api1.joinStreamRoom(sId);
-            console.log("6.6");
             const handle = await api1.createStream(sId);
 
             const expectError = async (fn: any) => {
@@ -975,20 +960,16 @@ test.describe("StreamTest", () => {
                 throw new Error("Expected error");
             };
 
-            console.log("7");
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
             await api1.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
             await api1.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
-            console.log("8");
 
             // Publish
             await api1.publishStream(handle);
             await new Promise<void>((resolve) => setTimeout(resolve, 3000));
-            console.log("9");
 
             // Unpublish
             await api1.unpublishStream(handle);
-            console.log("10");
 
             // Expect Error when publishing on the same destroyed handle
             await expectError(async () => {
@@ -1170,17 +1151,14 @@ test.describe("StreamTest", () => {
             };
 
             // Empty
-            await expectError(
-                async () => await streamApi.subscribeToRemoteStreams(sId, []),
-            );
+            await expectError(async () => await streamApi.subscribeToRemoteStreams(sId, []));
 
             // Invalid
             await expectError(
                 async () =>
-                    await streamApi.subscribeToRemoteStreams(
-                        sId,
-                        [{ streamId: -1, streamTrackId: "inv", onRemoteTrack: () => {} }],
-                    ),
+                    await streamApi.subscribeToRemoteStreams(sId, [
+                        { streamId: -1, streamTrackId: "inv" },
+                    ]),
             );
 
             // Valid (Need published stream)
@@ -1192,10 +1170,9 @@ test.describe("StreamTest", () => {
             const streams = await streamApi.listStreams(sId);
             if (streams.length > 0) {
                 const s = streams[0];
-                await streamApi.subscribeToRemoteStreams(
-                    sId,
-                    [{ streamId: s.id, streamTrackId: s.tracks[0].mid, onRemoteTrack: () => {} }],
-                );
+                await streamApi.subscribeToRemoteStreams(sId, [
+                    { streamId: s.id, streamTrackId: s.tracks[0].mid },
+                ]);
             }
 
             return { success: true };
@@ -1240,9 +1217,7 @@ test.describe("StreamTest", () => {
             };
 
             // Empty
-            await expectError(
-                async () => await streamApi.unsubscribeFromRemoteStreams(sId, []),
-            );
+            await expectError(async () => await streamApi.unsubscribeFromRemoteStreams(sId, []));
 
             // Publish & Subscribe first
             const handle = await streamApi.createStream(sId);
@@ -1252,16 +1227,15 @@ test.describe("StreamTest", () => {
 
             const streams = await streamApi.listStreams(sId);
             if (streams.length > 0) {
-                const sub = [{ streamId: streams[0].id, trackId: streams[0].tracks[0].mid, onRemoteTrack: () => {} }];
+                const sub = [{ streamId: streams[0].id, trackId: streams[0].tracks[0].mid }];
                 await streamApi.subscribeToRemoteStreams(sId, sub);
 
                 // Invalid Unsub
                 await expectError(
                     async () =>
-                        await streamApi.unsubscribeFromRemoteStreams(
-                            sId,
-                            [{ streamId: -1, streamTrackId: "inv" }],
-                        ),
+                        await streamApi.unsubscribeFromRemoteStreams(sId, [
+                            { streamId: -1, streamTrackId: "inv" },
+                        ]),
                 );
 
                 // Valid Unsub
@@ -1421,7 +1395,13 @@ test.describe("StreamTest", () => {
 
             const streams = await streamApi.listStreams(sId);
             if (streams.length === 0) return { success: true };
-            const sub = [{ streamId: streams[0].id, trackId: streams[0].tracks[0].mid, onRemoteTrack: () => {} }];
+            const sub = [
+                {
+                    streamId: streams[0].id,
+                    trackId: streams[0].tracks[0].mid,
+                    onRemoteTrack: () => {},
+                },
+            ];
             const expectError = async (fn: any) => {
                 try {
                     await fn();
@@ -1441,7 +1421,7 @@ test.describe("StreamTest", () => {
                 async () =>
                     await streamApi.modifyRemoteStreamsSubscriptions(
                         sId,
-                        [{ streamId: -1, streamTrackId: "inv", onRemoteTrack: () => {} }],
+                        [{ streamId: -1, streamTrackId: "inv" }],
                         [],
                     ),
             );
@@ -1559,10 +1539,13 @@ test.describe("StreamTest", () => {
                         document.body.appendChild(mediaEl);
                     };
 
+                    api.addRemoteStreamListener({
+                        onRemoteStreamTrack: onRemoteTrack,
+                        streamRoomId: roomId,
+                    });
                     const subs = targetStream.tracks.map((t: any) => ({
                         streamId: targetStream.id,
-                        trackId: t.mid,
-                        onRemoteTrack: onRemoteTrack
+                        streamTrackId: t.mid,
                     }));
 
                     await api.subscribeToRemoteStreams(roomId, subs);
@@ -1592,7 +1575,7 @@ test.describe("StreamTest", () => {
                 return video.currentTime > start;
             });
 
-            if (!isMoving) console.warn("Video stuck. Check fake-device args.");
+            if (!isMoving) throw new Error("Video stuck");
         });
     });
 
@@ -1611,7 +1594,6 @@ test.describe("StreamTest", () => {
 
         const page3 = await createContextPage();
         await initPage(page3);
-
 
         await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
         await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
@@ -1704,29 +1686,25 @@ test.describe("StreamTest", () => {
 
                     const sub1 = {
                         streamId: remoteStreams[0].id,
-                        onRemoteTrack: (event: RTCTrackEvent) => recvTracksFromUser.push(1)    
+                        onRemoteTrack: (event: RTCTrackEvent) => recvTracksFromUser.push(1),
                     };
                     const sub2 = {
                         streamId: remoteStreams[1].id,
-                        onRemoteTrack: (event: RTCTrackEvent) => recvTracksFromUser.push(2)    
+                        onRemoteTrack: (event: RTCTrackEvent) => recvTracksFromUser.push(2),
                     };
                     await api.subscribeToRemoteStreams(roomId, [sub1, sub2]);
-                    await new Promise((r) => setTimeout(r, 5000))
+                    await new Promise((r) => setTimeout(r, 5000));
                     // test
                     if (recvTracksFromUser.length > 1) {
                         if (new Set(recvTracksFromUser).size < 2) {
-                            throw new Error("Just one callback fired on two subscriptions")
+                            throw new Error("Just one callback fired on two subscriptions");
                         }
                     }
-
                 },
                 { roomId },
             );
-        });        
-
+        });
     });
-
-
 
     test("E2E: Renegotiation - Add Video Mid-Call", async ({ createContextPage, backend, cli }) => {
         const page1 = await createContextPage();
@@ -1813,7 +1791,7 @@ test.describe("StreamTest", () => {
                     const api = window.streamApi!;
                     await api.joinStreamRoom(roomId);
 
-                    let remote: any[] = [];
+                    let remote: StreamInfo[] = [];
                     for (let i = 0; i < 10; i++) {
                         remote = await api.listStreams(roomId);
                         if (remote.length > 0) break;
@@ -1832,7 +1810,15 @@ test.describe("StreamTest", () => {
                     };
 
                     const s = remote[0];
-                    const subs = s.tracks.map((t: any) => ({ streamId: s.id, trackId: t.mid, onRemoteTrack: onRemoteTrack }));
+
+                    api.addRemoteStreamListener({
+                        onRemoteStreamTrack: onRemoteTrack,
+                        streamRoomId: roomId,
+                    });
+                    const subs = s.tracks
+                        .filter((x) => x.type === "audio")
+                        .map((t) => ({ streamId: s.id, streamTrackId: t.mid }));
+                    await api.subscribeToRemoteStreams(roomId, subs);
                 },
                 { roomId },
             );
@@ -1870,16 +1856,22 @@ test.describe("StreamTest", () => {
 
                     const onRemoteTrack = (e: any) => {
                         const el = document.createElement("video");
-                        el.id = "remote-video";
+                        el.id = "remote-video-2";
                         el.autoplay = true;
                         el.srcObject = e.streams[0] || new MediaStream([e.track]);
                         document.body.appendChild(el);
                     };
 
+                    api.addRemoteStreamListener({
+                        onRemoteStreamTrack: onRemoteTrack,
+                        streamRoomId: roomId,
+                        streamId: remote[0].id as Types.StreamId,
+                    });
+
                     if (vTrack) {
                         await api.modifyRemoteStreamsSubscriptions(
                             roomId,
-                            [{ streamId: remote[0].id, streamTrackId: vTrack.mid, onRemoteTrack }],
+                            [{ streamId: remote[0].id, streamTrackId: vTrack.mid }],
                             [],
                         );
                     }
@@ -1887,11 +1879,11 @@ test.describe("StreamTest", () => {
                 { roomId },
             );
 
-            const vid = page2.locator("#remote-video");
+            const vid = page2.locator("#remote-video-2");
             await vid.waitFor({ state: "attached", timeout: 10000 });
 
             await page2.waitForFunction(() => {
-                const v = document.getElementById("remote-video") as HTMLVideoElement;
+                const v = document.getElementById("remote-video-2") as HTMLVideoElement;
                 return v && v.readyState === 4 && v.videoWidth > 0 && !v.paused;
             });
         });
@@ -1964,10 +1956,14 @@ test.describe("StreamTest", () => {
                     v.srcObject = e.streams[0];
                 };
 
-                await api.subscribeToRemoteStreams(
-                    roomId,
-                    [{ streamId: firstStream.id, streamTrackId: firstStream.tracks[0].mid, onRemoteTrack }],
-                );
+                api.addRemoteStreamListener({
+                    onRemoteStreamTrack: onRemoteTrack,
+                    streamRoomId: roomId,
+                    streamId: firstStream.id as Types.StreamId,
+                });
+                await api.subscribeToRemoteStreams(roomId, [
+                    { streamId: firstStream.id, streamTrackId: firstStream.tracks[0].mid },
+                ]);
 
                 // 3. User 2 PUBLISHES to keep the room alive during U1's crash/reload
                 const u2Handle = await api.createStream(roomId);
@@ -2024,13 +2020,26 @@ test.describe("StreamTest", () => {
                     if (newStream) break;
                     await new Promise((r) => setTimeout(r, 500));
                 }
-
+                const onRemoteTrack = (e: RTCTrackEvent) => {
+                    let v = document.getElementById("remote-video") as HTMLVideoElement;
+                    if (!v) {
+                        v = document.createElement("video");
+                        v.id = "remote-video";
+                        v.autoplay = true;
+                        v.playsInline = true;
+                        document.body.appendChild(v);
+                    }
+                    v.srcObject = e.streams[0];
+                };
                 if (!newStream) throw new Error("New stream never appeared");
-
-                await api.subscribeToRemoteStreams(
-                    roomId,
-                    [{ streamId: newStream.id, streamTrackId: newStream.tracks[0].mid, onRemoteTrack: () => {} }],
-                );
+                api.addRemoteStreamListener({
+                    onRemoteStreamTrack: onRemoteTrack,
+                    streamRoomId: roomId,
+                    streamId: newStream.id as Types.StreamId,
+                });
+                await api.subscribeToRemoteStreams(roomId, [
+                    { streamId: newStream.id, streamTrackId: newStream.tracks[0].mid },
+                ]);
                 return newStream.id;
             },
             { roomId, initialStreamIds },
@@ -2114,10 +2123,14 @@ test.describe("StreamTest", () => {
                     };
                 };
 
-                await api.subscribeToRemoteStreams(
-                    roomId,
-                    [{ streamId: remote[0].id, streamTrackId: remote[0].tracks[0].mid, onRemoteTrack: onRemoteTrack }],
-                );
+                api.addRemoteStreamListener({
+                    onRemoteStreamTrack: onRemoteTrack,
+                    streamRoomId: roomId,
+                    streamId: remote[0].id as Types.StreamId,
+                });
+                await api.subscribeToRemoteStreams(roomId, [
+                    { streamId: remote[0].id, streamTrackId: remote[0].tracks[0].mid },
+                ]);
             },
             { roomId },
         );
@@ -2191,8 +2204,6 @@ test.describe("StreamTest", () => {
             { contextId, users },
         );
 
-        console.log(`[Test] Room Created: ${roomId}`);
-
         // --- STEP 2: Join Both Users ---
         await test.step("Join Users", async () => {
             // User 1 Joins
@@ -2229,7 +2240,6 @@ test.describe("StreamTest", () => {
 
         // --- STEP 4: Both Users Leave ---
         await test.step("Leave Users", async () => {
-            console.log("[Test] User 1 leaving...");
             await page1.evaluate(
                 async ({ roomId }) => {
                     await window.streamApi!.leaveStreamRoom(roomId);
@@ -2237,7 +2247,6 @@ test.describe("StreamTest", () => {
                 { roomId },
             );
 
-            console.log("[Test] User 2 leaving...");
             await page2.evaluate(
                 async ({ roomId }) => {
                     await window.streamApi!.leaveStreamRoom(roomId);
@@ -2248,8 +2257,6 @@ test.describe("StreamTest", () => {
 
         // --- STEP 5: Wait & Verify Closure ---
         await test.step("Verify Room Closure", async () => {
-            console.log("[Test] Waiting for room to close (Polling)...");
-
             // We use page1 to poll status (assuming API client is still valid after leave)
             // If strictly disconnected, we might need a fresh connection or check via HTTP if available.
             // Assuming `getStreamRoom` works without being inside the room (which is standard).
@@ -2268,7 +2275,6 @@ test.describe("StreamTest", () => {
                         } catch (e) {
                             console.warn("Error fetching room info:", e);
                         }
-                        console.log(Date.now() - start);
                         // Wait 2s between checks
                         await new Promise((r) => setTimeout(r, 2000));
                     }
@@ -2280,7 +2286,6 @@ test.describe("StreamTest", () => {
             if (!isClosed) {
                 throw new Error(`Room ${roomId} did not close automatically within 30 seconds.`);
             }
-            console.log("[Test] SUCCESS: Room is closed.");
         });
     });
 
@@ -2320,7 +2325,6 @@ test.describe("StreamTest", () => {
             const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
 
             // 2. Create Room
-            console.log("[Test] Creating Room...");
             const sId = await api.createStreamRoom(
                 contextId,
                 [u1Obj],
@@ -2330,7 +2334,6 @@ test.describe("StreamTest", () => {
             );
 
             // 3. Make it ACTIVE (Publish Stream)
-            console.log("[Test] Joining & Publishing to make room ACTIVE...");
             await api.joinStreamRoom(sId);
 
             const handle = await api.createStream(sId);
@@ -2342,11 +2345,9 @@ test.describe("StreamTest", () => {
             await new Promise((r) => setTimeout(r, 2000));
 
             // 4. Abandon Room (Leave)
-            console.log("[Test] Leaving room to trigger auto-close...");
             await api.leaveStreamRoom(sId);
 
             // 5. Wait for Server Auto-Close (Polling)
-            console.log("[Test] Polling for room closure...");
             const start = Date.now();
             let isClosed = false;
 
@@ -2355,7 +2356,6 @@ test.describe("StreamTest", () => {
                 const room = await api.getStreamRoom(sId);
                 if (room.closed) {
                     isClosed = true;
-                    console.log(`[Test] Room ${sId} is now CLOSED.`);
                     break;
                 }
                 await new Promise((r) => setTimeout(r, 2000));
@@ -2378,10 +2378,7 @@ test.describe("StreamTest", () => {
             // C. Attempt to SUBSCRIBE (Direct call check)
             // Server: subscribeToRemoteStreams -> ensureActiveStreamRoom -> throws STREAM_ROOM_CLOSED
             // We pass dummy args just to hit the server check
-            await expectFailure(
-                "Subscribe",
-                api.subscribeToRemoteStreams(sId, []),
-            );
+            await expectFailure("Subscribe", api.subscribeToRemoteStreams(sId, []));
 
             // Note: We cannot test "Publish" directly here because `publishStream` requires
             // a valid `handle` from `createStream`, which requires `joinStreamRoom` to succeed first.
@@ -2431,7 +2428,6 @@ test.describe("StreamTest", () => {
             };
 
             // 1. Create 3 distinct rooms
-            console.log("[Test] Creating 3 rooms...");
             const roomA = await createAndActivateRoom("Room-A-To-Close");
             const roomB = await createAndActivateRoom("Room-B-To-Close");
             const roomC = await createAndActivateRoom("Room-C-To-Keep");
@@ -2440,12 +2436,10 @@ test.describe("StreamTest", () => {
             await new Promise((r) => setTimeout(r, 2000));
 
             // 2. Abandon Room A and Room B, but stay in Room C
-            console.log("[Test] Leaving Room A and Room B...");
             await api.leaveStreamRoom(roomA);
             await api.leaveStreamRoom(roomB);
 
             // 3. Poll for cleanup (Wait up to 45s)
-            console.log("[Test] Polling for cleanup job...");
             const start = Date.now();
             let aClosed = false;
             let bClosed = false;
@@ -2469,7 +2463,6 @@ test.describe("StreamTest", () => {
             }
 
             // 4. Verify Room C is still OPEN
-            console.log("[Test] Verifying Room C is untouched...");
             const rC = await api.getStreamRoom(roomC);
             if (rC.closed) {
                 throw new Error(
@@ -2477,7 +2470,6 @@ test.describe("StreamTest", () => {
                 );
             }
 
-            console.log("[Test] Success: Only abandoned rooms were closed.");
             return true;
         }, args);
     });
@@ -2585,7 +2577,6 @@ test.describe("StreamTest", () => {
                 { sharedRoomId },
             );
 
-            console.log("Waiting 20s to ensure server sweep passes...");
             await page1.waitForTimeout(20000); // Give the 15s job time to run
 
             // Verify it is STILL OPEN because U2 is inside and publishing
@@ -2609,7 +2600,6 @@ test.describe("StreamTest", () => {
                 { sharedRoomId },
             );
 
-            console.log("Polling for final closure...");
             const isClosed = await page2.evaluate(
                 async ({ sharedRoomId }) => {
                     const start = Date.now();
@@ -2684,8 +2674,6 @@ test.describe("StreamTest", () => {
             { contextId: testData.contextId, users },
         );
 
-        console.log(`[Test] Room ${roomId} created and ACTIVE. Simulating crash...`);
-
         // Give the server a moment to fully register the publisher state
         await page1.waitForTimeout(2000);
 
@@ -2693,18 +2681,15 @@ test.describe("StreamTest", () => {
         // We close the page abruptly. NO leaveStreamRoom is called.
         // This drops the WebSocket connection instantly.
         await page1.close();
-        console.log("[Test] Page 1 closed abruptly (WebSocket connection dropped).");
 
         // --- STEP 3: Reconnect & Verify (Device 2) ---
         // User opens a new tab or restarts the app
         const page2 = await createContextPage();
         await initPage(page2);
 
-        console.log("[Test] Reconnecting from a new session...");
         await connectUserToBridge(page2, users.u1, backend.bridgeUrl, testData.solutionId);
 
         // --- STEP 4: Poll for server-side cleanup ---
-        console.log("[Test] Polling for room closure. Waiting for server cleanup job...");
 
         const isClosed = await page2.evaluate(
             async ({ roomId }) => {
@@ -2734,7 +2719,5 @@ test.describe("StreamTest", () => {
                 `Room ${roomId} did not close automatically after an abrupt disconnect within 45 seconds. The cleanup job may have failed.`,
             );
         }
-
-        console.log("[Test] SUCCESS: Room correctly auto-closed after hangup.");
     });
 });
