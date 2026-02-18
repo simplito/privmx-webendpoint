@@ -22,6 +22,7 @@ import {
     StreamHandle,
     StreamSubscription,
     StreamPublishResult,
+    RemoteStreamListener,
 } from "../Types";
 import { StreamApiNative } from "../api/StreamApiNative";
 import { Buffer } from "buffer";
@@ -337,12 +338,11 @@ export class StreamApi extends BaseApi {
 
     async subscribeToRemoteStreams(
         streamRoomId: Types.StreamRoomId,
-        subscriptions: EndpointTypes.StreamSubscriptionWithCallback[],
+        subscriptions: EndpointTypes.StreamSubscription[],
     ): Promise<void> {
         // native part
         const peerCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(peerCredentials);
-        this.client.addRemoteStreamListener(streamRoomId, subscriptions);
 
         // server / core part
         await this.native.subscribeToRemoteStreams(this.servicePtr, [
@@ -354,10 +354,9 @@ export class StreamApi extends BaseApi {
 
     async modifyRemoteStreamsSubscriptions(
         streamRoomId: Types.StreamRoomId,
-        subscriptionsToAdd: EndpointTypes.StreamSubscriptionWithCallback[],
+        subscriptionsToAdd: EndpointTypes.StreamSubscription[],
         subscriptionsToRemove: StreamSubscription[],
     ): Promise<void> {
-        this.client.addRemoteStreamListener(streamRoomId, subscriptionsToAdd);
         await this.native.modifyRemoteStreamsSubscriptions(this.servicePtr, [
             streamRoomId,
             subscriptionsToAdd,
@@ -373,6 +372,10 @@ export class StreamApi extends BaseApi {
             streamRoomId,
             subscriptions,
         ]);
+    }
+
+    addRemoteStreamListener(listener: RemoteStreamListener) {
+        this.client.addRemoteStreamListener(listener);
     }
 
     /**

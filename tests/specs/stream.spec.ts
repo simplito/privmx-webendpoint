@@ -2,9 +2,9 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
-import type { Endpoint, StreamApi } from "../../src";
+import type { Endpoint, StreamApi, Types } from "../../src";
 import { StreamRoomId, StreamTrackMeta } from "../../src/webStreams/types/ApiTypes";
-import { SortOrder, StreamHandle } from "../../src/Types";
+import { SortOrder, StreamHandle, StreamInfo } from "../../src/Types";
 
 interface TestUser {
     id: string;
@@ -1101,7 +1101,7 @@ test.describe("StreamTest", () => {
                 async () =>
                     await streamApi.subscribeToRemoteStreams(
                         sId,
-                        [{ streamId: -1, streamTrackId: "inv", onRemoteTrack: () => {} }],
+                        [{ streamId: -1, streamTrackId: "inv"}],
                     ),
             );
 
@@ -1116,7 +1116,7 @@ test.describe("StreamTest", () => {
                 const s = streams[0];
                 await streamApi.subscribeToRemoteStreams(
                     sId,
-                    [{ streamId: s.id, streamTrackId: s.tracks[0].mid, onRemoteTrack: () => {} }],
+                    [{ streamId: s.id, streamTrackId: s.tracks[0].mid }],
                 );
             }
 
@@ -1126,6 +1126,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
+    // this will pass after fix merge: https://github.com/simplito/privmx-endpoint/pull/365
     test.skip("unsubscribeFromRemoteStreams: validations", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
@@ -1174,7 +1175,7 @@ test.describe("StreamTest", () => {
 
             const streams = await streamApi.listStreams(sId);
             if (streams.length > 0) {
-                const sub = [{ streamId: streams[0].id, trackId: streams[0].tracks[0].mid, onRemoteTrack: () => {} }];
+                const sub = [{ streamId: streams[0].id, trackId: streams[0].tracks[0].mid }];
                 await streamApi.subscribeToRemoteStreams(sId, sub);
 
                 // Invalid Unsub
@@ -1367,7 +1368,7 @@ test.describe("StreamTest", () => {
                 async () =>
                     await streamApi.modifyRemoteStreamsSubscriptions(
                         sId,
-                        [{ streamId: -1, streamTrackId: "inv", onRemoteTrack: () => {} }],
+                        [{ streamId: -1, streamTrackId: "inv" }],
                         [],
                     ),
             );
@@ -1489,10 +1490,13 @@ test.describe("StreamTest", () => {
                         document.body.appendChild(mediaEl);
                     };
 
+                    api.addRemoteStreamListener({
+                        onRemoteStreamTrack: onRemoteTrack,
+                        streamRoomId: roomId
+                    });
                     const subs = targetStream.tracks.map((t: any) => ({
                         streamId: targetStream.id,
-                        trackId: t.mid,
-                        onRemoteTrack: onRemoteTrack
+                        streamTrackId: t.mid
                     }));
 
                     await api.subscribeToRemoteStreams(roomId, subs);
@@ -1742,7 +1746,7 @@ test.describe("StreamTest", () => {
                     const api = window.streamApi!;
                     await api.joinStreamRoom(roomId);
 
-                    let remote: any[] = [];
+                    let remote: StreamInfo[] = [];
                     for (let i = 0; i < 10; i++) {
                         remote = await api.listStreams(roomId);
                         if (remote.length > 0) break;
@@ -1758,10 +1762,17 @@ test.describe("StreamTest", () => {
                         if (event.streams[0]) el.srcObject = event.streams[0];
                         else el.srcObject = new MediaStream([event.track]);
                         document.body.appendChild(el);
-                    };
+                    }
 
                     const s = remote[0];
-                    const subs = s.tracks.map((t: any) => ({ streamId: s.id, trackId: t.mid, onRemoteTrack: onRemoteTrack }));
+
+                    api.addRemoteStreamListener({
+                        onRemoteStreamTrack: onRemoteTrack,
+                        streamRoomId: roomId
+                    });
+                    const subs = s.tracks.filter(x => x.type === "audio").map(t => ({ streamId: s.id, streamTrackId: t.mid}));
+                    await api.subscribeToRemoteStreams(roomId, subs);
+
                 },
                 { roomId },
             );
@@ -1799,16 +1810,18 @@ test.describe("StreamTest", () => {
 
                     const onRemoteTrack = (e: any) => {
                         const el = document.createElement("video");
-                        el.id = "remote-video";
+                        el.id = "remote-video-2";
                         el.autoplay = true;
                         el.srcObject = e.streams[0] || new MediaStream([e.track]);
                         document.body.appendChild(el);
                     };
 
+                    api.addRemoteStreamListener({onRemoteStreamTrack: onRemoteTrack, streamRoomId: roomId, streamId: remote[0].id as Types.StreamId});
+
                     if (vTrack) {
                         await api.modifyRemoteStreamsSubscriptions(
                             roomId,
-                            [{ streamId: remote[0].id, streamTrackId: vTrack.mid, onRemoteTrack }],
+                            [{ streamId: remote[0].id, streamTrackId: vTrack.mid}],
                             [],
                         );
                     }
@@ -1816,11 +1829,11 @@ test.describe("StreamTest", () => {
                 { roomId },
             );
 
-            const vid = page2.locator("#remote-video");
+            const vid = page2.locator("#remote-video-2");
             await vid.waitFor({ state: "attached", timeout: 10000 });
 
             await page2.waitForFunction(() => {
-                const v = document.getElementById("remote-video") as HTMLVideoElement;
+                const v = document.getElementById("remote-video-2") as HTMLVideoElement;
                 return v && v.readyState === 4 && v.videoWidth > 0 && !v.paused;
             });
         });
@@ -1896,9 +1909,10 @@ test.describe("StreamTest", () => {
                     v.srcObject = e.streams[0];
                 };
 
+                api.addRemoteStreamListener({onRemoteStreamTrack: onRemoteTrack, streamRoomId: roomId, streamId: firstStream.id as Types.StreamId});
                 await api.subscribeToRemoteStreams(
                     roomId,
-                    [{ streamId: firstStream.id, streamTrackId: firstStream.tracks[0].mid, onRemoteTrack }],
+                    [{ streamId: firstStream.id, streamTrackId: firstStream.tracks[0].mid }],
                 );
                 return firstStream.id;
             },
@@ -1944,7 +1958,7 @@ test.describe("StreamTest", () => {
 
                 await api.subscribeToRemoteStreams(
                     roomId,
-                    [{ streamId: newStream.id, streamTrackId: newStream.tracks[0].mid, onRemoteTrack: () => {} }],
+                    [{ streamId: newStream.id, streamTrackId: newStream.tracks[0].mid }],
                 );
                 return newStream.id;
             },
@@ -2029,9 +2043,10 @@ test.describe("StreamTest", () => {
                     };
                 };
 
+                api.addRemoteStreamListener({onRemoteStreamTrack: onRemoteTrack, streamRoomId: roomId, streamId: remote[0].id as Types.StreamId});
                 await api.subscribeToRemoteStreams(
                     roomId,
-                    [{ streamId: remote[0].id, streamTrackId: remote[0].tracks[0].mid, onRemoteTrack: onRemoteTrack }],
+                    [{ streamId: remote[0].id, streamTrackId: remote[0].tracks[0].mid }],
                 );
             },
             { roomId },
