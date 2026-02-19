@@ -37,13 +37,13 @@ export async function setupTestUser(page: Page, cli: CliContext, contextIds: str
 export async function setupUsers(page: any, cli: CliContext) {
     const users = await page.evaluate(async () => {
         const cryptoApi = await window.Endpoint.createCryptoApi();
-        const users: {privKey: string, id: string, pubKey: string}[] = [];
+        const users: { privKey: string; id: string; pubKey: string }[] = [];
 
         for (let i = 0; i < 3; ++i) {
             const privKey = await cryptoApi.generatePrivateKey();
             const pubKey = await cryptoApi.derivePublicKey(privKey);
-            const id = `user-${i+1}-${Date.now()}`;
-            users.push({privKey, id, pubKey})
+            const id = `user-${i + 1}-${Date.now()}`;
+            users.push({ privKey, id, pubKey });
         }
         return users;
     });
@@ -55,9 +55,9 @@ export async function setupUsers(page: any, cli: CliContext) {
             userPubKey: u.pubKey,
         });
     }
-    const usersObj: {[id: string]: any} = {};
+    const usersObj: { [id: string]: any } = {};
     for (const [key, value] of users.entries()) {
-        usersObj[`u${key+1}`] = value;
+        usersObj[`u${key + 1}`] = value;
     }
     return usersObj;
 }

@@ -165,7 +165,9 @@ export class StreamApi extends BaseApi {
 
         let alreadyAddedId = "";
 
-        const tracksByHandle = Array.from(this.streamTracks.values()).filter(x => x.streamHandle === streamHandle);
+        const tracksByHandle = Array.from(this.streamTracks.values()).filter(
+            (x) => x.streamHandle === streamHandle,
+        );
 
         for (const streamTrack of tracksByHandle) {
             if (streamTrack.track && streamTrack.track?.id === meta.track?.id) {
@@ -236,7 +238,10 @@ export class StreamApi extends BaseApi {
         throw new Error("not implemented");
     }
 
-    public async publishStream(streamHandle: StreamHandle, onStreamState?: (state: RTCPeerConnectionState) => void): Promise<StreamPublishResult> {
+    public async publishStream(
+        streamHandle: StreamHandle,
+        onStreamState?: (state: RTCPeerConnectionState) => void,
+    ): Promise<StreamPublishResult> {
         const mediaTracks: MediaStreamTrack[] = [];
         for (const value of this.streamTracks.values()) {
             if (
@@ -258,10 +263,18 @@ export class StreamApi extends BaseApi {
         _stream.localMediaStream = mediaStream;
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(turnCredentials);
-        await this.client.createPeerConnectionWithLocalStream(streamHandle, _stream.streamRoomId, mediaStream);
-        
-        if (onStreamState && typeof(onStreamState) === "function") {
-            this.client.getStreamStateChangeDispatcher().addOnStateChangeListener({streamHandle: streamHandle}, (event) => onStreamState(event.state));
+        await this.client.createPeerConnectionWithLocalStream(
+            streamHandle,
+            _stream.streamRoomId,
+            mediaStream,
+        );
+
+        if (onStreamState && typeof onStreamState === "function") {
+            this.client
+                .getStreamStateChangeDispatcher()
+                .addOnStateChangeListener({ streamHandle: streamHandle }, (event) =>
+                    onStreamState(event.state),
+                );
         }
 
         const res = await this.native.publishStream(this.servicePtr, [streamHandle]);
@@ -326,14 +339,13 @@ export class StreamApi extends BaseApi {
         );
         this.streamTracks = filteredTracks;
 
-
         await this.native.unpublishStream(this.servicePtr, [streamHandle]);
         this.client.removeSenderPeerConnectionOnUnpublish(
             _stream.streamRoomId,
             _stream.localMediaStream,
         );
         this.streams.delete(streamHandle);
-        this.client.getStreamStateChangeDispatcher().removeOnStateChangeListener({streamHandle});
+        this.client.getStreamStateChangeDispatcher().removeOnStateChangeListener({ streamHandle });
     }
 
     async subscribeToRemoteStreams(
@@ -345,10 +357,7 @@ export class StreamApi extends BaseApi {
         await this.client.setTurnCredentials(peerCredentials);
 
         // server / core part
-        await this.native.subscribeToRemoteStreams(this.servicePtr, [
-            streamRoomId,
-            subscriptions,
-        ]);
+        await this.native.subscribeToRemoteStreams(this.servicePtr, [streamRoomId, subscriptions]);
         this.client.getConnectionManager().initialize(streamRoomId, "subscriber");
     }
 
@@ -366,7 +375,7 @@ export class StreamApi extends BaseApi {
 
     async unsubscribeFromRemoteStreams(
         streamRoomId: Types.StreamRoomId,
-        subscriptions: StreamSubscription[]
+        subscriptions: StreamSubscription[],
     ): Promise<void> {
         await this.native.unsubscribeFromRemoteStreams(this.servicePtr, [
             streamRoomId,

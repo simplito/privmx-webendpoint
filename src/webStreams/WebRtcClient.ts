@@ -35,13 +35,12 @@ export interface UserAudioStats {
 }
 
 export interface WebRtcStateEvents {
-    connected: {streamId: StreamId};
+    connected: { streamId: StreamId };
 }
 
 export interface AudioLevelsStats {
     levels: SpeakerState[];
 }
-
 
 type AudioLevelFuncCallback = (changes: AudioLevelsStats) => void;
 export class WebRtcClient {
@@ -112,7 +111,7 @@ export class WebRtcClient {
     public addRemoteStreamListener(listener: RemoteStreamListener) {
         let listeners = this.remoteStreamsListeners.get(listener.streamRoomId) || [];
 
-        const exists = listeners.find(x => x.streamId === listener.streamId);
+        const exists = listeners.find((x) => x.streamId === listener.streamId);
         if (exists) {
             throw new Error("RemoteStreamListener with given params already exists.");
         }
@@ -205,11 +204,9 @@ export class WebRtcClient {
         return this.configuration;
     }
 
-
     async setTurnCredentials(turnCredentials: TurnCredentials[]) {
         this.peerCredentials = turnCredentials;
     }
-
 
     async createPeerConnectionWithLocalStream(
         streamHandle: StreamHandle,
@@ -306,7 +303,6 @@ export class WebRtcClient {
         return pc;
     }
 
-
     // private async onSubscriberAttached(eventData: SignalingFromServer.SubscriberAttached) {
     // console.log("============> onSubscriberAttached",eventData);
     // // const peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
@@ -335,7 +331,6 @@ export class WebRtcClient {
     // await this.signalingApi?.acceptOffer(eventData.session_id, eventData.handle, answer);
     // }
 
-
     private createPeerConnectionMultiForRoom(
         roomId: StreamRoomId,
         configuration: RTCConfiguration & { encodedInsertableStreams?: boolean },
@@ -363,7 +358,10 @@ export class WebRtcClient {
             } else {
                 this.logger.log("info", "connection state: ", connection.connectionState);
             }
-            this.eventsDispatcher.emit({streamHandle: this.publishStreamHandle, state: connection.connectionState});
+            this.eventsDispatcher.emit({
+                streamHandle: this.publishStreamHandle,
+                state: connection.connectionState,
+            });
         });
         connection.addEventListener("datachannel", (event) => {
             this.logger.log("info", "datachannel: ", event);
@@ -382,7 +380,7 @@ export class WebRtcClient {
             this.logger.log("info", "signalingstatechange: ", event);
         });
         connection.addEventListener("track", async (event) => {
-             await this.addRemoteTrack(roomId, event /*, mappedPublisher*/);
+            await this.addRemoteTrack(roomId, event /*, mappedPublisher*/);
         });
 
         return connection;
@@ -583,9 +581,14 @@ export class WebRtcClient {
             this.logger.log("info", "No remoteTrack listener registered for room: " + roomId);
             return;
         }
-        const filteredListeners = listeners.filter(x => x.streamId === remoteStreamId || x.streamId === undefined);
+        const filteredListeners = listeners.filter(
+            (x) => x.streamId === remoteStreamId || x.streamId === undefined,
+        );
         for (const listener of filteredListeners) {
-            if (listener.onRemoteStreamTrack && typeof(listener.onRemoteStreamTrack) === "function") {
+            if (
+                listener.onRemoteStreamTrack &&
+                typeof listener.onRemoteStreamTrack === "function"
+            ) {
                 listener.onRemoteStreamTrack(event);
             }
         }
@@ -643,6 +646,4 @@ export class WebRtcClient {
         this.lastProcessedAnswer[room] = answer as Jsep;
         return answer as Jsep;
     }
-
 }
-

@@ -3,11 +3,11 @@ import { StreamHandle } from "../Types";
 export interface StateChangeEvent {
     streamHandle: StreamHandle;
     state: RTCPeerConnectionState;
-};
+}
 
 export interface StateChangeFilter {
     streamHandle: StreamHandle;
-};
+}
 
 export type StateChangeListener = (event: StateChangeEvent) => void;
 
@@ -17,10 +17,7 @@ export class StateChangeDispatcher {
         listener: StateChangeListener;
     }>();
 
-    addOnStateChangeListener(
-        filter: StateChangeFilter,
-        listener: StateChangeListener
-    ) {
+    addOnStateChangeListener(filter: StateChangeFilter, listener: StateChangeListener) {
         const entry = { filter, listener };
         this.listeners.add(entry);
     }
@@ -28,7 +25,7 @@ export class StateChangeDispatcher {
     removeOnStateChangeListener(filter: StateChangeFilter) {
         for (const value of this.listeners.values()) {
             if (value.filter === filter) {
-                this.listeners.delete(value)
+                this.listeners.delete(value);
             }
         }
     }

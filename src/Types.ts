@@ -12,7 +12,6 @@ limitations under the License.
 import { ExtKey } from "./service/ExtKey";
 import * as StreamsApiTypes from "./webStreams/types/ApiTypes";
 
-
 // export namespace core {
 export type SortOrder = "desc" | "asc";
 

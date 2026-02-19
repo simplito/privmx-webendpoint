@@ -44,9 +44,6 @@ test.use({
 
 test.describe("StreamTest", () => {
     test.beforeEach(async ({ page }) => {
-        page.on("console", (msg) => {
-            console.error(`[BROWSER]: ${msg.text()}`);
-        });
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
         await page.evaluate(async () => {
@@ -70,12 +67,16 @@ test.describe("StreamTest", () => {
         bridgeUrl: string,
         solutionId: string,
     ) => {
-        page.on("console", (msg: any) => {
-            if (msg.type() === "error") console.error(`[${user.id}]: ${msg.text()}`);
-        });
-
         await page.evaluate(
-            async ({ bridgeUrl, solutionId, user }) => {
+            async ({
+                bridgeUrl,
+                solutionId,
+                user,
+            }: {
+                bridgeUrl: string;
+                solutionId: string;
+                user: TestUser;
+            }) => {
                 const Endpoint = window.Endpoint;
                 const connection = await Endpoint.connect(user.privKey, solutionId, bridgeUrl);
                 const streamApi = await Endpoint.createStreamApi(
@@ -94,7 +95,7 @@ test.describe("StreamTest", () => {
     // STREAM ROOM CRUD
     // =========================================================================
 
-    test.skip("getStreamRoom with valid/invalid input data", async ({ page, backend, cli }) => {
+    test("getStreamRoom with valid/invalid input data", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -140,7 +141,7 @@ test.describe("StreamTest", () => {
         expect(result.room.version).toEqual(1);
     });
 
-    test.skip("listStreamRooms with invalid input data", async ({ page, backend, cli }) => {
+    test("listStreamRooms with invalid input data", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -213,7 +214,7 @@ test.describe("StreamTest", () => {
         }, args);
     });
 
-    test.skip("listStreamRooms with valid input data", async ({ page, backend, cli }) => {
+    test("listStreamRooms with valid input data", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -268,7 +269,7 @@ test.describe("StreamTest", () => {
         expect(result.list3.readItems.length).toBeGreaterThanOrEqual(2);
     });
 
-    test.skip("createStreamRoom with valid/invalid data", async ({ page, backend, cli }) => {
+    test("createStreamRoom with valid/invalid data", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -316,7 +317,7 @@ test.describe("StreamTest", () => {
         expect(result.r2.managers[0]).toEqual(users.u1.id);
     });
 
-    test.skip("updateStreamRoom with invalid data", async ({ page, backend, cli }) => {
+    test("updateStreamRoom with invalid data", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -418,7 +419,7 @@ test.describe("StreamTest", () => {
         }, args);
     });
 
-    test.skip("updateStreamRoom with correct data", async ({ page, backend, cli }) => {
+    test("updateStreamRoom with correct data", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -505,7 +506,7 @@ test.describe("StreamTest", () => {
         expect(result.r5.version).toBe(5);
     });
 
-    test.skip("deleteStreamRoom with valid/invalid data", async ({ page, backend, cli }) => {
+    test("deleteStreamRoom with valid/invalid data", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -562,11 +563,7 @@ test.describe("StreamTest", () => {
     // STREAM HANDLE / TRACKS
     // =========================================================================
 
-    test.skip("Stream Lifecycle: Join, Leave, Create, Media Devices", async ({
-        page,
-        backend,
-        cli,
-    }) => {
+    test("Stream Lifecycle: Join, Leave, Create, Media Devices", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -578,14 +575,20 @@ test.describe("StreamTest", () => {
         await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
             const Endpoint = window.Endpoint;
             const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const connection2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
             const streamApi = await Endpoint.createStreamApi(
                 connection,
                 await Endpoint.createEventApi(connection),
             );
+            const streamApi2 = await Endpoint.createStreamApi(
+                connection2,
+                await Endpoint.createEventApi(connection2),
+            );
             const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
             const sId = await streamApi.createStreamRoom(
                 contextId,
-                [u1Obj],
+                [u1Obj, u2Obj],
                 [u1Obj],
                 new TextEncoder().encode("p"),
                 new TextEncoder().encode("p"),
@@ -612,6 +615,8 @@ test.describe("StreamTest", () => {
             await streamApi.joinStreamRoom(sId); // Idempotent check
 
             await expectError(async () => await streamApi.leaveStreamRoom(fakeStreamId));
+            // U2 Joins for keepalive
+            await streamApi2.joinStreamRoom(sId);
             await streamApi.leaveStreamRoom(sId);
             await expectError(async () => await streamApi.leaveStreamRoom(sId)); // Not joined anymore
 
@@ -623,7 +628,7 @@ test.describe("StreamTest", () => {
         }, args);
     });
 
-    test.skip("addTrack: valid and invalid inputs", async ({ page, backend, cli }) => {
+    test("addTrack: valid and invalid inputs", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -683,7 +688,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("publishStream: no tracks", async ({ page, backend, cli }) => {
+    test("publishStream: no tracks", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -728,7 +733,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("publishStream: with tracks", async ({ page, backend, cli }) => {
+    test("publishStream: with tracks", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -755,24 +760,27 @@ test.describe("StreamTest", () => {
 
             await streamApi.joinStreamRoom(sId);
             const handle = await streamApi.createStream(sId);
-            const expectError = async (fn: any) => {
+            const expectError = async (action: string, fn: any) => {
                 try {
                     await fn();
                 } catch {
                     return;
                 }
-                throw new Error("Expected error");
+                throw new Error(`Expected error ${action}`);
             };
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
             await streamApi.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
             await streamApi.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
 
-            await expectError(async () => await streamApi.publishStream(-1 as StreamHandle));
+            await expectError(
+                "Publish stream with invalid handle",
+                async () => await streamApi.publishStream(-1 as StreamHandle),
+            );
             await streamApi.publishStream(handle);
 
             // Double publish should fail
-            await expectError(async () => await streamApi.publishStream(handle));
+            await expectError("Double publish", async () => await streamApi.publishStream(handle));
 
             return { success: true };
         }, args);
@@ -780,7 +788,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.fail("publishStream: to two different rooms", async ({ page, backend, cli }) => {
+    test("publishStream: to two different rooms", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -821,7 +829,6 @@ test.describe("StreamTest", () => {
             await streamApi.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
             await streamApi.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
             await streamApi.publishStream(handle);
-
 
             ///// ROOM 2 /////
             const sId2 = await streamApi.createStreamRoom(
@@ -840,15 +847,13 @@ test.describe("StreamTest", () => {
             await streamApi.addStreamTrack(handle2, { track: stream.getVideoTracks()[0] });
             await streamApi.publishStream(handle2);
 
-
             return { success: true };
         }, args);
 
         expect(result.success).toBe(true);
     });
 
-
-    test.skip("publishStream: publish unpublish publish back using same handle", async ({ page, backend, cli }) => {
+    test("publishStream: on publish callback", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -875,109 +880,6 @@ test.describe("StreamTest", () => {
 
             await streamApi.joinStreamRoom(sId);
             const handle = await streamApi.createStream(sId);
-            const expectError = async (fn: any) => {
-                try {
-                    await fn();
-                } catch {
-                    return;
-                }
-                throw new Error("Expected error");
-            };
-
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-            await streamApi.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
-            await streamApi.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
-            await streamApi.publishStream(handle);
-            await new Promise<void>(resolve => setTimeout(() => {resolve()}, 3000));
-            await streamApi.unpublishStream(handle);
-
-            await expectError(async () => {
-                await streamApi.publishStream(handle);
-            });
-
-            return { success: true };
-        }, args);
-
-        expect(result.success).toBe(true);
-    });
-
-    test.fail("publishStream: publish unpublish publish back using new handle", async ({ page, backend, cli }) => {
-        const users = await setupUsers(page, cli);
-        const args = {
-            bridgeUrl: backend.bridgeUrl,
-            solutionId: testData.solutionId,
-            contextId: testData.contextId,
-            users,
-        };
-
-        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
-            const Endpoint = window.Endpoint;
-            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
-            const streamApi = await Endpoint.createStreamApi(
-                connection,
-                await Endpoint.createEventApi(connection),
-            );
-            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
-            const sId = await streamApi.createStreamRoom(
-                contextId,
-                [u1Obj],
-                [u1Obj],
-                new TextEncoder().encode("p"),
-                new TextEncoder().encode("p"),
-            );
-
-            await streamApi.joinStreamRoom(sId);
-
-            const handle = await streamApi.createStream(sId);
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-            await streamApi.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
-            await streamApi.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
-            await streamApi.publishStream(handle);
-            await new Promise<void>(resolve => setTimeout(() => {resolve()}, 3000));
-            await streamApi.unpublishStream(handle);
-            
-            // NEW HANDLE
-            const handle2 = await streamApi.createStream(sId);
-            await streamApi.addStreamTrack(handle2, { track: stream.getAudioTracks()[0] });
-            await streamApi.addStreamTrack(handle2, { track: stream.getVideoTracks()[0] });
-            await streamApi.publishStream(handle2);
-            await new Promise<void>(resolve => setTimeout(() => {resolve()}, 3000));
-            await streamApi.unpublishStream(handle2);
-
-            return { success: true };
-        }, args);
-
-        expect(result.success).toBe(true);
-    });
-
-    test.skip("publishStream: on publish callback", async ({ page, backend, cli }) => {
-        const users = await setupUsers(page, cli);
-        const args = {
-            bridgeUrl: backend.bridgeUrl,
-            solutionId: testData.solutionId,
-            contextId: testData.contextId,
-            users,
-        };
-
-        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
-            const Endpoint = window.Endpoint;
-            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
-            const streamApi = await Endpoint.createStreamApi(
-                connection,
-                await Endpoint.createEventApi(connection),
-            );
-            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
-            const sId = await streamApi.createStreamRoom(
-                contextId,
-                [u1Obj],
-                [u1Obj],
-                new TextEncoder().encode("p"),
-                new TextEncoder().encode("p"),
-            );
-
-            await streamApi.joinStreamRoom(sId);
-            const handle = await streamApi.createStream(sId);
-
 
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
             await streamApi.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
@@ -985,7 +887,7 @@ test.describe("StreamTest", () => {
 
             const publishStates: string[] = [];
 
-            await streamApi.publishStream(handle, onStateChange => {
+            await streamApi.publishStream(handle, (onStateChange) => {
                 publishStates.push(onStateChange);
             });
 
@@ -996,7 +898,7 @@ test.describe("StreamTest", () => {
                     break;
                 }
             }
-            
+
             if (publishStates.length === 0) {
                 throw new Error("Did not receive state change on publishStream() callback..");
             }
@@ -1006,8 +908,176 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
+    test("publishStream: publish unpublish publish back using same handle", async ({
+        page,
+        backend,
+        cli,
+    }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
 
-    test.skip("publishStream: multiple instances of same track", async ({ page, backend, cli }) => {
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+
+            // Setup User 1 (The Publisher)
+            const connection1 = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const api1 = await Endpoint.createStreamApi(
+                connection1,
+                await Endpoint.createEventApi(connection1),
+            );
+            // Setup User 2 (The Watcher/Publisher - keeps room alive)
+            const connection2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
+            const api2 = await Endpoint.createStreamApi(
+                connection2,
+                await Endpoint.createEventApi(connection2),
+            );
+
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+            const sId = await api1.createStreamRoom(
+                contextId,
+                [u1Obj, u2Obj],
+                [u1Obj, u2Obj], // Made u2 a manager as well to ensure publish rights
+                new TextEncoder().encode("p"),
+                new TextEncoder().encode("p"),
+            );
+
+            // User 2 joins AND publishes to keep the room alive
+            await api2.joinStreamRoom(sId);
+            const u2Handle = await api2.createStream(sId);
+            const u2Stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: true,
+            });
+            await api2.addStreamTrack(u2Handle, { track: u2Stream.getAudioTracks()[0] });
+            await api2.addStreamTrack(u2Handle, { track: u2Stream.getVideoTracks()[0] });
+            await api2.publishStream(u2Handle);
+            // User 1 operations
+            await api1.joinStreamRoom(sId);
+            const handle = await api1.createStream(sId);
+
+            const expectError = async (fn: any) => {
+                try {
+                    await fn();
+                } catch {
+                    return;
+                }
+                throw new Error("Expected error");
+            };
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            await api1.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+            await api1.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+
+            // Publish
+            await api1.publishStream(handle);
+            await new Promise<void>((resolve) => setTimeout(resolve, 3000));
+
+            // Unpublish
+            await api1.unpublishStream(handle);
+
+            // Expect Error when publishing on the same destroyed handle
+            await expectError(async () => {
+                await api1.publishStream(handle);
+            });
+
+            return { success: true };
+        }, args);
+
+        expect(result.success).toBe(true);
+    });
+
+    test("publishStream: publish unpublish publish back using new handle", async ({
+        page,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(45000); // Give enough time for multiple 3s waits
+
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+
+            // Setup User 1
+            const connection1 = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const api1 = await Endpoint.createStreamApi(
+                connection1,
+                await Endpoint.createEventApi(connection1),
+            );
+
+            // Setup User 2 (The Watcher/Publisher)
+            const connection2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
+            const api2 = await Endpoint.createStreamApi(
+                connection2,
+                await Endpoint.createEventApi(connection2),
+            );
+
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+            const sId = await api1.createStreamRoom(
+                contextId,
+                [u1Obj, u2Obj],
+                [u1Obj, u2Obj],
+                new TextEncoder().encode("p"),
+                new TextEncoder().encode("p"),
+            );
+
+            // User 2 joins AND publishes to keep the room alive
+            await api2.joinStreamRoom(sId);
+            const u2Handle = await api2.createStream(sId);
+            const u2Stream = await navigator.mediaDevices.getUserMedia({
+                audio: true,
+                video: true,
+            });
+            await api2.addStreamTrack(u2Handle, { track: u2Stream.getAudioTracks()[0] });
+            await api2.addStreamTrack(u2Handle, { track: u2Stream.getVideoTracks()[0] });
+            await api2.publishStream(u2Handle);
+
+            await api1.joinStreamRoom(sId);
+
+            // --- FIRST HANDLE ---
+            const handle1 = await api1.createStream(sId);
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            await api1.addStreamTrack(handle1, { track: stream.getAudioTracks()[0] });
+            await api1.addStreamTrack(handle1, { track: stream.getVideoTracks()[0] });
+
+            await api1.publishStream(handle1);
+            await new Promise<void>((resolve) => setTimeout(resolve, 3000));
+            await api1.unpublishStream(handle1);
+
+            await api1.leaveStreamRoom(sId);
+            await api1.joinStreamRoom(sId);
+
+            // --- NEW HANDLE ---
+            const handle2 = await api1.createStream(sId);
+            await api1.addStreamTrack(handle2, { track: stream.getAudioTracks()[0] });
+            await api1.addStreamTrack(handle2, { track: stream.getVideoTracks()[0] });
+
+            await api1.publishStream(handle2);
+            await new Promise<void>((resolve) => setTimeout(resolve, 3000));
+            await api1.unpublishStream(handle2);
+
+            return { success: true };
+        }, args);
+
+        expect(result.success).toBe(true);
+    });
+
+    test("publishStream: multiple instances of same track", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -1056,7 +1126,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("subscribeToRemoteStreams: validations", async ({ page, backend, cli }) => {
+    test("subscribeToRemoteStreams: validations", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -1092,17 +1162,14 @@ test.describe("StreamTest", () => {
             };
 
             // Empty
-            await expectError(
-                async () => await streamApi.subscribeToRemoteStreams(sId, []),
-            );
+            await expectError(async () => await streamApi.subscribeToRemoteStreams(sId, []));
 
             // Invalid
             await expectError(
                 async () =>
-                    await streamApi.subscribeToRemoteStreams(
-                        sId,
-                        [{ streamId: -1, streamTrackId: "inv"}],
-                    ),
+                    await streamApi.subscribeToRemoteStreams(sId, [
+                        { streamId: -1, streamTrackId: "inv" },
+                    ]),
             );
 
             // Valid (Need published stream)
@@ -1114,10 +1181,9 @@ test.describe("StreamTest", () => {
             const streams = await streamApi.listStreams(sId);
             if (streams.length > 0) {
                 const s = streams[0];
-                await streamApi.subscribeToRemoteStreams(
-                    sId,
-                    [{ streamId: s.id, streamTrackId: s.tracks[0].mid }],
-                );
+                await streamApi.subscribeToRemoteStreams(sId, [
+                    { streamId: s.id, streamTrackId: s.tracks[0].mid },
+                ]);
             }
 
             return { success: true };
@@ -1126,8 +1192,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    // this will pass after fix merge: https://github.com/simplito/privmx-endpoint/pull/365
-    test.skip("unsubscribeFromRemoteStreams: validations", async ({ page, backend, cli }) => {
+    test("unsubscribeFromRemoteStreams: validations", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -1163,9 +1228,7 @@ test.describe("StreamTest", () => {
             };
 
             // Empty
-            await expectError(
-                async () => await streamApi.unsubscribeFromRemoteStreams(sId, []),
-            );
+            await expectError(async () => await streamApi.unsubscribeFromRemoteStreams(sId, []));
 
             // Publish & Subscribe first
             const handle = await streamApi.createStream(sId);
@@ -1181,10 +1244,9 @@ test.describe("StreamTest", () => {
                 // Invalid Unsub
                 await expectError(
                     async () =>
-                        await streamApi.unsubscribeFromRemoteStreams(
-                            sId,
-                            [{ streamId: -1, streamTrackId: "inv" }],
-                        ),
+                        await streamApi.unsubscribeFromRemoteStreams(sId, [
+                            { streamId: -1, streamTrackId: "inv" },
+                        ]),
                 );
 
                 // Valid Unsub
@@ -1197,7 +1259,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("updateStream: add/remove", async ({ page, backend, cli }) => {
+    test("updateStream: add/remove", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -1245,7 +1307,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("updateStream: after failed add / unpublish", async ({ page, backend, cli }) => {
+    test("updateStream: after failed add / unpublish", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -1311,11 +1373,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("modifyRemoteStreamsSubscriptions: various scenarios", async ({
-        page,
-        backend,
-        cli,
-    }) => {
+    test("modifyRemoteStreamsSubscriptions: various scenarios", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -1348,7 +1406,13 @@ test.describe("StreamTest", () => {
 
             const streams = await streamApi.listStreams(sId);
             if (streams.length === 0) return { success: true };
-            const sub = [{ streamId: streams[0].id, trackId: streams[0].tracks[0].mid, onRemoteTrack: () => {} }];
+            const sub = [
+                {
+                    streamId: streams[0].id,
+                    trackId: streams[0].tracks[0].mid,
+                    onRemoteTrack: () => {},
+                },
+            ];
             const expectError = async (fn: any) => {
                 try {
                     await fn();
@@ -1401,11 +1465,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("E2E: Two users exchange video streams", async ({
-        createContextPage,
-        backend,
-        cli,
-    }) => {
+    test("E2E: Two users exchange video streams", async ({ createContextPage, backend, cli }) => {
         const page1 = await createContextPage();
         await initPage(page1);
         const users = await setupUsers(page1, cli);
@@ -1492,11 +1552,11 @@ test.describe("StreamTest", () => {
 
                     api.addRemoteStreamListener({
                         onRemoteStreamTrack: onRemoteTrack,
-                        streamRoomId: roomId
+                        streamRoomId: roomId,
                     });
                     const subs = targetStream.tracks.map((t: any) => ({
                         streamId: targetStream.id,
-                        streamTrackId: t.mid
+                        streamTrackId: t.mid,
                     }));
 
                     await api.subscribeToRemoteStreams(roomId, subs);
@@ -1526,11 +1586,11 @@ test.describe("StreamTest", () => {
                 return video.currentTime > start;
             });
 
-            if (!isMoving) console.warn("Video stuck. Check fake-device args.");
+            if (!isMoving) throw new Error("Video stuck");
         });
     });
 
-    test.skip("E2E: Three users exchange video streams and expect remte streams callbacks separation", async ({
+    test("E2E: Three users exchange video streams and expect remte streams callbacks separation", async ({
         createContextPage,
         backend,
         cli,
@@ -1545,7 +1605,6 @@ test.describe("StreamTest", () => {
 
         const page3 = await createContextPage();
         await initPage(page3);
-
 
         await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
         await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
@@ -1638,35 +1697,27 @@ test.describe("StreamTest", () => {
 
                     const sub1 = {
                         streamId: remoteStreams[0].id,
-                        onRemoteTrack: (event: RTCTrackEvent) => recvTracksFromUser.push(1)    
+                        onRemoteTrack: (event: RTCTrackEvent) => recvTracksFromUser.push(1),
                     };
                     const sub2 = {
                         streamId: remoteStreams[1].id,
-                        onRemoteTrack: (event: RTCTrackEvent) => recvTracksFromUser.push(2)    
+                        onRemoteTrack: (event: RTCTrackEvent) => recvTracksFromUser.push(2),
                     };
                     await api.subscribeToRemoteStreams(roomId, [sub1, sub2]);
-                    await new Promise((r) => setTimeout(r, 5000))
+                    await new Promise((r) => setTimeout(r, 5000));
                     // test
                     if (recvTracksFromUser.length > 1) {
                         if (new Set(recvTracksFromUser).size < 2) {
-                            throw new Error("Just one callback fired on two subscriptions")
+                            throw new Error("Just one callback fired on two subscriptions");
                         }
                     }
-
                 },
                 { roomId },
             );
-        });        
-
+        });
     });
 
-
-
-    test.skip("E2E: Renegotiation - Add Video Mid-Call", async ({
-        createContextPage,
-        backend,
-        cli,
-    }) => {
+    test("E2E: Renegotiation - Add Video Mid-Call", async ({ createContextPage, backend, cli }) => {
         const page1 = await createContextPage();
         const page2 = await createContextPage();
 
@@ -1686,11 +1737,16 @@ test.describe("StreamTest", () => {
         const { u1, u2 } = users;
 
         const connect = async (page: any, user: any) => {
-            page.on("console", (msg: any) => {
-                if (msg.type() === "error") console.error(`[${user.id}]: ${msg.text()}`);
-            });
             await page.evaluate(
-                async ({ bridgeUrl, solutionId, user }) => {
+                async ({
+                    bridgeUrl,
+                    solutionId,
+                    user,
+                }: {
+                    bridgeUrl: string;
+                    solutionId: string;
+                    user: TestUser;
+                }) => {
                     const conn = await window.Endpoint.connect(user.privKey, solutionId, bridgeUrl);
                     const streamApi = await window.Endpoint.createStreamApi(
                         conn,
@@ -1762,17 +1818,18 @@ test.describe("StreamTest", () => {
                         if (event.streams[0]) el.srcObject = event.streams[0];
                         else el.srcObject = new MediaStream([event.track]);
                         document.body.appendChild(el);
-                    }
+                    };
 
                     const s = remote[0];
 
                     api.addRemoteStreamListener({
                         onRemoteStreamTrack: onRemoteTrack,
-                        streamRoomId: roomId
+                        streamRoomId: roomId,
                     });
-                    const subs = s.tracks.filter(x => x.type === "audio").map(t => ({ streamId: s.id, streamTrackId: t.mid}));
+                    const subs = s.tracks
+                        .filter((x) => x.type === "audio")
+                        .map((t) => ({ streamId: s.id, streamTrackId: t.mid }));
                     await api.subscribeToRemoteStreams(roomId, subs);
-
                 },
                 { roomId },
             );
@@ -1816,12 +1873,16 @@ test.describe("StreamTest", () => {
                         document.body.appendChild(el);
                     };
 
-                    api.addRemoteStreamListener({onRemoteStreamTrack: onRemoteTrack, streamRoomId: roomId, streamId: remote[0].id as Types.StreamId});
+                    api.addRemoteStreamListener({
+                        onRemoteStreamTrack: onRemoteTrack,
+                        streamRoomId: roomId,
+                        streamId: remote[0].id as Types.StreamId,
+                    });
 
                     if (vTrack) {
                         await api.modifyRemoteStreamsSubscriptions(
                             roomId,
-                            [{ streamId: remote[0].id, streamTrackId: vTrack.mid}],
+                            [{ streamId: remote[0].id, streamTrackId: vTrack.mid }],
                             [],
                         );
                     }
@@ -1839,11 +1900,7 @@ test.describe("StreamTest", () => {
         });
     });
 
-    test.skip("E2E: Edge Case - Page Reload & Recovery", async ({
-        createContextPage,
-        backend,
-        cli,
-    }) => {
+    test("E2E: Edge Case - Page Reload & Recovery", async ({ createContextPage, backend, cli }) => {
         test.setTimeout(90000);
 
         const page1 = await createContextPage();
@@ -1884,12 +1941,13 @@ test.describe("StreamTest", () => {
             { contextId: testData.contextId, users },
         );
 
-        // --- STEP 2: U2 Subscribes (Old Stream) ---
-        const oldStreamId = await page2.evaluate(
+        // --- STEP 2: U2 Subscribes AND Publishes (Keep-Alive) ---
+        const { oldStreamId, initialStreamIds } = await page2.evaluate(
             async ({ roomId }) => {
                 const api = window.streamApi!;
                 await api.joinStreamRoom(roomId);
 
+                // 1. Wait for U1's stream (Since U2 hasn't published yet, it's the only one)
                 let remote: any[] = [];
                 while (remote.length === 0) {
                     remote = await api.listStreams(roomId);
@@ -1909,12 +1967,32 @@ test.describe("StreamTest", () => {
                     v.srcObject = e.streams[0];
                 };
 
-                api.addRemoteStreamListener({onRemoteStreamTrack: onRemoteTrack, streamRoomId: roomId, streamId: firstStream.id as Types.StreamId});
-                await api.subscribeToRemoteStreams(
-                    roomId,
-                    [{ streamId: firstStream.id, streamTrackId: firstStream.tracks[0].mid }],
-                );
-                return firstStream.id;
+                api.addRemoteStreamListener({
+                    onRemoteStreamTrack: onRemoteTrack,
+                    streamRoomId: roomId,
+                    streamId: firstStream.id as Types.StreamId,
+                });
+                await api.subscribeToRemoteStreams(roomId, [
+                    { streamId: firstStream.id, streamTrackId: firstStream.tracks[0].mid },
+                ]);
+
+                // 3. User 2 PUBLISHES to keep the room alive during U1's crash/reload
+                const u2Handle = await api.createStream(roomId);
+                const u2Stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                await api.addStreamTrack(u2Handle, { track: u2Stream.getVideoTracks()[0] });
+                await api.publishStream(u2Handle);
+
+                // 4. Record all stream IDs so we know what to ignore in Step 5
+                let allStreams = await api.listStreams(roomId);
+                while (allStreams.length < 2) {
+                    allStreams = await api.listStreams(roomId);
+                    await new Promise((r) => setTimeout(r, 200));
+                }
+
+                return {
+                    oldStreamId: firstStream.id,
+                    initialStreamIds: allStreams.map((s) => s.id),
+                };
             },
             { roomId },
         );
@@ -1922,6 +2000,7 @@ test.describe("StreamTest", () => {
         await page2.locator("#remote-video").waitFor({ state: "attached" });
 
         // --- STEP 3: RELOAD USER 1 ---
+        // Room stays alive because User 2 is actively publishing
         await page1.reload();
         await initPage(page1);
         await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
@@ -1941,28 +2020,40 @@ test.describe("StreamTest", () => {
         );
 
         // --- STEP 5: VERIFY RECOVERY ---
-
         const expectedNewStreamId = await page2.evaluate(
-            async ({ roomId, oldStreamId }) => {
+            async ({ roomId, initialStreamIds }) => {
                 const api = window.streamApi!;
 
                 let newStream: any;
                 for (let i = 0; i < 60; i++) {
                     const streams = await api.listStreams(roomId);
-                    newStream = streams.find((s: any) => s.id !== oldStreamId);
+                    newStream = streams.find((s: any) => !initialStreamIds.includes(s.id));
                     if (newStream) break;
                     await new Promise((r) => setTimeout(r, 500));
                 }
-
+                const onRemoteTrack = (e: RTCTrackEvent) => {
+                    let v = document.getElementById("remote-video") as HTMLVideoElement;
+                    if (!v) {
+                        v = document.createElement("video");
+                        v.id = "remote-video";
+                        v.autoplay = true;
+                        v.playsInline = true;
+                        document.body.appendChild(v);
+                    }
+                    v.srcObject = e.streams[0];
+                };
                 if (!newStream) throw new Error("New stream never appeared");
-
-                await api.subscribeToRemoteStreams(
-                    roomId,
-                    [{ streamId: newStream.id, streamTrackId: newStream.tracks[0].mid }],
-                );
+                api.addRemoteStreamListener({
+                    onRemoteStreamTrack: onRemoteTrack,
+                    streamRoomId: roomId,
+                    streamId: newStream.id as Types.StreamId,
+                });
+                await api.subscribeToRemoteStreams(roomId, [
+                    { streamId: newStream.id, streamTrackId: newStream.tracks[0].mid },
+                ]);
                 return newStream.id;
             },
-            { roomId, oldStreamId },
+            { roomId, initialStreamIds },
         );
 
         await page2.waitForFunction(
@@ -1980,7 +2071,7 @@ test.describe("StreamTest", () => {
         );
     });
 
-    test.skip("E2E: Edge Case - Zombie Publisher (Abrupt Close)", async ({
+    test("E2E: Edge Case - Zombie Publisher (Abrupt Close)", async ({
         createContextPage,
         backend,
         cli,
@@ -2043,11 +2134,14 @@ test.describe("StreamTest", () => {
                     };
                 };
 
-                api.addRemoteStreamListener({onRemoteStreamTrack: onRemoteTrack, streamRoomId: roomId, streamId: remote[0].id as Types.StreamId});
-                await api.subscribeToRemoteStreams(
-                    roomId,
-                    [{ streamId: remote[0].id, streamTrackId: remote[0].tracks[0].mid }],
-                );
+                api.addRemoteStreamListener({
+                    onRemoteStreamTrack: onRemoteTrack,
+                    streamRoomId: roomId,
+                    streamId: remote[0].id as Types.StreamId,
+                });
+                await api.subscribeToRemoteStreams(roomId, [
+                    { streamId: remote[0].id, streamTrackId: remote[0].tracks[0].mid },
+                ]);
             },
             { roomId },
         );
@@ -2068,5 +2162,796 @@ test.describe("StreamTest", () => {
             { roomId },
             { timeout: 30000 },
         );
+    });
+
+    test("Stream Room Lifecycle: Auto-close after all users leave (Two Browsers)", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        // Extended timeout because we wait for server-side room closure (usually ~10-30s)
+        test.setTimeout(60000);
+
+        // 1. Setup Environment
+        const page1 = await createContextPage();
+        const page2 = await createContextPage();
+
+        await initPage(page1);
+        await initPage(page2);
+
+        // 2. Setup Users & Connections
+        // We use page1 to generate keys/users via CLI helper
+        const users = await setupUsers(page1, cli);
+
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+
+        const contextId = testData.contextId;
+        let roomId: StreamRoomId;
+
+        // --- STEP 1: Create Room (User 1) ---
+        roomId = await page1.evaluate(
+            async ({ contextId, users }) => {
+                const api = window.streamApi!;
+                const enc = new TextEncoder();
+
+                const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+                const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+                const sId = await api.createStreamRoom(
+                    contextId,
+                    [u1Obj, u2Obj],
+                    [u1Obj],
+                    enc.encode("LifecycleTest"),
+                    enc.encode("LifecycleTest"),
+                );
+
+                // Verify initial state
+                const room = await api.getStreamRoom(sId);
+                if (room.closed) throw new Error("Room should be initially OPEN");
+
+                return sId;
+            },
+            { contextId, users },
+        );
+
+        // --- STEP 2: Join Both Users ---
+        await test.step("Join Users", async () => {
+            // User 1 Joins
+            await page1.evaluate(
+                async ({ roomId }) => {
+                    await window.streamApi!.joinStreamRoom(roomId);
+                },
+                { roomId },
+            );
+
+            // User 2 Joins
+            await page2.evaluate(
+                async ({ roomId }) => {
+                    await window.streamApi!.joinStreamRoom(roomId);
+                },
+                { roomId },
+            );
+        });
+
+        // --- STEP 3: Publish Stream (User 1) ---
+        // This ensures the room is "active" with media flowing
+        await test.step("Publish Stream", async () => {
+            await page1.evaluate(
+                async ({ roomId }) => {
+                    const api = window.streamApi!;
+                    const handle = await api.createStream(roomId);
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                    await api.publishStream(handle);
+                },
+                { roomId },
+            );
+        });
+
+        // --- STEP 4: Both Users Leave ---
+        await test.step("Leave Users", async () => {
+            await page1.evaluate(
+                async ({ roomId }) => {
+                    await window.streamApi!.leaveStreamRoom(roomId);
+                },
+                { roomId },
+            );
+
+            await page2.evaluate(
+                async ({ roomId }) => {
+                    await window.streamApi!.leaveStreamRoom(roomId);
+                },
+                { roomId },
+            );
+        });
+
+        // --- STEP 5: Wait & Verify Closure ---
+        await test.step("Verify Room Closure", async () => {
+            // We use page1 to poll status (assuming API client is still valid after leave)
+            // If strictly disconnected, we might need a fresh connection or check via HTTP if available.
+            // Assuming `getStreamRoom` works without being inside the room (which is standard).
+            const isClosed = await page1.evaluate(
+                async ({ roomId }) => {
+                    const api = window.streamApi!;
+                    const start = Date.now();
+
+                    // Poll for up to 30 seconds
+                    while (Date.now() - start < 30000) {
+                        try {
+                            const room = await api.getStreamRoom(roomId);
+                            if (room.closed) {
+                                return true;
+                            }
+                        } catch (e) {
+                            console.warn("Error fetching room info:", e);
+                        }
+                        // Wait 2s between checks
+                        await new Promise((r) => setTimeout(r, 2000));
+                    }
+                    return false;
+                },
+                { roomId },
+            );
+
+            if (!isClosed) {
+                throw new Error(`Room ${roomId} did not close automatically within 30 seconds.`);
+            }
+        });
+    });
+
+    test("Security: Room lifecycle (Active -> Abandoned -> Closed) enforces locks", async ({
+        page,
+        backend,
+        cli,
+    }) => {
+        // Increase timeout to accommodate server-side auto-close delay (usually ~15s)
+        test.setTimeout(60000);
+
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+
+            // --- HELPER: Expect Action to Fail ---
+            const expectFailure = async (actionName: string, promise: Promise<any>) => {
+                try {
+                    await promise;
+                } catch {
+                    return;
+                }
+                throw new Error(`[FAIL] ${actionName} SUCCEEDED but should have been BLOCKED.`);
+            };
+
+            // 1. Setup & Connect
+            const conn = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const api = await Endpoint.createStreamApi(conn, await Endpoint.createEventApi(conn));
+            const enc = new TextEncoder();
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+
+            // 2. Create Room
+            const sId = await api.createStreamRoom(
+                contextId,
+                [u1Obj],
+                [u1Obj],
+                enc.encode("lifecycle-test"),
+                enc.encode("lifecycle-test"),
+            );
+
+            // 3. Make it ACTIVE (Publish Stream)
+            await api.joinStreamRoom(sId);
+
+            const handle = await api.createStream(sId);
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+            await api.publishStream(handle);
+
+            // Wait a moment to ensure server registers the activity
+            await new Promise((r) => setTimeout(r, 2000));
+
+            // 4. Abandon Room (Leave)
+            await api.leaveStreamRoom(sId);
+
+            // 5. Wait for Server Auto-Close (Polling)
+            const start = Date.now();
+            let isClosed = false;
+
+            // Wait up to 45s for the background job to run
+            while (Date.now() - start < 45000) {
+                const room = await api.getStreamRoom(sId);
+                if (room.closed) {
+                    isClosed = true;
+                    break;
+                }
+                await new Promise((r) => setTimeout(r, 2000));
+            }
+
+            if (!isClosed)
+                throw new Error("Timeout: Room did not close automatically after being abandoned.");
+
+            // =========================================================
+            // 6. VERIFY SECURITY LOCKS (The "Restricted Actions")
+            // =========================================================
+
+            // A. Attempt to LIST STREAMS (Explicit check in server code)
+            await expectFailure("List Streams", api.listStreams(sId));
+
+            // B. Attempt to JOIN (The gatekeeper for Publish/Subscribe)
+            // Server: ensureActiveStreamRoom -> throws STREAM_ROOM_CLOSED
+            await expectFailure("Join Room", api.joinStreamRoom(sId));
+
+            // C. Attempt to SUBSCRIBE (Direct call check)
+            // Server: subscribeToRemoteStreams -> ensureActiveStreamRoom -> throws STREAM_ROOM_CLOSED
+            // We pass dummy args just to hit the server check
+            await expectFailure("Subscribe", api.subscribeToRemoteStreams(sId, []));
+
+            // Note: We cannot test "Publish" directly here because `publishStream` requires
+            // a valid `handle` from `createStream`, which requires `joinStreamRoom` to succeed first.
+            // Since `joinStreamRoom` fails (Test B), `publishStream` is effectively unreachable
+            // and thus secured.
+
+            return { success: true };
+        }, args);
+    });
+
+    test("Stream Room Cleanup: Independent closure of multiple rooms (Single User)", async ({
+        page,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(90000); // Generous timeout for multiple server-side sweeps
+
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const conn = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const api = await Endpoint.createStreamApi(conn, await Endpoint.createEventApi(conn));
+            const enc = new TextEncoder();
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+
+            const createAndActivateRoom = async (name: string) => {
+                const sId = await api.createStreamRoom(
+                    contextId,
+                    [u1Obj],
+                    [u1Obj],
+                    enc.encode(name),
+                    enc.encode(name),
+                );
+                await api.joinStreamRoom(sId);
+                const handle = await api.createStream(sId);
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                await api.publishStream(handle);
+                return sId;
+            };
+
+            // 1. Create 3 distinct rooms
+            const roomA = await createAndActivateRoom("Room-A-To-Close");
+            const roomB = await createAndActivateRoom("Room-B-To-Close");
+            const roomC = await createAndActivateRoom("Room-C-To-Keep");
+
+            // Wait a moment for server to register all publishers
+            await new Promise((r) => setTimeout(r, 2000));
+
+            // 2. Abandon Room A and Room B, but stay in Room C
+            await api.leaveStreamRoom(roomA);
+            await api.leaveStreamRoom(roomB);
+
+            // 3. Poll for cleanup (Wait up to 45s)
+            const start = Date.now();
+            let aClosed = false;
+            let bClosed = false;
+
+            while (Date.now() - start < 45000) {
+                const rA = await api.getStreamRoom(roomA);
+                const rB = await api.getStreamRoom(roomB);
+
+                if (rA.closed) aClosed = true;
+                if (rB.closed) bClosed = true;
+
+                if (aClosed && bClosed) break;
+
+                await new Promise((r) => setTimeout(r, 2000));
+            }
+
+            if (!aClosed || !bClosed) {
+                throw new Error(
+                    `Timeout: Failed to close target rooms. Room A closed: ${aClosed}, Room B closed: ${bClosed}`,
+                );
+            }
+
+            // 4. Verify Room C is still OPEN
+            const rC = await api.getStreamRoom(roomC);
+            if (rC.closed) {
+                throw new Error(
+                    "FAIL: Room C was closed by the server, but it should have remained open!",
+                );
+            }
+
+            return true;
+        }, args);
+    });
+    test("Stream Room Cleanup: Room stays open until the LAST user leaves (Multi-User)", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(90000);
+
+        const page1 = await createContextPage();
+        const page2 = await createContextPage();
+
+        await initPage(page1);
+        await initPage(page2);
+
+        const users = await setupUsers(page1, cli);
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+
+        let sharedRoomId: StreamRoomId;
+        let controlRoomId: StreamRoomId;
+
+        // --- STEP 1: U1 creates two rooms ---
+        await test.step("Setup Rooms", async () => {
+            const ids = await page1.evaluate(
+                async ({ contextId, users }) => {
+                    const api = window.streamApi!;
+                    const enc = new TextEncoder();
+                    const uObjs = [users.u1, users.u2].map((u: any) => ({
+                        userId: u.id,
+                        pubKey: u.pubKey,
+                    }));
+
+                    // Shared room (both will join)
+                    const sId1 = await api.createStreamRoom(
+                        contextId,
+                        uObjs,
+                        uObjs,
+                        enc.encode("Shared"),
+                        enc.encode("Shared"),
+                    );
+                    // Control room (only U2 will join)
+                    const sId2 = await api.createStreamRoom(
+                        contextId,
+                        uObjs,
+                        uObjs,
+                        enc.encode("Control"),
+                        enc.encode("Control"),
+                    );
+
+                    return { sharedRoomId: sId1, controlRoomId: sId2 };
+                },
+                { contextId: testData.contextId, users },
+            );
+
+            sharedRoomId = ids.sharedRoomId;
+            controlRoomId = ids.controlRoomId;
+        });
+
+        // --- STEP 2: Join AND Publish logic ---
+        await test.step("Populate Rooms (Both Users Publish)", async () => {
+            // U1 joins and PUBLISHES in Shared Room
+            await page1.evaluate(
+                async ({ sharedRoomId }) => {
+                    const api = window.streamApi!;
+                    await api.joinStreamRoom(sharedRoomId);
+
+                    const handle = await api.createStream(sharedRoomId);
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                    await api.publishStream(handle);
+                },
+                { sharedRoomId },
+            );
+
+            // U2 joins and PUBLISHES in BOTH rooms
+            await page2.evaluate(
+                async ({ sharedRoomId, controlRoomId }) => {
+                    const api = window.streamApi!;
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+                    // 1. Publish to Shared Room
+                    await api.joinStreamRoom(sharedRoomId);
+                    const handleShared = await api.createStream(sharedRoomId);
+                    await api.addStreamTrack(handleShared, { track: stream.getVideoTracks()[0] });
+                    await api.publishStream(handleShared);
+
+                    // 2. Publish to Control Room
+                    await api.joinStreamRoom(controlRoomId);
+                    const handleControl = await api.createStream(controlRoomId);
+                    await api.addStreamTrack(handleControl, { track: stream.getVideoTracks()[0] });
+                    await api.publishStream(handleControl);
+                },
+                { sharedRoomId, controlRoomId },
+            );
+        });
+
+        // --- STEP 3: U1 Leaves Shared Room (Should NOT close) ---
+        await test.step("User 1 leaves, Room stays open", async () => {
+            await page1.evaluate(
+                async ({ sharedRoomId }) => {
+                    await window.streamApi!.leaveStreamRoom(sharedRoomId);
+                },
+                { sharedRoomId },
+            );
+
+            await page1.waitForTimeout(20000); // Give the 15s job time to run
+
+            // Verify it is STILL OPEN because U2 is inside and publishing
+            const isClosed = await page2.evaluate(
+                async ({ sharedRoomId }) => {
+                    return (await window.streamApi!.getStreamRoom(sharedRoomId)).closed;
+                },
+                { sharedRoomId },
+            );
+
+            if (isClosed)
+                throw new Error("FAIL: Shared room closed prematurely while U2 was still inside!");
+        });
+
+        // --- STEP 4: U2 Leaves Shared Room (Should NOW close) ---
+        await test.step("User 2 leaves, Room closes", async () => {
+            await page2.evaluate(
+                async ({ sharedRoomId }) => {
+                    await window.streamApi!.leaveStreamRoom(sharedRoomId);
+                },
+                { sharedRoomId },
+            );
+
+            const isClosed = await page2.evaluate(
+                async ({ sharedRoomId }) => {
+                    const start = Date.now();
+                    while (Date.now() - start < 30000) {
+                        if ((await window.streamApi!.getStreamRoom(sharedRoomId)).closed)
+                            return true;
+                        await new Promise((r) => setTimeout(r, 2000));
+                    }
+                    return false;
+                },
+                { sharedRoomId },
+            );
+
+            if (!isClosed)
+                throw new Error("FAIL: Shared room did not close after the last user (U2) left.");
+        });
+
+        // --- STEP 5: Verify Control Room is untouched ---
+        await test.step("Verify Control Room is still open", async () => {
+            const isControlClosed = await page2.evaluate(
+                async ({ controlRoomId }) => {
+                    return (await window.streamApi!.getStreamRoom(controlRoomId)).closed;
+                },
+                { controlRoomId },
+            );
+
+            if (isControlClosed)
+                throw new Error("FAIL: Control room was incorrectly closed by the cleanup job!");
+        });
+    });
+
+    test("Stream Room Cleanup: Abrupt disconnect (hangup) triggers auto-close", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(90000);
+
+        // --- SETUP ---
+        const page1 = await createContextPage();
+        await initPage(page1);
+        const users = await setupUsers(page1, cli);
+
+        // User connects on Device 1
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+
+        // --- STEP 1: Connect, Join, and Publish (Device 1) ---
+        const roomId = await page1.evaluate(
+            async ({ contextId, users }) => {
+                const api = window.streamApi!;
+                const enc = new TextEncoder();
+                const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+
+                // Create Room
+                const sId = await api.createStreamRoom(
+                    contextId,
+                    [u1Obj],
+                    [u1Obj],
+                    enc.encode("HangupTest"),
+                    enc.encode("HangupTest"),
+                );
+
+                // Join & Publish Media
+                await api.joinStreamRoom(sId);
+                const handle = await api.createStream(sId);
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                await api.publishStream(handle);
+
+                return sId;
+            },
+            { contextId: testData.contextId, users },
+        );
+
+        // Give the server a moment to fully register the publisher state
+        await page1.waitForTimeout(2000);
+
+        // --- STEP 2: Abrupt Hangup (Browser Crash/Close) ---
+        // We close the page abruptly. NO leaveStreamRoom is called.
+        // This drops the WebSocket connection instantly.
+        await page1.close();
+
+        // --- STEP 3: Reconnect & Verify (Device 2) ---
+        // User opens a new tab or restarts the app
+        const page2 = await createContextPage();
+        await initPage(page2);
+
+        await connectUserToBridge(page2, users.u1, backend.bridgeUrl, testData.solutionId);
+
+        // --- STEP 4: Poll for server-side cleanup ---
+
+        const isClosed = await page2.evaluate(
+            async ({ roomId }) => {
+                const api = window.streamApi!;
+                const start = Date.now();
+
+                // Poll for up to 20 seconds
+                while (Date.now() - start < 20000) {
+                    try {
+                        const room = await api.getStreamRoom(roomId);
+                        if (room.closed) {
+                            return true;
+                        }
+                    } catch (e) {
+                        console.warn("Error fetching room info:", e);
+                    }
+                    // Check every 2 seconds
+                    await new Promise((r) => setTimeout(r, 2000));
+                }
+                return false;
+            },
+            { roomId },
+        );
+
+        if (!isClosed) {
+            throw new Error(
+                `Room ${roomId} did not close automatically after an abrupt disconnect within 45 seconds. The cleanup job may have failed.`,
+            );
+        }
+    });
+
+    test("Lifecycle: Graceful leave by multiple non-publishing users closes room", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(90000);
+
+        const page1 = await createContextPage();
+        const page2 = await createContextPage();
+        const page3 = await createContextPage(); // Observer page
+
+        await initPage(page1);
+        await initPage(page2);
+        await initPage(page3);
+
+        const users = await setupUsers(page1, cli);
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page3, users.u3, backend.bridgeUrl, testData.solutionId);
+
+        let roomId: StreamRoomId;
+
+        // 1. U1 creates the room
+        await test.step("Create Room", async () => {
+            roomId = await page1.evaluate(
+                async ({ contextId, users }) => {
+                    const api = window.streamApi!;
+                    const uObjs = [users.u1, users.u2, users.u3].map((u: any) => ({
+                        userId: u.id,
+                        pubKey: u.pubKey,
+                    }));
+
+                    return await api.createStreamRoom(
+                        contextId,
+                        uObjs,
+                        uObjs,
+                        new TextEncoder().encode("GracefulLeave"),
+                        new TextEncoder().encode("GracefulLeave"),
+                    );
+                },
+                { contextId: testData.contextId, users },
+            );
+        });
+
+        // 2. U1 and U2 Join (No Publishing)
+        await test.step("Users Join", async () => {
+            await page1.evaluate(
+                async ({ roomId }) => await window.streamApi!.joinStreamRoom(roomId),
+                { roomId },
+            );
+            await page2.evaluate(
+                async ({ roomId }) => await window.streamApi!.joinStreamRoom(roomId),
+                { roomId },
+            );
+        });
+
+        // 3. U1 Leaves. Room should stay open because U2 is still there.
+        await test.step("U1 Leaves, Room stays open", async () => {
+            await page1.evaluate(
+                async ({ roomId }) => await window.streamApi!.leaveStreamRoom(roomId),
+                { roomId },
+            );
+
+            await page1.waitForTimeout(20000); // Give the 15s job time to run
+
+            const isClosed = await page3.evaluate(
+                async ({ roomId }) => (await window.streamApi!.getStreamRoom(roomId)).closed,
+                { roomId },
+            );
+
+            if (isClosed)
+                throw new Error("FAIL: Room closed prematurely while U2 was still inside!");
+        });
+
+        // 4. U2 Leaves. Room should now close.
+        await test.step("U2 Leaves, Room closes", async () => {
+            await page2.evaluate(
+                async ({ roomId }) => await window.streamApi!.leaveStreamRoom(roomId),
+                { roomId },
+            );
+
+            console.log("Polling for final closure...");
+            const isClosed = await page3.evaluate(
+                async ({ roomId }) => {
+                    const start = Date.now();
+                    while (Date.now() - start < 30000) {
+                        if ((await window.streamApi!.getStreamRoom(roomId)).closed) return true;
+                        await new Promise((r) => setTimeout(r, 2000));
+                    }
+                    return false;
+                },
+                { roomId },
+            );
+
+            if (!isClosed)
+                throw new Error("FAIL: Room did not close after the last user (U2) left.");
+        });
+    });
+
+    test("Lifecycle: Abrupt tab close without publishing triggers auto-close", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(90000);
+
+        const page1 = await createContextPage();
+        const page2 = await createContextPage(); // Observer page
+
+        await initPage(page1);
+        await initPage(page2);
+
+        const users = await setupUsers(page1, cli);
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+
+        // Create and Join (No Publish)
+        const roomId = await page1.evaluate(
+            async ({ contextId, users }) => {
+                const api = window.streamApi!;
+                const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+                const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+                const sId = await api.createStreamRoom(
+                    contextId,
+                    [u1Obj, u2Obj],
+                    [u1Obj],
+                    new TextEncoder().encode("AbruptClose"),
+                    new TextEncoder().encode("AbruptClose"),
+                );
+
+                await api.joinStreamRoom(sId);
+                return sId;
+            },
+            { contextId: testData.contextId, users },
+        );
+
+        await page1.waitForTimeout(2000); // Let server register the join
+
+        // Abrupt Close
+        await page1.close();
+
+        // Poll from Observer
+        const isClosed = await page2.evaluate(
+            async ({ roomId }) => {
+                const start = Date.now();
+                while (Date.now() - start < 30000) {
+                    const room = await window.streamApi!.getStreamRoom(roomId);
+                    if (room.closed) return true;
+                    await new Promise((r) => setTimeout(r, 2000));
+                }
+                return false;
+            },
+            { roomId },
+        );
+
+        if (!isClosed)
+            throw new Error(
+                "FAIL: Room did not auto-close after lurker's tab was abruptly closed.",
+            );
+    });
+
+    test("Lifecycle: Page close triggers auto-close", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(30_000);
+
+        const page1 = await createContextPage();
+        const page2 = await createContextPage(); // Observer page
+
+        await initPage(page1);
+        await initPage(page2);
+
+        const users = await setupUsers(page1, cli);
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+
+        // 1. Create and Join (No Publish)
+        const roomId = await page1.evaluate(
+            async ({ contextId, users }) => {
+                const api = window.streamApi!;
+                const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+                const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+                const sId = await api.createStreamRoom(
+                    contextId,
+                    [u1Obj, u2Obj],
+                    [u1Obj],
+                    new TextEncoder().encode("LidCloseTest"),
+                    new TextEncoder().encode("LidCloseTest"),
+                );
+
+                await api.joinStreamRoom(sId);
+                return sId;
+            },
+            { contextId: testData.contextId, users },
+        );
+
+        await page1.waitForTimeout(2000);
+
+        // Simulate page close
+        await page1.close();
+
+        const isClosed = await page2.evaluate(
+            async ({ roomId }) => {
+                const start = Date.now();
+                while (Date.now() - start < 30_000) {
+                    const room = await window.streamApi!.getStreamRoom(roomId);
+                    if (room.closed) return true;
+                    await new Promise((r) => setTimeout(r, 3000));
+                }
+                return false;
+            },
+            { roomId },
+        );
+
+        if (!isClosed) {
+            throw new Error("FAIL: Room did not auto-close after lurker lost network connection.");
+        }
     });
 });
