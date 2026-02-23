@@ -4,7 +4,13 @@ import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
 import type { Endpoint, StreamApi, Types } from "../../src";
 import { StreamRoomId, StreamTrackMeta } from "../../src/webStreams/types/ApiTypes";
-import { SortOrder, StreamHandle, StreamInfo } from "../../src/Types";
+import {
+    SortOrder,
+    StreamEventSelectorType,
+    StreamEventType,
+    StreamHandle,
+    StreamInfo,
+} from "../../src/Types";
 
 interface TestUser {
     id: string;
@@ -1357,7 +1363,6 @@ test.describe("StreamTest", () => {
             } catch {}
             await streamApi.updateStream(handle);
 
-            // 2. Update after Unpublish (Should Fail)
             await streamApi.unpublishStream(handle);
 
             // Try to add track to unpublished stream -> Fail
@@ -2953,5 +2958,467 @@ test.describe("StreamTest", () => {
         if (!isClosed) {
             throw new Error("FAIL: Room did not auto-close after lurker lost network connection.");
         }
+    });
+
+    test("Lifecycle: Graceful leave by multiple non-publishing users closes room (Single Page)", async ({
+        page,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(90000);
+
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        // --- SETUP: Create 3 separate connections on the same page ---
+        await test.step("Setup Connections", async () => {
+            await page.evaluate(async ({ bridgeUrl, solutionId, users }) => {
+                const Endpoint = window.Endpoint;
+
+                // User 1
+                const conn1 = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+                (window as any).api1 = await Endpoint.createStreamApi(
+                    conn1,
+                    await Endpoint.createEventApi(conn1),
+                );
+
+                // User 2
+                const conn2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
+                (window as any).api2 = await Endpoint.createStreamApi(
+                    conn2,
+                    await Endpoint.createEventApi(conn2),
+                );
+
+                // User 3 (Observer)
+                const conn3 = await Endpoint.connect(users.u3.privKey, solutionId, bridgeUrl);
+                (window as any).api3 = await Endpoint.createStreamApi(
+                    conn3,
+                    await Endpoint.createEventApi(conn3),
+                );
+            }, args);
+        });
+
+        let roomId: StreamRoomId;
+
+        // 1. U1 creates the room
+        await test.step("Create Room", async () => {
+            roomId = await page.evaluate(
+                async ({ contextId, users }) => {
+                    const api1 = (window as any).api1;
+                    const uObjs = [users.u1, users.u2, users.u3].map((u: any) => ({
+                        userId: u.id,
+                        pubKey: u.pubKey,
+                    }));
+
+                    return await api1.createStreamRoom(
+                        contextId,
+                        uObjs,
+                        uObjs,
+                        new TextEncoder().encode("GracefulLeaveSingle"),
+                        new TextEncoder().encode("GracefulLeaveSingle"),
+                    );
+                },
+                { contextId: testData.contextId, users },
+            );
+        });
+
+        // 2. U1 and U2 Join (No Publishing)
+        await test.step("Users Join", async () => {
+            await page.evaluate(
+                async ({ roomId }) => {
+                    await (window as any).api1.joinStreamRoom(roomId);
+                    await (window as any).api2.joinStreamRoom(roomId);
+                },
+                { roomId },
+            );
+        });
+
+        // 3. U1 Leaves. Room should stay open because U2 is still there.
+        await test.step("U1 Leaves, Room stays open", async () => {
+            await page.evaluate(
+                async ({ roomId }) => {
+                    await (window as any).api1.leaveStreamRoom(roomId);
+                },
+                { roomId },
+            );
+
+            await page.waitForTimeout(20000); // Give the 15s job time to run
+
+            const isClosed = await page.evaluate(
+                async ({ roomId }) => {
+                    return (await (window as any).api3.getStreamRoom(roomId)).closed;
+                },
+                { roomId },
+            );
+
+            if (isClosed)
+                throw new Error("FAIL: Room closed prematurely while U2 was still inside!");
+        });
+
+        // 4. U2 Leaves. Room should now close.
+        await test.step("U2 Leaves, Room closes", async () => {
+            await page.evaluate(
+                async ({ roomId }) => {
+                    await (window as any).api2.leaveStreamRoom(roomId);
+                },
+                { roomId },
+            );
+
+            console.log("Polling for final closure...");
+            const isClosed = await page.evaluate(
+                async ({ roomId }) => {
+                    const start = Date.now();
+                    while (Date.now() - start < 30000) {
+                        if ((await (window as any).api3.getStreamRoom(roomId)).closed) return true;
+                        await new Promise((r) => setTimeout(r, 2000));
+                    }
+                    return false;
+                },
+                { roomId },
+            );
+
+            if (!isClosed)
+                throw new Error("FAIL: Room did not close after the last user (U2) left.");
+        });
+    });
+
+    // =========================================================================
+    // STREAM EVENTS (VIA EVENT QUEUE)
+    // =========================================================================
+
+    test("Listening on Stream events while actively publishing (Control)", async ({
+        page,
+        backend,
+        cli,
+    }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+            eventType: StreamEventType,
+            selectorType: StreamEventSelectorType,
+        };
+
+        const result = await page.evaluate(
+            async ({ bridgeUrl, solutionId, contextId, users, eventType, selectorType }) => {
+                const Endpoint = window.Endpoint;
+                const eventQueue = await Endpoint.getEventQueue();
+
+                // Setup User 1 (The Observer)
+                const conn1 = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+                const api1 = await Endpoint.createStreamApi(
+                    conn1,
+                    await Endpoint.createEventApi(conn1),
+                );
+                const u1ConnId = await conn1.getConnectionId();
+
+                // Setup User 2 (The Actor)
+                const conn2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
+                const api2 = await Endpoint.createStreamApi(
+                    conn2,
+                    await Endpoint.createEventApi(conn2),
+                );
+
+                // Pop initial libConnectedEvents
+                await eventQueue.waitEvent();
+                await eventQueue.waitEvent();
+
+                const enc = new TextEncoder();
+                const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+                const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+                const sId = await api1.createStreamRoom(
+                    contextId,
+                    [u1Obj, u2Obj],
+                    [u1Obj, u2Obj],
+                    enc.encode("p"),
+                    enc.encode("p"),
+                );
+
+                // Subscribe User 1 to the "stream" channel AND specific events
+                const selType = selectorType.STREAMROOM_ID;
+                const queries = [
+                    await api1.buildSubscriptionQuery(eventType.STREAMROOM_UPDATE, selType, sId),
+                    await api1.buildSubscriptionQuery(eventType.STREAM_PUBLISH, selType, sId),
+                    await api1.buildSubscriptionQuery(eventType.STREAM_UNPUBLISH, selType, sId),
+                    await api1.buildSubscriptionQuery(eventType.STREAM_JOIN, selType, sId),
+                    await api1.buildSubscriptionQuery(eventType.STREAM_LEAVE, selType, sId),
+                ];
+                await api1.subscribeFor(queries);
+
+                // Start Background Event Collector for User 1
+                const u1Events: any[] = [];
+                const collectPromise = (async () => {
+                    while (true) {
+                        const ev = await eventQueue.waitEvent();
+                        if (ev.type === "libBreak") break;
+                        if (ev.connectionId === u1ConnId) u1Events.push(ev);
+                    }
+                })();
+
+                // User 1 Joins and Publishes (Active State)
+                await api1.joinStreamRoom(sId);
+                const handle1 = await api1.createStream(sId);
+                const stream1 = await navigator.mediaDevices.getUserMedia({ video: true });
+                await api1.addStreamTrack(handle1, { track: stream1.getVideoTracks()[0] });
+                await api1.publishStream(handle1);
+
+                // Clear events captured during setup, so we strictly test U2's actions
+                u1Events.length = 0;
+
+                // User 2 Performs Actions
+                await api2.joinStreamRoom(sId);
+                const handle2 = await api2.createStream(sId);
+                const stream2 = await navigator.mediaDevices.getUserMedia({ video: true });
+                await api2.addStreamTrack(handle2, { track: stream2.getVideoTracks()[0] });
+
+                await api2.publishStream(handle2);
+                await api2.updateStreamRoom(
+                    sId,
+                    [u1Obj, u2Obj],
+                    [u1Obj, u2Obj],
+                    enc.encode("n"),
+                    enc.encode("n"),
+                    1,
+                    true,
+                    false,
+                );
+                await api2.unpublishStream(handle2);
+                await api2.leaveStreamRoom(sId);
+
+                // Break event queue and await collection
+                setTimeout(() => {
+                    eventQueue.emitBreakEvent();
+                }, 3000);
+                await collectPromise;
+
+                return { u1Events };
+            },
+            args,
+        );
+
+        const types = result.u1Events.map((e: any) => e.type);
+
+        expect(types).toContain("streamJoined");
+        expect(types).toContain("streamPublished");
+        expect(types).toContain("streamRoomUpdated");
+        expect(types).toContain("streamUnpublished");
+        expect(types).toContain("streamLeft");
+    });
+
+    test("Listening on Stream events AFTER unpublish", async ({ page, backend, cli }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+            eventType: StreamEventType,
+            selectorType: StreamEventSelectorType,
+        };
+
+        const result = await page.evaluate(
+            async ({ bridgeUrl, solutionId, contextId, users, eventType, selectorType }) => {
+                const Endpoint = window.Endpoint;
+                const eventQueue = await Endpoint.getEventQueue();
+
+                const conn1 = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+                const api1 = await Endpoint.createStreamApi(
+                    conn1,
+                    await Endpoint.createEventApi(conn1),
+                );
+                const u1ConnId = await conn1.getConnectionId();
+
+                const conn2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
+                const api2 = await Endpoint.createStreamApi(
+                    conn2,
+                    await Endpoint.createEventApi(conn2),
+                );
+
+                await eventQueue.waitEvent();
+                await eventQueue.waitEvent();
+
+                const enc = new TextEncoder();
+                const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+                const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+                const sId = await api1.createStreamRoom(
+                    contextId,
+                    [u1Obj, u2Obj],
+                    [u1Obj, u2Obj],
+                    enc.encode("p"),
+                    enc.encode("p"),
+                );
+
+                // 1. Subscribe User 1
+                const selType = selectorType.STREAMROOM_ID;
+                const queries = [
+                    await api1.buildSubscriptionQuery(eventType.STREAMROOM_UPDATE, selType, sId),
+                    await api1.buildSubscriptionQuery(eventType.STREAM_PUBLISH, selType, sId),
+                    await api1.buildSubscriptionQuery(eventType.STREAM_UNPUBLISH, selType, sId),
+                    await api1.buildSubscriptionQuery(eventType.STREAM_JOIN, selType, sId),
+                    await api1.buildSubscriptionQuery(eventType.STREAM_LEAVE, selType, sId),
+                ];
+                await api1.subscribeFor(queries);
+
+                // Start Background Event Collector for User 1
+                const u1Events: any[] = [];
+                const collectPromise = (async () => {
+                    while (true) {
+                        const ev = await eventQueue.waitEvent();
+                        if (ev.type === "libBreak") break;
+                        if (ev.connectionId === u1ConnId) u1Events.push(ev);
+                    }
+                })();
+
+                // User 1 Joins, Publishes, and UNPUBLISHES
+                await api1.joinStreamRoom(sId);
+                const handle1 = await api1.createStream(sId);
+                const stream1 = await navigator.mediaDevices.getUserMedia({ video: true });
+                await api1.addStreamTrack(handle1, { track: stream1.getVideoTracks()[0] });
+
+                await api1.publishStream(handle1);
+                await new Promise((r) => setTimeout(r, 500));
+
+                // The critical test parameter: User 1 drops media
+                await api1.unpublishStream(handle1);
+
+                // Clear events captured so far
+                u1Events.length = 0;
+
+                // User 2 Performs Actions
+                await api2.joinStreamRoom(sId);
+                const handle2 = await api2.createStream(sId);
+                const stream2 = await navigator.mediaDevices.getUserMedia({ video: true });
+                await api2.addStreamTrack(handle2, { track: stream2.getVideoTracks()[0] });
+
+                await api2.publishStream(handle2);
+                await api2.updateStreamRoom(
+                    sId,
+                    [u1Obj, u2Obj],
+                    [u1Obj, u2Obj],
+                    enc.encode("n"),
+                    enc.encode("n"),
+                    1,
+                    true,
+                    false,
+                );
+                await api2.unpublishStream(handle2);
+                await api2.leaveStreamRoom(sId);
+
+                // 5. Break event queue and await collection
+                setTimeout(() => {
+                    eventQueue.emitBreakEvent();
+                }, 3000);
+                await collectPromise;
+
+                return { u1Events };
+            },
+            args,
+        );
+
+        const types = result.u1Events.map((e: any) => e.type);
+
+        // Expect User 1 to STILL receive all lifecycle events even after they stopped publishing
+        expect(types).toContain("streamJoined");
+        expect(types).toContain("streamPublished");
+        expect(types).toContain("streamRoomUpdated");
+        expect(types).toContain("streamUnpublished");
+        expect(types).toContain("streamLeft");
+    });
+
+    test.fixme("Listening on Stream events without proper subscription", async ({
+        page,
+        backend,
+        cli,
+    }) => {
+        // BUG - libBreak is not always emitted
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const eventQueue = await Endpoint.getEventQueue();
+
+            const conn1 = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const api1 = await Endpoint.createStreamApi(
+                conn1,
+                await Endpoint.createEventApi(conn1),
+            );
+            const u1ConnId = await conn1.getConnectionId();
+
+            const conn2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
+            const api2 = await Endpoint.createStreamApi(
+                conn2,
+                await Endpoint.createEventApi(conn2),
+            );
+
+            await eventQueue.waitEvent();
+            await eventQueue.waitEvent();
+
+            const enc = new TextEncoder();
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+            const sId = await api1.createStreamRoom(
+                contextId,
+                [u1Obj, u2Obj],
+                [u1Obj, u2Obj],
+                enc.encode("p"),
+                enc.encode("p"),
+            );
+
+            // DO NOT SUBSCRIBE User 1 to the stream channel or queries
+            // await api1.subscribeFor([...]);
+
+            // Start Background Event Collector for User 1
+            const u1Events: any[] = [];
+            let lastEvent = null;
+            const collectPromise = (async () => {
+                while (true) {
+                    const ev = await eventQueue.waitEvent();
+                    if (ev.type === "libBreak") {
+                        lastEvent = ev;
+                        break;
+                    }
+                    if (ev.connectionId === u1ConnId) u1Events.push(ev);
+                }
+            })();
+
+            // User 2 Performs Actions
+            await api2.joinStreamRoom(sId);
+            const handle2 = await api2.createStream(sId);
+            const stream2 = await navigator.mediaDevices.getUserMedia({ video: true });
+            await api2.addStreamTrack(handle2, { track: stream2.getVideoTracks()[0] });
+            await api2.publishStream(handle2);
+
+            // Break event queue and await collection
+            setTimeout(() => {
+                eventQueue.emitBreakEvent();
+            }, 3000);
+            await collectPromise;
+
+            return { u1Events, lastEvent };
+        }, args);
+
+        // Assert no stream events leaked through to User 1
+        const streamEvents = result.u1Events.filter((e: any) => e.channel === "stream");
+        expect(streamEvents.length).toBe(0);
+
+        // Assert the breakout triggered properly
+        expect(result.lastEvent).toBeDefined();
+        expect(result.lastEvent.type).toEqual("libBreak");
     });
 });
