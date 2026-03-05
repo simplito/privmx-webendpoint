@@ -2954,4 +2954,116 @@ test.describe("StreamTest", () => {
             throw new Error("FAIL: Room did not auto-close after lurker lost network connection.");
         }
     });
+
+    test("E2E: invalid subscription", async ({ createContextPage, backend, cli }) => {
+        const page1 = await createContextPage();
+        await initPage(page1);
+        const users = await setupUsers(page1, cli);
+
+        const page2 = await createContextPage();
+        await initPage(page2);
+
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+
+        const contextId = testData.contextId;
+        let roomId: StreamRoomId;
+
+        // --- STEP 1: U1 Creates Room & Publishes ---
+        await test.step("User 1: Create Room, Join, Publish", async () => {
+            roomId = await page1.evaluate(
+                async ({ contextId, users }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 1");
+                    const api = window.streamApi;
+                    const enc = new TextEncoder();
+
+                    const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+                    const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+                    const sId = await api.createStreamRoom(
+                        contextId,
+                        [u1Obj, u2Obj],
+                        [u1Obj, u2Obj],
+                        enc.encode("p"),
+                        enc.encode("p"),
+                    );
+
+                    await api.joinStreamRoom(sId);
+                    const handle = await api.createStream(sId);
+
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: true,
+                        video: true,
+                    });
+                    await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                    await api.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+
+                    await api.publishStream(handle);
+                    await new Promise((r) => setTimeout(r, 1000));
+                    return sId;
+                },
+                { contextId, users },
+            );
+        });
+
+        // --- STEP 2: U2 Subscribes ---
+        await test.step("User 2: Join and invalid subscribe Subscribe, valid subscribe", async () => {
+            await page2.evaluate(
+                async ({ roomId }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
+                    const api = window.streamApi;
+
+                    await api.joinStreamRoom(roomId);
+
+                    let remoteStreams: any[] = [];
+                    for (let i = 0; i < 20; i++) {
+                        remoteStreams = await api.listStreams(roomId);
+                        if (remoteStreams.length > 0) break;
+                        await new Promise((r) => setTimeout(r, 500));
+                    }
+                    if (remoteStreams.length === 0) throw new Error("Stream not found");
+
+                    const targetStream = remoteStreams[0];
+
+                    const onRemoteTrack = (event: RTCTrackEvent) => {
+                        const track = event.track;
+                        const stream = event.streams[0];
+                        const elementId = `remote-${track.kind}`;
+
+                        if (document.getElementById(elementId)) return;
+
+                        const mediaEl = document.createElement("video");
+                        mediaEl.id = elementId;
+                        mediaEl.autoplay = true;
+                        mediaEl.playsInline = true;
+                        mediaEl.srcObject = stream || new MediaStream([track]);
+                        document.body.appendChild(mediaEl);
+                    };
+
+                    api.addRemoteStreamListener({
+                        onRemoteStreamTrack: onRemoteTrack,
+                        streamRoomId: roomId,
+                    });
+                    const invalidSubs = [{ streamId: 99, streamTrackId: "invalid" }];
+                    const expectError = async (fn: any) => {
+                        try {
+                            await fn();
+                        } catch {
+                            return;
+                        }
+                        throw new Error("Expected error");
+                    };
+                    await expectError(
+                        async () => await api.subscribeToRemoteStreams(roomId, invalidSubs),
+                    );
+                    const subs = targetStream.tracks.map((t: any) => ({
+                        streamId: targetStream.id,
+                        streamTrackId: t.mid,
+                    }));
+                    await api.subscribeToRemoteStreams(roomId, subs);
+                },
+                { roomId },
+            );
+        });
+    });
 });

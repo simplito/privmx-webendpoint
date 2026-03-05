@@ -161,6 +161,7 @@ export const test = base.extend<
                 `PMX_STREAM_ENABLED=true`,
                 `PRIVMX_HOSTNAME=0.0.0.0`,
                 // Internal Domains (must match service names in docker-compose)
+                `PMX_MEDIA_SERVER_ALLOW_SELF_SIGNED_CERTS=true`,
                 `PMX_STREAMS_MEDIA_SERVER=janus`,
                 `PMX_STREAMS_TURN_SERVER=turn:127.0.0.1:3478`,
                 `PMX_STREAMS_TURN_SERVER_SECRET=my-secret-key`,
