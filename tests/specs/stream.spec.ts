@@ -2955,7 +2955,7 @@ test.describe("StreamTest", () => {
         }
     });
 
-    test.only("E2E: invalid subscription", async ({ createContextPage, backend, cli }) => {
+    test("E2E: invalid subscription", async ({ createContextPage, backend, cli }) => {
         const page1 = await createContextPage();
         await initPage(page1);
         const users = await setupUsers(page1, cli);
@@ -3044,9 +3044,7 @@ test.describe("StreamTest", () => {
                         onRemoteStreamTrack: onRemoteTrack,
                         streamRoomId: roomId,
                     });
-                    const invalidSubs = [
-                        {streamId: -1, streamTrackId: "invalid"}
-                    ]
+                    const invalidSubs = [{ streamId: 99, streamTrackId: "invalid" }];
                     const expectError = async (fn: any) => {
                         try {
                             await fn();
@@ -3056,14 +3054,12 @@ test.describe("StreamTest", () => {
                         throw new Error("Expected error");
                     };
                     await expectError(
-                        async () =>
-                            await api.subscribeToRemoteStreams(roomId, invalidSubs)
+                        async () => await api.subscribeToRemoteStreams(roomId, invalidSubs),
                     );
                     const subs = targetStream.tracks.map((t: any) => ({
                         streamId: targetStream.id,
                         streamTrackId: t.mid,
                     }));
-
                     await api.subscribeToRemoteStreams(roomId, subs);
                 },
                 { roomId },
@@ -3071,5 +3067,3 @@ test.describe("StreamTest", () => {
         });
     });
 });
-
-
