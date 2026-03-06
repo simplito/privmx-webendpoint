@@ -196,4 +196,5 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(StreamApi, buildSubscriptionQuery)
     BINDING_FUNCTION(StreamApi, trickle)
     BINDING_FUNCTION(StreamApi, acceptOfferOnReconfigure)
+    BINDING_FUNCTION(StreamApi, setNewOfferOnReconfigure)
 }
