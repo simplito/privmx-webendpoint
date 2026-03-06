@@ -377,6 +377,7 @@ API_FUNCTION(StreamApi, unsubscribeFrom)
 API_FUNCTION(StreamApi, buildSubscriptionQuery)
 API_FUNCTION(StreamApi, trickle)
 API_FUNCTION(StreamApi, acceptOfferOnReconfigure)
+API_FUNCTION(StreamApi, setNewOfferOnReconfigure)
 
 }  // namespace api
 }  // namespace webendpoint

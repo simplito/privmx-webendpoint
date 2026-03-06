@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { ExtKey } from "./service/ExtKey";
-import { StreamRoomId } from "./webStreams/types/ApiTypes";
+import * as StreamsApiTypes from "./webStreams/types/ApiTypes";
 
 // export namespace core {
 export type SortOrder = "desc" | "asc";
@@ -623,6 +623,10 @@ export interface ItemPolicy {
     delete?: PolicyEntry;
 }
 
+export type StreamId = StreamsApiTypes.StreamId;
+export type StreamRoomId = StreamsApiTypes.StreamRoomId;
+export type StreamHandle = number & { _streamHandle: never };
+
 export interface StreamRoom {
     contextId: string;
     streamRoomId: string;
@@ -637,6 +641,7 @@ export interface StreamRoom {
     privateMeta: Uint8Array;
     policy: ContainerPolicy;
     statusCode: number;
+    closed: boolean;
 }
 
 export interface StreamInfo {
@@ -667,9 +672,6 @@ export interface StreamPublishResult {
         userId: string;
     };
 }
-
-/** reserved for future use */
-export interface StreamSettings {}
 
 /**
  * Holds error details
@@ -753,12 +755,11 @@ export interface TurnCredentials {
     expirationTime: number;
 }
 
-export interface StreamSettings {
-    settings: any;
-    onRemoteTrack: (track: RTCTrackEvent) => void;
+export interface RemoteStreamListener {
+    streamRoomId: StreamRoomId;
+    streamId?: StreamId;
+    onRemoteStreamTrack: (event: RTCTrackEvent) => void;
 }
-
-export type StreamHandle = number & { _streamHandle: never };
 
 /**
  * PKI Verification options
@@ -883,6 +884,6 @@ export type CollectionChangedEventData = {
 };
 
 export interface RecordingEncKey {
-    id: string;
+    id: Uint8Array;
     key: Uint8Array;
 }

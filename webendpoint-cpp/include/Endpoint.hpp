@@ -206,6 +206,7 @@ API_FUNCTION_HEADER(StreamApi, unsubscribeFrom)
 API_FUNCTION_HEADER(StreamApi, buildSubscriptionQuery)
 API_FUNCTION_HEADER(StreamApi, trickle)
 API_FUNCTION_HEADER(StreamApi, acceptOfferOnReconfigure)
+API_FUNCTION_HEADER(StreamApi, setNewOfferOnReconfigure)
 
 }  // namespace api
 }  // namespace webendpoint

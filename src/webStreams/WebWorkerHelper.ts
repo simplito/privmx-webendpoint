@@ -18,15 +18,17 @@ import { InitializeEvent, SetKeysEvent } from "./worker/WorkerEvents";
 // }
 
 interface WorkerLogEvent {
-    data: {
-        data: Object | String;
-        type: "error" | "debug";
-    } | {
-        type: "rms";
-        rms: number;
-        receiverId: number;
-        publisherId: number;
-    }
+    data:
+        | {
+              data: Object | String;
+              type: "error" | "debug";
+          }
+        | {
+              type: "rms";
+              rms: number;
+              receiverId: number;
+              publisherId: number;
+          };
 }
 
 export interface FrameInfo {
@@ -38,8 +40,10 @@ export interface FrameInfo {
 
 export class WebWorker {
     worker: Worker | undefined;
-    constructor(private assetsDir: string, private onFrame: (frameInfo: FrameInfo) => void) {
-    }
+    constructor(
+        private assetsDir: string,
+        private onFrame: (frameInfo: FrameInfo) => void,
+    ) {}
 
     async init_e2ee() {
         // this.worker = await this.createWorkerFromScript(this.assetsDir + "/e2ee-worker.js");
@@ -51,10 +55,14 @@ export class WebWorker {
             try {
                 if (event.data.type === "rms") {
                     if (this.onFrame !== undefined && typeof this.onFrame === "function") {
-                        this.onFrame({rms: event.data.rms, kind: "audio", receiverId: event.data.receiverId, publisherId: event.data.publisherId});
-                    }     
-                } else
-                if (event.data.type === "debug") {
+                        this.onFrame({
+                            rms: event.data.rms,
+                            kind: "audio",
+                            receiverId: event.data.receiverId,
+                            publisherId: event.data.publisherId,
+                        });
+                    }
+                } else if (event.data.type === "debug") {
                     console.log("[Worker-LOG/debug]", event.data.data);
                 } else if (event.data.type === "error") {
                     console.error("[Worker-LOG/error]", event.data.data);

@@ -2,10 +2,10 @@ import { defineConfig, devices } from '@playwright/test';
 import type { WorkerOptions } from "./tests/fixtures";
 
 export default defineConfig<WorkerOptions>({
-    testDir: './tests/specs', // Point to your specs folder
+    testDir: './tests/specs',
     workers: process.env.CI ? '100%' : undefined,
     webServer: {
-        command: 'npx serve . -p 8080', // Serve the ROOT folder
+        command: 'npx serve . -p 8080',
         url: 'http://localhost:8080',
         reuseExistingServer: !process.env.CI,
     },

@@ -1,23 +1,22 @@
 import {
     EncPair,
-    InitOptions,
     JanusPluginHandle,
     JanusSession,
     QueueItem,
-    RemoteStreamListener,
     SessionId,
 } from "./WebRtcClientTypes";
-import { FrameInfo, WebWorker } from "./WebWorkerHelper";
+import { WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
-import { Key, TurnCredentials } from "../Types";
+import { Key, TurnCredentials, StreamHandle, RemoteStreamListener } from "../Types";
 import { KeyStore } from "./KeyStore";
 import { PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
-import { StreamRoomId } from "./types/ApiTypes";
+import { StreamId, StreamRoomId } from "./types/ApiTypes";
 import { Queue } from "./Queue";
 import { Jsep } from "../service/WebRtcInterface";
 import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
 import { ActiveSpeakerDetector, DEFAULTS, SpeakerState } from "./audio/ActiveSpeakerDetector";
+import { StateChangeDispatcher } from "../service/EventDispatcher";
 
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
@@ -30,11 +29,15 @@ export interface StreamsCallbackInterface {
 }
 
 export interface UserAudioStats {
-    streamId: number;  
+    streamId: number;
     rms: number;
     active: boolean;
 }
- 
+
+export interface WebRtcStateEvents {
+    connected: { streamId: StreamId };
+}
+
 export interface AudioLevelsStats {
     levels: SpeakerState[];
 }
@@ -50,10 +53,12 @@ export class WebRtcClient {
     private configuration: RTCConfiguration | undefined;
     private keyStore: KeyStore = new KeyStore();
 
+    private publishStreamHandle: StreamHandle;
+
     // to moze byc uzyte kiedy wymagany jest update credentials (jak straca waznosc)
     private peerCredentials: TurnCredentials[] | undefined;
 
-    private onRemoteTrackListeners: { [roomId: StreamRoomId]: RemoteStreamListener } = {};
+    private remoteStreamsListeners: Map<StreamRoomId, RemoteStreamListener[]> = new Map();
     private peerConnectionsManager: PeerConnectionManager;
     private streamsApiInterface: StreamsCallbackInterface;
     private activeSpeakerDetector: ActiveSpeakerDetector;
@@ -66,7 +71,7 @@ export class WebRtcClient {
     private peerConnectionReconfigureQueue: Queue<QueueItem> | undefined;
     public lastProcessedAnswer: { [roomId: string]: Jsep } = {};
     private lastMeasuredLocalRMS: number = -99;
-    // private subscriberAttachedProcessing: boolean = false;
+    private eventsDispatcher: StateChangeDispatcher = new StateChangeDispatcher();
 
     constructor(private assetsDir: string) {
         this.uniqId = "" + Math.random() + "-" + Math.random();
@@ -103,11 +108,20 @@ export class WebRtcClient {
         this.streamsApiInterface = streamsApiInterface;
     }
 
-    public addRemoteStreamListener(roomId: StreamRoomId, listener: RemoteStreamListener) {
-        if (roomId in this.onRemoteTrackListeners) {
-            return;
+    public addRemoteStreamListener(listener: RemoteStreamListener) {
+        let listeners = this.remoteStreamsListeners.get(listener.streamRoomId) || [];
+
+        const exists = listeners.find((x) => x.streamId === listener.streamId);
+        if (exists) {
+            throw new Error("RemoteStreamListener with given params already exists.");
         }
-        this.onRemoteTrackListeners[roomId] = listener;
+
+        listeners.push(listener);
+        this.remoteStreamsListeners.set(listener.streamRoomId, listeners);
+    }
+
+    public getStreamStateChangeDispatcher() {
+        return this.eventsDispatcher;
     }
 
     public getConnectionManager() {
@@ -115,6 +129,10 @@ export class WebRtcClient {
             throw new Error("No peerConnectionManager initialized.");
         }
         return this.peerConnectionsManager;
+    }
+
+    public getWebRtcEventDispatcher() {
+        return this.eventsDispatcher;
     }
 
     protected getEncKey(): Key {
@@ -142,7 +160,11 @@ export class WebRtcClient {
                 }
             };
             worker.addEventListener("message", listener);
-            worker.postMessage({ operation: "init-pipeline", id: receiverTrackId, publisherId: publisherId });
+            worker.postMessage({
+                operation: "init-pipeline",
+                id: receiverTrackId,
+                publisherId: publisherId,
+            });
         });
 
         return waitPromise;
@@ -150,24 +172,24 @@ export class WebRtcClient {
 
     protected async getWorkerApi(): Promise<WebWorker> {
         if (!this.webWorkerApi) {
-            this.webWorkerApi = new WebWorker(this.assetsDir, (frameInfo => {
+            this.webWorkerApi = new WebWorker(this.assetsDir, (frameInfo) => {
                 if (this.audioLevelCallback && typeof this.audioLevelCallback === "function") {
                     // report local rms to activeSpeakerDetector to have notifications for local streams
                     this.activeSpeakerDetector.onFrame({
                         id: 0,
                         rms: this.lastMeasuredLocalRMS,
-                        timestamp: Date.now()
+                        timestamp: Date.now(),
                     });
                     const speakers = this.activeSpeakerDetector.onFrame({
                         id: frameInfo.publisherId,
                         rms: frameInfo.rms,
-                        timestamp: Date.now()
-                    })
+                        timestamp: Date.now(),
+                    });
                     // if (laudestParticipant === frameInfo.publisherId) {
-                        this.audioLevelCallback({levels: speakers})
+                    this.audioLevelCallback({ levels: speakers });
                     // }
                 }
-            }));
+            });
             console.log("Init e2ee worker ...");
             await this.webWorkerApi.init_e2ee();
         }
@@ -182,58 +204,16 @@ export class WebRtcClient {
         return this.configuration;
     }
 
-    // async recreateAndGetReceiverPeerConnection() {
-    //     this.receiverPeerConnection = this.createPeerConnectionMulti(this.configuration);
-    //     return this.receiverPeerConnection;
-    // }
-
     async setTurnCredentials(turnCredentials: TurnCredentials[]) {
         this.peerCredentials = turnCredentials;
     }
 
-    // async createPeerConnectionWithLocalStream(stream: MediaStream): Promise<RTCPeerConnection> {
-    //     // this.peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
-    //     this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
-
-    //     this.senderPeerConnection = this.createPeerConnectionMulti(this.configuration);
-    //     this.receiverPeerConnection = this.createPeerConnectionMulti(this.configuration);
-    //     console.log("=========> peerConnection multi created.", this.uniqId);
-    //     if (stream.getTracks().length > 0) {
-    //         const [track] = stream.getTracks();
-    //         console.log("adding track to peerConnection...");
-    //         const videoSender = this.senderPeerConnection.addTrack(track, stream);
-    //         this.e2eeWorker = await this.getWorker();
-
-    //         console.log("this.e2eeWorker", this.e2eeWorker);
-
-    //         if ((window as any).RTCRtpScriptTransform) {
-    //             const options = {
-    //                 operation: 'encode',
-    //             };
-    //             console.log("======> set e2ee worker for frame encoding (RTCRtpScriptTransform).");
-    //             (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
-    //         } else {
-
-    //             const senderStreams = (videoSender as any).createEncodedStreams();
-    //             console.log("post 'encode' frame to the e2ee worker..");
-    //             this.e2eeWorker.postMessage({
-    //                 operation: 'encode',
-    //                 readableStream: senderStreams.readable,
-    //                 writableStream: senderStreams.writable,
-    //             }, [ senderStreams.readable, senderStreams.writable ]);
-    //         }
-
-    //         console.log("Transform streams added.")
-    //     }
-    //     console.log("Created peerConnection with configuration: ", this.senderPeerConnection.getConfiguration(), "and clientId: ", this.clientId);
-    //     return this.senderPeerConnection;
-    // }
-
     async createPeerConnectionWithLocalStream(
+        streamHandle: StreamHandle,
         streamRoomId: StreamRoomId,
         stream: MediaStream,
     ): Promise<RTCPeerConnection> {
-        // this.peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
+        this.publishStreamHandle = streamHandle;
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
 
         const peerConnManager = this.getConnectionManager();
@@ -244,23 +224,16 @@ export class WebRtcClient {
             "publisher",
         ).pc;
 
-        // this.receiverPeerConnection = this.createPeerConnectionMulti(this.configuration);
-        console.log("=========> peerConnection multi created.", this.uniqId);
         if (stream.getTracks().length > 0) {
             const tracks = stream.getTracks();
             this.e2eeWorker = await this.getWorker();
-            console.log("adding track to peerConnection...");
             for (const track of tracks) {
                 if (track.kind === "audio") {
                     // add RMSProcessor
-                    console.log("Creating AudioLevelMeter instance for track...");
-                    const audioLevelMeter = await (new LocalAudioLevelMeter(track, onRms => {
-                        this.e2eeWorker.postMessage({operation: "rms", rms: onRms});
+                    const audioLevelMeter = await new LocalAudioLevelMeter(track, (onRms) => {
+                        this.e2eeWorker.postMessage({ operation: "rms", rms: onRms });
                         this.lastMeasuredLocalRMS = onRms;
-                    })
-                    ).init(
-                        this.assetsDir + '/rms-processor.js'
-                    );
+                    }).init(this.assetsDir + "/rms-processor.js");
                 }
 
                 const streamSender = pc.addTrack(track, stream);
@@ -283,11 +256,6 @@ export class WebRtcClient {
         tracksToAdd: MediaStreamTrack[],
         tracksToRemove: MediaStreamTrack[],
     ): Promise<RTCPeerConnection> {
-        console.log(
-            "[WebRTCClient] on updatePeerConnectionWithLocalStream",
-            { tracksToAdd },
-            { tracksToRemove },
-        );
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
         const peerConnManager = this.getConnectionManager();
         peerConnManager.initialize(streamRoomId, "publisher");
@@ -298,28 +266,20 @@ export class WebRtcClient {
         ).pc;
 
         if (tracksToAdd.length > 0) {
-            // const tracks = newStream.getTracks();
             this.e2eeWorker = await this.getWorker();
 
-            console.log("adding track to peerConnection...");
             for (const track of tracksToAdd) {
                 const videoSender = pc.addTrack(track, localStream);
-                console.log("PEER_CONNECTION: addTrack", track);
-
                 if ((window as any).RTCRtpScriptTransform) {
                     const options = {
                         operation: "encode",
                     };
-                    console.log(
-                        "======> set e2ee worker for frame encoding (RTCRtpScriptTransform).",
-                    );
                     (videoSender as any).transform = new RTCRtpScriptTransform(
                         this.e2eeWorker,
                         options,
                     );
                 } else {
                     const senderStreams = (videoSender as any).createEncodedStreams();
-                    console.log("post 'encode' frame to the e2ee worker..");
                     this.e2eeWorker.postMessage(
                         {
                             operation: "encode",
@@ -332,26 +292,16 @@ export class WebRtcClient {
             }
         }
         if (tracksToRemove.length > 0) {
-            // remove marked tracks
             const senders = pc.getSenders();
             for (const oldTrack of tracksToRemove) {
                 const sender = senders.find((s) => s.track === oldTrack);
                 if (sender) {
-                    console.log(
-                        "[WebRTCClient] on updatePeerConnectionWithLocalStream - pc.removeTrack",
-                        { sender },
-                    );
                     pc.removeTrack(sender);
                 }
             }
         }
         return pc;
     }
-
-    // public async createPeerConnectionOnJoin(peerCredentials: TurnCredentials[]) {
-    //     const configuration = WebRtcConfig.generateTurnConfiguration(peerCredentials);
-    //     this.receiverPeerConnection = this.createPeerConnectionMulti(configuration);
-    // }
 
     // private async onSubscriberAttached(eventData: SignalingFromServer.SubscriberAttached) {
     // console.log("============> onSubscriberAttached",eventData);
@@ -381,91 +331,6 @@ export class WebRtcClient {
     // await this.signalingApi?.acceptOffer(eventData.session_id, eventData.handle, answer);
     // }
 
-    // private async createAppServerChannel(): Promise<AppServerChannel> {
-    //     const appServerChannel = new AppServerChannel({
-    //         serverAddress: WebRtcConfig.getAppServerAddress(),
-    //         onResponse: async (data: Message) => {
-    //             if (data.kind === "credentials") {
-    //                 console.log("on data in crate AppServerChannel(): creadentials", data);
-    //                 await this.updatePeerConnectionCredentialsOnEvent(data.data);
-    //             }
-    //         },
-    //         onEvent: async (data: any) => await this.onAppServerSignalingEvent(data)
-    //     });
-    //     this.clientId = await appServerChannel.connect();
-    //     return appServerChannel;
-    // }
-
-    private async updatePeerConnectionCredentialsOnEvent(_credentials: TurnCredentials[]) {
-        // console.log("updatePeerConnectionCredentialsOnEvent...");
-        // this.peerCredentials = credentials;
-        // const peerConnection = this.getActivePeerConnection();
-        // if (peerConnection) {
-        //     const newConfiguration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
-        //     peerConnection.setConfiguration(newConfiguration);
-        //     this.startNegotiationMulti(true);
-        // }
-        // console.log("PeerConnection and peerCredentials after update", this.peerConnection, this.peerCredentials);
-    }
-
-    // private createPeerConnectionMulti(configuration: RTCConfiguration & {encodedInsertableStreams?: boolean}): RTCPeerConnection {
-    //     console.log("createPeerConnectionMulti...");
-    //     const extConf = configuration || this.getPeerConnectionConfiguration();
-    //     if (!extConf) {
-    //         throw new Error("No configuration available!");
-    //     }
-    //     (extConf as any).encodedInsertableStreams = true;
-    //     console.log("extConf", extConf);
-    //     const connection = new RTCPeerConnection(extConf);
-    //     // Listen for local ICE candidates on the local RTCPeerConnection
-    //     connection.addEventListener('icecandidate', event => {
-    //         // console.log("on peerConnection new iceCandidate: ", event);
-    //         if (event.candidate) {
-    //             // signalingChannel.send({'iceCandidate': event.candidate});
-    //             this.iceCandidates.push(event.candidate);
-    //         }
-    //     });
-    //     // gethering state change
-    //     connection.addEventListener('icegatheringstatechange', event => {
-    //         console.log("on ice state change: ", event);
-    //     });
-    //     // ice candidate error
-    //     connection.addEventListener('icecandidateerror', event => {
-    //         console.warn("on ice error: ", event);
-    //     });
-    //     connection.addEventListener('connectionstatechange', event => {
-    //         console.log("connectionstatechange: ", event);
-    //         if (connection.connectionState === "connected") {
-    //             console.log("Peers connected!");
-    //         } else {
-    //             console.log("connection state: ", connection.connectionState);
-    //         }
-    //     });
-    //     connection.addEventListener('datachannel', event => {
-    //         console.log("=================> datachannel: ", event);
-    //         const recvChannel = event.channel;
-    //         this.addDataChannel(recvChannel);
-    //     });
-
-    //     connection.addEventListener('iceconnectionstatechange', event => {
-    //         console.log("iceconnectionstatechange: ", event);
-    //     });
-    //     connection.addEventListener('negotiationneeded', event => {
-    //         console.log("negotiationneeded: ", event);
-    //         this.startNegotiationMulti(connection);
-    //         console.warn("negotiationneeded call... ignored for now but has to be implemented.")
-    //     });
-    //     connection.addEventListener('signalingstatechange', event => {
-    //         console.log("signalingstatechange: ", event);
-    //     });
-    //     connection.addEventListener('track', event => {
-    //         console.log("track: ", event);
-    //         this.addRemoteTrack(event);
-    //     });
-    //     console.log("2");
-    //     return connection;
-    // }
-
     private createPeerConnectionMultiForRoom(
         roomId: StreamRoomId,
         configuration: RTCConfiguration & { encodedInsertableStreams?: boolean },
@@ -477,24 +342,6 @@ export class WebRtcClient {
         (extConf as any).encodedInsertableStreams = true;
         this.logger.log("info", "extConf", extConf);
         const connection = new RTCPeerConnection(extConf);
-
-        // Listen for local ICE candidates on the local RTCPeerConnection
-        // connection.addEventListener('icecandidate', event => {
-        //     if (event.candidate) {
-        //         this.logger.log("info", "on peerConnection new iceCandidate: ", event);
-        //         if (handle && session) {
-        //             try {
-        //                 // this.mediaServerChannel?.trickle(session, handle, event.candidate);
-        //                 this.streamsApiInterface.trickle(session.id, event.candidate);
-        //             } catch (e) {
-        //                 // fallback: push to array
-        //                 this.iceCandidates.push(event.candidate);
-        //             }
-        //         } else {
-        //             this.iceCandidates.push(event.candidate);
-        //         }
-        //     }
-        // });
 
         // gethering state change
         connection.addEventListener("icegatheringstatechange", (event) => {
@@ -511,6 +358,10 @@ export class WebRtcClient {
             } else {
                 this.logger.log("info", "connection state: ", connection.connectionState);
             }
+            this.eventsDispatcher.emit({
+                streamHandle: this.publishStreamHandle,
+                state: connection.connectionState,
+            });
         });
         connection.addEventListener("datachannel", (event) => {
             this.logger.log("info", "datachannel: ", event);
@@ -529,37 +380,11 @@ export class WebRtcClient {
             this.logger.log("info", "signalingstatechange: ", event);
         });
         connection.addEventListener("track", async (event) => {
-            // const mappedPublisher = this.getPublishers().find(publisher => publisher.id.toString() === event.streams[0].id);
-            // if (!mappedPublisher) {
-            //     throw new Error("Cannot match new remote track event with any known publisher..");
-            // }
-            console.group("Adding remote track of publisher", event /*, mappedPublisher*/);
             await this.addRemoteTrack(roomId, event /*, mappedPublisher*/);
         });
 
         return connection;
     }
-
-    // protected getPublishers(): Publisher[] {
-    //     const publishers: Publisher[] = [];
-    //     for (const [_key, value] of Object.entries(this.mediaServerAvailPublishers)) {
-    //         publishers.push(value);
-    //     }
-    //     return publishers;
-    // }
-
-    // public getSenderActivePeerConnection(): RTCPeerConnection {
-    //     if (!this.senderPeerConnection) {
-    //         throw new Error("PeerConnection not initialized! " + this.uniqId);
-    //     }
-    //     return this.senderPeerConnection;
-    // }
-    // public getReceiverActivePeerConnection(): RTCPeerConnection {
-    //     if (!this.receiverPeerConnection) {
-    //         throw new Error("Receiver PeerConnection not initialized!");
-    //     }
-    //     return this.receiverPeerConnection;
-    // }
 
     private async startNegotiationMulti(
         rtcPeerConnection: RTCPeerConnection,
@@ -611,19 +436,18 @@ export class WebRtcClient {
         (await this.getWorkerApi()).setKeys(keys);
     }
 
-
     /// INSERTABLE STREAMS
 
     private setupSenderTransform(videoSender: RTCRtpSender) {
         if ((window as any).RTCRtpScriptTransform) {
-            this.logger.log("important-only", "Worker - encoding frames using RTCRtpScriptTransform");
+            this.logger.log(
+                "important-only",
+                "Worker - encoding frames using RTCRtpScriptTransform",
+            );
             const options = {
                 operation: "encode",
             };
-            (videoSender as any).transform = new RTCRtpScriptTransform(
-                this.e2eeWorker,
-                options,
-            );
+            (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
         } else {
             this.logger.log("important-only", "Worker - encoding frames using EncodedStreams");
             const senderStreams = (videoSender as any).createEncodedStreams();
@@ -638,27 +462,38 @@ export class WebRtcClient {
         }
     }
 
-    private async setupReceiverTransform(receiver: RTCRtpReceiver, publisherId: number, worker: Worker) {
-        console.group("on setupReceiverTransform");
-
+    private async setupReceiverTransform(
+        receiver: RTCRtpReceiver,
+        publisherId: number,
+        worker: Worker,
+    ) {
         if ("RTCRtpScriptTransform" in window && !receiver.transform) {
             this.logger.log("important-only", "-> using RtpScriptTransform");
             const id = receiver.track.id;
             receiver.transform = new window.RTCRtpScriptTransform(worker, {
                 operation: "decode",
                 id,
-                publisherId
+                publisherId,
             });
-            console.groupEnd();
             return;
         }
         this.logger.log("important-only", "-> using EncodedStreams");
 
         // Fallback: Encoded Streams
-        if (!this.encByReceiver.has(receiver) && "createEncodedStreams" in receiver && typeof (receiver.createEncodedStreams) === "function") {
+        if (
+            !this.encByReceiver.has(receiver) &&
+            "createEncodedStreams" in receiver &&
+            typeof receiver.createEncodedStreams === "function"
+        ) {
             this.logger.log("important-only", "-> call for createEncodedStreams()");
             const { readable, writable } = await receiver.createEncodedStreams();
-            const enc = { readable, writable, id: receiver.track.id, publisherId: publisherId, posted: false };
+            const enc = {
+                readable,
+                writable,
+                id: receiver.track.id,
+                publisherId: publisherId,
+                posted: false,
+            };
             this.encByReceiver.set(receiver, enc);
 
             this.logger.log(
@@ -681,7 +516,6 @@ export class WebRtcClient {
         } else {
             this.logger.log("important-only", "-> EncodedStreams posted to worker already.");
         }
-        console.groupEnd();
     }
 
     private async waitUntilConnected(pc: RTCPeerConnection) {
@@ -720,14 +554,6 @@ export class WebRtcClient {
         roomId: StreamRoomId,
         event: RTCTrackEvent /*, mappedPublisher: Publisher*/,
     ) {
-        // if (this.subscriberAttachedProcessing) {
-        //     console.log("=====> POSTPONE addRemoteTrack <- waiting for: setupReceiverTranfrom()");
-        //     setTimeout(() => {
-        //         this.addRemoteTrack(event, mappedPublisher);
-        //     }, 10);
-        //     return;
-        // }
-        console.log("===================== REMOTE TRACK ADDED ========================");
         const worker = await this.getWorker();
         const track = event.track;
         const receiver = event.receiver;
@@ -745,29 +571,27 @@ export class WebRtcClient {
         await this.setupReceiverTransform(receiver, publisherId, worker);
         track.addEventListener("ended", async () => await this.teardownReceiver(receiver, worker));
 
-        // if ((window as any).RTCRtpScriptTransform) {
-        //     const options = {
-        //         operation: 'decode',
-        //         kind: track.kind
-        //     };
+        this.callRegisteredListeners(roomId, event);
+    }
 
-        //     (receiver as any).transform = new RTCRtpScriptTransform(worker, options);
-        // } else {
-        //     console.log("receiver", receiver);
-        //     const receiverStreams = (receiver as any).createEncodedStreams();
-
-        //     worker.postMessage({
-        //         operation: 'decode',
-        //         readableStream: receiverStreams.readable,
-        //         writableStream: receiverStreams.writable,
-        //     }, [ receiverStreams.readable, receiverStreams.writable ]);
-
-        //     console.log({receiver, receiverStreams, track, key});
-        // }
-        if (!(roomId in this.onRemoteTrackListeners)) {
-            throw new Error("No remoteTrack listener registered for room: " + roomId);
+    private callRegisteredListeners(roomId: StreamRoomId, event: RTCTrackEvent) {
+        const remoteStreamId = Number(event.streams[0].id);
+        const listeners = this.remoteStreamsListeners.get(roomId);
+        if (!listeners) {
+            this.logger.log("info", "No remoteTrack listener registered for room: " + roomId);
+            return;
         }
-        this.onRemoteTrackListeners[roomId](event);
+        const filteredListeners = listeners.filter(
+            (x) => x.streamId === remoteStreamId || x.streamId === undefined,
+        );
+        for (const listener of filteredListeners) {
+            if (
+                listener.onRemoteStreamTrack &&
+                typeof listener.onRemoteStreamTrack === "function"
+            ) {
+                listener.onRemoteStreamTrack(event);
+            }
+        }
     }
 
     // test
@@ -788,22 +612,10 @@ export class WebRtcClient {
     }
 
     public async onSubscriptionUpdatedSingle(_room: StreamRoomId, offer: any) {
-        // if (!this.peerConnectionReconfigureQueue) {
-        //     throw new Error("ReconfigureQueue does not exist.");
-        // }
-        // this.peerConnectionReconfigureQueue.enqueue({taskId: Math.floor(1 + Math.random() * 10000), _room, offer});
-        // try {
-        //     await this.peerConnectionReconfigureQueue.processAll();
-        // } catch (e) {
-        //     console.error("Error on onSubscriberAttached", e);
-        // }
         return this.reconfigureSingle(_room, offer);
     }
 
     private async reconfigureSingle(room: StreamRoomId, offer: Jsep): Promise<Jsep> {
-        // this.subscriberAttachedProcessing = true;
-        console.group("Reconfiguring to recv streams of all publishers - task: ");
-
         if (!this.configuration) {
             throw new Error("Configuration missing.");
         }
@@ -830,68 +642,8 @@ export class WebRtcClient {
         this.logger.log("important-only", "3. Setting up localDescription...");
         await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
 
-        // this.logger.log("important-only", "4. notifying Janus with answer...");
-        // await this.streamsApiInterface.acceptOffer(janusConnection.sessionId, {type: answer.type, sdp: answer.sdp});
-        // await this.mediaServerChannel?.videoRoomAcceptOffer(item.sessionId, item.handle, answer);
-        console.groupEnd();
         // this.subscriberAttachedProcessing = false
         this.lastProcessedAnswer[room] = answer as Jsep;
         return answer as Jsep;
     }
-
-    // public async addNewPublisherAsAvailable(room: StreamRoomId, publisher: NewPublisherEvent) {
-    //     this.logger.log("important-only", "addNewPublisher ", room, {newPublisher: publisher, currentPublishers: this.mediaServerAvailPublishers});
-    //     if (!(publisher.id in this.mediaServerAvailPublishers)) {
-    //         const newPublisher = {...publisher, attached: false, room: room};
-    //         this.mediaServerAvailPublishers[newPublisher.id] = newPublisher;
-    //     }
-    // }
-
-    // public async getPublishersToSubscribeTo(room: StreamRoomId, _publisher: Publisher) {
-    //     console.group("subscribeToRemotePublisher...");
-
-    //     const publishers = this.getPublishers();
-    //     const streamsToJoin = publishers.filter(x => x.attached === false).flatMap(publisher => {
-    //         const filtered = publisher.streams.map((stream) => {
-    //             return {feed: publisher.id, mid: stream.mid};
-    //         });
-    //         return filtered;
-    //     })
-    //     return streamsToJoin;
-    // }
-
-    // public async setHasSubscriptions(roomId: StreamRoomId) {
-    //     const janusConn = this.getConnectionManager().getConnectionWithSession(roomId, "subscriber");
-    //     janusConn.hasSubscriptions = true;
-    // }
-
-    // public markPublishersAsSubscribed(streamsIds: StreamId[]) {
-    //     for (const id of streamsIds) {
-    //         if (id in this.mediaServerAvailPublishers) {
-    //             this.mediaServerAvailPublishers[id].attached = true;
-    //         }
-    //     }
-    // }
-
-    // private async unsubscribeRemotePublishers(room: VideoRoomId, publishers: Publisher[]) {
-    //     console.group("unsubscribeRemotePublishers...");
-    //     const connection = await this.ensureSubscriberPeerConnectionWithSessionAndHandle(room);
-
-    //     const streamsToLeave = publishers.filter(x => x.attached === true).flatMap(publisher => {
-    //         const filtered = publisher.streams.map((stream) => {
-    //             return {feed: publisher.id, mid: stream.mid};
-    //         });
-    //         return filtered;
-    //     })
-    //     this.logger.log("important-only", "unsubscribeRemotePublishers", streamsToLeave);
-
-    //     console.log("===================> UNSUBSCRIBE FROM EXISTING ", streamsToLeave, "< ==================")
-    //     await this.mediaServerChannel?.videoRoomSubscribeOnExisting(connection.session.id, connection.handle, {
-    //         streams: streamsToLeave
-    //     });
-
-    // }
 }
-
-// TODO: sprawdzic processing queue
-// dodac acceptOfferOnReconfigure do StreamApiLowVarInterface

@@ -148,7 +148,10 @@ export class StreamApiNative extends BaseNative {
         );
     }
 
-    async getStreamRoomRecordingKeys(ptr: number, args: [string]): Promise<Types.RecordingEncKey[]> {
+    async getStreamRoomRecordingKeys(
+        ptr: number,
+        args: [string],
+    ): Promise<Types.RecordingEncKey[]> {
         return this.runAsync<Types.RecordingEncKey[]>((taskId) =>
             this.api.lib.StreamApi_getStreamRoomRecordingKeys(taskId, ptr, args),
         );
@@ -182,7 +185,7 @@ export class StreamApiNative extends BaseNative {
 
     async subscribeToRemoteStreams(
         ptr: number,
-        args: [string, Types.StreamSubscription[], Types.StreamSettings],
+        args: [string, Types.StreamSubscription[]],
     ): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.StreamApi_subscribeToRemoteStreams(taskId, ptr, args),
@@ -191,12 +194,7 @@ export class StreamApiNative extends BaseNative {
 
     async modifyRemoteStreamsSubscriptions(
         ptr: number,
-        args: [
-            string,
-            Types.StreamSubscription[],
-            Types.StreamSubscription[],
-            Types.StreamSettings,
-        ],
+        args: [string, Types.StreamSubscription[], Types.StreamSubscription[]],
     ): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.StreamApi_modifyRemoteStreamsSubscriptions(taskId, ptr, args),
@@ -205,7 +203,7 @@ export class StreamApiNative extends BaseNative {
 
     async unsubscribeFromRemoteStreams(
         ptr: number,
-        args: [string, Types.StreamSubscription[], Types.StreamSettings],
+        args: [string, Types.StreamSubscription[]],
     ): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.StreamApi_unsubscribeFromRemoteStreams(taskId, ptr, args),
@@ -252,6 +250,12 @@ export class StreamApiNative extends BaseNative {
     async acceptOfferOnReconfigure(ptr: number, args: [number, Jsep]): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.StreamApi_acceptOfferOnReconfigure(taskId, ptr, args),
+        );
+    }
+
+    async setNewOfferOnReconfigure(ptr: number, args: [number, Jsep]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_setNewOfferOnReconfigure(taskId, ptr, args),
         );
     }
 
