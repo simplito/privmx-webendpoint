@@ -253,6 +253,12 @@ export class StreamApiNative extends BaseNative {
         );
     }
 
+    async setNewOfferOnReconfigure(ptr: number, args: [number, Jsep]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_setNewOfferOnReconfigure(taskId, ptr, args),
+        );
+    }
+
     protected bindWebRtcInterfaceAsHandler(bindingId: number): void {
         this.webRtcInterfaceImpl = new WebRtcInterfaceImpl(this.webRtcClient);
         let windowBinder = (window as any).webRtcInterfaceToNativeHandler;

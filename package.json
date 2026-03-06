@@ -1,6 +1,6 @@
 {
   "name": "@simplito/privmx-webendpoint",
-  "version": "2.7.0-rc3",
+  "version": "2.7.0-rc5",
   "description": "PrivMX Web Endpoint library",
   "author": "Simplito",
   "license": "PrivMX Free License",
@@ -39,7 +39,7 @@
   "scripts": {
     "clean": "rm -rf ./dist",
     "test": "jest src",
-    
+
     "build": "npm run clean && npm run build:wasm && npm run build:js && scripts/move_wasm_assets",
     "build:wasm": "scripts/pipeline.sh",
     "build:js": "npm run compile && npm run bundle && npm run build:worker && cp ./dist/assets/* ./assets/ && cp ./dist/bundle/rms-processor.js ./assets/",
