@@ -39,7 +39,6 @@
   "scripts": {
     "clean": "rm -rf ./dist",
     "test": "jest src",
-
     "build": "npm run clean && npm run build:wasm && npm run build:js && scripts/move_wasm_assets",
     "build:wasm": "scripts/pipeline.sh",
     "build:js": "npm run compile && npm run bundle && npm run build:worker && cp ./dist/assets/* ./assets/ && cp ./dist/bundle/rms-processor.js ./assets/",
@@ -82,8 +81,8 @@
     "assert": "^2.1.0",
     "babel-jest": "^29.7.0",
     "buffer": "^6.0.3",
-    "copy-webpack-plugin": "^13.0.1",
-    "crypto-browserify": "^3.12.0",
+    "copy-webpack-plugin": "^14.0.0",
+    "crypto-browserify": "^3.3.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-indent-empty-lines": "^1.0.2",
