@@ -58,45 +58,6 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     }
 
     async createOfferAndSetLocalDescription(model: RoomModel) {
-        // ==== CODE BELOW MOVED TO WEBRTC IMPL ===========
-        //
-        // // configure client
-        // const mediaTracks: MediaStreamTrack[] = [];
-        // for (const value of this.streamTracks.values()) {
-        //     if (value.streamId === streamId && value.track) {
-        //         mediaTracks.push(value.track);
-        //     }
-        // }
-        // const key = streamId.toString();
-        // const _stream = this.streams.get(key);
-        // if (!_stream) {
-        //     throw new Error("No stream defined to publish");
-        // }
-
-        // const mediaStream = new MediaStream(mediaTracks);
-
-        // // prepare peerConnection
-        // const peerConnection = await this.client.createPeerConnectionWithLocalStream(mediaStream);
-
-        // // natywna obsluga datachanneli
-        // let dataChannelId = -1;
-        // for (const value of this.streamTracks.values()) {
-        //     if (value.streamId === streamId && value.dataChannelMeta) {
-        //         const channel = peerConnection.createDataChannel(value.dataChannelMeta.name, {id: (++dataChannelId)});
-        //         console.log("CREATING AND SETTING UP data channel", value, channel);
-        //         this.dataChannels.set(value.id, channel);
-        //     }
-        // }
-
-        // // get offer created and set during negotiation
-        // console.warn("streamPublish: generate new offer on publish, but has to be implemented in conjunction with negotiationneeded event");
-        // // const offer = peerConnection.currentLocalDescription?.toJSON();
-        // const offer = await peerConnection.createOffer();
-        // peerConnection.setLocalDescription(offer);
-
-        // createPeerConnectionWithLocalStream powinno byc zawolane w kliencie jak ustawiamy strumien z kamery
-        // const peerConnection = await this.client.createPeerConnectionWithLocalStream(mediaStream);
-        console.log("[WebrtcInterfaceImpl]: createOfferAndSetLocalDescription call..");
         const peerConnection = this.getClient()
             .getConnectionManager()
             .getConnectionWithSession(model.roomId, "publisher").pc;
@@ -107,24 +68,12 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     }
 
     async createAnswerAndSetDescriptions(model: SdpWithRoomModel): Promise<string> {
-        console.log("[WebrtcInterfaceImpl]: createAnswerAndSetDescriptions call..");
-        // const janusSession = this.getClient().getConnectionManager().getConnectionWithSession(model.roomId, "subscriber");
-        // if (!("pc" in janusSession)) {
-        //     throw new Error("WebRtcInterfaceImpl: No peerConnection available on createAnswerAndSetDescriptions");
-        // }
-        // const peerConnection = janusSession.pc;
-
-        // await peerConnection.setRemoteDescription(new RTCSessionDescription({sdp: model.sdp, type: model.type as RTCSdpType}));
-        // const answer = await peerConnection.createAnswer();
-        // await peerConnection.setLocalDescription(answer);
         const offer: Jsep = { sdp: model.sdp, type: model.type };
-        const answer = await this.getClient().onSubscriptionUpdated(model.roomId, offer);
-        // return answer.sdp;
+        await this.getClient().onSubscriptionUpdated(model.roomId, offer);
         return this.webRtcClient.lastProcessedAnswer[model.roomId].sdp;
     }
 
     async setAnswerAndSetRemoteDescription(model: SetAnswerAndSetRemoteDescriptionModel) {
-        console.log("[WebrtcInterfaceImpl]: setAnswerAndSetRemoteDescription call..");
         const janusSession = this.getClient()
             .getConnectionManager()
             .getConnectionWithSession(model.roomId, "publisher");
@@ -137,7 +86,6 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         await peerConnection.setRemoteDescription(
             new RTCSessionDescription({ sdp: model.sdp, type: model.type as RTCSdpType }),
         );
-        console.log("PEER CONNECTION: ", peerConnection);
     }
 
     async close(roomId: StreamRoomId) {

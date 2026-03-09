@@ -72,14 +72,10 @@ export class WebRtcClient {
     public lastProcessedAnswer: { [roomId: string]: Jsep } = {};
     private lastMeasuredLocalRMS: number = -99;
     private eventsDispatcher: StateChangeDispatcher = new StateChangeDispatcher();
+    private localAudioLevelMeters: Map<string, LocalAudioLevelMeter> = new Map();
 
     constructor(private assetsDir: string) {
         this.uniqId = "" + Math.random() + "-" + Math.random();
-        console.log(
-            "WebRtcClient constructor (" + this.uniqId + ")",
-            "assetsDir: ",
-            this.assetsDir,
-        );
         this.peerConnectionsManager = new PeerConnectionManager(
             (roomId: StreamRoomId) => {
                 return this.createPeerConnectionMultiForRoom(
@@ -98,6 +94,34 @@ export class WebRtcClient {
         });
 
         this.activeSpeakerDetector = new ActiveSpeakerDetector(DEFAULTS);
+    }
+
+    private async ensureLocalAudioLevelMeter(track: MediaStreamTrack) {
+        if (this.localAudioLevelMeters.has(track.id)) {
+            return;
+        }
+        const worker = await this.getWorker();
+        const meter = new LocalAudioLevelMeter(track, (onRms) => {
+            worker.postMessage({ operation: "rms", rms: onRms });
+            this.lastMeasuredLocalRMS = onRms;
+        });
+        this.localAudioLevelMeters.set(track.id, meter);
+        try {
+            await meter.init(this.assetsDir + "/rms-processor.js");
+        } catch (e) {
+            this.localAudioLevelMeters.delete(track.id);
+            meter.stop();
+            throw e;
+        }
+    }
+
+    private stopLocalAudioLevelMeter(track: MediaStreamTrack) {
+        const meter = this.localAudioLevelMeters.get(track.id);
+        if (!meter) {
+            return;
+        }
+        this.localAudioLevelMeters.delete(track.id);
+        meter.stop();
     }
 
     public setAudioLevelCallback(func: AudioLevelFuncCallback) {
@@ -190,7 +214,6 @@ export class WebRtcClient {
                     // }
                 }
             });
-            console.log("Init e2ee worker ...");
             await this.webWorkerApi.init_e2ee();
         }
         return this.webWorkerApi;
@@ -230,10 +253,7 @@ export class WebRtcClient {
             for (const track of tracks) {
                 if (track.kind === "audio") {
                     // add RMSProcessor
-                    const audioLevelMeter = await new LocalAudioLevelMeter(track, (onRms) => {
-                        this.e2eeWorker.postMessage({ operation: "rms", rms: onRms });
-                        this.lastMeasuredLocalRMS = onRms;
-                    }).init(this.assetsDir + "/rms-processor.js");
+                    await this.ensureLocalAudioLevelMeter(track);
                 }
 
                 const streamSender = pc.addTrack(track, stream);
@@ -243,9 +263,12 @@ export class WebRtcClient {
         return pc;
     }
 
-    removeSenderPeerConnectionOnUnpublish(streamRoomId: StreamRoomId, _stream: MediaStream) {
+    removeSenderPeerConnectionOnUnpublish(streamRoomId: StreamRoomId, stream: MediaStream) {
         const peerConnManager = this.getConnectionManager();
         const session = peerConnManager.getConnectionWithSession(streamRoomId, "publisher");
+        for (const track of stream.getAudioTracks()) {
+            this.stopLocalAudioLevelMeter(track);
+        }
         session.pc.close();
         session.pc = undefined;
     }
@@ -269,6 +292,9 @@ export class WebRtcClient {
             this.e2eeWorker = await this.getWorker();
 
             for (const track of tracksToAdd) {
+                if (track.kind === "audio") {
+                    await this.ensureLocalAudioLevelMeter(track);
+                }
                 const videoSender = pc.addTrack(track, localStream);
                 if ((window as any).RTCRtpScriptTransform) {
                     const options = {
@@ -294,6 +320,9 @@ export class WebRtcClient {
         if (tracksToRemove.length > 0) {
             const senders = pc.getSenders();
             for (const oldTrack of tracksToRemove) {
+                if (oldTrack.kind === "audio") {
+                    this.stopLocalAudioLevelMeter(oldTrack);
+                }
                 const sender = senders.find((s) => s.track === oldTrack);
                 if (sender) {
                     pc.removeTrack(sender);
@@ -303,44 +332,14 @@ export class WebRtcClient {
         return pc;
     }
 
-    // private async onSubscriberAttached(eventData: SignalingFromServer.SubscriberAttached) {
-    // console.log("============> onSubscriberAttached",eventData);
-    // // const peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
-
-    // // const configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
-    // if (!this.configuration) {
-    //     throw new Error("Configuration missing.");
-    // }
-    // console.log("-----> onSubscriberAttached", {room: eventData.room, streams: eventData.streams});
-    // this.receiverPeerConnection = this.createPeerConnectionMulti(this.configuration);
-    // const peerConnection = this.receiverPeerConnection;
-
-    // console.log("-----> setting up remote subscriber offer as remoteDescription", eventData.offer);
-    // await peerConnection.setRemoteDescription(new RTCSessionDescription(eventData.offer));
-    // console.log("----------> creating answer for remote offer..");
-
-    // const dataStreams = eventData.streams.filter(x => x.type === "data");
-    // for (const x of dataStreams) {
-    //     console.log("============> Creating dataChannel handler..." + x.mid);
-    //     peerConnection.createDataChannel("JanusDataChannel/" + x.mid);
-    // }
-    // const answer = await peerConnection.createAnswer();
-
-    // await peerConnection.setLocalDescription(answer);
-
-    // await this.signalingApi?.acceptOffer(eventData.session_id, eventData.handle, answer);
-    // }
-
     private createPeerConnectionMultiForRoom(
         roomId: StreamRoomId,
         configuration: RTCConfiguration & { encodedInsertableStreams?: boolean },
         _handle?: JanusPluginHandle,
         _session?: JanusSession,
     ): RTCPeerConnection {
-        this.logger.log("info", "createPeerConnectionMulti");
         const extConf = configuration;
         (extConf as any).encodedInsertableStreams = true;
-        this.logger.log("info", "extConf", extConf);
         const connection = new RTCPeerConnection(extConf);
 
         // gethering state change
@@ -363,11 +362,6 @@ export class WebRtcClient {
                 state: connection.connectionState,
             });
         });
-        connection.addEventListener("datachannel", (event) => {
-            this.logger.log("info", "datachannel: ", event);
-            const recvChannel = event.channel;
-            this.addDataChannel(recvChannel);
-        });
 
         connection.addEventListener("iceconnectionstatechange", (event) => {
             this.logger.log("info", "iceconnectionstatechange: ", event);
@@ -386,64 +380,13 @@ export class WebRtcClient {
         return connection;
     }
 
-    private async startNegotiationMulti(
-        rtcPeerConnection: RTCPeerConnection,
-        withIceRestart?: boolean,
-    ) {
-        try {
-            console.log("[startNegotiationMulti]", "Create offer...");
-            const offer = await rtcPeerConnection.createOffer({ iceRestart: withIceRestart });
-            console.log("setLocalDescription on startNegotiationMulti");
-            await rtcPeerConnection.setLocalDescription(offer);
-        } catch (e) {
-            console.error("Error on startNegotiationMulti", e);
-        }
-    }
-
-    createDataChannel(_name: string) {
-        // const channel = this.getSenderActivePeerConnection().createDataChannel(name);
-        // this.addDataChannel(channel);
-    }
-
-    private addDataChannel(dataChannel: RTCDataChannel) {
-        console.log("on addDataChannel", dataChannel);
-        dataChannel.addEventListener("open", () => {
-            console.log("Data channel opened.");
-        });
-        dataChannel.addEventListener("close", () => {
-            console.log("Data channel closed.");
-        });
-        dataChannel.addEventListener("error", (err) => {
-            console.log("Data channel error", err);
-        });
-        this.dataChannels.push(dataChannel);
-    }
-
-    async sendToChannel(name: string, message: string) {
-        const channel = this.dataChannels.find((x) => x.label === name);
-        if (!channel || channel.readyState !== "open") {
-            console.error("Cannot find open channel by given name");
-            return;
-        }
-        channel.send(message);
-        console.log("Message sent!");
-    }
-
     async updateKeys(_streamRoomId: StreamRoomId, keys: Key[]) {
         this.keyStore.setKeys(keys);
-
-        // propagate keys to the worker
         (await this.getWorkerApi()).setKeys(keys);
     }
 
-    /// INSERTABLE STREAMS
-
     private setupSenderTransform(videoSender: RTCRtpSender) {
         if ((window as any).RTCRtpScriptTransform) {
-            this.logger.log(
-                "important-only",
-                "Worker - encoding frames using RTCRtpScriptTransform",
-            );
             const options = {
                 operation: "encode",
             };
