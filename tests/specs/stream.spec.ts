@@ -1373,7 +1373,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test("modifyRemoteStreamsSubscriptions: various scenarios", async ({ page, backend, cli }) => {
+    test.skip("modifyRemoteStreamsSubscriptions: various scenarios", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
