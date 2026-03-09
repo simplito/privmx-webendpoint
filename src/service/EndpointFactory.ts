@@ -46,19 +46,6 @@ export class EndpointFactory {
     private static eventQueueInstance: EventQueue;
     private static assetsBasePath: string;
 
-    public static debugCall() {
-        const origWait = Atomics.wait;
-        Atomics.wait = (typedArray: any, index, value: any, timeout) => {
-            console.log("Atomics.wait", {
-                index,
-                value,
-                timeout,
-                stack: new Error().stack,
-            });
-            return origWait(typedArray, index, value, timeout);
-        };
-    }
-
     /**
      * Load the Endpoint's WASM assets and initialize the Endpoint library.
      *
@@ -69,7 +56,6 @@ export class EndpointFactory {
             assetsBasePath ||
             (document.currentScript as HTMLScriptElement).src.split("/").slice(0, -1).join("/");
         this.assetsBasePath = basePath;
-        console.log("DEBUG assetsPath (1)", this.assetsBasePath);
         const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
         for (const asset of assets) {
             await this.loadScript(basePath + "/" + asset);

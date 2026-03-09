@@ -56,20 +56,14 @@ export class PeerConnectionManager {
         this.connections[room][connectionType] = newConnection;
 
         pc.addEventListener("icecandidate", (event) => {
-            // 1. Handle "End of Gathering" (null candidate) gracefully
             if (!event.candidate) {
-                // console.debug("ICE Gathering Complete");
                 return;
             }
 
             const conn = this.connections[room][connectionType];
-
-            // Safety check in case connection was closed/removed during gathering
             if (!conn) return;
 
             const currentSessionId = conn.sessionId;
-
-            // 2. If Session is ready, trickle immediately
             if (currentSessionId && currentSessionId > -1) {
                 try {
                     this.onTrickle(currentSessionId, event.candidate);
@@ -77,8 +71,6 @@ export class PeerConnectionManager {
                     console.warn("Failed to trickle candidate", err);
                 }
             } else {
-                // 3. If Session NOT ready, buffer the candidate
-                // console.log("Buffering ICE candidate (SessionId not ready)...");
                 conn.candidateQueue.push(event.candidate);
             }
         });
@@ -90,13 +82,9 @@ export class PeerConnectionManager {
         session: SessionId,
     ) {
         if (!(room in this.connections) || !(connectionType in this.connections[room])) {
-            // Initialize with default (-1) if missing
             this.initialize(room, connectionType);
         }
-
         const conn = this.connections[room][connectionType];
-
-        // 1. Update the Session ID
         conn!.sessionId = session;
 
         if (conn!.candidateQueue.length > 0) {
@@ -107,7 +95,6 @@ export class PeerConnectionManager {
                     console.warn("Failed to trickle buffered candidate", err);
                 }
             });
-            // Clear the queue to free memory and prevent re-sending
             conn!.candidateQueue = [];
         }
     }

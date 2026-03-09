@@ -46,12 +46,8 @@ export class WebWorker {
     ) {}
 
     async init_e2ee() {
-        // this.worker = await this.createWorkerFromScript(this.assetsDir + "/e2ee-worker.js");
-        console.log("assetsDir in Worker: ", this.assetsDir);
         this.worker = new Worker(this.assetsDir + "/e2ee-worker.js");
         this.worker.onmessage = (event: WorkerLogEvent) => {
-            // console.log("worker: ", event);
-
             try {
                 if (event.data.type === "rms") {
                     if (this.onFrame !== undefined && typeof this.onFrame === "function") {
@@ -62,12 +58,6 @@ export class WebWorker {
                             publisherId: event.data.publisherId,
                         });
                     }
-                } else if (event.data.type === "debug") {
-                    console.log("[Worker-LOG/debug]", event.data.data);
-                } else if (event.data.type === "error") {
-                    console.error("[Worker-LOG/error]", event.data.data);
-                } else {
-                    console.log("unrecognized event from worker", event.data);
                 }
             } catch (e) {
                 console.error("[Worker]: invalid event");

@@ -8,7 +8,6 @@ export class LocalAudioLevelMeter {
     ) {}
 
     async init(workletUrl: string) {
-        console.log("++++ Initializing RMS Audio Context: ", workletUrl);
         this.ctx = new AudioContext({ sampleRate: 48000 });
 
         await this.ctx.audioWorklet.addModule(workletUrl);
@@ -19,7 +18,6 @@ export class LocalAudioLevelMeter {
         this.node.port.onmessage = (e) => this.onLevel(e.data.rmsDb);
 
         source.connect(this.node);
-        console.log("++++ Initializing RMS Audio Context DONE");
     }
 
     stop() {
