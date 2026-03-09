@@ -11,7 +11,6 @@ export class LocalAudioLevelMeter {
     ) {}
 
     async init(workletUrl: string) {
-        console.log("++++ Initializing RMS Audio Context: ", workletUrl);
         const candidateSampleRates: Array<number | undefined> = [];
         try {
             const settings = this.track.getSettings?.();
@@ -61,14 +60,12 @@ export class LocalAudioLevelMeter {
                 } catch {
                     // ignore
                 }
-                // try next candidate sampleRate (FF can throw when bridging MediaStreamGraph<->AudioContext)
             }
         }
 
         if (lastErr) {
             throw lastErr;
         }
-        console.log("++++ Initializing RMS Audio Context DONE");
     }
 
     stop() {

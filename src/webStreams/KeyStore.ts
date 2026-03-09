@@ -24,10 +24,6 @@ export class KeyStore {
 
     getEncriptionKey(): Key {
         if (!this._encryptionKeyId) {
-            console.error("No encryption key set.");
-            console.log("DEBUG-info: ", this._keys);
-            console.trace("Location");
-
             throw new Error("No encryption key set.");
         }
         return this._keys.get(this._encryptionKeyId);

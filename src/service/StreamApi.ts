@@ -293,7 +293,6 @@ export class StreamApi extends BaseApi {
             published: false,
         };
         this.streamTracks.set(streamTrackId, streamTrack);
-        console.log("defined streamTracks", { tracks: this.streamTracks });
         return streamTrackId;
     }
 
@@ -311,7 +310,6 @@ export class StreamApi extends BaseApi {
         meta: Types.StreamTrackMeta,
     ): Promise<void> {
         if (!this.streams.has(streamHandle)) {
-            console.log("LOG: ", this.streams);
             throw new Error(
                 "[removeStreamTrack]: there is no Stream with given Id: " + streamHandle,
             );
