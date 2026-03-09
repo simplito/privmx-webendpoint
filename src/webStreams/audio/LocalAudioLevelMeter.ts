@@ -66,7 +66,6 @@ export class LocalAudioLevelMeter {
         if (lastErr) {
             throw lastErr;
         }
-        console.log("++++ Initializing RMS Audio Context DONE");
     }
 
     stop() {
