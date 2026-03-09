@@ -6,21 +6,49 @@ if [ -z "$1" ]; then
     echo "$0: Parameter missing. Pass privmx-endpoint version used in build process"
     exit -1;
 fi
-PRIVMX_ENDPOINT_VERSION=$1
+PRIVMX_ENDPOINT_VERSION_IN=$1
+PRIVMX_ENDPOINT_VERSION="${PRIVMX_ENDPOINT_VERSION_IN//\//_}"
 
 source "$SCRIPT_PATH/config.sh"
 source "$EMSDK_DIR/emsdk_env.sh"
 
-cd "$PRIVMX_WEBENDPOINT_API_SRC/cpp"
-cp "$PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC/out/loader.js" "$PRIVMX_WEBENDPOINT_API_SRC/cpp/js/"
-cp "$PRIVMX_ENDPOINT_SRC-$PRIVMX_ENDPOINT_VERSION/emscripten/jslibrary/websocket.js" "$PRIVMX_WEBENDPOINT_API_SRC/cpp/js/"
-rm -rf ./build-emscripten
-mkdir -p build-emscripten && cd build-emscripten
-echo "EMSDK_DIR PASSED TO CMAKE: $EMSDK_DIR"
-echo "====================================="
-SDK_DIR=$EMSDK_DIR emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
-SDK_DIR=$EMSDK_DIR emmake make -j20
+echo "Checking API Interface checksum: $PRIVMX_WEBENDPOINT_API_SRC ..."
+set +e
+$SCRIPT_PATH/check_dir_checksum "$PRIVMX_WEBENDPOINT_API_SRC"
+RESULT=$?
+set -e
+if [ -f "$PRIVMX_WEBENDPOINT_API_SRC/need_rebuild" ]; then
+    RESULT=1;
+    rm -f "$PRIVMX_WEBENDPOINT_API_SRC/need_rebuild"
+fi
+case "$RESULT" in
+    0)
+        echo "No changes on Endpoint API Interface- skipping build"
+        ;;
+    1)
+        echo "changes - rebuild..."
+        cd "$PRIVMX_WEBENDPOINT_API_SRC"
+        cp "$PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC/out/loader.js" "$PRIVMX_WEBENDPOINT_API_SRC/js/"
+        cp "$PRIVMX_ENDPOINT_SRC-$PRIVMX_ENDPOINT_VERSION/emscripten/jslibrary/websocket.js" "$PRIVMX_WEBENDPOINT_API_SRC/js/"
+        rm -rf ./build-emscripten
+        mkdir -p build-emscripten && cd build-emscripten
+        echo "EMSDK_DIR PASSED TO CMAKE: $EMSDK_DIR"
+        echo "====================================="
+        SDK_DIR=$EMSDK_DIR emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
+        SDK_DIR=$EMSDK_DIR emmake make -j20
 
-cd "$PRIVMX_WEBENDPOINT_API_SRC/ts"
-npm ci --registry=https://npmregistry.privmx.com
-npm run build
+        set +e
+        $SCRIPT_PATH/check_dir_checksum "$PRIVMX_WEBENDPOINT_API_SRC"
+        set -e
+        ;;
+    2)
+        echo "\n\n\nBłąd wejścia" >&2
+        exit 2
+        ;;
+    *)
+        echo "\n\n\nNieznany kod wyjścia: $RESULT" >&2
+        exit 3
+        ;;
+esac
+
+

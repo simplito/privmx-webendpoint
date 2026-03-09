@@ -2,14 +2,15 @@
 
 BASE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )/.."
 
-EMSDK_VERSION="4.0.12"
+EMSDK_VERSION="4.0.19"
 
 EMSDK_DIR="$BASE_DIR/emsdk"
 SCRIPTS_DIR="$BASE_DIR/scripts"
 SYSROOT_DIR="$BASE_DIR/emsdk/upstream/emscripten/cache/sysroot"
 
-SOURCE_DIR="$BASE_DIR/src"
+SOURCE_DIR="$BASE_DIR/dependency_sources"
 DRIVERS_DIR="$BASE_DIR/drivers"
+PRIVMX_WEB_ASYNC_ENGINE="$BASE_DIR/async-engine"
 
 OUT_DIR="$BASE_DIR/out"
 
@@ -32,12 +33,11 @@ OUT_DIR="$BASE_DIR/out"
 
 PRIVMX_ENDPOINT_SRC="$SOURCE_DIR/privmx-endpoint"
 PSON_CPP_SRC="$SOURCE_DIR/pson-cpp"
-PRIVMX_WEB_ASYNC_ENGINE="$BASE_DIR/async-engine"
 
-PRIVMX_WEBENDPOINT_API_SRC="$BASE_DIR/privmx-webendpoint-api"
+PRIVMX_WEBENDPOINT_API_SRC="$BASE_DIR/webendpoint-cpp"
 PRIVMX_WEBENDPOINT_DRV_ECC_SRC="$DRIVERS_DIR/privmx-webendpoint-drv-ecc"
 PRIVMX_WEBENDPOINT_DRV_NET_SRC="$DRIVERS_DIR/privmx-webendpoint-drv-net"
 PRIVMX_WEBENDPOINT_DRV_CRYPTO_SRC="$DRIVERS_DIR/privmx-webendpoint-drv-crypto"
 PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC="$DRIVERS_DIR/privmx-webendpoint-drv-context"
 
-NPM_ASSETS_DIR="$PRIVMX_WEBENDPOINT_API_SRC/ts/assets"
+NPM_ASSETS_DIR="$BASE_DIR/assets/"

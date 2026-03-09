@@ -1,0 +1,56 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, devel ]
+  pull_request:
+    branches: [ main, devel ]
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: 'npm'
+
+    - name: Install CMake and Build Tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential clang-format
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Check clang-format
+      run: npm run lint:clang-format
+
+    - name: Check lint
+      run: npm run lint
+
+    - name: Run unit tests
+      run: npm test
+
+    - name: Build Wasm
+      run: npm run build
+      env:
+        TERM: xterm
+
+    - name: Install Playwright Browsers
+      run: npx playwright install --with-deps
+
+    - name: Start Backend Services
+      run: |
+        cd tests
+        docker compose up -d
+        sleep 15
+
+    - name: Run e2e tests
+      run: npx playwright test --project=chromium --reporter=list
+      env:
+        CI: true

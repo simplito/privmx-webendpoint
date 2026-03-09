@@ -1,11 +1,14 @@
 #include <emscripten.h>
-#include <emscripten/val.h>
 #include <emscripten/bind.h>
+#include <emscripten/val.h>
+
 #include "AsyncEngine.hpp"
 #include "Mapper.hpp"
 
 using namespace emscripten;
 using namespace privmx::webendpoint;
+
+// clang-format off
 
 EM_JS(void, performBindingsCall_impl, (const char* method_str, emscripten::EM_VAL params_handle, int callId), {
     let method = UTF8ToString(method_str);
@@ -21,6 +24,8 @@ EM_JS(void, performBindingsCall_impl, (const char* method_str, emscripten::EM_VA
         Module.ccall('AsyncEngine_onError', null, ['number', 'number'], [callId, Emval.toHandle(ret)]);
     });
 });
+
+// clang-format on
 
 void performBindingsCall(const std::string& method, emscripten::val params, int callId) {
     performBindingsCall_impl(method.c_str(), params.as_handle(), callId);

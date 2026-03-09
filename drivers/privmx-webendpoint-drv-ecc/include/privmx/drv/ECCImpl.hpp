@@ -11,19 +11,17 @@ limitations under the License.
 
 #ifndef _PRIVMXLIB_CRYPTO_EMSCRIPTEN_ECCIMPL_HPP_
 #define _PRIVMXLIB_CRYPTO_EMSCRIPTEN_ECCIMPL_HPP_
-#include <string>
-#include <privmx/drv/ECCImpl.hpp>
 #include <privmx/drv/BNImpl.hpp>
+#include <privmx/drv/ECCImpl.hpp>
 #include <privmx/drv/PointImpl.hpp>
+#include <string>
 
-struct Signature
-{
+struct Signature {
     std::unique_ptr<BNImpl> r;
     std::unique_ptr<BNImpl> s;
 };
 
-class ECCImpl
-{
+class ECCImpl {
 public:
     using Ptr = std::unique_ptr<ECCImpl>;
     static ECCImpl::Ptr genPair();
@@ -67,4 +65,4 @@ inline bool ECCImpl::isEmpty() const {
     return _privkey.empty() && _pubkey.empty();
 }
 
-#endif // _PRIVMXLIB_CRYPTO_EMSCRIPTEN_ECCIMPL_HPP_
+#endif  // _PRIVMXLIB_CRYPTO_EMSCRIPTEN_ECCIMPL_HPP_
