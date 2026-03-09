@@ -68,6 +68,8 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     }
 
     async createAnswerAndSetDescriptions(model: SdpWithRoomModel): Promise<string> {
+        const offer: Jsep = { sdp: model.sdp, type: model.type };
+        await this.getClient().onSubscriptionUpdated(model.roomId, offer);
         return this.webRtcClient.lastProcessedAnswer[model.roomId].sdp;
     }
 
