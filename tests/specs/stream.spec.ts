@@ -2,11 +2,10 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
-import type { Endpoint, StreamApi} from "../../src";
-import { Types } from "../../src";
+import type { Endpoint, StreamApi, Types} from "../../src";
 import { StreamRoomId, StreamTrackMeta } from "../../src/webStreams/types/ApiTypes";
 import { SortOrder, StreamHandle, StreamInfo } from "../../src/Types";
-
+import { StreamEventType, StreamEventSelectorType } from "../../src/Types";
 interface TestUser {
     id: string;
     privKey: string;
@@ -3070,12 +3069,20 @@ test.describe("StreamTest", () => {
 
 
 
-    test("E2E: Two users exchange video streams - second expect to receive 'new streams' event", async ({ createContextPage, backend, cli }) => {
+    test("E2E: Two users exchange video streams - second expect to receive 'remoteStreamsChanged' event", async ({ createContextPage, backend, cli }) => {
+        test.setTimeout(60_000);
         const page1 = await createContextPage();
         await initPage(page1);
         const users = await setupUsers(page1, cli);
 
         const page2 = await createContextPage();
+
+        page1.on("console", msg => {
+            console.log(msg);
+        });
+        page2.on("console", msg => {
+            console.log(msg);
+        });
         await initPage(page2);
 
         await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
@@ -3083,12 +3090,11 @@ test.describe("StreamTest", () => {
 
         const contextId = testData.contextId;
         let roomId: StreamRoomId;
-        let resultArray: string[] = [];
 
         // --- STEP 1: U1 Creates Room & Publishes ---
         await test.step("User 1: Create Room, Join, Wait for 'new streams' events", async () => {
             roomId = await page1.evaluate(
-                async ({ contextId, users }) => {
+                async ({ contextId, users, StreamEventSelectorType, StreamEventType }) => {
                     if (!window.streamApi) throw new Error("StreamApi not ready on Page 1");
                     const api = window.streamApi;
                     const enc = new TextEncoder();
@@ -3106,31 +3112,44 @@ test.describe("StreamTest", () => {
 
                     await api.joinStreamRoom(sId);
 
-                    // await api.subscribeFor([
-                    //     await api.buildSubscriptionQuery(Types.StreamEventType.STREAMROOM_UPDATE, Types.StreamEventSelectorType.STREAMROOM_ID, roomId),
-                    //     await api.buildSubscriptionQuery(Types.StreamEventType.STREAMROOM_DELETE, Types.StreamEventSelectorType.STREAMROOM_ID, roomId),
-                    //     await api.buildSubscriptionQuery(Types.StreamEventType.STREAM_PUBLISH, Types.StreamEventSelectorType.STREAMROOM_ID, roomId),
-                    //     await api.buildSubscriptionQuery(Types.StreamEventType.STREAM_UNPUBLISH, Types.StreamEventSelectorType.STREAMROOM_ID, roomId),
-                    //     await api.buildSubscriptionQuery(Types.StreamEventType.STREAM_JOIN, Types.StreamEventSelectorType.STREAMROOM_ID, roomId),
-                    //     await api.buildSubscriptionQuery(Types.StreamEventType.STREAM_LEAVE, Types.StreamEventSelectorType.STREAMROOM_ID, roomId),
-                    // ]);
+                    await api.subscribeFor([
+                        await api.buildSubscriptionQuery(StreamEventType.STREAMROOM_UPDATE, StreamEventSelectorType.STREAMROOM_ID, sId),
+                        await api.buildSubscriptionQuery(StreamEventType.STREAMROOM_DELETE, StreamEventSelectorType.STREAMROOM_ID, sId),
+                        await api.buildSubscriptionQuery(StreamEventType.STREAM_PUBLISH, StreamEventSelectorType.STREAMROOM_ID, sId),
+                        await api.buildSubscriptionQuery(StreamEventType.STREAM_UNPUBLISH, StreamEventSelectorType.STREAMROOM_ID, sId),
+                        await api.buildSubscriptionQuery(StreamEventType.STREAM_JOIN, StreamEventSelectorType.STREAMROOM_ID, sId),
+                        await api.buildSubscriptionQuery(StreamEventType.STREAM_LEAVE, StreamEventSelectorType.STREAMROOM_ID, sId),
+                    ]);
                     const eventQueue = await window.Endpoint.getEventQueue();
-                    
-                    const listenForEvents = () => {
-                        if (!eventQueue) {
-                            throw new Error("EventQueue not initialized.");
-                        }
-                        let events = eventQueue.waitEvent();
-                        events.then(async event => {
-                            resultArray.push(event.type);
-                            listenForEvents();
-                        })
+
+                    if (!eventQueue) {
+                        throw new Error("EventQueue not initialized.");
                     }
 
-                    listenForEvents();
+                    const w = window as any;
+
+                    w.__eventCollector = {
+                        events: [],
+                        running: true,
+                    };
+
+                    const listenForEvents = async () => {
+                        while (w.__eventCollector.running) {
+                            try {
+                                const event = await eventQueue.waitEvent();
+                                w.__eventCollector.events.push(event);
+                            }
+                            catch (e) {
+                                console.error("event listener failed", e);
+                                break;
+                            }
+                        }
+                    };
+                    void listenForEvents();
+
                     return sId;
                 },
-                { contextId, users },
+                { contextId, users, StreamEventType, StreamEventSelectorType },
             );
         });
 
@@ -3153,20 +3172,29 @@ test.describe("StreamTest", () => {
                     await api.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
 
                     await api.publishStream(handle);
-                    
-
-                    const waitFor = (n: number) => new Promise<void>(resolve => setTimeout(() => resolve(), n));
-                    for (let x = 0; x < 15000; ++x) {
-                        await waitFor(1000);
-                        if (resultArray.length > 0) {
-                            console.log("Event recv...", JSON.stringify(resultArray, null, 2));
-                            break;
-                        }
-                    }
-                    expect(resultArray.length > 0).toBeTruthy();
                 },
                 { roomId },
             );
+        });
+
+        await test.step("User 1: Wait for events", async () => {
+            await expect
+                .poll(
+                    async () =>
+                        await page1.evaluate((expectedType) => {
+                            const w = window as any;
+                            const events = w.__eventCollector?.events ?? [];
+                            return events.some((e: any) => e.type === expectedType);
+                        }, "remoteStreamsChanged"),
+                    { timeout: 15_000 }
+                )
+                .toBe(true);
+            const events = await page1.evaluate(() => {
+                const w = window as any;
+                return w.__eventCollector?.events ?? [];
+            });
+
+            console.log("Event recv...", JSON.stringify(events, null, 2));
         });
     });
 
