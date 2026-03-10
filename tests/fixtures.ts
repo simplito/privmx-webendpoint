@@ -174,20 +174,35 @@ export const test = base.extend<
             const db = client.db(dbName);
 
             try {
-                execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
-            } catch {}
+                execSync(`docker rm -f ${containerName}`, { stdio: "pipe" });
+            } catch (e) {
+                console.error("docker rm failed");
+                console.error("status:", e.status);
+                console.error("stdout:", e.stdout?.toString());
+                console.error("stderr:", e.stderr?.toString());
+            }
+            try {
+                execSync(
+                    `docker run -d --name ${containerName} -p ${hostPort}:3000 \
+                    --network ${COMPOSE_NETWORK} \
+                    --label com.docker.compose.project=${COMPOSE_PROJECT} \
+                    --label com.docker.compose.service=e2e_worker \
+                    --label com.docker.compose.oneoff=False \
+                    ${envVars} \
+                    --add-host=host.docker.internal:host-gateway \
+                    ${dockerImage}`,
+                    { stdio: "pipe" },
+                );
 
-            execSync(
-                `docker run -d --name ${containerName} -p ${hostPort}:3000 \
-                --network ${COMPOSE_NETWORK} \
-                --label com.docker.compose.project=${COMPOSE_PROJECT} \
-                --label com.docker.compose.service=e2e_worker \
-                --label com.docker.compose.oneoff=False \
-                ${envVars} \
-                --add-host=host.docker.internal:host-gateway \
-                ${dockerImage}`,
-                { stdio: "ignore" },
-            );
+            } catch(e) {
+                console.error("docker run failed");
+                console.error("status:", e.status);
+                console.error("stdout:", e.stdout?.toString());
+                console.error("stderr:", e.stderr?.toString());
+                throw e;
+            }
+
+            
 
             await waitForServerReady(hostPort, containerName);
 

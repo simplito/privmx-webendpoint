@@ -2,7 +2,8 @@ import { test } from "../fixtures";
 import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
-import type { Endpoint, StreamApi, Types } from "../../src";
+import type { Endpoint, StreamApi} from "../../src";
+import { Types } from "../../src";
 import { StreamRoomId, StreamTrackMeta } from "../../src/webStreams/types/ApiTypes";
 import { SortOrder, StreamHandle, StreamInfo } from "../../src/Types";
 
@@ -3066,4 +3067,107 @@ test.describe("StreamTest", () => {
             );
         });
     });
+
+
+
+    test("E2E: Two users exchange video streams - second expect to receive 'new streams' event", async ({ createContextPage, backend, cli }) => {
+        const page1 = await createContextPage();
+        await initPage(page1);
+        const users = await setupUsers(page1, cli);
+
+        const page2 = await createContextPage();
+        await initPage(page2);
+
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+
+        const contextId = testData.contextId;
+        let roomId: StreamRoomId;
+        let resultArray: string[] = [];
+
+        // --- STEP 1: U1 Creates Room & Publishes ---
+        await test.step("User 1: Create Room, Join, Wait for 'new streams' events", async () => {
+            roomId = await page1.evaluate(
+                async ({ contextId, users }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 1");
+                    const api = window.streamApi;
+                    const enc = new TextEncoder();
+
+                    const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+                    const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+                    const sId = await api.createStreamRoom(
+                        contextId,
+                        [u1Obj, u2Obj],
+                        [u1Obj, u2Obj],
+                        enc.encode("p"),
+                        enc.encode("p"),
+                    );
+
+                    await api.joinStreamRoom(sId);
+
+                    // await api.subscribeFor([
+                    //     await api.buildSubscriptionQuery(Types.StreamEventType.STREAMROOM_UPDATE, Types.StreamEventSelectorType.STREAMROOM_ID, roomId),
+                    //     await api.buildSubscriptionQuery(Types.StreamEventType.STREAMROOM_DELETE, Types.StreamEventSelectorType.STREAMROOM_ID, roomId),
+                    //     await api.buildSubscriptionQuery(Types.StreamEventType.STREAM_PUBLISH, Types.StreamEventSelectorType.STREAMROOM_ID, roomId),
+                    //     await api.buildSubscriptionQuery(Types.StreamEventType.STREAM_UNPUBLISH, Types.StreamEventSelectorType.STREAMROOM_ID, roomId),
+                    //     await api.buildSubscriptionQuery(Types.StreamEventType.STREAM_JOIN, Types.StreamEventSelectorType.STREAMROOM_ID, roomId),
+                    //     await api.buildSubscriptionQuery(Types.StreamEventType.STREAM_LEAVE, Types.StreamEventSelectorType.STREAMROOM_ID, roomId),
+                    // ]);
+                    const eventQueue = await window.Endpoint.getEventQueue();
+                    
+                    const listenForEvents = () => {
+                        if (!eventQueue) {
+                            throw new Error("EventQueue not initialized.");
+                        }
+                        let events = eventQueue.waitEvent();
+                        events.then(async event => {
+                            resultArray.push(event.type);
+                            listenForEvents();
+                        })
+                    }
+
+                    listenForEvents();
+                    return sId;
+                },
+                { contextId, users },
+            );
+        });
+
+        // --- STEP 2: U2 Subscribes ---
+        await test.step("User 2: Join and Publish", async () => {
+            await page2.evaluate(
+                async ({ roomId }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
+                    const api = window.streamApi;
+
+                    await api.joinStreamRoom(roomId);
+
+                    const handle = await api.createStream(roomId);
+
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: true,
+                        video: true,
+                    });
+                    await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                    await api.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+
+                    await api.publishStream(handle);
+                    
+
+                    const waitFor = (n: number) => new Promise<void>(resolve => setTimeout(() => resolve(), n));
+                    for (let x = 0; x < 15000; ++x) {
+                        await waitFor(1000);
+                        if (resultArray.length > 0) {
+                            console.log("Event recv...", JSON.stringify(resultArray, null, 2));
+                            break;
+                        }
+                    }
+                    expect(resultArray.length > 0).toBeTruthy();
+                },
+                { roomId },
+            );
+        });
+    });
+
 });
