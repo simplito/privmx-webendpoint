@@ -326,34 +326,6 @@ export class StreamApi extends BaseApi {
     }
 
     /**
-     * Sends a data message over a stream data track.
-     *
-     * @param {string} _streamTrackId StreamTrackId returned by `addStreamTrack`
-     * @param {Buffer} _data data to send
-     * @throws {Error} not implemented
-     */
-    public async streamTrackSendData(
-        _streamTrackId: Types.StreamTrackId,
-        _data: Buffer,
-    ): Promise<void> {
-        throw new Error("not implemented");
-    }
-
-    /**
-     * Registers a data receive callback for a stream data track.
-     *
-     * @param {string} _streamTrackId StreamTrackId returned by `addStreamTrack`
-     * @param {(data: Buffer) => void} _onData callback invoked when data is received
-     * @throws {Error} not implemented
-     */
-    public async streamTrackRecvData(
-        _streamTrackId: Types.StreamTrackId,
-        _onData: (data: Buffer) => void,
-    ): Promise<void> {
-        throw new Error("not implemented");
-    }
-
-    /**
      * Publishes the Stream (with currently staged tracks) to the server.
      *
      * @param {StreamHandle} streamHandle handle returned by `createStream`
