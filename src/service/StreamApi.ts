@@ -225,7 +225,7 @@ export class StreamApi extends BaseApi {
     }
 
     /**
-     * Adds a local media track or a data channel definition to a Stream handle.
+     * Adds a local media track definition to a Stream handle.
      *
      * The track is staged locally and becomes visible to others after `publishStream`/`updateStream`.
      *
@@ -238,21 +238,6 @@ export class StreamApi extends BaseApi {
         streamHandle: StreamHandle,
         meta: Types.StreamTrackMeta,
     ): Promise<Types.StreamTrackId> {
-        // if (streamTrack.dataChannelMeta) {
-        //     await this.client.provideSession();
-        //     const request: StreamDataTrackAddRequest = {
-        //         kind: "streams.streamDataTrackAdd",
-        //         data: {
-        //             streamRoomId: stream.streamRoomId,
-        //             streamId: streamTrack.streamId,
-        //             streamTrackId: streamTrack.id,
-        //             meta: streamTrack.dataChannelMeta
-        //         }
-        //     };
-
-        //     await this.serverChannel.call<StreamsApi.StreamDataTrackAddRequest, void>(request);
-        // }
-
         if (!this.streams.has(streamHandle)) {
             throw new Error("[addStreamTrack]: there is no Stream with given Id: " + streamHandle);
         }
