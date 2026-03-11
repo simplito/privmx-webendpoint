@@ -225,7 +225,7 @@ export class StreamApi extends BaseApi {
     }
 
     /**
-     * Adds a local media track or a data channel definition to a Stream handle.
+     * Adds a local media track definition to a Stream handle.
      *
      * The track is staged locally and becomes visible to others after `publishStream`/`updateStream`.
      *
@@ -238,21 +238,6 @@ export class StreamApi extends BaseApi {
         streamHandle: StreamHandle,
         meta: Types.StreamTrackMeta,
     ): Promise<Types.StreamTrackId> {
-        // if (streamTrack.dataChannelMeta) {
-        //     await this.client.provideSession();
-        //     const request: StreamDataTrackAddRequest = {
-        //         kind: "streams.streamDataTrackAdd",
-        //         data: {
-        //             streamRoomId: stream.streamRoomId,
-        //             streamId: streamTrack.streamId,
-        //             streamTrackId: streamTrack.id,
-        //             meta: streamTrack.dataChannelMeta
-        //         }
-        //     };
-
-        //     await this.serverChannel.call<StreamsApi.StreamDataTrackAddRequest, void>(request);
-        // }
-
         if (!this.streams.has(streamHandle)) {
             throw new Error("[addStreamTrack]: there is no Stream with given Id: " + streamHandle);
         }
@@ -323,34 +308,6 @@ export class StreamApi extends BaseApi {
                 streamTrack.markedToRemove = true;
             }
         }
-    }
-
-    /**
-     * Sends a data message over a stream data track.
-     *
-     * @param {string} _streamTrackId StreamTrackId returned by `addStreamTrack`
-     * @param {Buffer} _data data to send
-     * @throws {Error} not implemented
-     */
-    public async streamTrackSendData(
-        _streamTrackId: Types.StreamTrackId,
-        _data: Buffer,
-    ): Promise<void> {
-        throw new Error("not implemented");
-    }
-
-    /**
-     * Registers a data receive callback for a stream data track.
-     *
-     * @param {string} _streamTrackId StreamTrackId returned by `addStreamTrack`
-     * @param {(data: Buffer) => void} _onData callback invoked when data is received
-     * @throws {Error} not implemented
-     */
-    public async streamTrackRecvData(
-        _streamTrackId: Types.StreamTrackId,
-        _onData: (data: Buffer) => void,
-    ): Promise<void> {
-        throw new Error("not implemented");
     }
 
     /**
