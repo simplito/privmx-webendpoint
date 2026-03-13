@@ -3,7 +3,7 @@ import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
 import type { Endpoint, StreamApi, Types } from "../../src";
-import { StreamRoomId, StreamTrackMeta } from "../../src/webStreams/types/ApiTypes";
+import { StreamRoomId, StreamTrackInit } from "../../src/webStreams/types/ApiTypes";
 import { SortOrder, StreamHandle, StreamInfo } from "../../src/Types";
 
 import { StreamEventType, StreamEventSelectorType } from "../../src/Types";
@@ -117,7 +117,7 @@ test.describe("StreamTest", () => {
         let dataTrackId: string;
         let streamHandle: StreamHandle;
 
-        // --- STEP 1: U1 Creates Room & listens ---
+        // --- STEP 1: U1 Creates Room & listens for events ---
         await test.step("User 1: Create Room, Join, Wait for 'new streams' events", async () => {
             roomId = await page1.evaluate(
                 async ({ contextId, users, StreamEventSelectorType, StreamEventType }) => {
@@ -179,7 +179,7 @@ test.describe("StreamTest", () => {
             );
         });
 
-        await test.step("User 2: Join and Publish", async () => {
+        await test.step("U2: Join and Publish", async () => {
             const result = await page2.evaluate(
                 async ({ roomId }) => {
                     if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
@@ -194,7 +194,7 @@ test.describe("StreamTest", () => {
                         video: true,
                     });
                     await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
-                    const dataTrackId = await api.addStreamTrack(handle, { dataChannel: {name: "test"} });
+                    const dataTrackId = await api.addStreamTrack(handle, { createDataChannel: true });
                     await api.publishStream(handle);
 
                     return {dataTrackId, streamHandle: handle};

@@ -74,6 +74,7 @@ export class WebRtcClient {
     private lastMeasuredLocalRMS: number = -99;
     private eventsDispatcher: StateChangeDispatcher = new StateChangeDispatcher();
     private localAudioLevelMeters: Map<string, LocalAudioLevelMeter> = new Map();
+    private bootstrapDataChannel: RTCDataChannel | undefined;
 
     constructor(private assetsDir: string) {
         this.uniqId = "" + Math.random() + "-" + Math.random();
@@ -368,7 +369,7 @@ export class WebRtcClient {
         connection.addEventListener("connectionstatechange", (event) => {
             this.logger.log("info", "connectionstatechange: ", event);
             if (connection.connectionState === "connected") {
-                this.logger.log("important-only", "Peers connected!");
+                this.logger.log("info", "Peers connected!");
             } else {
                 this.logger.log("info", "connection state: ", connection.connectionState);
             }
@@ -380,8 +381,14 @@ export class WebRtcClient {
 
         connection.addEventListener("datachannel", (event) => {
             this.logger.log("info", "================ RECV datachannel: ", event);
-            const recvChannel = event.channel;
-            this.addDataChannel(recvChannel);
+            const dc = event.channel;
+            dc.binaryType = "arraybuffer";
+            dc.onopen = () => { console.log("===> RECEIVER data stream: open") };
+            dc.onmessage = (m) => { console.log("===> RECEIVER data stream: onmessage", m) };
+            dc.onclose = () => { console.log("===> RECEIVER data stream: close") };
+            dc.onerror = (e) => { console.log("===> RECEIVER data stream: error", e) };
+            // const recvChannel = event.channel;
+            // this.addDataChannel(recvChannel);
         });
 
         connection.addEventListener("iceconnectionstatechange", (event) => {
@@ -686,8 +693,16 @@ export class WebRtcClient {
             "subscriber",
         );
         const peerConnection = janusConnection.pc;
-
+        this.logger.log("info", "SUBSCRIBER RECV OFFER FROM PUBLISHER: ", offer.sdp);
         this.logger.log("important-only", "1. Setting up remoteDescription...");
+
+        if (!this.bootstrapDataChannel) {
+            const bootstrap = peerConnection.createDataChannel("JanusDataChannel");
+            bootstrap.onopen = () => console.log("====> Bootstrap dataChannel: open");
+            bootstrap.onerror = (e) => console.error("====> Bootrstrap dataChannel: error", e);
+        }
+
+
         await peerConnection.setRemoteDescription(
             new RTCSessionDescription({ type: offer.type as RTCSdpType, sdp: offer.sdp }),
         );

@@ -32,7 +32,7 @@ export interface StreamTrack {
     streamId?: Types.StreamId;
     streamHandle: StreamHandle;
     track?: MediaStreamTrack;
-    dataChannelMeta?: DataChannelMeta;
+    dataChannelMeta: DataChannelMeta;
     published: Boolean;
     markedToRemove?: boolean;
 }
@@ -230,13 +230,13 @@ export class StreamApi extends BaseApi {
      * The track is staged locally and becomes visible to others after `publishStream`/`updateStream`.
      *
      * @param {StreamHandle} streamHandle handle returned by `createStream`
-     * @param {Types.StreamTrackMeta} meta track/data channel metadata (track: `MediaStreamTrack`, dataChannel: `DataChannelMeta`)
+     * @param {Types.StreamTrackInit} meta track/data channel metadata (track: `MediaStreamTrack`, dataChannel: `DataChannelMeta`)
      * @returns {string} StreamTrackId assigned locally for this track
      * @throws {Error} when the given `streamHandle` does not exist or the same browser track is already staged
      */
     public async addStreamTrack(
         streamHandle: StreamHandle,
-        meta: Types.StreamTrackMeta,
+        meta: Types.StreamTrackInit,
     ): Promise<Types.StreamTrackId> {
         if (!this.streams.has(streamHandle)) {
             throw new Error("[addStreamTrack]: there is no Stream with given Id: " + streamHandle);
@@ -274,7 +274,7 @@ export class StreamApi extends BaseApi {
             id: streamTrackId,
             streamHandle: streamHandle,
             track: meta.track,
-            dataChannelMeta: meta.dataChannel,
+            dataChannelMeta: {created: meta.createDataChannel},
             published: false,
         };
         this.streamTracks.set(streamTrackId, streamTrack);
@@ -287,12 +287,12 @@ export class StreamApi extends BaseApi {
      * For already published streams the removal is applied on `updateStream`.
      *
      * @param {StreamHandle} streamHandle handle returned by `createStream`
-     * @param {Types.StreamTrackMeta} meta media track metadata previously passed to `addStreamTrack`
+     * @param {Types.StreamTrackInit} meta media track metadata previously passed to `addStreamTrack`
      * @throws {Error} when the given `streamHandle` does not exist
      */
     public async removeStreamTrack(
         streamHandle: StreamHandle,
-        meta: Types.StreamTrackMeta,
+        meta: Types.StreamTrackInit,
     ): Promise<void> {
         if (!this.streams.has(streamHandle)) {
             throw new Error(
@@ -340,7 +340,7 @@ export class StreamApi extends BaseApi {
 
             if (
                 value.streamHandle === streamHandle &&
-                value.dataChannelMeta &&
+                value.dataChannelMeta.created === true &&
                 !value.markedToRemove &&
                 value.published === false
             ) {
