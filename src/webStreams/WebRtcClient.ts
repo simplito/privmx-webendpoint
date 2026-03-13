@@ -17,6 +17,7 @@ import { Jsep } from "../service/WebRtcInterface";
 import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
 import { ActiveSpeakerDetector, DEFAULTS, SpeakerState } from "./audio/ActiveSpeakerDetector";
 import { StateChangeDispatcher } from "../service/EventDispatcher";
+import { StreamTrack } from "../service/StreamApi";
 
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
@@ -89,8 +90,13 @@ export class WebRtcClient {
         );
         this.peerConnectionReconfigureQueue = new Queue<QueueItem>();
         this.peerConnectionReconfigureQueue.assignProcessorFunc(async (_item: QueueItem) => {
-            // await this.reconfigure(_item);
-            await this.reconfigureSingle(_item._room, _item.offer);
+
+            if (_item.jsep && _item.jsep.type === "offer") {
+                await this.reconfigureSingle(_item._room, _item.jsep);
+            }
+            else {
+                await this.reconfigureSingleCreateOffer(_item._room);
+            }
         });
 
         this.activeSpeakerDetector = new ActiveSpeakerDetector(DEFAULTS);
@@ -234,7 +240,8 @@ export class WebRtcClient {
     async createPeerConnectionWithLocalStream(
         streamHandle: StreamHandle,
         streamRoomId: StreamRoomId,
-        stream: MediaStream,
+        stream?: MediaStream,
+        dataTracks?: StreamTrack[]
     ): Promise<RTCPeerConnection> {
         this.publishStreamHandle = streamHandle;
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
@@ -260,6 +267,14 @@ export class WebRtcClient {
                 this.setupSenderTransform(streamSender);
             }
         }
+
+        if (dataTracks) {
+            for (const dataTrack of dataTracks) {
+                const dataChannel = pc.createDataChannel("JanusDataChannel");
+                dataTrack.dataChannelMeta.dataChannel = dataChannel;
+            }
+        }
+
         return pc;
     }
 
@@ -363,12 +378,18 @@ export class WebRtcClient {
             });
         });
 
+        connection.addEventListener("datachannel", (event) => {
+            this.logger.log("info", "================ RECV datachannel: ", event);
+            const recvChannel = event.channel;
+            this.addDataChannel(recvChannel);
+        });
+
         connection.addEventListener("iceconnectionstatechange", (event) => {
             this.logger.log("info", "iceconnectionstatechange: ", event);
         });
-        connection.addEventListener("negotiationneeded", async (event) => {
-            this.logger.log("info", "negotiationneeded: ", event);
-            // await this.startNegotiationMulti(connection);
+        connection.addEventListener("negotiationneeded", async (_event) => {
+            this.logger.log("info", "negotiationneeded: ", _event);
+            // await this.startNegotiationMulti(roomId, (_event as any).target);
         });
         connection.addEventListener("signalingstatechange", (event) => {
             this.logger.log("info", "signalingstatechange: ", event);
@@ -379,6 +400,93 @@ export class WebRtcClient {
 
         return connection;
     }
+
+
+
+        // private async onSubscriberAttached(eventData: SignalingFromServer.SubscriberAttached) {
+    // console.log("============> onSubscriberAttached",eventData);
+    // // const peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
+
+    // // const configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
+    // if (!this.configuration) {
+    //     throw new Error("Configuration missing.");
+    // }
+    // console.log("-----> onSubscriberAttached", {room: eventData.room, streams: eventData.streams});
+    // this.receiverPeerConnection = this.createPeerConnectionMulti(this.configuration);
+    // const peerConnection = this.receiverPeerConnection;
+
+    // console.log("-----> setting up remote subscriber offer as remoteDescription", eventData.offer);
+    // await peerConnection.setRemoteDescription(new RTCSessionDescription(eventData.offer));
+    // console.log("----------> creating answer for remote offer..");
+
+    // const dataStreams = eventData.streams.filter(x => x.type === "data");
+    // for (const x of dataStreams) {
+    //     console.log("============> Creating dataChannel handler..." + x.mid);
+    //     peerConnection.createDataChannel("JanusDataChannel/" + x.mid);
+    // }
+    // const answer = await peerConnection.createAnswer();
+
+    // await peerConnection.setLocalDescription(answer);
+
+    // await this.signalingApi?.acceptOffer(eventData.session_id, eventData.handle, answer);
+    // }
+
+    private async startNegotiationMulti(roomId: StreamRoomId,
+        _rtcPeerConnection: RTCPeerConnection,
+        _withIceRestart?: boolean,
+    ) {
+        try {
+            // console.log("[startNegotiationMulti]", "Create offer...");
+            // const offer = await rtcPeerConnection.createOffer({ iceRestart: withIceRestart });
+            // console.log("setLocalDescription on startNegotiationMulti");
+            // await rtcPeerConnection.setLocalDescription(offer);
+            if (!this.peerConnectionReconfigureQueue) {
+                throw new Error("ReconfigureQueue does not exist.");
+            }
+            this.peerConnectionReconfigureQueue.enqueue({
+            taskId: Math.floor(1 + Math.random() * 10000),
+            _room: roomId
+        });
+        try {
+            await this.peerConnectionReconfigureQueue.processAll();
+        } catch (e) {
+            console.error("Error on onSubscriberAttached", e);
+        }
+            console.log("renegotiation func DONE");
+        } catch (e) {
+            console.error("Error on startNegotiationMulti", e);
+        }
+    }
+
+    createDataChannel(_name: string) {
+        // const channel = this.getSenderActivePeerConnection().createDataChannel(name);
+        // this.addDataChannel(channel);
+    }
+
+    private addDataChannel(dataChannel: RTCDataChannel) {
+        console.log("on addDataChannel", dataChannel);
+        dataChannel.addEventListener("open", () => {
+            console.log("Data channel opened.");
+        });
+        dataChannel.addEventListener("close", () => {
+            console.log("Data channel closed.");
+        });
+        dataChannel.addEventListener("error", (err) => {
+            console.log("Data channel error", err);
+        });
+        this.dataChannels.push(dataChannel);
+    }
+
+    async sendToChannel(name: string, message: string) {
+        const channel = this.dataChannels.find((x) => x.label === name);
+        if (!channel || channel.readyState !== "open") {
+            console.error("Cannot find open channel by given name");
+            return;
+        }
+        channel.send(message);
+        console.log("Message sent!");
+    }
+
 
     async updateKeys(_streamRoomId: StreamRoomId, keys: Key[]) {
         this.keyStore.setKeys(keys);
@@ -514,6 +622,17 @@ export class WebRtcClient {
         await this.setupReceiverTransform(receiver, publisherId, worker);
         track.addEventListener("ended", async () => await this.teardownReceiver(receiver, worker));
 
+        if (track.kind === "data") {
+            console.log("Received DATA track ===============================");
+            // const channel = peerConnection.createDataChannel("JanusDataChannel/" + event.track.id);
+            // channel.addEventListener("message", (e) => {
+            //     console.log("ON MESSAGE", e);
+            // });
+
+            // const newOffer = peerConnection.createOffer();
+            
+        }
+
         this.callRegisteredListeners(roomId, event);
     }
 
@@ -538,14 +657,14 @@ export class WebRtcClient {
     }
 
     // test
-    public async onSubscriptionUpdated(_room: StreamRoomId, offer: any) {
+    public async onSubscriptionUpdated(_room: StreamRoomId, offer: {sdp: string, type: string}) {
         if (!this.peerConnectionReconfigureQueue) {
             throw new Error("ReconfigureQueue does not exist.");
         }
         this.peerConnectionReconfigureQueue.enqueue({
             taskId: Math.floor(1 + Math.random() * 10000),
             _room,
-            offer,
+            jsep: offer,
         });
         try {
             await this.peerConnectionReconfigureQueue.processAll();
@@ -588,5 +707,21 @@ export class WebRtcClient {
         // this.subscriberAttachedProcessing = false
         this.lastProcessedAnswer[room] = answer as Jsep;
         return answer as Jsep;
+    }
+
+    private async reconfigureSingleCreateOffer(room: StreamRoomId): Promise<Jsep> {
+        if (!this.configuration) {
+            throw new Error("Configuration missing.");
+        }
+        const janusConnection = this.getConnectionManager().getConnectionWithSession(
+            room,
+            "publisher",
+        );
+        const peerConnection = janusConnection.pc;
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(new RTCSessionDescription({type: "offer", sdp: offer.sdp}));
+
+        return offer as Jsep;
     }
 }

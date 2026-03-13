@@ -1,7 +1,7 @@
 export type LoggerLevel = "debug" | "info" | "important-only";
 export class Logger {
     private static instance: Logger;
-    private static logLevel: LoggerLevel = "important-only";
+    private static logLevel: LoggerLevel = "info";
 
     static get() {
         if (!this.instance) {

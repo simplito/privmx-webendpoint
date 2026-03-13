@@ -323,7 +323,10 @@ export class StreamApi extends BaseApi {
         onStreamState?: (state: RTCPeerConnectionState) => void,
     ): Promise<StreamPublishResult> {
         const mediaTracks: MediaStreamTrack[] = [];
+        const dataTracks: StreamTrack[]  = [];
+
         for (const value of this.streamTracks.values()) {
+            let toPublish = false;
             if (
                 value.streamHandle === streamHandle &&
                 value.track &&
@@ -331,22 +334,40 @@ export class StreamApi extends BaseApi {
                 value.published === false
             ) {
                 mediaTracks.push(value.track);
-                value.published = true;
+                // value.published = true;
+                toPublish = true;
             }
+
+            if (
+                value.streamHandle === streamHandle &&
+                value.dataChannelMeta &&
+                !value.markedToRemove &&
+                value.published === false
+            ) {
+                dataTracks.push(value);
+                toPublish = true;
+            }
+            value.published = toPublish;
         }
         const _stream = this.streams.get(streamHandle);
         if (!_stream) {
             throw new Error("No stream defined to publish");
         }
+        let mediaStream: MediaStream = undefined;
 
-        const mediaStream = new MediaStream(mediaTracks);
-        _stream.localMediaStream = mediaStream;
+        if (mediaTracks.length > 0) {
+            mediaStream = new MediaStream(mediaTracks);
+            _stream.localMediaStream = mediaStream;
+
+        }
+
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(turnCredentials);
         await this.client.createPeerConnectionWithLocalStream(
             streamHandle,
             _stream.streamRoomId,
             mediaStream,
+            dataTracks
         );
 
         if (onStreamState && typeof onStreamState === "function") {
@@ -552,5 +573,11 @@ export class StreamApi extends BaseApi {
         if (onStats && typeof onStats === "function") {
             this.client.setAudioLevelCallback(onStats);
         }
+    }
+
+    async sendData(streamTrackId: Types.StreamTrackId, data: string) {
+        const dataChannel = this.streamTracks.get(streamTrackId)?.dataChannelMeta.dataChannel;
+        console.log("sendData to channel: ", dataChannel.id, dataChannel.label);
+        dataChannel.send(data);
     }
 }

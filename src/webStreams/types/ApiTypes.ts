@@ -54,6 +54,7 @@ export interface StreamList {
 export type StreamId = number & { __streamId: never };
 export interface DataChannelMeta {
     name: string;
+    dataChannel?: RTCDataChannel;
 }
 
 // Channels
