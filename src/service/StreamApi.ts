@@ -575,9 +575,18 @@ export class StreamApi extends BaseApi {
         }
     }
 
-    async sendData(streamTrackId: Types.StreamTrackId, data: string) {
+    /**
+     * Sends binary data over a WebRTC DataChannel associated with a published Stream data track.
+     *
+     * @param {Types.StreamTrackId} streamTrackId StreamTrackId of the data track created via `addStreamTrack`
+     * @param {Uint8Array} data bytes to send to remote participants
+     * @throws {Error} when there is no DataTrack (or DataChannel) for the given `streamTrackId`
+     */
+    async sendData(streamTrackId: Types.StreamTrackId, data: Uint8Array) {
         const dataChannel = this.streamTracks.get(streamTrackId)?.dataChannelMeta.dataChannel;
-        console.log("sendData to channel: ", dataChannel.id, dataChannel.label);
+        if (!dataChannel) {
+            throw new Error(`There is no DataTrack with given streamTrackId: ${streamTrackId}`);
+        }
         dataChannel.send(data);
     }
 }

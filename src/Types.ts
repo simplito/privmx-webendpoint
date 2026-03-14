@@ -758,7 +758,8 @@ export interface TurnCredentials {
 export interface RemoteStreamListener {
     streamRoomId: StreamRoomId;
     streamId?: StreamId;
-    onRemoteStreamTrack: (event: RTCTrackEvent) => void;
+    onRemoteStreamTrack?: (event: RTCTrackEvent) => void;
+    onRemoteDataChannel?: (event: RTCDataChannelEvent) => void;
 }
 
 /**

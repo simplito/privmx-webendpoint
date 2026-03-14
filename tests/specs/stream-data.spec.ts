@@ -97,22 +97,13 @@ test.describe("StreamTest", () => {
     test("E2E: Three users exchange data streams", async ({ createContextPage, backend, cli }) => {
         test.setTimeout(60_000);
         const page1 = await createContextPage();
-        page1.on("console", msg => {
-            console.log("[U 1]", msg);
-        });
         await initPage(page1);
         const users = await setupUsers(page1, cli);
 
         const page2 = await createContextPage();
-        page2.on("console", msg => {
-            console.log("[U 2]", msg);
-        });
         await initPage(page2);
 
         const page3 = await createContextPage();
-        page3.on("console", msg => {
-            console.log("[U 3]", msg);
-        });
         await initPage(page3);
 
         await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
@@ -123,6 +114,17 @@ test.describe("StreamTest", () => {
         let roomId: StreamRoomId;
         let dataTrackId: string;
         let streamHandle: StreamHandle;
+        const testMessage = "test message";
+
+        let resolvePage1: () => void;
+        let resolvePage3: () => void;
+
+        const page1Event = new Promise<void>(r => resolvePage1 = r);
+        const page3Event = new Promise<void>(r => resolvePage3 = r);
+
+        // user1 and user3 will wait for message
+        await page1.exposeFunction("notifyMessageReceived", () => resolvePage1());
+        await page3.exposeFunction("notifyMessageReceived", () => resolvePage3());
 
         // --- STEP 1: U1 Creates Room & listens for events ---
         await test.step("User 1: Create Room, Join, Wait for 'new streams' events", async () => {
@@ -225,15 +227,13 @@ test.describe("StreamTest", () => {
                 const w = window as any;
                 return w.__eventCollector?.events ?? [];
             });
-
-            console.log("Event recv...", JSON.stringify(events, null, 2));
         });
 
 
         test.step("User 1: try to read from data stream", async () => {
             await page1.evaluate(
-                async ({ roomId }) => {
-                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
+                async ({ roomId, testMessage }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 1");
                     const api = window.streamApi;
 
                     const streams = await api.listStreams(roomId);
@@ -248,17 +248,26 @@ test.describe("StreamTest", () => {
                     );
 
                     await api.subscribeToRemoteStreams(roomId, streamsWithDataTracks);
+                    api.addRemoteStreamListener({streamRoomId: roomId, onRemoteDataChannel: (event) => {
+                        event.channel.onmessage = (m) => {
+                            const msg = new TextDecoder().decode(m.data);
+                            if (msg === testMessage) {
+                                // @ts-ignore
+                                window.notifyMessageReceived();
+                            }
+                        };
+                    }});
                     await new Promise<void>(resolve => setTimeout(() => resolve(), 10000));
 
                 },
-                { roomId },
+                { roomId, testMessage },
             );
         });
 
         await test.step("User 3: try to read from data stream", async () => {
             await page3.evaluate(
-                async ({ roomId }) => {
-                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
+                async ({ roomId, testMessage }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 3");
                     const api = window.streamApi;
                     await api.joinStreamRoom(roomId);
                     const streams = await api.listStreams(roomId);
@@ -273,10 +282,19 @@ test.describe("StreamTest", () => {
                     );
 
                     await api.subscribeToRemoteStreams(roomId, streamsWithDataTracks);
+                    api.addRemoteStreamListener({streamRoomId: roomId, onRemoteDataChannel: (event) => {
+                        event.channel.onmessage = (m) => {
+                            const msg = new TextDecoder().decode(m.data);
+                            if (msg === testMessage) {
+                                // @ts-ignore
+                                window.notifyMessageReceived();
+                            }
+                        };
+                    }});
                     await new Promise<void>(resolve => setTimeout(() => resolve(), 10000));
 
                 },
-                { roomId },
+                { roomId, testMessage },
             );
         });
 
@@ -284,18 +302,16 @@ test.describe("StreamTest", () => {
 
         await test.step("User 2: try to send data to data stream", async () => {
             await page2.evaluate(
-                async ({ roomId, dataTrackId }) => {
+                async ({ dataTrackId, testMessage }) => {
                     if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
                     const api = window.streamApi;
-
-                    console.log("sending data...")
-                    await api.sendData(dataTrackId as any, "lala");
-                    await new Promise<void>(resolve => setTimeout(() => resolve(), 20000));
-
+                    await api.sendData(dataTrackId as any, new TextEncoder().encode(testMessage));
                 },
-                { roomId, dataTrackId },
+                { dataTrackId, testMessage },
             );
         });
+
+        await Promise.all([page1Event, page3Event]);
     });
 
 });

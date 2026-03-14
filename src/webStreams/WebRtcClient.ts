@@ -49,8 +49,6 @@ export class WebRtcClient {
     private e2eeWorker: Worker | undefined;
     private webWorkerApi: WebWorker;
 
-    private dataChannels: RTCDataChannel[] = [];
-
     private configuration: RTCConfiguration | undefined;
     private keyStore: KeyStore = new KeyStore();
 
@@ -67,13 +65,14 @@ export class WebRtcClient {
 
     // private mediaServerAvailPublishers: {[publisherId: number]: Publisher} = {};
     private encByReceiver = new WeakMap<RTCRtpReceiver, EncPair>();
-    private logger: Logger = Logger.get();
+    private logger: Logger = new Logger();
 
     private peerConnectionReconfigureQueue: Queue<QueueItem> | undefined;
     public lastProcessedAnswer: { [roomId: string]: Jsep } = {};
     private lastMeasuredLocalRMS: number = -99;
     private eventsDispatcher: StateChangeDispatcher = new StateChangeDispatcher();
     private localAudioLevelMeters: Map<string, LocalAudioLevelMeter> = new Map();
+    
     private bootstrapDataChannel: RTCDataChannel | undefined;
 
     constructor(private assetsDir: string) {
@@ -360,18 +359,18 @@ export class WebRtcClient {
 
         // gethering state change
         connection.addEventListener("icegatheringstatechange", (event) => {
-            this.logger.log("info", "on ice state change: ", event);
+            this.logger.info("on ice state change: ", event);
         });
         // ice candidate error
         connection.addEventListener("icecandidateerror", (event) => {
-            this.logger.log("info", "on ice error: ", event);
+            this.logger.info("on ice error: ", event);
         });
         connection.addEventListener("connectionstatechange", (event) => {
-            this.logger.log("info", "connectionstatechange: ", event);
+            this.logger.info("connectionstatechange: ", event);
             if (connection.connectionState === "connected") {
-                this.logger.log("info", "Peers connected!");
+                this.logger.info("Peers connected!");
             } else {
-                this.logger.log("info", "connection state: ", connection.connectionState);
+                this.logger.info("connection state: ", connection.connectionState);
             }
             this.eventsDispatcher.emit({
                 streamHandle: this.publishStreamHandle,
@@ -380,120 +379,49 @@ export class WebRtcClient {
         });
 
         connection.addEventListener("datachannel", (event) => {
-            this.logger.log("info", "================ RECV datachannel: ", event.channel.id, event.channel.label);
+            this.logger.info("================ RECV datachannel: ", event.channel.id, event.channel.label);
             const dc = event.channel;
             dc.binaryType = "arraybuffer";
-            dc.onopen = () => { console.log("===> RECEIVER data stream: open") };
-            dc.onmessage = (m) => { console.log("===> RECEIVER data stream: onmessage", m) };
-            dc.onclose = () => { console.log("===> RECEIVER data stream: close") };
-            dc.onerror = (e) => { console.log("===> RECEIVER data stream: error", e) };
-            // const recvChannel = event.channel;
-            // this.addDataChannel(recvChannel);
+            this.callRegisteredListenersForDataChannel(roomId, event);
         });
 
         connection.addEventListener("iceconnectionstatechange", (event) => {
-            this.logger.log("info", "iceconnectionstatechange: ", event);
+            this.logger.info("iceconnectionstatechange: ", event);
         });
         connection.addEventListener("negotiationneeded", async (_event) => {
-            this.logger.log("info", "negotiationneeded: ", _event);
+            this.logger.info("negotiationneeded: ", _event);
             // await this.startNegotiationMulti(roomId, (_event as any).target);
         });
         connection.addEventListener("signalingstatechange", (event) => {
-            this.logger.log("info", "signalingstatechange: ", event);
+            this.logger.info("signalingstatechange: ", event);
         });
         connection.addEventListener("track", async (event) => {
             await this.addRemoteTrack(roomId, event /*, mappedPublisher*/);
         });
-
         return connection;
     }
-
-
-
-        // private async onSubscriberAttached(eventData: SignalingFromServer.SubscriberAttached) {
-    // console.log("============> onSubscriberAttached",eventData);
-    // // const peerCredentials = await (await this.getAppServerChannel()).requestCredentials();
-
-    // // const configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
-    // if (!this.configuration) {
-    //     throw new Error("Configuration missing.");
-    // }
-    // console.log("-----> onSubscriberAttached", {room: eventData.room, streams: eventData.streams});
-    // this.receiverPeerConnection = this.createPeerConnectionMulti(this.configuration);
-    // const peerConnection = this.receiverPeerConnection;
-
-    // console.log("-----> setting up remote subscriber offer as remoteDescription", eventData.offer);
-    // await peerConnection.setRemoteDescription(new RTCSessionDescription(eventData.offer));
-    // console.log("----------> creating answer for remote offer..");
-
-    // const dataStreams = eventData.streams.filter(x => x.type === "data");
-    // for (const x of dataStreams) {
-    //     console.log("============> Creating dataChannel handler..." + x.mid);
-    //     peerConnection.createDataChannel("JanusDataChannel/" + x.mid);
-    // }
-    // const answer = await peerConnection.createAnswer();
-
-    // await peerConnection.setLocalDescription(answer);
-
-    // await this.signalingApi?.acceptOffer(eventData.session_id, eventData.handle, answer);
-    // }
 
     private async startNegotiationMulti(roomId: StreamRoomId,
         _rtcPeerConnection: RTCPeerConnection,
         _withIceRestart?: boolean,
     ) {
         try {
-            // console.log("[startNegotiationMulti]", "Create offer...");
-            // const offer = await rtcPeerConnection.createOffer({ iceRestart: withIceRestart });
-            // console.log("setLocalDescription on startNegotiationMulti");
-            // await rtcPeerConnection.setLocalDescription(offer);
             if (!this.peerConnectionReconfigureQueue) {
                 throw new Error("ReconfigureQueue does not exist.");
             }
             this.peerConnectionReconfigureQueue.enqueue({
-            taskId: Math.floor(1 + Math.random() * 10000),
-            _room: roomId
-        });
-        try {
-            await this.peerConnectionReconfigureQueue.processAll();
-        } catch (e) {
-            console.error("Error on onSubscriberAttached", e);
-        }
-            console.log("renegotiation func DONE");
+                taskId: Math.floor(1 + Math.random() * 10000),
+                _room: roomId
+            });
+            try {
+                await this.peerConnectionReconfigureQueue.processAll();
+            } catch (e) {
+                console.error("Error on onSubscriberAttached", e);
+            }
         } catch (e) {
             console.error("Error on startNegotiationMulti", e);
         }
     }
-
-    createDataChannel(_name: string) {
-        // const channel = this.getSenderActivePeerConnection().createDataChannel(name);
-        // this.addDataChannel(channel);
-    }
-
-    private addDataChannel(dataChannel: RTCDataChannel) {
-        console.log("on addDataChannel", dataChannel);
-        dataChannel.addEventListener("open", () => {
-            console.log("Data channel opened.");
-        });
-        dataChannel.addEventListener("close", () => {
-            console.log("Data channel closed.");
-        });
-        dataChannel.addEventListener("error", (err) => {
-            console.log("Data channel error", err);
-        });
-        this.dataChannels.push(dataChannel);
-    }
-
-    async sendToChannel(name: string, message: string) {
-        const channel = this.dataChannels.find((x) => x.label === name);
-        if (!channel || channel.readyState !== "open") {
-            console.error("Cannot find open channel by given name");
-            return;
-        }
-        channel.send(message);
-        console.log("Message sent!");
-    }
-
 
     async updateKeys(_streamRoomId: StreamRoomId, keys: Key[]) {
         this.keyStore.setKeys(keys);
@@ -507,7 +435,7 @@ export class WebRtcClient {
             };
             (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
         } else {
-            this.logger.log("important-only", "Worker - encoding frames using EncodedStreams");
+            this.logger.info("Worker - encoding frames using EncodedStreams");
             const senderStreams = (videoSender as any).createEncodedStreams();
             this.e2eeWorker.postMessage(
                 {
@@ -526,7 +454,7 @@ export class WebRtcClient {
         worker: Worker,
     ) {
         if ("RTCRtpScriptTransform" in window && !receiver.transform) {
-            this.logger.log("important-only", "-> using RtpScriptTransform");
+            this.logger.info("-> using RtpScriptTransform");
             const id = receiver.track.id;
             receiver.transform = new window.RTCRtpScriptTransform(worker, {
                 operation: "decode",
@@ -535,7 +463,7 @@ export class WebRtcClient {
             });
             return;
         }
-        this.logger.log("important-only", "-> using EncodedStreams");
+        this.logger.info("-> using EncodedStreams");
 
         // Fallback: Encoded Streams
         if (
@@ -543,7 +471,7 @@ export class WebRtcClient {
             "createEncodedStreams" in receiver &&
             typeof receiver.createEncodedStreams === "function"
         ) {
-            this.logger.log("important-only", "-> call for createEncodedStreams()");
+            this.logger.info("-> call for createEncodedStreams()");
             const { readable, writable } = await receiver.createEncodedStreams();
             const enc = {
                 readable,
@@ -554,8 +482,7 @@ export class WebRtcClient {
             };
             this.encByReceiver.set(receiver, enc);
 
-            this.logger.log(
-                "important-only",
+            this.logger.info(
                 "-> posting EncodedStreams to worker (should happen only once)",
             );
 
@@ -572,7 +499,7 @@ export class WebRtcClient {
                 [enc.readable, enc.writable], // transfer ownership
             );
         } else {
-            this.logger.log("important-only", "-> EncodedStreams posted to worker already.");
+            this.logger.info("-> EncodedStreams posted to worker already.");
         }
     }
 
@@ -622,10 +549,10 @@ export class WebRtcClient {
             roomId,
             "subscriber",
         ).pc;
-        this.logger.log("important-only", "waitUntilConnected...");
+        this.logger.debug("waitUntilConnected...");
         await this.waitUntilConnected(peerConnection);
 
-        this.logger.log("important-only", "setupReceiverTransform...");
+        this.logger.info("setupReceiverTransform...");
         await this.setupReceiverTransform(receiver, publisherId, worker);
         track.addEventListener("ended", async () => await this.teardownReceiver(receiver, worker));
 
@@ -636,7 +563,7 @@ export class WebRtcClient {
         const remoteStreamId = Number(event.streams[0].id);
         const listeners = this.remoteStreamsListeners.get(roomId);
         if (!listeners) {
-            this.logger.log("info", "No remoteTrack listener registered for room: " + roomId);
+            this.logger.info("No remoteTrack listener registered for room: " + roomId);
             return;
         }
         const filteredListeners = listeners.filter(
@@ -652,7 +579,26 @@ export class WebRtcClient {
         }
     }
 
-    // test
+    private callRegisteredListenersForDataChannel(roomId: StreamRoomId, event: RTCDataChannelEvent) {
+        const remoteStreamId = Number(event.channel.label);
+        const listeners = this.remoteStreamsListeners.get(roomId);
+        if (!listeners) {
+            this.logger.info("No remoteTrack listener registered for room: " + roomId);
+            return;
+        }
+        const filteredListeners = listeners.filter(
+            (x) => x.streamId === remoteStreamId || x.streamId === undefined,
+        );
+        for (const listener of filteredListeners) {
+            if (
+                listener.onRemoteDataChannel &&
+                typeof listener.onRemoteDataChannel === "function"
+            ) {
+                listener.onRemoteDataChannel(event);
+            }
+        }
+    }
+
     public async onSubscriptionUpdated(_room: StreamRoomId, offer: {sdp: string, type: string}) {
         if (!this.peerConnectionReconfigureQueue) {
             throw new Error("ReconfigureQueue does not exist.");
@@ -682,30 +628,31 @@ export class WebRtcClient {
             "subscriber",
         );
         const peerConnection = janusConnection.pc;
-        this.logger.log("info", "SUBSCRIBER RECV OFFER FROM PUBLISHER: ", offer.sdp);
-        this.logger.log("important-only", "1. Setting up remoteDescription...");
+        this.logger.info("SUBSCRIBER RECV OFFER FROM PUBLISHER: ", offer.sdp);
+        this.logger.info("1. Setting up remoteDescription...");
 
         if (!this.bootstrapDataChannel) {
             const bootstrap = peerConnection.createDataChannel("JanusDataChannel");
-            bootstrap.onopen = () => console.log("====> Bootstrap dataChannel: open");
-            bootstrap.onerror = (e) => console.error("====> Bootrstrap dataChannel: error", e);
+            bootstrap.onerror = (e) => {
+                console.error(e);
+                throw new Error("Cannot initialize Bootrstrap dataChannel");
+            };
         }
 
 
         await peerConnection.setRemoteDescription(
             new RTCSessionDescription({ type: offer.type as RTCSdpType, sdp: offer.sdp }),
         );
-        this.logger.log("important-only", "offer from Janus: ", JSON.stringify(offer, null, 2));
+        this.logger.debug("offer from Janus: ", JSON.stringify(offer, null, 2));
 
-        this.logger.log(
-            "important-only",
+        this.logger.info(
             "2. Creating an answer...",
             "peerConnection state",
             peerConnection.connectionState,
         );
         const answer = await peerConnection.createAnswer();
 
-        this.logger.log("important-only", "3. Setting up localDescription...");
+        this.logger.info("3. Setting up localDescription...");
         await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
 
         // this.subscriberAttachedProcessing = false
