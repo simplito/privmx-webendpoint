@@ -271,7 +271,7 @@ export class WebRtcClient {
 
         if (dataTracks) {
             for (const dataTrack of dataTracks) {
-                const dataChannel = pc.createDataChannel("JanusDataChannel");
+                const dataChannel = pc.createDataChannel("JanusDataChannel", {ordered: true, negotiated: false});
                 dataTrack.dataChannelMeta.dataChannel = dataChannel;
             }
         }
@@ -380,7 +380,7 @@ export class WebRtcClient {
         });
 
         connection.addEventListener("datachannel", (event) => {
-            this.logger.log("info", "================ RECV datachannel: ", event);
+            this.logger.log("info", "================ RECV datachannel: ", event.channel.id, event.channel.label);
             const dc = event.channel;
             dc.binaryType = "arraybuffer";
             dc.onopen = () => { console.log("===> RECEIVER data stream: open") };
@@ -628,17 +628,6 @@ export class WebRtcClient {
         this.logger.log("important-only", "setupReceiverTransform...");
         await this.setupReceiverTransform(receiver, publisherId, worker);
         track.addEventListener("ended", async () => await this.teardownReceiver(receiver, worker));
-
-        if (track.kind === "data") {
-            console.log("Received DATA track ===============================");
-            // const channel = peerConnection.createDataChannel("JanusDataChannel/" + event.track.id);
-            // channel.addEventListener("message", (e) => {
-            //     console.log("ON MESSAGE", e);
-            // });
-
-            // const newOffer = peerConnection.createOffer();
-            
-        }
 
         this.callRegisteredListeners(roomId, event);
     }

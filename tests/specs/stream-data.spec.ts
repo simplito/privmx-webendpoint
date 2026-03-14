@@ -94,23 +94,30 @@ test.describe("StreamTest", () => {
     };
 
 ////////////////////////////////////////////////////////////////////////////
-    test("E2E: Two users exchange data streams", async ({ createContextPage, backend, cli }) => {
+    test("E2E: Three users exchange data streams", async ({ createContextPage, backend, cli }) => {
         test.setTimeout(60_000);
         const page1 = await createContextPage();
+        page1.on("console", msg => {
+            console.log("[U 1]", msg);
+        });
         await initPage(page1);
         const users = await setupUsers(page1, cli);
 
         const page2 = await createContextPage();
-        page1.on("console", msg => {
-            console.log(msg);
-        });
         page2.on("console", msg => {
-            console.log(msg);
+            console.log("[U 2]", msg);
         });
         await initPage(page2);
 
+        const page3 = await createContextPage();
+        page3.on("console", msg => {
+            console.log("[U 3]", msg);
+        });
+        await initPage(page3);
+
         await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
         await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page3, users.u3, backend.bridgeUrl, testData.solutionId);
 
         const contextId = testData.contextId;
         let roomId: StreamRoomId;
@@ -123,18 +130,13 @@ test.describe("StreamTest", () => {
                 async ({ contextId, users, StreamEventSelectorType, StreamEventType }) => {
                     if (!window.streamApi) throw new Error("StreamApi not ready on Page 1");
                     const api = window.streamApi;
-                    const enc = new TextEncoder();
+                    const usersList = [
+                        { userId: users.u1.id, pubKey: users.u1.pubKey },
+                        { userId: users.u2.id, pubKey: users.u2.pubKey },
+                        { userId: users.u3.id, pubKey: users.u3.pubKey }
+                    ];
 
-                    const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
-                    const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
-
-                    const sId = await api.createStreamRoom(
-                        contextId,
-                        [u1Obj, u2Obj],
-                        [u1Obj, u2Obj],
-                        enc.encode("p"),
-                        enc.encode("p"),
-                    );
+                    const sId = await api.createStreamRoom(contextId, usersList, usersList, new Uint8Array(), new Uint8Array());
 
                     await api.joinStreamRoom(sId);
 
@@ -228,7 +230,7 @@ test.describe("StreamTest", () => {
         });
 
 
-        await test.step("User 1: try to read from data stream", async () => {
+        test.step("User 1: try to read from data stream", async () => {
             await page1.evaluate(
                 async ({ roomId }) => {
                     if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
@@ -252,6 +254,32 @@ test.describe("StreamTest", () => {
                 { roomId },
             );
         });
+
+        await test.step("User 3: try to read from data stream", async () => {
+            await page3.evaluate(
+                async ({ roomId }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
+                    const api = window.streamApi;
+                    await api.joinStreamRoom(roomId);
+                    const streams = await api.listStreams(roomId);
+
+                    const streamsWithDataTracks = streams.flatMap(stream =>
+                        stream.tracks
+                            .filter(track => track.type === "data")
+                            .map(track => ({
+                                streamId: stream.id,
+                                streamTrackId: track.mid
+                            }))
+                    );
+
+                    await api.subscribeToRemoteStreams(roomId, streamsWithDataTracks);
+                    await new Promise<void>(resolve => setTimeout(() => resolve(), 10000));
+
+                },
+                { roomId },
+            );
+        });
+
 
 
         await test.step("User 2: try to send data to data stream", async () => {
