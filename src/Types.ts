@@ -759,7 +759,7 @@ export interface RemoteStreamListener {
     streamRoomId: StreamRoomId;
     streamId?: StreamId;
     onRemoteStreamTrack?: (event: RTCTrackEvent) => void;
-    onRemoteDataChannel?: (event: RTCDataChannelEvent) => void;
+    onRemoteData?: (data: Uint8Array, statusCode: number) => void;
 }
 
 /**
@@ -887,4 +887,36 @@ export type CollectionChangedEventData = {
 export interface RecordingEncKey {
     id: Uint8Array;
     key: Uint8Array;
+}
+
+export enum DataChannelCryptorDecryptStatus {
+    /** No error */
+    OK = 0x0000,
+
+    /** Frame too short */
+    FRAME_TOO_SHORT = 0x1001,
+
+    /** Unsupported protocol version */
+    UNSUPPORTED_VERSION = 0x1002,
+
+    /** Invalid IV length */
+    INVALID_IV_LENGTH = 0x1003,
+
+    /** Truncated frame */
+    FRAME_TRUNCATED = 0x1004,
+
+    /** Invalid key ID */
+    INVALID_KEY_ID = 0x1005,
+
+    /** Encryption key not found */
+    KEY_NOT_FOUND = 0x1006,
+
+    /** Invalid encryption key length */
+    INVALID_KEY_LENGTH = 0x1007,
+
+    /** Decryption failed (authentication error) */
+    DECRYPT_AUTH_FAILED = 0x1008,
+
+    /** Invalid data sequence number */
+    INVALID_DATA_SEQUENCE = 0x1009,
 }

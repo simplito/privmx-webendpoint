@@ -7,7 +7,7 @@ import {
 } from "./WebRtcClientTypes";
 import { WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
-import { Key, TurnCredentials, StreamHandle, RemoteStreamListener } from "../Types";
+import { Key, TurnCredentials, StreamHandle, RemoteStreamListener, DataChannelCryptorDecryptStatus } from "../Types";
 import { KeyStore } from "./KeyStore";
 import { PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
@@ -18,6 +18,7 @@ import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
 import { ActiveSpeakerDetector, DEFAULTS, SpeakerState } from "./audio/ActiveSpeakerDetector";
 import { StateChangeDispatcher } from "../service/EventDispatcher";
 import { StreamTrack } from "../service/StreamApi";
+import { DataChannelCryptor, DataChannelCryptorError } from "./DataChannelCryptor";
 
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
@@ -58,6 +59,9 @@ export class WebRtcClient {
     private peerCredentials: TurnCredentials[] | undefined;
 
     private remoteStreamsListeners: Map<StreamRoomId, RemoteStreamListener[]> = new Map();
+    private sequenceNumberByRemoteStreamId: Map<number, bigint> = new Map();
+    private dataChannelByRemoteStreamId: Map<number, RTCDataChannel> = new Map();
+    private sequenceNumberOfSender: bigint;
     private peerConnectionsManager: PeerConnectionManager;
     private streamsApiInterface: StreamsCallbackInterface;
     private activeSpeakerDetector: ActiveSpeakerDetector;
@@ -77,6 +81,7 @@ export class WebRtcClient {
 
     constructor(private assetsDir: string) {
         this.uniqId = "" + Math.random() + "-" + Math.random();
+        this.sequenceNumberOfSender = 1n;
         this.peerConnectionsManager = new PeerConnectionManager(
             (roomId: StreamRoomId) => {
                 return this.createPeerConnectionMultiForRoom(
@@ -348,6 +353,15 @@ export class WebRtcClient {
         return pc;
     }
 
+    async encryptDataChannelData(data: Uint8Array) {
+        const cryptor = new DataChannelCryptor(this.getKeyStore());
+        console.log("before encrypt", this.sequenceNumberOfSender, ++this.sequenceNumberOfSender);
+        return cryptor.encryptToWireFormat({
+            plaintext: data,
+            sequenceNumber: ++this.sequenceNumberOfSender,
+        });
+    }
+
     private createPeerConnectionMultiForRoom(
         roomId: StreamRoomId,
         configuration: RTCConfiguration & { encodedInsertableStreams?: boolean },
@@ -387,7 +401,29 @@ export class WebRtcClient {
             );
             const dc = event.channel;
             dc.binaryType = "arraybuffer";
-            this.callRegisteredListenersForDataChannel(roomId, event);
+            dc.onmessage = async (dataEvent) => {
+                this.logger.debug("================ ON MESSAGE....");
+                const cryptor = new DataChannelCryptor(this.keyStore);
+                const remoteStreamId = Number(event.channel.label);
+
+                try {
+                    const lastSeq = this.sequenceNumberByRemoteStreamId.get(remoteStreamId) || 0n;
+                    const decrypted = await cryptor.decryptFromWireFormat({
+                        frame: dataEvent.data,
+                        lastSequenceNumber: lastSeq,
+                    });
+                    this.sequenceNumberByRemoteStreamId.set(remoteStreamId, decrypted.seq);
+                    this.callRegisteredListenersForDataChannel(roomId, remoteStreamId, decrypted.data, DataChannelCryptorDecryptStatus.OK);
+                } catch (e) {
+                    if (e instanceof DataChannelCryptorError) {
+                        this.callRegisteredListenersForDataChannel(roomId, remoteStreamId, new Uint8Array(), e.code);
+                    }
+                    else {
+                        throw e;
+                    }
+                }
+            };
+            this.dataChannelByRemoteStreamId.set(Number(dc.label), dc);
         });
 
         connection.addEventListener("iceconnectionstatechange", (event) => {
@@ -430,8 +466,13 @@ export class WebRtcClient {
     }
 
     async updateKeys(_streamRoomId: StreamRoomId, keys: Key[]) {
+        this.logger.debug("=======> UPDATE KEYS", _streamRoomId, keys.length);
         this.keyStore.setKeys(keys);
         (await this.getWorkerApi()).setKeys(keys);
+    }
+
+    getKeyStore(): KeyStore {
+        return this.keyStore;
     }
 
     private setupSenderTransform(videoSender: RTCRtpSender) {
@@ -541,7 +582,7 @@ export class WebRtcClient {
 
     private async addRemoteTrack(
         roomId: StreamRoomId,
-        event: RTCTrackEvent /*, mappedPublisher: Publisher*/,
+        event: RTCTrackEvent,
     ) {
         const worker = await this.getWorker();
         const track = event.track;
@@ -584,9 +625,10 @@ export class WebRtcClient {
 
     private callRegisteredListenersForDataChannel(
         roomId: StreamRoomId,
-        event: RTCDataChannelEvent,
+        remoteStreamId: number,
+        data: Uint8Array,
+        statusCode: number,
     ) {
-        const remoteStreamId = Number(event.channel.label);
         const listeners = this.remoteStreamsListeners.get(roomId);
         if (!listeners) {
             return;
@@ -596,10 +638,10 @@ export class WebRtcClient {
         );
         for (const listener of filteredListeners) {
             if (
-                listener.onRemoteDataChannel &&
-                typeof listener.onRemoteDataChannel === "function"
+                listener.onRemoteData &&
+                typeof listener.onRemoteData === "function"
             ) {
-                listener.onRemoteDataChannel(event);
+                listener.onRemoteData(data, statusCode);
             }
         }
     }

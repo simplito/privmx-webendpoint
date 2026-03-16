@@ -14,6 +14,10 @@ export class KeyStore {
         }
     }
 
+    getKeys() {
+        return this._keys;
+    }
+
     getKey(keyId: string): Key {
         return this._keys.get(keyId);
     }

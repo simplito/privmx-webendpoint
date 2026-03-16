@@ -8,7 +8,7 @@ export enum LogLevel {
 export class Logger {
     private level: LogLevel;
 
-    constructor(level: LogLevel = LogLevel.ERROR) {
+    constructor(level: LogLevel = LogLevel.DEBUG) {
         this.level = level;
     }
 
