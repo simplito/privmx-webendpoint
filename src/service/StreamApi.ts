@@ -260,6 +260,7 @@ export class StreamApi extends BaseApi {
                 }
             }
         }
+
         if (alreadyAddedId.length > 0) {
             return alreadyAddedId as StreamTrackId;
         }
@@ -352,19 +353,15 @@ export class StreamApi extends BaseApi {
         if (!_stream) {
             throw new Error("No stream defined to publish");
         }
-        let mediaStream: MediaStream = undefined;
-
-        if (mediaTracks.length > 0) {
-            mediaStream = new MediaStream(mediaTracks);
-            _stream.localMediaStream = mediaStream;
-        }
+        
+        _stream.localMediaStream = mediaTracks.length > 0 ? new MediaStream(mediaTracks) : undefined;
 
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(turnCredentials);
         await this.client.createPeerConnectionWithLocalStream(
             streamHandle,
             _stream.streamRoomId,
-            mediaStream,
+            _stream.localMediaStream,
             dataTracks,
         );
 
