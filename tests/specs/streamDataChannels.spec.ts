@@ -97,25 +97,15 @@ test.describe("StreamTest", () => {
     test("E2E: Three users exchange data streams", async ({ createContextPage, backend, cli }) => {
         test.setTimeout(60_000);
         const page1 = await createContextPage();
-        page1.on("console", msg => {
-            console.log("[P1]", msg)
-        })
-
         await initPage(page1);
         const users = await setupUsers(page1, cli);
 
         const page2 = await createContextPage();
-                page2.on("console", msg => {
-            console.log("[P2]", msg)
-        })
 
         await initPage(page2);
 
-
         const page3 = await createContextPage();
-        page3.on("console", msg => {
-            console.log("[P3]", msg)
-        })
+
         await initPage(page3);
 
 
@@ -301,14 +291,14 @@ test.describe("StreamTest", () => {
                     await api.subscribeToRemoteStreams(roomId, streamsWithDataTracks);
                     api.addRemoteStreamListener({
                         streamRoomId: roomId,
-                        onRemoteDataChannel: (event) => {
-                            event.channel.onmessage = (m) => {
-                                const msg = new TextDecoder().decode(m.data);
-                                if (msg === testMessage) {
-                                    // @ts-ignore
-                                    window.notifyMessageReceived();
-                                }
-                            };
+                        onRemoteData: (data, statusCode) => {
+                            const msg = new TextDecoder().decode(data);
+                            if (msg === testMessage && statusCode === 0) {
+                                // @ts-ignore
+                                window.notifyMessageReceived();
+                            } else if (statusCode > 0) {
+                                throw new Error("non-zero statusCode on decrypt");
+                            }
                         },
                     });
                     await new Promise<void>((resolve) => setTimeout(() => resolve(), 10000));
@@ -337,11 +327,13 @@ test.describe("StreamTest", () => {
                     await api.subscribeToRemoteStreams(roomId, streamsWithDataTracks);
                     api.addRemoteStreamListener({
                         streamRoomId: roomId,
-                        onRemoteData: (data) => {
+                        onRemoteData: (data, statusCode) => {
                             const msg = new TextDecoder().decode(data);
-                            if (msg === testMessage) {
+                            if (msg === testMessage && statusCode === 0) {
                                 // @ts-ignore
                                 window.notifyMessageReceived();
+                            } else if (statusCode > 0) {
+                                throw new Error("non-zero statusCode on decrypt");
                             }
                         },
                     });

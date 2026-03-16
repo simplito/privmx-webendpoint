@@ -59,9 +59,9 @@ export class WebRtcClient {
     private peerCredentials: TurnCredentials[] | undefined;
 
     private remoteStreamsListeners: Map<StreamRoomId, RemoteStreamListener[]> = new Map();
-    private sequenceNumberByRemoteStreamId: Map<number, bigint> = new Map();
+    private sequenceNumberByRemoteStreamId: Map<number, number> = new Map();
     private dataChannelByRemoteStreamId: Map<number, RTCDataChannel> = new Map();
-    private sequenceNumberOfSender: bigint;
+    private sequenceNumberOfSender: number;
     private peerConnectionsManager: PeerConnectionManager;
     private streamsApiInterface: StreamsCallbackInterface;
     private activeSpeakerDetector: ActiveSpeakerDetector;
@@ -81,7 +81,7 @@ export class WebRtcClient {
 
     constructor(private assetsDir: string) {
         this.uniqId = "" + Math.random() + "-" + Math.random();
-        this.sequenceNumberOfSender = 1n;
+        this.sequenceNumberOfSender = 1;
         this.peerConnectionsManager = new PeerConnectionManager(
             (roomId: StreamRoomId) => {
                 return this.createPeerConnectionMultiForRoom(
@@ -355,10 +355,10 @@ export class WebRtcClient {
 
     async encryptDataChannelData(data: Uint8Array) {
         const cryptor = new DataChannelCryptor(this.getKeyStore());
-        console.log("before encrypt", this.sequenceNumberOfSender, ++this.sequenceNumberOfSender);
+        const nextSequenceNumber = ++this.sequenceNumberOfSender;
         return cryptor.encryptToWireFormat({
             plaintext: data,
-            sequenceNumber: ++this.sequenceNumberOfSender,
+            sequenceNumber: nextSequenceNumber,
         });
     }
 
@@ -405,14 +405,21 @@ export class WebRtcClient {
                 this.logger.debug("================ ON MESSAGE....");
                 const cryptor = new DataChannelCryptor(this.keyStore);
                 const remoteStreamId = Number(event.channel.label);
+                const frame =
+                    dataEvent.data instanceof Uint8Array
+                        ? dataEvent.data
+                        : dataEvent.data instanceof ArrayBuffer
+                          ? new Uint8Array(dataEvent.data)
+                          : new Uint8Array(dataEvent.data.buffer);
 
                 try {
-                    const lastSeq = this.sequenceNumberByRemoteStreamId.get(remoteStreamId) || 0n;
+                    const lastSeq = this.sequenceNumberByRemoteStreamId.get(remoteStreamId) || 0;
                     const decrypted = await cryptor.decryptFromWireFormat({
-                        frame: dataEvent.data,
+                        frame,
                         lastSequenceNumber: lastSeq,
                     });
                     this.sequenceNumberByRemoteStreamId.set(remoteStreamId, decrypted.seq);
+                    this.logger.debug("Calling listener for dataChannel with values: ", roomId, remoteStreamId, decrypted.data, DataChannelCryptorDecryptStatus.OK)
                     this.callRegisteredListenersForDataChannel(roomId, remoteStreamId, decrypted.data, DataChannelCryptorDecryptStatus.OK);
                 } catch (e) {
                     if (e instanceof DataChannelCryptorError) {

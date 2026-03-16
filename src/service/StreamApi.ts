@@ -584,16 +584,7 @@ export class StreamApi extends BaseApi {
         if (!dataChannel) {
             throw new Error(`There is no DataTrack with given streamTrackId: ${streamTrackId}`);
         }
-        const logger = new Logger();
-        logger.debug("Encrypt data frame");
         const frame = await this.client.encryptDataChannelData(data);
-        logger.debug("====> after encryption -> sending");
         dataChannel.send(frame);
-        logger.debug("Sent...");
-
-        logger.debug("TEST DECRYPT IN-PLACE...");
-        const decryptor = new DataChannelCryptor(this.client.getKeyStore());
-        const decrypted = await decryptor.decryptFromWireFormat({frame, lastSequenceNumber: 0n});
-        logger.debug("Decrypted message: ", new TextDecoder().decode(decrypted.data), "seq: ", decrypted.seq)
     }
 }

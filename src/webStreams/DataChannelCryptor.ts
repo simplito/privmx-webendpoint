@@ -11,22 +11,22 @@ const WIRE_FORMAT_VERSION = 1;
 const FIXED_HEADER_LENGTH =
     1 + // version
     2 + // keyIdLength
-    8 + // sequenceNumber
+    4 + // sequenceNumber
     12; // iv
 
 export interface EncryptToWireFormatParams {
     plaintext: Uint8Array;
-    sequenceNumber: bigint;
+    sequenceNumber: number;
 }
 
 export interface DecryptFromWireFormatParams {
     frame: Uint8Array;
-    lastSequenceNumber: bigint;
+    lastSequenceNumber: number;
 }
 
 export interface ParsedEncryptedFrame {
     version: number;
-    sequenceNumber: bigint;
+    sequenceNumber: number;
     keyId: string;
     iv: Uint8Array;
     ciphertext: Uint8Array;
@@ -42,13 +42,14 @@ export class DataChannelCryptor {
 
     async encryptToWireFormat(params: EncryptToWireFormatParams): Promise<Uint8Array> {
         const { plaintext, sequenceNumber } = params;
-        console.log("sequenceNumber on encryptToWireFormat", sequenceNumber, params.sequenceNumber);
         const { keyId, key } = this.keyStore.getEncriptionKey();
 
         this.assertKeyId(keyId);
         this.assertKeyBytes(key);
 
-        if (sequenceNumber < 0n) {
+        this.assertSequenceNumberValue(sequenceNumber);
+
+        if (sequenceNumber < 0) {
             throw new Error("sequenceNumber must be non-negative");
         }
 
@@ -87,9 +88,8 @@ export class DataChannelCryptor {
 
     async decryptFromWireFormat(
         params: DecryptFromWireFormatParams,
-    ): Promise<{data: Uint8Array, seq: bigint}> {
+    ): Promise<{data: Uint8Array, seq: number}> {
         const parsed = this.parseEncryptedFrame(params.frame, params.lastSequenceNumber);
-        console.log(`parsed data - keyId: ${parsed.keyId}  /  sequenceNumber: ${parsed.sequenceNumber}`)
         const keyBytes = this.keyStore.getKey(parsed.keyId).key;
         const logger = new Logger();
         logger.debug("decryptFromWireFormat", params, parsed, keyBytes);
@@ -123,7 +123,7 @@ export class DataChannelCryptor {
         }
     }
 
-    parseEncryptedFrame(frame: Uint8Array, lastSeq: bigint): ParsedEncryptedFrame {
+    parseEncryptedFrame(frame: Uint8Array, lastSeq: number): ParsedEncryptedFrame {
         this.assertFrameLength(frame);
 
         const view = new DataView(frame.buffer, frame.byteOffset, frame.byteLength);
@@ -142,9 +142,8 @@ export class DataChannelCryptor {
         const keyIdLength = view.getUint16(offset, false);
         offset += 2;
 
-        const sequenceNumber = view.getBigUint64(offset, false);
-        console.log("parsed sequenceNumber: ", sequenceNumber);
-        offset += 8;
+        const sequenceNumber = view.getUint32(offset, false);
+        offset += 4;
 
         this.assertSequence(sequenceNumber, lastSeq);
 
@@ -183,13 +182,14 @@ export class DataChannelCryptor {
 
     private serializeHeader(params: {
         version: number;
-        sequenceNumber: bigint;
+        sequenceNumber: number;
         iv: Uint8Array;
         keyIdBytes: Uint8Array;
     }): Uint8Array {
         const { version, sequenceNumber, iv, keyIdBytes } = params;
 
         this.assertIv(iv);
+        this.assertSequenceNumberValue(sequenceNumber);
 
         const header = new Uint8Array(FIXED_HEADER_LENGTH + keyIdBytes.length);
 
@@ -203,9 +203,8 @@ export class DataChannelCryptor {
         view.setUint16(offset, keyIdBytes.length, false);
         offset += 2;
 
-        view.setBigUint64(offset, sequenceNumber, false);
-        console.log("sequenceNumber to serialize", sequenceNumber);
-        offset += 8;
+        view.setUint32(offset, sequenceNumber, false);
+        offset += 4;
 
         header.set(iv, offset);
         offset += GCM_NONCE_LENGTH_BYTES;
@@ -259,11 +258,20 @@ export class DataChannelCryptor {
         }
     }
 
-    private assertSequence(msgSeq: bigint, lastSeq: bigint): void {
+    private assertSequence(msgSeq: number, lastSeq: number): void {
         if (msgSeq <= lastSeq) {
             throw new DataChannelCryptorError(
                 DataChannelCryptorDecryptStatus.INVALID_DATA_SEQUENCE, `Invalid data sequence number: ${msgSeq}`
             );
+        }
+    }
+
+    private assertSequenceNumberValue(sequenceNumber: number): void {
+        if (!Number.isInteger(sequenceNumber)) {
+            throw new Error(`sequenceNumber must be an integer, got: ${sequenceNumber}`);
+        }
+        if (sequenceNumber < 0 || sequenceNumber > 0xffffffff) {
+            throw new Error(`sequenceNumber must fit in uint32, got: ${sequenceNumber}`);
         }
     }
 
