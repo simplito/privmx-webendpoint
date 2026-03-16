@@ -70,7 +70,7 @@ export class WebRtcClient {
 
     private peerConnectionReconfigureQueue: Queue<QueueItem> | undefined;
     public lastProcessedAnswer: { [roomId: string]: Jsep } = {};
-    private lastMeasuredLocalRMS: number = -99;
+    private lastMeasuredLocalRMS: number = LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
     private eventsDispatcher: StateChangeDispatcher = new StateChangeDispatcher();
     private localAudioLevelMeters: Map<string, LocalAudioLevelMeter> = new Map();
 
@@ -102,7 +102,8 @@ export class WebRtcClient {
         }
         const worker = await this.getWorker();
         const meter = new LocalAudioLevelMeter(track, (onRms) => {
-            worker.postMessage({ operation: "rms", rms: onRms });
+            const rmsToReport = track.enabled ? onRms : LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
+            worker.postMessage({ operation: "rms", rms: rmsToReport });
             this.lastMeasuredLocalRMS = onRms;
         });
         this.localAudioLevelMeters.set(track.id, meter);

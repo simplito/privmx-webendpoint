@@ -1,4 +1,5 @@
 export class LocalAudioLevelMeter {
+    public static readonly RMS_VALUE_OF_SILENCE = -99;
     private ctx!: AudioContext;
     private node!: AudioWorkletNode;
     private source!: MediaStreamAudioSourceNode;
