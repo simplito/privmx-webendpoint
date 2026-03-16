@@ -248,9 +248,9 @@ export class StreamApi extends BaseApi {
         );
 
         for (const streamTrack of tracksByHandle) {
-            if (streamTrack.track && streamTrack.track?.id === meta.track?.id) {
+            if (streamTrack.track && streamTrack.track.id === meta.track?.id) {
                 if (streamTrack.markedToRemove === true) {
-                    streamTrack.markedToRemove === undefined;
+                    streamTrack.markedToRemove = undefined;
                     alreadyAddedId = streamTrack.id;
                     break;
                 } else {
