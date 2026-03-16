@@ -65,5 +65,5 @@ export interface RTCEncodedStream {
 export interface QueueItem {
     taskId: number;
     _room: StreamRoomId;
-    jsep?: {sdp: string, type: string};
+    jsep?: { sdp: string; type: string };
 }

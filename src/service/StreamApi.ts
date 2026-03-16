@@ -29,7 +29,6 @@ import { Buffer } from "buffer";
 
 export interface StreamTrack {
     id: Types.StreamTrackId;
-    streamId?: Types.StreamId;
     streamHandle: StreamHandle;
     track?: MediaStreamTrack;
     dataChannelMeta: DataChannelMeta;
@@ -274,7 +273,7 @@ export class StreamApi extends BaseApi {
             id: streamTrackId,
             streamHandle: streamHandle,
             track: meta.track,
-            dataChannelMeta: {created: meta.createDataChannel},
+            dataChannelMeta: { created: meta.createDataChannel },
             published: false,
         };
         this.streamTracks.set(streamTrackId, streamTrack);
@@ -323,7 +322,7 @@ export class StreamApi extends BaseApi {
         onStreamState?: (state: RTCPeerConnectionState) => void,
     ): Promise<StreamPublishResult> {
         const mediaTracks: MediaStreamTrack[] = [];
-        const dataTracks: StreamTrack[]  = [];
+        const dataTracks: StreamTrack[] = [];
 
         for (const value of this.streamTracks.values()) {
             let toPublish = false;
@@ -358,7 +357,6 @@ export class StreamApi extends BaseApi {
         if (mediaTracks.length > 0) {
             mediaStream = new MediaStream(mediaTracks);
             _stream.localMediaStream = mediaStream;
-
         }
 
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
@@ -367,7 +365,7 @@ export class StreamApi extends BaseApi {
             streamHandle,
             _stream.streamRoomId,
             mediaStream,
-            dataTracks
+            dataTracks,
         );
 
         if (onStreamState && typeof onStreamState === "function") {
