@@ -7,14 +7,15 @@ import {
 } from "../CryptoUtils";
 import * as events from "./WorkerEvents";
 import { KeyStore } from "../KeyStore";
+import { LocalAudioLevelMeter } from "../audio/LocalAudioLevelMeter";
 
 const NUM_AS_UINT8_SIZE = 1;
 const DEBUG = false;
 const sessions = new Map<string, { pipeline: Promise<void> }>();
 const pipelines = new Map<string, { ready: boolean }>();
 
-let lastRMS = -99;
-let recvRMS = -99;
+let lastRMS = LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
+let recvRMS = LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
 let recvRMSTimestamp = Date.now();
 
 export interface TransformContext {
