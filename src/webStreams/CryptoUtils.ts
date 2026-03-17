@@ -1,5 +1,6 @@
 // Types for function parameters and return values
 type BufferLike = ArrayBuffer | Uint8Array;
+type CryptoMaterial = BufferLike | CryptoKey;
 
 interface EncryptionResult {
     success: true;
@@ -26,20 +27,13 @@ interface DecryptionError {
 type DecryptionResponse = DecryptionResult | DecryptionError;
 
 async function encryptWithAES256GCM(
-    key: BufferLike,
+    key: CryptoMaterial,
     iv: BufferLike,
     data: BufferLike,
     header: BufferLike,
 ): Promise<EncryptionResponse> {
     try {
-        // Import the key for AES-GCM
-        const cryptoKey: CryptoKey = await crypto.subtle.importKey(
-            "raw",
-            key,
-            { name: "AES-GCM" },
-            false,
-            ["encrypt"],
-        );
+        const cryptoKey = await ensureCryptoKey(key, "encrypt");
 
         // Encrypt the data
         const encrypted: ArrayBuffer = await crypto.subtle.encrypt(
@@ -67,19 +61,13 @@ async function encryptWithAES256GCM(
 }
 
 async function decryptWithAES256GCM(
-    key: BufferLike,
+    key: CryptoMaterial,
     iv: BufferLike,
     encryptedData: BufferLike,
     header: BufferLike,
 ): Promise<DecryptionResponse> {
     try {
-        const cryptoKey: CryptoKey = await crypto.subtle.importKey(
-            "raw",
-            key,
-            { name: "AES-GCM" },
-            false,
-            ["decrypt"],
-        );
+        const cryptoKey = await ensureCryptoKey(key, "decrypt");
 
         const decrypted: ArrayBuffer = await crypto.subtle.decrypt(
             {
@@ -113,6 +101,23 @@ function isDecryptionSuccess(result: DecryptionResponse): result is DecryptionRe
     return result.success;
 }
 
+async function ensureCryptoKey(
+    key: CryptoMaterial,
+    usage: KeyUsage,
+): Promise<CryptoKey> {
+    if (key instanceof CryptoKey) {
+        return key;
+    }
+
+    return crypto.subtle.importKey(
+        "raw",
+        key,
+        { name: "AES-GCM" },
+        false,
+        [usage],
+    );
+}
+
 export {
     encryptWithAES256GCM,
     decryptWithAES256GCM,
@@ -121,4 +126,5 @@ export {
     type EncryptionResponse,
     type DecryptionResponse,
     type BufferLike,
+    type CryptoMaterial,
 };

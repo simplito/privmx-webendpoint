@@ -3,7 +3,7 @@ import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
 import type { Endpoint, StreamApi, Types } from "../../src";
-import { StreamRoomId, StreamTrackMeta } from "../../src/webStreams/types/ApiTypes";
+import { StreamRoomId, StreamTrackInit } from "../../src/webStreams/types/ApiTypes";
 import { SortOrder, StreamHandle, StreamInfo } from "../../src/Types";
 
 interface TestUser {
@@ -1353,7 +1353,7 @@ test.describe("StreamTest", () => {
             try {
                 await streamApi.addStreamTrack(handle, {
                     track: null as unknown as MediaStreamTrack,
-                } as StreamTrackMeta);
+                } as StreamTrackInit);
             } catch {}
             await streamApi.updateStream(handle);
 
@@ -1373,7 +1373,11 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("modifyRemoteStreamsSubscriptions: various scenarios", async ({ page, backend, cli }) => {
+    test.skip("modifyRemoteStreamsSubscriptions: various scenarios", async ({
+        page,
+        backend,
+        cli,
+    }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
