@@ -5,14 +5,17 @@ import { Logger } from "./Logger";
 const AES_GCM_KEY_LENGTH_BYTES = 32;
 const GCM_NONCE_LENGTH_BYTES = 12;
 const GCM_TAG_LENGTH_BITS = 128;
+const VERSION_LENGTH_BYTES = 1;
+const KEY_ID_LENGTH_BYTES = 2;
+const SEQUENCE_NUMBER_LENGTH_BYTES = 4;
 
 const WIRE_FORMAT_VERSION = 1;
 
 const FIXED_HEADER_LENGTH =
-    1 + // version
-    2 + // keyIdLength
-    4 + // sequenceNumber
-    12; // iv
+    VERSION_LENGTH_BYTES +
+    KEY_ID_LENGTH_BYTES +
+    SEQUENCE_NUMBER_LENGTH_BYTES +
+    GCM_NONCE_LENGTH_BYTES;
 
 export interface EncryptToWireFormatParams {
     plaintext: Uint8Array;
@@ -34,7 +37,6 @@ export interface ParsedEncryptedFrame {
 }
 
 export class DataChannelCryptor {
-    private readonly cryptoKeyCache = new Map<string, Promise<CryptoKey>>();
     private readonly textEncoder = new TextEncoder();
     private readonly textDecoder = new TextDecoder();
 
@@ -42,10 +44,9 @@ export class DataChannelCryptor {
 
     async encryptToWireFormat(params: EncryptToWireFormatParams): Promise<Uint8Array> {
         const { plaintext, sequenceNumber } = params;
-        const { keyId, key } = this.keyStore.getEncriptionKey();
+        const keyId = this.keyStore.getEncryptionKeyId();
 
         this.assertKeyId(keyId);
-        this.assertKeyBytes(key);
 
         this.assertSequenceNumberValue(sequenceNumber);
 
@@ -68,7 +69,7 @@ export class DataChannelCryptor {
             keyIdBytes,
         });
 
-        const cryptoKey = await this.getCryptoKey(keyId, key);
+        const cryptoKey = await this.keyStore.getEncriptionKey();
 
         const encrypted = await crypto.subtle.encrypt(
             {
@@ -90,18 +91,16 @@ export class DataChannelCryptor {
         params: DecryptFromWireFormatParams,
     ): Promise<{data: Uint8Array, seq: number}> {
         const parsed = this.parseEncryptedFrame(params.frame, params.lastSequenceNumber);
-        const keyBytes = this.keyStore.getKey(parsed.keyId).key;
         const logger = new Logger();
-        logger.debug("decryptFromWireFormat", params, parsed, keyBytes);
-        if (!keyBytes) {
+        logger.debug("decryptFromWireFormat", params, parsed);
+
+        if (!this.keyStore.hasKey(parsed.keyId)) {
             throw new DataChannelCryptorError(
                 DataChannelCryptorDecryptStatus.KEY_NOT_FOUND, `Key not found: ${parsed.keyId}`
             );
         }
 
-        this.assertKeyBytes(keyBytes);
-
-        const cryptoKey = await this.getCryptoKey(parsed.keyId, keyBytes);
+        const cryptoKey = await this.keyStore.getKey(parsed.keyId);
 
         try {
             const decrypted = await crypto.subtle.decrypt(
@@ -140,10 +139,10 @@ export class DataChannelCryptor {
         }
 
         const keyIdLength = view.getUint16(offset, false);
-        offset += 2;
+        offset += KEY_ID_LENGTH_BYTES;
 
         const sequenceNumber = view.getUint32(offset, false);
-        offset += 4;
+        offset += SEQUENCE_NUMBER_LENGTH_BYTES;
 
         this.assertSequence(sequenceNumber, lastSeq);
 
@@ -198,13 +197,13 @@ export class DataChannelCryptor {
         let offset = 0;
 
         view.setUint8(offset, version);
-        offset += 1;
+        offset += VERSION_LENGTH_BYTES;
 
         view.setUint16(offset, keyIdBytes.length, false);
-        offset += 2;
+        offset += KEY_ID_LENGTH_BYTES;
 
         view.setUint32(offset, sequenceNumber, false);
-        offset += 4;
+        offset += SEQUENCE_NUMBER_LENGTH_BYTES;
 
         header.set(iv, offset);
         offset += GCM_NONCE_LENGTH_BYTES;
@@ -212,26 +211,6 @@ export class DataChannelCryptor {
         header.set(keyIdBytes, offset);
 
         return header;
-    }
-
-    private async getCryptoKey(keyId: string, keyBytes: Uint8Array): Promise<CryptoKey> {
-        const cacheKey = `${keyId}:${this.bytesToBase64(keyBytes)}`;
-
-        let cryptoKey = this.cryptoKeyCache.get(cacheKey);
-
-        if (!cryptoKey) {
-            cryptoKey = crypto.subtle.importKey(
-                "raw",
-                keyBytes,
-                { name: "AES-GCM" },
-                false,
-                ["encrypt", "decrypt"],
-            );
-
-            this.cryptoKeyCache.set(cacheKey, cryptoKey);
-        }
-
-        return cryptoKey;
     }
 
     private assertFrameLength(frame: Uint8Array) {
@@ -246,14 +225,6 @@ export class DataChannelCryptor {
         if (!keyId || keyId.trim().length === 0) {
             throw new DataChannelCryptorError(
                 DataChannelCryptorDecryptStatus.INVALID_KEY_ID, "Invalid KeyID"
-            );
-        }
-    }
-
-    private assertKeyBytes(keyBytes: Uint8Array): void {
-        if (keyBytes.length !== AES_GCM_KEY_LENGTH_BYTES) {
-            throw new DataChannelCryptorError(
-                DataChannelCryptorDecryptStatus.INVALID_KEY_LENGTH, `Invalid key length: ${keyBytes.length}`
             );
         }
     }
@@ -290,11 +261,6 @@ export class DataChannelCryptor {
         return out;
     }
 
-    private bytesToBase64(bytes: Uint8Array): string {
-        let binary = "";
-        for (const b of bytes) binary += String.fromCharCode(b);
-        return btoa(binary);
-    }
 }
 
 export class DataChannelCryptorError extends Error {

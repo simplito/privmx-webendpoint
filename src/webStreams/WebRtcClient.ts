@@ -168,10 +168,6 @@ export class WebRtcClient {
         return this.eventsDispatcher;
     }
 
-    protected getEncKey(): Key {
-        return this.keyStore.getEncriptionKey();
-    }
-
     protected async getWorker(): Promise<Worker> {
         if (!this.e2eeWorker) {
             const workerApi = await this.getWorkerApi();
@@ -595,7 +591,6 @@ export class WebRtcClient {
         const track = event.track;
         const receiver = event.receiver;
         const publisherId = Number(event.streams[0].id);
-        const key = this.getEncKey();
 
         const peerConnection = this.getConnectionManager().getConnectionWithSession(
             roomId,

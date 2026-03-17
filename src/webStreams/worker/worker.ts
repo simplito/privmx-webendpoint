@@ -51,13 +51,14 @@ export class EncryptTransform {
         const frameBody = new Uint8Array(encodedFrame.data, headerLen);
 
         const iv = Utils.genIvAsBuffer();
-        const keyEntry = this.keyStore.getEncriptionKey();
+        const keyId = this.keyStore.getEncryptionKeyId();
+        const cryptoKey = await this.keyStore.getEncriptionKey();
 
-        const cryptoResult = await encryptWithAES256GCM(keyEntry.key, iv, frameBody, frameHeader);
+        const cryptoResult = await encryptWithAES256GCM(cryptoKey, iv, frameBody, frameHeader);
         if (!isEncryptionSuccess(cryptoResult)) {
             throw new Error("Cannot encrypt frame");
         }
-        const keyIdAsUint8 = new TextEncoder().encode(keyEntry.keyId);
+        const keyIdAsUint8 = new TextEncoder().encode(keyId);
 
         const posOfCipher = frameHeader.byteLength;
         const posOfIv = posOfCipher + cryptoResult.data.byteLength;
@@ -129,9 +130,9 @@ export class EncryptTransform {
                 controller.enqueue(encodedFrame);
                 return;
             }
-            const keyEntry = this.keyStore.getKey(keyId);
+            const cryptoKey = await this.keyStore.getKey(keyId);
             const decryptionResult = await decryptWithAES256GCM(
-                keyEntry.key,
+                cryptoKey,
                 iv,
                 payload,
                 frameHeader,
