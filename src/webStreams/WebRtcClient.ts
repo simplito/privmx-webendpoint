@@ -61,6 +61,7 @@ export class WebRtcClient {
     private remoteStreamsListeners: Map<StreamRoomId, RemoteStreamListener[]> = new Map();
     private sequenceNumberByRemoteStreamId: Map<number, number> = new Map();
     private dataChannelByRemoteStreamId: Map<number, RTCDataChannel> = new Map();
+    private dataChannelCryptor: DataChannelCryptor;
     private sequenceNumberOfSender: number;
     private peerConnectionsManager: PeerConnectionManager;
     private streamsApiInterface: StreamsCallbackInterface;
@@ -103,6 +104,7 @@ export class WebRtcClient {
         });
 
         this.activeSpeakerDetector = new ActiveSpeakerDetector(DEFAULTS);
+        this.dataChannelCryptor = new DataChannelCryptor(this.getKeyStore());
     }
 
     private async ensureLocalAudioLevelMeter(track: MediaStreamTrack) {
@@ -350,9 +352,8 @@ export class WebRtcClient {
     }
 
     async encryptDataChannelData(data: Uint8Array) {
-        const cryptor = new DataChannelCryptor(this.getKeyStore());
         const nextSequenceNumber = ++this.sequenceNumberOfSender;
-        return cryptor.encryptToWireFormat({
+        return this.dataChannelCryptor.encryptToWireFormat({
             plaintext: data,
             sequenceNumber: nextSequenceNumber,
         });
@@ -399,7 +400,6 @@ export class WebRtcClient {
             dc.binaryType = "arraybuffer";
             dc.onmessage = async (dataEvent) => {
                 this.logger.debug("================ ON MESSAGE....");
-                const cryptor = new DataChannelCryptor(this.keyStore);
                 const remoteStreamId = Number(event.channel.label);
                 const frame =
                     dataEvent.data instanceof Uint8Array
@@ -410,7 +410,7 @@ export class WebRtcClient {
 
                 try {
                     const lastSeq = this.sequenceNumberByRemoteStreamId.get(remoteStreamId) || 0;
-                    const decrypted = await cryptor.decryptFromWireFormat({
+                    const decrypted = await this.dataChannelCryptor.decryptFromWireFormat({
                         frame,
                         lastSequenceNumber: lastSeq,
                     });
