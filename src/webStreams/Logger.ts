@@ -1,22 +1,45 @@
-export type LoggerLevel = "debug" | "info" | "important-only";
-export class Logger {
-    private static instance: Logger;
-    private static logLevel: LoggerLevel = "important-only";
+export enum LogLevel {
+    ERROR = 0,
+    WARN = 1,
+    INFO = 2,
+    DEBUG = 3,
+}
 
-    static get() {
-        if (!this.instance) {
-            this.instance = new Logger();
-        }
-        return this.instance;
+export class Logger {
+    private level: LogLevel;
+
+    constructor(level: LogLevel = LogLevel.WARN) {
+        this.level = level;
     }
 
-    log(level: LoggerLevel, ...args: any[]) {
-        if (Logger.logLevel === "debug") {
-            console.log(...args);
-        } else if (level === "info" && Logger.logLevel === "info") {
-            console.log(...args);
-        } else if (level === "important-only" && Logger.logLevel === "important-only") {
-            console.log(...args);
+    setLevel(level: LogLevel) {
+        this.level = level;
+    }
+
+    getLevel(): LogLevel {
+        return this.level;
+    }
+
+    private log(level: LogLevel, prefix: string, args: any[]) {
+        if (level <= this.level) {
+            const timestamp = new Date().toISOString();
+            console.log(`[${timestamp}] [${prefix}]`, ...args);
         }
+    }
+
+    debug(...args: any[]) {
+        this.log(LogLevel.DEBUG, "DEBUG", args);
+    }
+
+    info(...args: any[]) {
+        this.log(LogLevel.INFO, "INFO", args);
+    }
+
+    warn(...args: any[]) {
+        this.log(LogLevel.WARN, "WARN", args);
+    }
+
+    error(...args: any[]) {
+        this.log(LogLevel.ERROR, "ERROR", args);
     }
 }

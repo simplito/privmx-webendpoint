@@ -26,13 +26,14 @@ import {
 } from "../Types";
 import { StreamApiNative } from "../api/StreamApiNative";
 import { Buffer } from "buffer";
+import { DataChannelCryptor } from "../webStreams/DataChannelCryptor";
+import { Logger } from "../webStreams/Logger";
 
 export interface StreamTrack {
     id: Types.StreamTrackId;
-    streamId?: Types.StreamId;
     streamHandle: StreamHandle;
     track?: MediaStreamTrack;
-    dataChannelMeta?: DataChannelMeta;
+    dataChannelMeta: DataChannelMeta;
     published: Boolean;
     markedToRemove?: boolean;
 }
@@ -225,34 +226,19 @@ export class StreamApi extends BaseApi {
     }
 
     /**
-     * Adds a local media track or a data channel definition to a Stream handle.
+     * Adds a local media track definition to a Stream handle.
      *
      * The track is staged locally and becomes visible to others after `publishStream`/`updateStream`.
      *
      * @param {StreamHandle} streamHandle handle returned by `createStream`
-     * @param {Types.StreamTrackMeta} meta track/data channel metadata (track: `MediaStreamTrack`, dataChannel: `DataChannelMeta`)
+     * @param {Types.StreamTrackInit} meta track/data channel metadata (track: `MediaStreamTrack`, dataChannel: `DataChannelMeta`)
      * @returns {string} StreamTrackId assigned locally for this track
      * @throws {Error} when the given `streamHandle` does not exist or the same browser track is already staged
      */
     public async addStreamTrack(
         streamHandle: StreamHandle,
-        meta: Types.StreamTrackMeta,
+        meta: Types.StreamTrackInit,
     ): Promise<Types.StreamTrackId> {
-        // if (streamTrack.dataChannelMeta) {
-        //     await this.client.provideSession();
-        //     const request: StreamDataTrackAddRequest = {
-        //         kind: "streams.streamDataTrackAdd",
-        //         data: {
-        //             streamRoomId: stream.streamRoomId,
-        //             streamId: streamTrack.streamId,
-        //             streamTrackId: streamTrack.id,
-        //             meta: streamTrack.dataChannelMeta
-        //         }
-        //     };
-
-        //     await this.serverChannel.call<StreamsApi.StreamDataTrackAddRequest, void>(request);
-        // }
-
         if (!this.streams.has(streamHandle)) {
             throw new Error("[addStreamTrack]: there is no Stream with given Id: " + streamHandle);
         }
@@ -264,9 +250,9 @@ export class StreamApi extends BaseApi {
         );
 
         for (const streamTrack of tracksByHandle) {
-            if (streamTrack.track && streamTrack.track?.id === meta.track?.id) {
+            if (streamTrack.track && streamTrack.track.id === meta.track?.id) {
                 if (streamTrack.markedToRemove === true) {
-                    streamTrack.markedToRemove === undefined;
+                    streamTrack.markedToRemove = undefined;
                     alreadyAddedId = streamTrack.id;
                     break;
                 } else {
@@ -276,6 +262,7 @@ export class StreamApi extends BaseApi {
                 }
             }
         }
+
         if (alreadyAddedId.length > 0) {
             return alreadyAddedId as StreamTrackId;
         }
@@ -289,7 +276,7 @@ export class StreamApi extends BaseApi {
             id: streamTrackId,
             streamHandle: streamHandle,
             track: meta.track,
-            dataChannelMeta: meta.dataChannel,
+            dataChannelMeta: { created: meta.createDataChannel },
             published: false,
         };
         this.streamTracks.set(streamTrackId, streamTrack);
@@ -302,12 +289,12 @@ export class StreamApi extends BaseApi {
      * For already published streams the removal is applied on `updateStream`.
      *
      * @param {StreamHandle} streamHandle handle returned by `createStream`
-     * @param {Types.StreamTrackMeta} meta media track metadata previously passed to `addStreamTrack`
+     * @param {Types.StreamTrackInit} meta media track metadata previously passed to `addStreamTrack`
      * @throws {Error} when the given `streamHandle` does not exist
      */
     public async removeStreamTrack(
         streamHandle: StreamHandle,
-        meta: Types.StreamTrackMeta,
+        meta: Types.StreamTrackInit,
     ): Promise<void> {
         if (!this.streams.has(streamHandle)) {
             throw new Error(
@@ -326,34 +313,6 @@ export class StreamApi extends BaseApi {
     }
 
     /**
-     * Sends a data message over a stream data track.
-     *
-     * @param {string} _streamTrackId StreamTrackId returned by `addStreamTrack`
-     * @param {Buffer} _data data to send
-     * @throws {Error} not implemented
-     */
-    public async streamTrackSendData(
-        _streamTrackId: Types.StreamTrackId,
-        _data: Buffer,
-    ): Promise<void> {
-        throw new Error("not implemented");
-    }
-
-    /**
-     * Registers a data receive callback for a stream data track.
-     *
-     * @param {string} _streamTrackId StreamTrackId returned by `addStreamTrack`
-     * @param {(data: Buffer) => void} _onData callback invoked when data is received
-     * @throws {Error} not implemented
-     */
-    public async streamTrackRecvData(
-        _streamTrackId: Types.StreamTrackId,
-        _onData: (data: Buffer) => void,
-    ): Promise<void> {
-        throw new Error("not implemented");
-    }
-
-    /**
      * Publishes the Stream (with currently staged tracks) to the server.
      *
      * @param {StreamHandle} streamHandle handle returned by `createStream`
@@ -366,7 +325,10 @@ export class StreamApi extends BaseApi {
         onStreamState?: (state: RTCPeerConnectionState) => void,
     ): Promise<StreamPublishResult> {
         const mediaTracks: MediaStreamTrack[] = [];
+        const dataTracks: StreamTrack[] = [];
+
         for (const value of this.streamTracks.values()) {
+            let toPublish = false;
             if (
                 value.streamHandle === streamHandle &&
                 value.track &&
@@ -374,22 +336,35 @@ export class StreamApi extends BaseApi {
                 value.published === false
             ) {
                 mediaTracks.push(value.track);
-                value.published = true;
+                // value.published = true;
+                toPublish = true;
             }
+
+            if (
+                value.streamHandle === streamHandle &&
+                value.dataChannelMeta.created === true &&
+                !value.markedToRemove &&
+                value.published === false
+            ) {
+                dataTracks.push(value);
+                toPublish = true;
+            }
+            value.published = toPublish;
         }
         const _stream = this.streams.get(streamHandle);
         if (!_stream) {
             throw new Error("No stream defined to publish");
         }
+        
+        _stream.localMediaStream = mediaTracks.length > 0 ? new MediaStream(mediaTracks) : undefined;
 
-        const mediaStream = new MediaStream(mediaTracks);
-        _stream.localMediaStream = mediaStream;
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(turnCredentials);
         await this.client.createPeerConnectionWithLocalStream(
             streamHandle,
             _stream.streamRoomId,
-            mediaStream,
+            _stream.localMediaStream,
+            dataTracks,
         );
 
         if (onStreamState && typeof onStreamState === "function") {
@@ -595,5 +570,21 @@ export class StreamApi extends BaseApi {
         if (onStats && typeof onStats === "function") {
             this.client.setAudioLevelCallback(onStats);
         }
+    }
+
+    /**
+     * Sends binary data over a WebRTC DataChannel associated with a published Stream data track.
+     *
+     * @param {Types.StreamTrackId} streamTrackId StreamTrackId of the data track created via `addStreamTrack`
+     * @param {Uint8Array} data bytes to send to remote participants
+     * @throws {Error} when there is no DataTrack (or DataChannel) for the given `streamTrackId`
+     */
+    async sendData(streamTrackId: Types.StreamTrackId, data: Uint8Array) {
+        const dataChannel = this.streamTracks.get(streamTrackId)?.dataChannelMeta.dataChannel;
+        if (!dataChannel) {
+            throw new Error(`There is no DataTrack with given streamTrackId: ${streamTrackId}`);
+        }
+        const frame = await this.client.encryptDataChannelData(data);
+        dataChannel.send(frame);
     }
 }

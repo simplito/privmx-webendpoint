@@ -53,16 +53,15 @@ export interface StreamList {
 
 export type StreamId = number & { __streamId: never };
 export interface DataChannelMeta {
-    name: string;
+    created: boolean;
+    dataChannel?: RTCDataChannel;
 }
 
 // Channels
-export interface StreamTrackMeta {
+export interface StreamTrackInit {
     // Track
     track?: MediaStreamTrack;
-
-    // DataChannel
-    dataChannel?: DataChannelMeta;
+    createDataChannel?: boolean;
 }
 
 export interface StreamTrackList {
