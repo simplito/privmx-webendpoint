@@ -5,7 +5,6 @@ import { setupUsers } from "../test-utils";
 import type { Endpoint, StreamApi } from "../../src";
 import { StreamRoomId } from "../../src/webStreams/types/ApiTypes";
 import { StreamHandle } from "../../src/Types";
-
 import { StreamEventType, StreamEventSelectorType } from "../../src/Types";
 
 interface TestUser {
@@ -93,7 +92,6 @@ test.describe("StreamTest", () => {
         );
     };
 
-    ////////////////////////////////////////////////////////////////////////////
     test("E2E: Three users exchange data streams", async ({ createContextPage, backend, cli }) => {
         test.setTimeout(60_000);
         const page1 = await createContextPage();
@@ -107,7 +105,6 @@ test.describe("StreamTest", () => {
         const page3 = await createContextPage();
 
         await initPage(page3);
-
 
         await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
         await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);

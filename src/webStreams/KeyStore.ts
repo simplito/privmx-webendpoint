@@ -20,13 +20,10 @@ export class KeyStore {
             this.assertKeyBytes(rawKey);
             this._keys.set(k.keyId, {
                 keyId: k.keyId,
-                cryptoKey: crypto.subtle.importKey(
-                    "raw",
-                    rawKey,
-                    { name: "AES-GCM" },
-                    false,
-                    ["encrypt", "decrypt"],
-                ),
+                cryptoKey: crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, [
+                    "encrypt",
+                    "decrypt",
+                ]),
                 type: k.type,
             });
             if (k.type === 0) {
