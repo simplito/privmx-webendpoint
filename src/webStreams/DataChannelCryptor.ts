@@ -6,7 +6,7 @@ const AES_GCM_KEY_LENGTH_BYTES = 32;
 const GCM_NONCE_LENGTH_BYTES = 12;
 const GCM_TAG_LENGTH_BITS = 128;
 const VERSION_LENGTH_BYTES = 1;
-const KEY_ID_LENGTH_BYTES = 2;
+const KEY_ID_LENGTH_BYTES = 1;
 const SEQUENCE_NUMBER_LENGTH_BYTES = 4;
 
 const WIRE_FORMAT_VERSION = 1;
@@ -138,9 +138,6 @@ export class DataChannelCryptor {
             );
         }
 
-        const keyIdLength = view.getUint16(offset, false);
-        offset += KEY_ID_LENGTH_BYTES;
-
         const sequenceNumber = view.getUint32(offset, false);
         offset += SEQUENCE_NUMBER_LENGTH_BYTES;
 
@@ -150,6 +147,9 @@ export class DataChannelCryptor {
         offset += GCM_NONCE_LENGTH_BYTES;
 
         this.assertIv(iv);
+
+        const keyIdLength = view.getUint8(offset);
+        offset += KEY_ID_LENGTH_BYTES;
 
         const headerLength = FIXED_HEADER_LENGTH + keyIdLength;
 
@@ -199,14 +199,14 @@ export class DataChannelCryptor {
         view.setUint8(offset, version);
         offset += VERSION_LENGTH_BYTES;
 
-        view.setUint16(offset, keyIdBytes.length, false);
-        offset += KEY_ID_LENGTH_BYTES;
-
         view.setUint32(offset, sequenceNumber, false);
         offset += SEQUENCE_NUMBER_LENGTH_BYTES;
 
         header.set(iv, offset);
         offset += GCM_NONCE_LENGTH_BYTES;
+
+        view.setUint8(offset, keyIdBytes.length);
+        offset += KEY_ID_LENGTH_BYTES;
 
         header.set(keyIdBytes, offset);
 
