@@ -193,16 +193,13 @@ export const test = base.extend<
                     ${dockerImage}`,
                     { stdio: "pipe" },
                 );
-
-            } catch(e) {
+            } catch (e) {
                 console.error("docker run failed");
                 console.error("status:", e.status);
                 console.error("stdout:", e.stdout?.toString());
                 console.error("stderr:", e.stderr?.toString());
                 throw e;
             }
-
-            
 
             await waitForServerReady(hostPort, containerName);
 

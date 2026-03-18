@@ -37,9 +37,7 @@ export class LocalAudioLevelMeter {
                     // ignore (can be blocked until user gesture)
                 }
 
-                this.source = this.ctx.createMediaStreamSource(
-                    new MediaStream([this.track]),
-                );
+                this.source = this.ctx.createMediaStreamSource(new MediaStream([this.track]));
 
                 this.node = new AudioWorkletNode(this.ctx, "rms-processor");
                 this.node.port.onmessage = (e) => this.onLevel(e.data.rmsDb);
