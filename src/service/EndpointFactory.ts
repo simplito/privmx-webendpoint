@@ -51,18 +51,67 @@ export class EndpointFactory {
      *
      * @param {string} [assetsBasePath] base path/url to the Endpoint's WebAssembly assets (like: endpoint-wasm-module.js, driver-web-context.js and others)
      */
-    public static async setup(assetsBasePath?: string): Promise<void> {
-        const basePath =
-            assetsBasePath ||
-            (document.currentScript as HTMLScriptElement).src.split("/").slice(0, -1).join("/");
-        this.assetsBasePath = basePath;
-        const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
-        for (const asset of assets) {
-            await this.loadScript(basePath + "/" + asset);
-        }
-        const lib = await endpointWasmModule();
-        EndpointFactory.init(lib);
+
+public static async setup(assetsBasePath?: string): Promise<void> {
+    const basePath = this.resolveAssetsBasePath(assetsBasePath);
+    this.assetsBasePath = basePath;
+
+    const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
+
+    for (const asset of assets) {
+        await this.loadScript(this.buildAssetUrl(basePath, asset));
     }
+
+    const lib = await endpointWasmModule();
+    EndpointFactory.init(lib);
+}
+
+private static resolveAssetsBasePath(assetsBasePath?: string): string {
+    if (assetsBasePath != null) {
+        return this.normalizeBasePath(assetsBasePath);
+    }
+    return "/";
+}
+
+private static normalizeBasePath(path: string): string {
+    const trimmed = path.trim();
+
+    if (trimmed === "" || trimmed === "/") {
+        return "/";
+    }
+
+    if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmed)) {
+        return trimmed.replace(/\/+$/, "");
+    }
+
+    const resolved = new URL(trimmed.replace(/\/+$/, "") + "/", document.baseURI).href;
+
+    return resolved.replace(/\/+$/, "");
+}
+
+private static buildAssetUrl(basePath: string, asset: string): string {
+    const fileName = asset.replace(/^\/+/, "");
+
+    if (basePath === "/") {
+        return `/${fileName}`;
+    }
+
+    return new URL(fileName, basePath.endsWith("/") ? basePath : `${basePath}/`).href;
+}
+
+    // public static async setup(assetsBasePath?: string): Promise<void> {
+    //     const basePath =
+    //         assetsBasePath || 
+    //         (document.currentScript as HTMLScriptElement).src.split("/").slice(0, -1).join("/");
+    //     this.assetsBasePath = basePath;
+    //     const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
+    //     for (const asset of assets) {
+    //         await this.loadScript(basePath + "/" + asset);
+    //     }
+    //     const lib = await endpointWasmModule();
+    //     EndpointFactory.init(lib);
+    // }
+
 
     private static async loadScript(url: string): Promise<void> {
         return new Promise<void>((resolve) => {
