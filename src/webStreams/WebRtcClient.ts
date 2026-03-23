@@ -7,7 +7,13 @@ import {
 } from "./WebRtcClientTypes";
 import { WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
-import { Key, TurnCredentials, StreamHandle, RemoteStreamListener, DataChannelCryptorDecryptStatus } from "../Types";
+import {
+    Key,
+    TurnCredentials,
+    StreamHandle,
+    RemoteStreamListener,
+    DataChannelCryptorDecryptStatus,
+} from "../Types";
 import { KeyStore } from "./KeyStore";
 import { PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
@@ -416,13 +422,28 @@ export class WebRtcClient {
                         lastSequenceNumber: lastSeq,
                     });
                     this.sequenceNumberByRemoteStreamId.set(remoteStreamId, decrypted.seq);
-                    this.logger.debug("Calling listener for dataChannel with values: ", roomId, remoteStreamId, decrypted.data, DataChannelCryptorDecryptStatus.OK)
-                    this.callRegisteredListenersForDataChannel(roomId, remoteStreamId, decrypted.data, DataChannelCryptorDecryptStatus.OK);
+                    this.logger.debug(
+                        "Calling listener for dataChannel with values: ",
+                        roomId,
+                        remoteStreamId,
+                        decrypted.data,
+                        DataChannelCryptorDecryptStatus.OK,
+                    );
+                    this.callRegisteredListenersForDataChannel(
+                        roomId,
+                        remoteStreamId,
+                        decrypted.data,
+                        DataChannelCryptorDecryptStatus.OK,
+                    );
                 } catch (e) {
                     if (e instanceof DataChannelCryptorError) {
-                        this.callRegisteredListenersForDataChannel(roomId, remoteStreamId, new Uint8Array(), e.code);
-                    }
-                    else {
+                        this.callRegisteredListenersForDataChannel(
+                            roomId,
+                            remoteStreamId,
+                            new Uint8Array(),
+                            e.code,
+                        );
+                    } else {
                         throw e;
                     }
                 }
@@ -584,10 +605,7 @@ export class WebRtcClient {
         }
     }
 
-    private async addRemoteTrack(
-        roomId: StreamRoomId,
-        event: RTCTrackEvent,
-    ) {
+    private async addRemoteTrack(roomId: StreamRoomId, event: RTCTrackEvent) {
         const worker = await this.getWorker();
         const track = event.track;
         const receiver = event.receiver;
@@ -640,10 +658,7 @@ export class WebRtcClient {
             (x) => x.streamId === remoteStreamId || x.streamId === undefined,
         );
         for (const listener of filteredListeners) {
-            if (
-                listener.onRemoteData &&
-                typeof listener.onRemoteData === "function"
-            ) {
+            if (listener.onRemoteData && typeof listener.onRemoteData === "function") {
                 listener.onRemoteData(data, statusCode);
             }
         }

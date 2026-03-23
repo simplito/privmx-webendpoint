@@ -101,21 +101,12 @@ function isDecryptionSuccess(result: DecryptionResponse): result is DecryptionRe
     return result.success;
 }
 
-async function ensureCryptoKey(
-    key: CryptoMaterial,
-    usage: KeyUsage,
-): Promise<CryptoKey> {
+async function ensureCryptoKey(key: CryptoMaterial, usage: KeyUsage): Promise<CryptoKey> {
     if (key instanceof CryptoKey) {
         return key;
     }
 
-    return crypto.subtle.importKey(
-        "raw",
-        key,
-        { name: "AES-GCM" },
-        false,
-        [usage],
-    );
+    return crypto.subtle.importKey("raw", key, { name: "AES-GCM" }, false, [usage]);
 }
 
 export {

@@ -89,14 +89,15 @@ export class DataChannelCryptor {
 
     async decryptFromWireFormat(
         params: DecryptFromWireFormatParams,
-    ): Promise<{data: Uint8Array, seq: number}> {
+    ): Promise<{ data: Uint8Array; seq: number }> {
         const parsed = this.parseEncryptedFrame(params.frame, params.lastSequenceNumber);
         const logger = new Logger();
         logger.debug("decryptFromWireFormat", params, parsed);
 
         if (!this.keyStore.hasKey(parsed.keyId)) {
             throw new DataChannelCryptorError(
-                DataChannelCryptorDecryptStatus.KEY_NOT_FOUND, `Key not found: ${parsed.keyId}`
+                DataChannelCryptorDecryptStatus.KEY_NOT_FOUND,
+                `Key not found: ${parsed.keyId}`,
             );
         }
 
@@ -114,10 +115,11 @@ export class DataChannelCryptor {
                 parsed.ciphertext,
             );
 
-            return {data: new Uint8Array(decrypted), seq: parsed.sequenceNumber};
+            return { data: new Uint8Array(decrypted), seq: parsed.sequenceNumber };
         } catch {
             throw new DataChannelCryptorError(
-                DataChannelCryptorDecryptStatus.DECRYPT_AUTH_FAILED, `Decryption failed (auth error)`
+                DataChannelCryptorDecryptStatus.DECRYPT_AUTH_FAILED,
+                `Decryption failed (auth error)`,
             );
         }
     }
@@ -134,7 +136,8 @@ export class DataChannelCryptor {
 
         if (version !== WIRE_FORMAT_VERSION) {
             throw new DataChannelCryptorError(
-                DataChannelCryptorDecryptStatus.UNSUPPORTED_VERSION, `Unsupported version: ${version}`
+                DataChannelCryptorDecryptStatus.UNSUPPORTED_VERSION,
+                `Unsupported version: ${version}`,
             );
         }
 
@@ -155,7 +158,8 @@ export class DataChannelCryptor {
 
         if (frame.length < headerLength) {
             throw new DataChannelCryptorError(
-                DataChannelCryptorDecryptStatus.FRAME_TRUNCATED, `Frame truncated`
+                DataChannelCryptorDecryptStatus.FRAME_TRUNCATED,
+                `Frame truncated`,
             );
         }
 
@@ -216,7 +220,8 @@ export class DataChannelCryptor {
     private assertFrameLength(frame: Uint8Array) {
         if (!frame || frame.length < FIXED_HEADER_LENGTH) {
             throw new DataChannelCryptorError(
-                DataChannelCryptorDecryptStatus.FRAME_TOO_SHORT, "Frame too short"
+                DataChannelCryptorDecryptStatus.FRAME_TOO_SHORT,
+                "Frame too short",
             );
         }
     }
@@ -224,7 +229,8 @@ export class DataChannelCryptor {
     private assertKeyId(keyId: string): void {
         if (!keyId || keyId.trim().length === 0) {
             throw new DataChannelCryptorError(
-                DataChannelCryptorDecryptStatus.INVALID_KEY_ID, "Invalid KeyID"
+                DataChannelCryptorDecryptStatus.INVALID_KEY_ID,
+                "Invalid KeyID",
             );
         }
     }
@@ -232,7 +238,8 @@ export class DataChannelCryptor {
     private assertSequence(msgSeq: number, lastSeq: number): void {
         if (msgSeq <= lastSeq) {
             throw new DataChannelCryptorError(
-                DataChannelCryptorDecryptStatus.INVALID_DATA_SEQUENCE, `Invalid data sequence number: ${msgSeq}`
+                DataChannelCryptorDecryptStatus.INVALID_DATA_SEQUENCE,
+                `Invalid data sequence number: ${msgSeq}`,
             );
         }
     }
@@ -249,7 +256,8 @@ export class DataChannelCryptor {
     private assertIv(iv: Uint8Array): void {
         if (iv.length !== GCM_NONCE_LENGTH_BYTES) {
             throw new DataChannelCryptorError(
-                DataChannelCryptorDecryptStatus.INVALID_IV_LENGTH, `Invalid IV length: ${iv.length}`
+                DataChannelCryptorDecryptStatus.INVALID_IV_LENGTH,
+                `Invalid IV length: ${iv.length}`,
             );
         }
     }
@@ -260,7 +268,6 @@ export class DataChannelCryptor {
         out.set(b, a.length);
         return out;
     }
-
 }
 
 export class DataChannelCryptorError extends Error {

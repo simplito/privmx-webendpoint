@@ -355,8 +355,9 @@ export class StreamApi extends BaseApi {
         if (!_stream) {
             throw new Error("No stream defined to publish");
         }
-        
-        _stream.localMediaStream = mediaTracks.length > 0 ? new MediaStream(mediaTracks) : undefined;
+
+        _stream.localMediaStream =
+            mediaTracks.length > 0 ? new MediaStream(mediaTracks) : undefined;
 
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(turnCredentials);
