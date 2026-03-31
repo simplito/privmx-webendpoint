@@ -7,14 +7,15 @@ import {
 } from "../CryptoUtils";
 import * as events from "./WorkerEvents";
 import { KeyStore } from "../KeyStore";
+import { LocalAudioLevelMeter } from "../audio/LocalAudioLevelMeter";
 
 const NUM_AS_UINT8_SIZE = 1;
 const DEBUG = false;
 const sessions = new Map<string, { pipeline: Promise<void> }>();
 const pipelines = new Map<string, { ready: boolean }>();
 
-let lastRMS = -99;
-let recvRMS = -99;
+let lastRMS = LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
+let recvRMS = LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
 let recvRMSTimestamp = Date.now();
 
 export interface TransformContext {
@@ -51,13 +52,14 @@ export class EncryptTransform {
         const frameBody = new Uint8Array(encodedFrame.data, headerLen);
 
         const iv = Utils.genIvAsBuffer();
-        const keyEntry = this.keyStore.getEncriptionKey();
+        const keyId = this.keyStore.getEncryptionKeyId();
+        const cryptoKey = await this.keyStore.getEncriptionKey();
 
-        const cryptoResult = await encryptWithAES256GCM(keyEntry.key, iv, frameBody, frameHeader);
+        const cryptoResult = await encryptWithAES256GCM(cryptoKey, iv, frameBody, frameHeader);
         if (!isEncryptionSuccess(cryptoResult)) {
             throw new Error("Cannot encrypt frame");
         }
-        const keyIdAsUint8 = new TextEncoder().encode(keyEntry.keyId);
+        const keyIdAsUint8 = new TextEncoder().encode(keyId);
 
         const posOfCipher = frameHeader.byteLength;
         const posOfIv = posOfCipher + cryptoResult.data.byteLength;
@@ -129,9 +131,9 @@ export class EncryptTransform {
                 controller.enqueue(encodedFrame);
                 return;
             }
-            const keyEntry = this.keyStore.getKey(keyId);
+            const cryptoKey = await this.keyStore.getKey(keyId);
             const decryptionResult = await decryptWithAES256GCM(
-                keyEntry.key,
+                cryptoKey,
                 iv,
                 payload,
                 frameHeader,

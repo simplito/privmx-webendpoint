@@ -7,7 +7,13 @@ import {
 } from "./WebRtcClientTypes";
 import { WebWorker } from "./WebWorkerHelper";
 import { WebRtcConfig } from "./WebRtcConfig";
-import { Key, TurnCredentials, StreamHandle, RemoteStreamListener } from "../Types";
+import {
+    Key,
+    TurnCredentials,
+    StreamHandle,
+    RemoteStreamListener,
+    DataChannelCryptorDecryptStatus,
+} from "../Types";
 import { KeyStore } from "./KeyStore";
 import { PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
@@ -17,6 +23,8 @@ import { Jsep } from "../service/WebRtcInterface";
 import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
 import { ActiveSpeakerDetector, DEFAULTS, SpeakerState } from "./audio/ActiveSpeakerDetector";
 import { StateChangeDispatcher } from "../service/EventDispatcher";
+import { StreamTrack } from "../service/StreamApi";
+import { DataChannelCryptor, DataChannelCryptorError } from "./DataChannelCryptor";
 
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
@@ -48,8 +56,6 @@ export class WebRtcClient {
     private e2eeWorker: Worker | undefined;
     private webWorkerApi: WebWorker;
 
-    private dataChannels: RTCDataChannel[] = [];
-
     private configuration: RTCConfiguration | undefined;
     private keyStore: KeyStore = new KeyStore();
 
@@ -59,6 +65,10 @@ export class WebRtcClient {
     private peerCredentials: TurnCredentials[] | undefined;
 
     private remoteStreamsListeners: Map<StreamRoomId, RemoteStreamListener[]> = new Map();
+    private sequenceNumberByRemoteStreamId: Map<number, number> = new Map();
+    private dataChannelByRemoteStreamId: Map<number, RTCDataChannel> = new Map();
+    private dataChannelCryptor: DataChannelCryptor;
+    private sequenceNumberOfSender: number;
     private peerConnectionsManager: PeerConnectionManager;
     private streamsApiInterface: StreamsCallbackInterface;
     private activeSpeakerDetector: ActiveSpeakerDetector;
@@ -66,16 +76,19 @@ export class WebRtcClient {
 
     // private mediaServerAvailPublishers: {[publisherId: number]: Publisher} = {};
     private encByReceiver = new WeakMap<RTCRtpReceiver, EncPair>();
-    private logger: Logger = Logger.get();
+    private logger: Logger = new Logger();
 
     private peerConnectionReconfigureQueue: Queue<QueueItem> | undefined;
     public lastProcessedAnswer: { [roomId: string]: Jsep } = {};
-    private lastMeasuredLocalRMS: number = -99;
+    private lastMeasuredLocalRMS: number = LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
     private eventsDispatcher: StateChangeDispatcher = new StateChangeDispatcher();
     private localAudioLevelMeters: Map<string, LocalAudioLevelMeter> = new Map();
 
+    private bootstrapDataChannel: RTCDataChannel | undefined;
+
     constructor(private assetsDir: string) {
         this.uniqId = "" + Math.random() + "-" + Math.random();
+        this.sequenceNumberOfSender = 1;
         this.peerConnectionsManager = new PeerConnectionManager(
             (roomId: StreamRoomId) => {
                 return this.createPeerConnectionMultiForRoom(
@@ -89,11 +102,15 @@ export class WebRtcClient {
         );
         this.peerConnectionReconfigureQueue = new Queue<QueueItem>();
         this.peerConnectionReconfigureQueue.assignProcessorFunc(async (_item: QueueItem) => {
-            // await this.reconfigure(_item);
-            await this.reconfigureSingle(_item._room, _item.offer);
+            if (_item.jsep && _item.jsep.type === "offer") {
+                await this.reconfigureSingle(_item._room, _item.jsep);
+            } else {
+                await this.reconfigureSingleCreateOffer(_item._room);
+            }
         });
 
         this.activeSpeakerDetector = new ActiveSpeakerDetector(DEFAULTS);
+        this.dataChannelCryptor = new DataChannelCryptor(this.getKeyStore());
     }
 
     private async ensureLocalAudioLevelMeter(track: MediaStreamTrack) {
@@ -102,7 +119,8 @@ export class WebRtcClient {
         }
         const worker = await this.getWorker();
         const meter = new LocalAudioLevelMeter(track, (onRms) => {
-            worker.postMessage({ operation: "rms", rms: onRms });
+            const rmsToReport = track.enabled ? onRms : LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
+            worker.postMessage({ operation: "rms", rms: rmsToReport });
             this.lastMeasuredLocalRMS = onRms;
         });
         this.localAudioLevelMeters.set(track.id, meter);
@@ -157,10 +175,6 @@ export class WebRtcClient {
 
     public getWebRtcEventDispatcher() {
         return this.eventsDispatcher;
-    }
-
-    protected getEncKey(): Key {
-        return this.keyStore.getEncriptionKey();
     }
 
     protected async getWorker(): Promise<Worker> {
@@ -234,7 +248,8 @@ export class WebRtcClient {
     async createPeerConnectionWithLocalStream(
         streamHandle: StreamHandle,
         streamRoomId: StreamRoomId,
-        stream: MediaStream,
+        stream?: MediaStream,
+        dataTracks?: StreamTrack[],
     ): Promise<RTCPeerConnection> {
         this.publishStreamHandle = streamHandle;
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
@@ -260,6 +275,17 @@ export class WebRtcClient {
                 this.setupSenderTransform(streamSender);
             }
         }
+
+        if (dataTracks) {
+            for (const dataTrack of dataTracks) {
+                const dataChannel = pc.createDataChannel("JanusDataChannel", {
+                    ordered: true,
+                    negotiated: false,
+                });
+                dataTrack.dataChannelMeta.dataChannel = dataChannel;
+            }
+        }
+
         return pc;
     }
 
@@ -332,6 +358,14 @@ export class WebRtcClient {
         return pc;
     }
 
+    async encryptDataChannelData(data: Uint8Array) {
+        const nextSequenceNumber = ++this.sequenceNumberOfSender;
+        return this.dataChannelCryptor.encryptToWireFormat({
+            plaintext: data,
+            sequenceNumber: nextSequenceNumber,
+        });
+    }
+
     private createPeerConnectionMultiForRoom(
         roomId: StreamRoomId,
         configuration: RTCConfiguration & { encodedInsertableStreams?: boolean },
@@ -344,18 +378,18 @@ export class WebRtcClient {
 
         // gethering state change
         connection.addEventListener("icegatheringstatechange", (event) => {
-            this.logger.log("info", "on ice state change: ", event);
+            this.logger.debug("on ice state change: ", event);
         });
         // ice candidate error
         connection.addEventListener("icecandidateerror", (event) => {
-            this.logger.log("info", "on ice error: ", event);
+            this.logger.debug("on ice error: ", event);
         });
         connection.addEventListener("connectionstatechange", (event) => {
-            this.logger.log("info", "connectionstatechange: ", event);
+            this.logger.debug("connectionstatechange: ", event);
             if (connection.connectionState === "connected") {
-                this.logger.log("important-only", "Peers connected!");
+                this.logger.debug("Peers connected!");
             } else {
-                this.logger.log("info", "connection state: ", connection.connectionState);
+                this.logger.debug("connection state: ", connection.connectionState);
             }
             this.eventsDispatcher.emit({
                 streamHandle: this.publishStreamHandle,
@@ -363,26 +397,107 @@ export class WebRtcClient {
             });
         });
 
-        connection.addEventListener("iceconnectionstatechange", (event) => {
-            this.logger.log("info", "iceconnectionstatechange: ", event);
-        });
-        connection.addEventListener("negotiationneeded", async (event) => {
-            this.logger.log("info", "negotiationneeded: ", event);
-            // await this.startNegotiationMulti(connection);
-        });
-        connection.addEventListener("signalingstatechange", (event) => {
-            this.logger.log("info", "signalingstatechange: ", event);
-        });
-        connection.addEventListener("track", async (event) => {
-            await this.addRemoteTrack(roomId, event /*, mappedPublisher*/);
+        connection.addEventListener("datachannel", (event) => {
+            this.logger.debug(
+                "================ RECV datachannel: ",
+                event.channel.id,
+                event.channel.label,
+            );
+            const dc = event.channel;
+            dc.binaryType = "arraybuffer";
+            dc.onmessage = async (dataEvent) => {
+                this.logger.debug("================ ON MESSAGE....");
+                const remoteStreamId = Number(event.channel.label);
+                const frame =
+                    dataEvent.data instanceof Uint8Array
+                        ? dataEvent.data
+                        : dataEvent.data instanceof ArrayBuffer
+                          ? new Uint8Array(dataEvent.data)
+                          : new Uint8Array(dataEvent.data.buffer);
+
+                try {
+                    const lastSeq = this.sequenceNumberByRemoteStreamId.get(remoteStreamId) || 0;
+                    const decrypted = await this.dataChannelCryptor.decryptFromWireFormat({
+                        frame,
+                        lastSequenceNumber: lastSeq,
+                    });
+                    this.sequenceNumberByRemoteStreamId.set(remoteStreamId, decrypted.seq);
+                    this.logger.debug(
+                        "Calling listener for dataChannel with values: ",
+                        roomId,
+                        remoteStreamId,
+                        decrypted.data,
+                        DataChannelCryptorDecryptStatus.OK,
+                    );
+                    this.callRegisteredListenersForDataChannel(
+                        roomId,
+                        remoteStreamId,
+                        decrypted.data,
+                        DataChannelCryptorDecryptStatus.OK,
+                    );
+                } catch (e) {
+                    if (e instanceof DataChannelCryptorError) {
+                        this.callRegisteredListenersForDataChannel(
+                            roomId,
+                            remoteStreamId,
+                            new Uint8Array(),
+                            e.code,
+                        );
+                    } else {
+                        throw e;
+                    }
+                }
+            };
+            this.dataChannelByRemoteStreamId.set(Number(dc.label), dc);
         });
 
+        connection.addEventListener("iceconnectionstatechange", (event) => {
+            this.logger.debug("iceconnectionstatechange: ", event);
+        });
+        connection.addEventListener("negotiationneeded", async (_event) => {
+            this.logger.debug("negotiationneeded: ", _event);
+            // await this.startNegotiationMulti(roomId, (_event as any).target);
+        });
+        connection.addEventListener("signalingstatechange", (event) => {
+            this.logger.debug("signalingstatechange: ", event);
+        });
+        connection.addEventListener("track", async (event) => {
+            await this.addRemoteTrack(roomId, event);
+        });
         return connection;
     }
 
+    private async startNegotiationMulti(
+        roomId: StreamRoomId,
+        _rtcPeerConnection: RTCPeerConnection,
+        _withIceRestart?: boolean,
+    ) {
+        try {
+            if (!this.peerConnectionReconfigureQueue) {
+                throw new Error("ReconfigureQueue does not exist.");
+            }
+            this.peerConnectionReconfigureQueue.enqueue({
+                taskId: Math.floor(1 + Math.random() * 10000),
+                _room: roomId,
+            });
+            try {
+                await this.peerConnectionReconfigureQueue.processAll();
+            } catch (e) {
+                console.error("Error on onSubscriberAttached", e);
+            }
+        } catch (e) {
+            console.error("Error on startNegotiationMulti", e);
+        }
+    }
+
     async updateKeys(_streamRoomId: StreamRoomId, keys: Key[]) {
+        this.logger.debug("=======> UPDATE KEYS", _streamRoomId, keys.length);
         this.keyStore.setKeys(keys);
         (await this.getWorkerApi()).setKeys(keys);
+    }
+
+    getKeyStore(): KeyStore {
+        return this.keyStore;
     }
 
     private setupSenderTransform(videoSender: RTCRtpSender) {
@@ -392,7 +507,7 @@ export class WebRtcClient {
             };
             (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
         } else {
-            this.logger.log("important-only", "Worker - encoding frames using EncodedStreams");
+            this.logger.debug("Worker - encoding frames using EncodedStreams");
             const senderStreams = (videoSender as any).createEncodedStreams();
             this.e2eeWorker.postMessage(
                 {
@@ -411,7 +526,7 @@ export class WebRtcClient {
         worker: Worker,
     ) {
         if ("RTCRtpScriptTransform" in window && !receiver.transform) {
-            this.logger.log("important-only", "-> using RtpScriptTransform");
+            this.logger.debug("-> using RtpScriptTransform");
             const id = receiver.track.id;
             receiver.transform = new window.RTCRtpScriptTransform(worker, {
                 operation: "decode",
@@ -420,7 +535,7 @@ export class WebRtcClient {
             });
             return;
         }
-        this.logger.log("important-only", "-> using EncodedStreams");
+        this.logger.debug("-> using EncodedStreams");
 
         // Fallback: Encoded Streams
         if (
@@ -428,7 +543,7 @@ export class WebRtcClient {
             "createEncodedStreams" in receiver &&
             typeof receiver.createEncodedStreams === "function"
         ) {
-            this.logger.log("important-only", "-> call for createEncodedStreams()");
+            this.logger.debug("-> call for createEncodedStreams()");
             const { readable, writable } = await receiver.createEncodedStreams();
             const enc = {
                 readable,
@@ -439,10 +554,7 @@ export class WebRtcClient {
             };
             this.encByReceiver.set(receiver, enc);
 
-            this.logger.log(
-                "important-only",
-                "-> posting EncodedStreams to worker (should happen only once)",
-            );
+            this.logger.debug("-> posting EncodedStreams to worker (should happen only once)");
 
             await this.initPipeline(enc.id, enc.publisherId);
 
@@ -457,7 +569,7 @@ export class WebRtcClient {
                 [enc.readable, enc.writable], // transfer ownership
             );
         } else {
-            this.logger.log("important-only", "-> EncodedStreams posted to worker already.");
+            this.logger.debug("-> EncodedStreams posted to worker already.");
         }
     }
 
@@ -493,24 +605,20 @@ export class WebRtcClient {
         }
     }
 
-    private async addRemoteTrack(
-        roomId: StreamRoomId,
-        event: RTCTrackEvent /*, mappedPublisher: Publisher*/,
-    ) {
+    private async addRemoteTrack(roomId: StreamRoomId, event: RTCTrackEvent) {
         const worker = await this.getWorker();
         const track = event.track;
         const receiver = event.receiver;
         const publisherId = Number(event.streams[0].id);
-        const key = this.getEncKey();
 
         const peerConnection = this.getConnectionManager().getConnectionWithSession(
             roomId,
             "subscriber",
         ).pc;
-        this.logger.log("important-only", "waitUntilConnected...");
+        this.logger.debug("waitUntilConnected...");
         await this.waitUntilConnected(peerConnection);
 
-        this.logger.log("important-only", "setupReceiverTransform...");
+        this.logger.debug("setupReceiverTransform...");
         await this.setupReceiverTransform(receiver, publisherId, worker);
         track.addEventListener("ended", async () => await this.teardownReceiver(receiver, worker));
 
@@ -521,7 +629,6 @@ export class WebRtcClient {
         const remoteStreamId = Number(event.streams[0].id);
         const listeners = this.remoteStreamsListeners.get(roomId);
         if (!listeners) {
-            this.logger.log("info", "No remoteTrack listener registered for room: " + roomId);
             return;
         }
         const filteredListeners = listeners.filter(
@@ -537,15 +644,34 @@ export class WebRtcClient {
         }
     }
 
-    // test
-    public async onSubscriptionUpdated(_room: StreamRoomId, offer: any) {
+    private callRegisteredListenersForDataChannel(
+        roomId: StreamRoomId,
+        remoteStreamId: number,
+        data: Uint8Array,
+        statusCode: number,
+    ) {
+        const listeners = this.remoteStreamsListeners.get(roomId);
+        if (!listeners) {
+            return;
+        }
+        const filteredListeners = listeners.filter(
+            (x) => x.streamId === remoteStreamId || x.streamId === undefined,
+        );
+        for (const listener of filteredListeners) {
+            if (listener.onRemoteData && typeof listener.onRemoteData === "function") {
+                listener.onRemoteData(data, statusCode);
+            }
+        }
+    }
+
+    public async onSubscriptionUpdated(_room: StreamRoomId, offer: { sdp: string; type: string }) {
         if (!this.peerConnectionReconfigureQueue) {
             throw new Error("ReconfigureQueue does not exist.");
         }
         this.peerConnectionReconfigureQueue.enqueue({
             taskId: Math.floor(1 + Math.random() * 10000),
             _room,
-            offer,
+            jsep: offer,
         });
         try {
             await this.peerConnectionReconfigureQueue.processAll();
@@ -567,26 +693,52 @@ export class WebRtcClient {
             "subscriber",
         );
         const peerConnection = janusConnection.pc;
+        this.logger.debug("SUBSCRIBER RECV OFFER FROM PUBLISHER: ", offer.sdp);
+        this.logger.debug("1. Setting up remoteDescription...");
 
-        this.logger.log("important-only", "1. Setting up remoteDescription...");
+        if (!this.bootstrapDataChannel) {
+            const bootstrap = peerConnection.createDataChannel("JanusDataChannel");
+            bootstrap.onerror = (e) => {
+                console.error(e);
+                throw new Error("Cannot initialize Bootrstrap dataChannel");
+            };
+        }
+
         await peerConnection.setRemoteDescription(
             new RTCSessionDescription({ type: offer.type as RTCSdpType, sdp: offer.sdp }),
         );
-        this.logger.log("important-only", "offer from Janus: ", JSON.stringify(offer, null, 2));
+        this.logger.debug("offer from Janus: ", JSON.stringify(offer, null, 2));
 
-        this.logger.log(
-            "important-only",
+        this.logger.debug(
             "2. Creating an answer...",
             "peerConnection state",
             peerConnection.connectionState,
         );
         const answer = await peerConnection.createAnswer();
 
-        this.logger.log("important-only", "3. Setting up localDescription...");
+        this.logger.debug("3. Setting up localDescription...");
         await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
 
         // this.subscriberAttachedProcessing = false
         this.lastProcessedAnswer[room] = answer as Jsep;
         return answer as Jsep;
+    }
+
+    private async reconfigureSingleCreateOffer(room: StreamRoomId): Promise<Jsep> {
+        if (!this.configuration) {
+            throw new Error("Configuration missing.");
+        }
+        const janusConnection = this.getConnectionManager().getConnectionWithSession(
+            room,
+            "publisher",
+        );
+        const peerConnection = janusConnection.pc;
+
+        const offer = await peerConnection.createOffer();
+        await peerConnection.setLocalDescription(
+            new RTCSessionDescription({ type: "offer", sdp: offer.sdp }),
+        );
+
+        return offer as Jsep;
     }
 }

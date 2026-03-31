@@ -3,9 +3,9 @@ import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
 import type { Endpoint, StreamApi, Types } from "../../src";
-import { StreamRoomId, StreamTrackMeta } from "../../src/webStreams/types/ApiTypes";
+import { StreamRoomId, StreamTrackInit } from "../../src/webStreams/types/ApiTypes";
 import { SortOrder, StreamHandle, StreamInfo } from "../../src/Types";
-
+import { StreamEventType, StreamEventSelectorType } from "../../src/Types";
 interface TestUser {
     id: string;
     privKey: string;
@@ -1353,7 +1353,7 @@ test.describe("StreamTest", () => {
             try {
                 await streamApi.addStreamTrack(handle, {
                     track: null as unknown as MediaStreamTrack,
-                } as StreamTrackMeta);
+                } as StreamTrackInit);
             } catch {}
             await streamApi.updateStream(handle);
 
@@ -1373,7 +1373,11 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("modifyRemoteStreamsSubscriptions: various scenarios", async ({ page, backend, cli }) => {
+    test.skip("modifyRemoteStreamsSubscriptions: various scenarios", async ({
+        page,
+        backend,
+        cli,
+    }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
@@ -2813,7 +2817,6 @@ test.describe("StreamTest", () => {
                 { roomId },
             );
 
-            console.log("Polling for final closure...");
             const isClosed = await page3.evaluate(
                 async ({ roomId }) => {
                     const start = Date.now();
@@ -3064,6 +3067,154 @@ test.describe("StreamTest", () => {
                 },
                 { roomId },
             );
+        });
+    });
+
+    test("E2E: Two users exchange video streams - second expect to receive 'remoteStreamsChanged' event", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(60_000);
+        const page1 = await createContextPage();
+        await initPage(page1);
+        const users = await setupUsers(page1, cli);
+
+        const page2 = await createContextPage();
+
+        await initPage(page2);
+
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+
+        const contextId = testData.contextId;
+        let roomId: StreamRoomId;
+
+        // --- STEP 1: U1 Creates Room & Publishes ---
+        await test.step("User 1: Create Room, Join, Wait for 'new streams' events", async () => {
+            roomId = await page1.evaluate(
+                async ({ contextId, users, StreamEventSelectorType, StreamEventType }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 1");
+                    const api = window.streamApi;
+                    const enc = new TextEncoder();
+
+                    const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+                    const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+                    const sId = await api.createStreamRoom(
+                        contextId,
+                        [u1Obj, u2Obj],
+                        [u1Obj, u2Obj],
+                        enc.encode("p"),
+                        enc.encode("p"),
+                    );
+
+                    await api.joinStreamRoom(sId);
+
+                    await api.subscribeFor([
+                        await api.buildSubscriptionQuery(
+                            StreamEventType.STREAMROOM_UPDATE,
+                            StreamEventSelectorType.STREAMROOM_ID,
+                            sId,
+                        ),
+                        await api.buildSubscriptionQuery(
+                            StreamEventType.STREAMROOM_DELETE,
+                            StreamEventSelectorType.STREAMROOM_ID,
+                            sId,
+                        ),
+                        await api.buildSubscriptionQuery(
+                            StreamEventType.STREAM_PUBLISH,
+                            StreamEventSelectorType.STREAMROOM_ID,
+                            sId,
+                        ),
+                        await api.buildSubscriptionQuery(
+                            StreamEventType.STREAM_UNPUBLISH,
+                            StreamEventSelectorType.STREAMROOM_ID,
+                            sId,
+                        ),
+                        await api.buildSubscriptionQuery(
+                            StreamEventType.STREAM_JOIN,
+                            StreamEventSelectorType.STREAMROOM_ID,
+                            sId,
+                        ),
+                        await api.buildSubscriptionQuery(
+                            StreamEventType.STREAM_LEAVE,
+                            StreamEventSelectorType.STREAMROOM_ID,
+                            sId,
+                        ),
+                    ]);
+                    const eventQueue = await window.Endpoint.getEventQueue();
+
+                    if (!eventQueue) {
+                        throw new Error("EventQueue not initialized.");
+                    }
+
+                    const w = window as any;
+
+                    w.__eventCollector = {
+                        events: [],
+                        running: true,
+                    };
+
+                    const listenForEvents = async () => {
+                        while (w.__eventCollector.running) {
+                            try {
+                                const event = await eventQueue.waitEvent();
+                                w.__eventCollector.events.push(event);
+                            } catch (e) {
+                                console.error("event listener failed", e);
+                                break;
+                            }
+                        }
+                    };
+                    void listenForEvents();
+
+                    return sId;
+                },
+                { contextId, users, StreamEventType, StreamEventSelectorType },
+            );
+        });
+
+        // --- STEP 2: U2 Subscribes ---
+        await test.step("User 2: Join and Publish", async () => {
+            await page2.evaluate(
+                async ({ roomId }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
+                    const api = window.streamApi;
+
+                    await api.joinStreamRoom(roomId);
+
+                    const handle = await api.createStream(roomId);
+
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        audio: true,
+                        video: true,
+                    });
+                    await api.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                    await api.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+
+                    await api.publishStream(handle);
+                },
+                { roomId },
+            );
+        });
+
+        await test.step("User 1: Wait for events", async () => {
+            await expect
+                .poll(
+                    async () =>
+                        await page1.evaluate((expectedType) => {
+                            const w = window as any;
+                            const events = w.__eventCollector?.events ?? [];
+                            return events.some((e: any) => e.type === expectedType);
+                        }, "remoteStreamsChanged"),
+                    { timeout: 15_000 },
+                )
+                .toBe(true);
+            const events = await page1.evaluate(() => {
+                const w = window as any;
+                return w.__eventCollector?.events ?? [];
+            });
         });
     });
 });
