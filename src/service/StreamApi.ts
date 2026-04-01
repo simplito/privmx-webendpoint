@@ -522,7 +522,7 @@ export class StreamApi extends BaseApi {
      * @param {number} [listener.streamId] optional remote Stream ID to filter events (omit for all streams)
      * @param {(event: RTCTrackEvent) => void} listener.onRemoteStreamTrack callback invoked for incoming remote tracks
      */
-    addRemoteStreamListener(listener: RemoteStreamListener) {
+    addRemoteStreamListener(listener: RemoteStreamListener): void {
         this.client.addRemoteStreamListener(listener);
     }
 
@@ -549,6 +549,7 @@ export class StreamApi extends BaseApi {
      * @param {EventType} eventType type of event which you listen for
      * @param {EventSelectorType} selectorType scope on which you listen for events
      * @param {string} selectorId ID of the selector
+     * @returns {string} subscription ID
      */
     async buildSubscriptionQuery(
         eventType: StreamEventType,
@@ -567,7 +568,7 @@ export class StreamApi extends BaseApi {
      *
      * @param {(stats: AudioLevelsStats) => void} onStats callback invoked with current audio levels stats
      */
-    async addAudioLevelStatsListener(onStats: (stats: AudioLevelsStats) => void) {
+    async addAudioLevelStatsListener(onStats: (stats: AudioLevelsStats) => void): Promise<void> {
         if (onStats && typeof onStats === "function") {
             this.client.setAudioLevelCallback(onStats);
         }
@@ -580,7 +581,7 @@ export class StreamApi extends BaseApi {
      * @param {Uint8Array} data bytes to send to remote participants
      * @throws {Error} when there is no DataTrack (or DataChannel) for the given `streamTrackId`
      */
-    async sendData(streamTrackId: Types.StreamTrackId, data: Uint8Array) {
+    async sendData(streamTrackId: Types.StreamTrackId, data: Uint8Array): Promise<void> {
         const dataChannel = this.streamTracks.get(streamTrackId)?.dataChannelMeta.dataChannel;
         if (!dataChannel) {
             throw new Error(`There is no DataTrack with given streamTrackId: ${streamTrackId}`);
