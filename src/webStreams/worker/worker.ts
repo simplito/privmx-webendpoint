@@ -53,9 +53,9 @@ export class EncryptTransform {
 
         const iv = Utils.genIvAsBuffer();
         const keyId = this.keyStore.getEncryptionKeyId();
-        const cryptoKey = await this.keyStore.getEncriptionKey();
+        const rawKey = this.keyStore.getRawEncryptionKey();
 
-        const cryptoResult = await encryptWithAES256GCM(cryptoKey, iv, frameBody, frameHeader);
+        const cryptoResult = await encryptWithAES256GCM(rawKey, iv, frameBody, frameHeader);
         if (!isEncryptionSuccess(cryptoResult)) {
             throw new Error("Cannot encrypt frame");
         }
@@ -131,13 +131,8 @@ export class EncryptTransform {
                 controller.enqueue(encodedFrame);
                 return;
             }
-            const cryptoKey = await this.keyStore.getKey(keyId);
-            const decryptionResult = await decryptWithAES256GCM(
-                cryptoKey,
-                iv,
-                payload,
-                frameHeader,
-            );
+            const rawKey = this.keyStore.getRawKey(keyId);
+            const decryptionResult = await decryptWithAES256GCM(rawKey, iv, payload, frameHeader);
 
             if (!isDecryptionSuccess(decryptionResult)) {
                 controller.enqueue(encodedFrame);
@@ -162,7 +157,8 @@ export class EncryptTransform {
 (self as any).keyStore = new KeyStore();
 const getKeyStore = () => (self as any).keyStore as KeyStore;
 
-self.onmessage = async (event: MessageEvent) => {
+self.addEventListener("message", async (event: MessageEvent) => {
+    if (!event || !event.data || typeof event.data !== "object" || !event.data.operation) return;
     const { operation, kind } = event.data;
 
     if (operation === "initialize") {
@@ -180,7 +176,7 @@ self.onmessage = async (event: MessageEvent) => {
     } else if (operation === "rms") {
         lastRMS = Math.round(event.data.rms as number);
     }
-};
+});
 
 function createSenderTransform(keyStore: KeyStore, kind: string) {
     const encrypter = new EncryptTransform(keyStore);

@@ -1,3 +1,5 @@
+import { CryptoFacade } from "../crypto/CryptoFacade";
+
 // Types for function parameters and return values
 type BufferLike = ArrayBuffer | Uint8Array;
 type CryptoMaterial = BufferLike | CryptoKey;
@@ -33,21 +35,15 @@ async function encryptWithAES256GCM(
     header: BufferLike,
 ): Promise<EncryptionResponse> {
     try {
-        const cryptoKey = await ensureCryptoKey(key, "encrypt");
+        const rawKey = await ensureRawKey(key);
 
-        // Encrypt the data
-        const encrypted: ArrayBuffer = await crypto.subtle.encrypt(
-            {
-                name: "AES-GCM",
-                iv: iv,
-                additionalData: header,
-                tagLength: 128, // 16 bytes * 8 = 128 bits (TAG_LEN equivalent)
-            },
-            cryptoKey,
-            data,
+        const encrypted = await CryptoFacade.aeadEncrypt(
+            new Uint8Array(rawKey),
+            new Uint8Array(iv),
+            new Uint8Array(header),
+            new Uint8Array(data),
         );
 
-        // The encrypted result contains both ciphertext and authentication tag
         return {
             success: true,
             data: new Uint8Array(encrypted),
@@ -67,17 +63,20 @@ async function decryptWithAES256GCM(
     header: BufferLike,
 ): Promise<DecryptionResponse> {
     try {
-        const cryptoKey = await ensureCryptoKey(key, "decrypt");
+        const rawKey = await ensureRawKey(key);
+        const fullBuffer = new Uint8Array(encryptedData);
+        if (fullBuffer.length < 16) {
+            throw new Error("Invalid encrypted data length (too short for tag)");
+        }
+        const data = fullBuffer.slice(0, fullBuffer.length - 16);
+        const tag = fullBuffer.slice(fullBuffer.length - 16);
 
-        const decrypted: ArrayBuffer = await crypto.subtle.decrypt(
-            {
-                name: "AES-GCM",
-                iv: iv,
-                additionalData: header,
-                tagLength: 128,
-            },
-            cryptoKey,
-            encryptedData,
+        const decrypted = await CryptoFacade.aeadDecrypt(
+            new Uint8Array(rawKey),
+            new Uint8Array(iv),
+            new Uint8Array(header),
+            data,
+            tag,
         );
 
         return {
@@ -101,12 +100,12 @@ function isDecryptionSuccess(result: DecryptionResponse): result is DecryptionRe
     return result.success;
 }
 
-async function ensureCryptoKey(key: CryptoMaterial, usage: KeyUsage): Promise<CryptoKey> {
+async function ensureRawKey(key: CryptoMaterial): Promise<Uint8Array> {
     if (key instanceof CryptoKey) {
-        return key;
+        const raw = await crypto.subtle.exportKey("raw", key);
+        return new Uint8Array(raw);
     }
-
-    return crypto.subtle.importKey("raw", key, { name: "AES-GCM" }, false, [usage]);
+    return new Uint8Array(key);
 }
 
 export {

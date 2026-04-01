@@ -76,7 +76,7 @@ async function waitForServerReady(port: number, containerName: string) {
         try {
             const res = await fetch(url);
             if (res.ok) return;
-        } catch {}
+        } catch { }
 
         await new Promise((r) => setTimeout(r, 200));
     }
@@ -90,7 +90,7 @@ function printContainerLogs(containerName: string) {
         const logs = execSync(`docker logs --tail 20 ${containerName}`).toString();
         console.log(logs);
         console.log(`--- END LOGS ---\n`);
-    } catch (e) {}
+    } catch (e) { }
 }
 
 async function applyCorsProtection(target: Page | BrowserContext) {
@@ -125,7 +125,7 @@ async function applyCorsProtection(target: Page | BrowserContext) {
             }
             try {
                 await route.continue();
-            } catch (ignore) {}
+            } catch (ignore) { }
         }
     });
 }
@@ -216,7 +216,7 @@ export const test = base.extend<
             await client.close();
             try {
                 execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
-            } catch {}
+            } catch { }
         },
         { scope: "worker" },
     ],
@@ -228,7 +228,7 @@ export const test = base.extend<
         try {
             try {
                 execSync(`docker stop ${containerName}`, { stdio: "ignore" });
-            } catch {}
+            } catch { }
             await db.dropDatabase();
 
             execSync(`docker start ${containerName}`, { stdio: "ignore" });
@@ -249,7 +249,7 @@ export const test = base.extend<
         } finally {
             try {
                 execSync(`docker stop ${containerName}`, { stdio: "ignore" });
-            } catch {}
+            } catch { }
             await db.dropDatabase();
         }
     },

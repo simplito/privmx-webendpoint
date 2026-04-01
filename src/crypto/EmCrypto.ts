@@ -9,23 +9,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// @ts-ignore
 import * as elliptic from "elliptic";
-import { assertIsNumber, assertIsUint8Array, assertArgsValid, assertIsString } from "../assert";
+import { assertIsNumber, assertIsUint8Array, assertArgsValid, assertIsString } from "./assert";
 import * as Types from "./Types";
 import * as Utils from "./Utils";
+// @ts-ignore
 import BN = require("bn.js");
 const EC = new elliptic.ec("secp256k1");
-const {subtle} = globalThis.crypto;
-const crypto = require('crypto');
+import * as aesjs from "aes-js";
+import RIPEMD160 = require("ripemd160");
+
+const subtle = typeof crypto !== "undefined" ? crypto.subtle : (globalThis as any).crypto?.subtle;
 
 export class EmCrypto {
-    static HASH_ALGORITHM_MAP: {[name: string]: string} = {
+    static HASH_ALGORITHM_MAP: { [name: string]: string } = {
         sha1: "SHA-1",
         sha256: "SHA-256",
         sha512: "SHA-512",
         SHA1: "SHA-1",
         SHA256: "SHA-256",
-        SHA512: "SHA-512"
+        SHA512: "SHA-512",
     };
 
     private methodsMap: { [K: string]: Function } = {
@@ -51,6 +55,8 @@ export class EmCrypto {
         aes256CbcHmac256Encrypt: this.aes256CbcHmac256Encrypt,
         aes256CbcHmac256Decrypt: this.aes256CbcHmac256Decrypt,
         pbkdf2: this.pbkdf2,
+        aeadEncrypt: this.aeadEncrypt,
+        aeadDecrypt: this.aeadDecrypt,
         ecc_genPair: this.eccGenPair,
         ecc_fromPublicKey: this.eccFromPublicKey,
         ecc_fromPrivateKey: this.eccFromPrivateKey,
@@ -67,145 +73,188 @@ export class EmCrypto {
         point_mul: this.pointMul,
         point_add: this.pointAdd,
         fillWithZeroesTo32: this.fillWithZeroesTo32,
-        getRecoveryParam: this.getRecoveryParam
-     };
+        getRecoveryParam: this.getRecoveryParam,
+    };
 
     async methodCaller(name: string, params: any): Promise<any> {
         if (this.methodsMap[name]) {
             return this.methodsMap[name](params);
-        }        
-        throw new Error(`Method '${name}' is not implemented.`);        
+        }
+        throw new Error(`Method '${name}' is not implemented.`);
     }
 
-    private async randomBytes(params: Types.RANDOM_BYTES_PARAMS): Promise<ArrayBuffer> {
+    public async randomBytes(params: Types.RANDOM_BYTES_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.RANDOM_BYTES_PARAMS);
         assertIsNumber(params.length);
         let buf = new Uint8Array(params.length);
-        return globalThis.crypto.getRandomValues(buf);
+        return Utils.toArrayBuffer(globalThis.crypto.getRandomValues(buf));
     }
 
-    private async hmac(params: Types.HMAC_PARAMS): Promise<ArrayBuffer> {
+    public async hmac(params: Types.HMAC_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.HMAC_PARAMS);
         assertIsString(params.engine);
         assertIsUint8Array(params.key);
         assertIsUint8Array(params.data);
         if (params.engine === "sha1") {
             return this.hmacSha1(params.key, params.data);
-        }
-        else if (params.engine === "sha256") {
+        } else if (params.engine === "sha256") {
             return this.hmacSha256(params.key, params.data);
-        }
-        else if (params.engine === "sha512") {
+        } else if (params.engine === "sha512") {
             return this.hmacSha512(params.key, params.data);
         }
         throw new Error("hmac: invalid engine arg");
     }
 
-
-    private async hmacSha1(key: ArrayBuffer, data: ArrayBuffer): Promise<ArrayBuffer> {
-        const importedKey = await subtle.importKey("raw", new Uint8Array(key), {
-            name: "HMAC",
-            hash: "SHA-1"
-        }, false, ["sign"]);
+    public async hmacSha1(
+        key: ArrayBuffer | Uint8Array,
+        data: ArrayBuffer | Uint8Array,
+    ): Promise<ArrayBuffer> {
+        const importedKey = await subtle.importKey(
+            "raw",
+            new Uint8Array(key),
+            {
+                name: "HMAC",
+                hash: "SHA-1",
+            },
+            false,
+            ["sign"],
+        );
         return await subtle.sign("HMAC", importedKey, new Uint8Array(data));
     }
 
-    private async hmacSha256(key: ArrayBuffer, data: ArrayBuffer): Promise<ArrayBuffer> {
-        const importedKey = await subtle.importKey("raw", new Uint8Array(key), {
-            name: "HMAC",
-            hash: "SHA-256"
-        }, false, ["sign"]);
+    public async hmacSha256(
+        key: ArrayBuffer | Uint8Array,
+        data: ArrayBuffer | Uint8Array,
+    ): Promise<ArrayBuffer> {
+        const importedKey = await subtle.importKey(
+            "raw",
+            new Uint8Array(key),
+            {
+                name: "HMAC",
+                hash: "SHA-256",
+            },
+            false,
+            ["sign"],
+        );
         return subtle.sign("HMAC", importedKey, new Uint8Array(data));
     }
 
-    private async hmacSha512(key: ArrayBuffer, data: ArrayBuffer): Promise<ArrayBuffer> {
-        const importedKey = await subtle.importKey("raw", new Uint8Array(key), {
-            name: "HMAC",
-            hash: "SHA-512"
-        }, false, ["sign"]);
+    public async hmacSha512(
+        key: ArrayBuffer | Uint8Array,
+        data: ArrayBuffer | Uint8Array,
+    ): Promise<ArrayBuffer> {
+        const importedKey = await subtle.importKey(
+            "raw",
+            new Uint8Array(key),
+            {
+                name: "HMAC",
+                hash: "SHA-512",
+            },
+            false,
+            ["sign"],
+        );
         return subtle.sign("HMAC", importedKey, new Uint8Array(data));
     }
 
-    private async sha1(params: Types.SHA_PARAMS): Promise<ArrayBuffer> {
+    public async sha1(params: Types.SHA_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.SHA_PARAMS);
         assertIsUint8Array(params.data);
         return subtle.digest("SHA-1", new Uint8Array(params.data));
     }
 
-    private async sha256(params: Types.SHA_PARAMS): Promise<ArrayBuffer> {
+    public async sha256(params: Types.SHA_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.SHA_PARAMS);
         assertIsUint8Array(params.data);
         return subtle.digest("SHA-256", new Uint8Array(params.data));
     }
 
-    private async sha512(params: Types.SHA_PARAMS): Promise<ArrayBuffer> {
+    public async sha512(params: Types.SHA_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.SHA_PARAMS);
         assertIsUint8Array(params.data);
         return subtle.digest("SHA-512", new Uint8Array(params.data));
     }
 
-    private async ripemd160(params: Types.RIPEMD160_PARAMS): Promise<ArrayBuffer> {
+    public async ripemd160(params: Types.RIPEMD160_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.RIPEMD160_PARAMS);
         assertIsUint8Array(params.data);
-        return crypto.createHash("ripemd160").update(Buffer.from(params.data)).digest();
+        return Utils.toArrayBuffer(new RIPEMD160().update(Buffer.from(params.data)).digest());
     }
 
-    private async aes256EcbEncrypt(params: Types.AES256ECB_PARAMS): Promise<ArrayBuffer> {
+    public async aes256EcbEncrypt(params: Types.AES256ECB_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.AES256ECB_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
-        const cipher = crypto.createCipheriv("aes-256-ecb", new Uint8Array(params.key), '');
-        cipher.setAutoPadding(false);
-        return Utils.toArrayBuffer(Buffer.concat([cipher.update(new Uint8Array(params.data)), cipher.final()]));
+        const aesEcb = new aesjs.ModeOfOperation.ecb(new Uint8Array(params.key));
+        const encryptedBytes = aesEcb.encrypt(new Uint8Array(params.data));
+        return Utils.toArrayBuffer(Buffer.from(encryptedBytes));
     }
 
-    private async aes256EcbDecrypt(params: Types.AES256ECB_PARAMS): Promise<ArrayBuffer> {
+    public async aes256EcbDecrypt(params: Types.AES256ECB_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.AES256ECB_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
-        const cipher = crypto.createDecipheriv("aes-256-ecb", new Uint8Array(params.key), '');
-        cipher.setAutoPadding(false);
-        return Utils.toArrayBuffer(Buffer.concat([cipher.update(new Uint8Array(params.data)), cipher.final()]));
+        const aesEcb = new aesjs.ModeOfOperation.ecb(new Uint8Array(params.key));
+        const decryptedBytes = aesEcb.decrypt(new Uint8Array(params.data));
+        return Utils.toArrayBuffer(Buffer.from(decryptedBytes));
     }
 
-    private async aes256CbcPkcs7Encrypt(params: Types.Aes256CbcPkcs7_PARAMS): Promise<ArrayBuffer> {
+    public async aes256CbcPkcs7Encrypt(params: Types.Aes256CbcPkcs7_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.Aes256CbcPkcs7_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
-        const key = await subtle.importKey("raw", new Uint8Array(params.key), "AES-CBC", true, ["encrypt"]);
-        return subtle.encrypt({name: "AES-CBC", iv: new Uint8Array(params.iv)}, key, new Uint8Array(params.data));
+        const key = await subtle.importKey("raw", new Uint8Array(params.key), "AES-CBC", true, [
+            "encrypt",
+        ]);
+        return subtle.encrypt(
+            { name: "AES-CBC", iv: new Uint8Array(params.iv) },
+            key,
+            new Uint8Array(params.data),
+        );
     }
 
-    private async aes256CbcPkcs7Decrypt(params: Types.Aes256CbcPkcs7_PARAMS): Promise<ArrayBuffer> {
+    public async aes256CbcPkcs7Decrypt(params: Types.Aes256CbcPkcs7_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.Aes256CbcPkcs7_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
-        const key = await subtle.importKey("raw", new Uint8Array(params.key), "AES-CBC", true, ["decrypt"]);
-        return subtle.decrypt({name: "AES-CBC", iv: new Uint8Array(params.iv)}, key, new Uint8Array(params.data));
+        const key = await subtle.importKey("raw", new Uint8Array(params.key), "AES-CBC", true, [
+            "decrypt",
+        ]);
+        return subtle.decrypt(
+            { name: "AES-CBC", iv: new Uint8Array(params.iv) },
+            key,
+            new Uint8Array(params.data),
+        );
     }
 
-    private async aes256CbcNoPadEncrypt(params: Types.Aes256CbcPkcs7_PARAMS): Promise<ArrayBuffer> {
+    public async aes256CbcNoPadEncrypt(params: Types.Aes256CbcPkcs7_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.Aes256CbcPkcs7_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
-        const cipher = crypto.createCipheriv("aes-256-cbc", params.key, params.iv);
-        cipher.setAutoPadding(false);
-        return Utils.toArrayBuffer(Buffer.concat([cipher.update(params.data), cipher.final()]));
+        const aesCbc = new aesjs.ModeOfOperation.cbc(
+            new Uint8Array(params.key),
+            new Uint8Array(params.iv),
+        );
+        const encryptedBytes = aesCbc.encrypt(new Uint8Array(params.data));
+        return Utils.toArrayBuffer(Buffer.from(encryptedBytes));
     }
 
-    private async aes256CbcNoPadDecrypt(params: Types.Aes256CbcPkcs7_PARAMS): Promise<ArrayBuffer> {
+    public async aes256CbcNoPadDecrypt(params: Types.Aes256CbcPkcs7_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.Aes256CbcPkcs7_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
-        const cipher = crypto.createDecipheriv("aes-256-cbc", params.key, params.iv);
-        return Utils.toArrayBuffer(Buffer.concat([cipher.update(params.data), cipher.final()]));
+        const aesCbc = new aesjs.ModeOfOperation.cbc(
+            new Uint8Array(params.key),
+            new Uint8Array(params.iv),
+        );
+        const decryptedBytes = aesCbc.decrypt(new Uint8Array(params.data));
+        return Utils.toArrayBuffer(Buffer.from(decryptedBytes));
     }
 
-    private async prf_tls12(params: Types.Prf_tls12_PARAMS): Promise<ArrayBuffer> {
+    public async prf_tls12(params: Types.Prf_tls12_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.Prf_tls12_PARAMS);
         assertIsUint8Array(params.key);
         assertIsUint8Array(params.seed);
@@ -214,12 +263,20 @@ export class EmCrypto {
         let a = new Uint8Array(params.seed);
         while (result.length < params.length) {
             a = new Uint8Array(await this.hmacSha256(new Uint8Array(params.key), a));
-            result = Buffer.concat([result, Buffer.from(await this.hmacSha256(new Uint8Array(params.key), Buffer.concat([a, new Uint8Array(params.seed)])))]);
+            result = Buffer.concat([
+                result,
+                Buffer.from(
+                    await this.hmacSha256(
+                        new Uint8Array(params.key),
+                        Buffer.concat([a, new Uint8Array(params.seed)]),
+                    ),
+                ),
+            ]);
         }
         return Utils.toArrayBuffer(result.slice(0, params.length));
     }
 
-    private async kdf(algo: string, length: number, key: Buffer, labelStr: string): Promise<Buffer> {
+    public async kdf(algo: string, length: number, key: Buffer, labelStr: string): Promise<Buffer> {
         const label = Buffer.from(labelStr);
         const context = Buffer.alloc(0);
         let seed = Buffer.alloc(label.length + context.length + 5);
@@ -237,14 +294,14 @@ export class EmCrypto {
             count.writeUInt32BE(i++, 0);
             input = Buffer.concat([input, count]);
             input = Buffer.concat([input, seed]);
-            const hmac = await this.hmac({engine: algo, key, data: input});
+            const hmac = await this.hmac({ engine: algo, key, data: input });
             k = Buffer.from(hmac);
             result = Buffer.concat([result, k]);
         }
         return result;
     }
 
-    private async getKEM(algo: string, key: Buffer, keLen?: number, kmLen?: number) {
+    public async getKEM(algo: string, key: Buffer, keLen?: number, kmLen?: number) {
         if (!keLen && keLen !== 0) {
             keLen = 32;
         }
@@ -254,11 +311,13 @@ export class EmCrypto {
         const kEM = await this.kdf(algo, keLen + kmLen, key, "key expansion");
         return {
             kE: kEM.slice(0, keLen),
-            kM: kEM.slice(keLen)
-        }
+            kM: kEM.slice(keLen),
+        };
     }
 
-    private async aes256CbcHmac256Encrypt(params: Types.Aes256CbcPkcs7Encrypt_PARAMS): Promise<ArrayBuffer> {
+    public async aes256CbcHmac256Encrypt(
+        params: Types.Aes256CbcPkcs7Encrypt_PARAMS,
+    ): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.Aes256CbcPkcs7Encrypt_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
@@ -269,12 +328,16 @@ export class EmCrypto {
         const prefix = Buffer.alloc(16);
         prefix.fill(0);
         const data = Buffer.concat([prefix, Buffer.from(params.data)]);
-        const cipher = await this.aes256CbcPkcs7Encrypt({data, key: kem.kE, iv});
+        const cipher = await this.aes256CbcPkcs7Encrypt({ data, key: kem.kE, iv });
         const tag = await this.hmacSha256(kem.kM, cipher);
-        return Utils.toArrayBuffer(Buffer.concat([Buffer.from(cipher), Buffer.from(tag).slice(0, params.taglen)]));
+        return Utils.toArrayBuffer(
+            Buffer.concat([Buffer.from(cipher), Buffer.from(tag).slice(0, params.taglen)]),
+        );
     }
 
-    private async aes256CbcHmac256Decrypt(params: Types.Aes256CbcPkcs7Decrypt_PARAMS): Promise<ArrayBuffer> {
+    public async aes256CbcHmac256Decrypt(
+        params: Types.Aes256CbcPkcs7Decrypt_PARAMS,
+    ): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.Aes256CbcPkcs7Decrypt_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
@@ -290,76 +353,134 @@ export class EmCrypto {
         }
         const iv = data.slice(0, 16);
         data = data.slice(16);
-        return this.aes256CbcPkcs7Decrypt({data, key: kem.kE, iv});
+        return this.aes256CbcPkcs7Decrypt({ data, key: kem.kE, iv });
     }
 
-    private async pbkdf2(params: Types.PBKDF2_PARAMS): Promise<ArrayBuffer> {
+    public async aeadEncrypt(params: Types.AeadEncrypt_PARAMS): Promise<ArrayBuffer> {
+        assertArgsValid(params, Types.AeadEncrypt_PARAMS);
+        assertIsUint8Array(params.data);
+        assertIsUint8Array(params.key);
+        assertIsUint8Array(params.iv);
+        assertIsUint8Array(params.aad);
+        const key = await subtle.importKey("raw", new Uint8Array(params.key), "AES-GCM", true, [
+            "encrypt",
+        ]);
+        return subtle.encrypt(
+            {
+                name: "AES-GCM",
+                iv: new Uint8Array(params.iv),
+                additionalData: new Uint8Array(params.aad),
+                tagLength: 128,
+            },
+            key,
+            new Uint8Array(params.data),
+        );
+    }
+
+    public async aeadDecrypt(params: Types.AeadDecrypt_PARAMS): Promise<ArrayBuffer> {
+        assertArgsValid(params, Types.AeadDecrypt_PARAMS);
+        assertIsUint8Array(params.data);
+        assertIsUint8Array(params.key);
+        assertIsUint8Array(params.iv);
+        assertIsUint8Array(params.aad);
+        assertIsUint8Array(params.tag);
+        const key = await subtle.importKey("raw", new Uint8Array(params.key), "AES-GCM", true, [
+            "decrypt",
+        ]);
+        const dataWithTag = Buffer.concat([Buffer.from(params.data), Buffer.from(params.tag)]);
+        return subtle.decrypt(
+            {
+                name: "AES-GCM",
+                iv: new Uint8Array(params.iv),
+                additionalData: new Uint8Array(params.aad),
+                tagLength: 128,
+            },
+            key,
+            dataWithTag,
+        );
+    }
+
+    public async pbkdf2(params: Types.PBKDF2_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.PBKDF2_PARAMS);
         assertIsString(params.password);
         assertIsString(params.salt);
         assertIsNumber(params.rounds);
         assertIsNumber(params.length);
         assertIsString(params.hash);
-        const key = await subtle.importKey("raw", new Uint8Array(Buffer.from(params.password, "utf-8")), "PBKDF2", false, ["deriveBits"]);
-        return subtle.deriveBits({
-            name: "PBKDF2",
-            salt: Buffer.from(params.salt, "utf-8"),
-            iterations: params.rounds,
-            hash: { name: EmCrypto.HASH_ALGORITHM_MAP[params.hash] }
-        }, key, params.length * 8);
+        const key = await subtle.importKey(
+            "raw",
+            new Uint8Array(Buffer.from(params.password, "utf-8")),
+            "PBKDF2",
+            false,
+            ["deriveBits"],
+        );
+        return subtle.deriveBits(
+            {
+                name: "PBKDF2",
+                salt: Buffer.from(params.salt, "utf-8"),
+                iterations: params.rounds,
+                hash: { name: EmCrypto.HASH_ALGORITHM_MAP[params.hash] },
+            },
+            key,
+            params.length * 8,
+        );
     }
 
-    private async hash160(params: Types.HASH160_PARAMS): Promise<ArrayBuffer> {
+    public async hash160(params: Types.HASH160_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.HASH160_PARAMS);
         assertIsUint8Array(params.data);
         const sha256 = await subtle.digest("SHA-256", new Uint8Array(params.data));
-        return crypto.createHash("ripemd160").update(Buffer.from(sha256)).digest();
+        return Utils.toArrayBuffer(new RIPEMD160().update(Buffer.from(sha256)).digest());
     }
-
-
 
     private fillWithZeroesTo32(buffer: Buffer) {
-        return buffer.length < 32 ? Buffer.concat([Buffer.alloc(32 - buffer.length).fill(0), buffer]) : buffer;
+        return buffer.length < 32
+            ? Buffer.concat([Buffer.alloc(32 - buffer.length).fill(0), buffer])
+            : buffer;
     }
 
-    private async eccGenPair() {
+    public async eccGenPair() {
         const keyPair = EC.genKeyPair();
         const privateKey = this.fillWithZeroesTo32(Buffer.from(keyPair.getPrivate("hex"), "hex"));
         const publicKey = Buffer.from(keyPair.getPublic().encodeCompressed());
         return {
             privateKey: privateKey,
-            publicKey: publicKey
+            publicKey: publicKey,
         };
     }
 
-    private async eccFromPublicKey(params: Types.FromPublicOrPrivateKey_PARAMS) {
+    public async eccFromPublicKey(params: Types.FromPublicOrPrivateKey_PARAMS) {
         assertArgsValid(params, Types.FromPublicOrPrivateKey_PARAMS);
         assertIsUint8Array(params.key);
         const keyPairPub = EC.keyFromPublic(Buffer.from(params.key));
         const serializedPub = Buffer.from(keyPairPub.getPublic().encodeCompressed());
         return {
-            publicKey: Utils.toArrayBuffer(serializedPub)
+            publicKey: Utils.toArrayBuffer(serializedPub),
         };
     }
 
-    private async eccFromPrivateKey(params: Types.FromPublicOrPrivateKey_PARAMS) {
+    public async eccFromPrivateKey(params: Types.FromPublicOrPrivateKey_PARAMS) {
         assertArgsValid(params, Types.FromPublicOrPrivateKey_PARAMS);
         assertIsUint8Array(params.key);
         const keyPair = EC.keyFromPrivate(Buffer.from(params.key));
-        const privateKey = Utils.toArrayBuffer(this.fillWithZeroesTo32(Buffer.from(keyPair.getPrivate("hex"), "hex")));
+        const privateKey = Utils.toArrayBuffer(
+            this.fillWithZeroesTo32(Buffer.from(keyPair.getPrivate("hex"), "hex")),
+        );
         const publicKey = Utils.toArrayBuffer(Buffer.from(keyPair.getPublic().encodeCompressed()));
         return {
             privateKey: new Uint8Array(privateKey),
             publicKey: new Uint8Array(publicKey),
-        }
+        };
     }
 
-    private async eccSign(params: Types.Sign_PARAMS) {
+    public async eccSign(params: Types.Sign_PARAMS) {
         assertArgsValid(params, Types.Sign_PARAMS);
         assertIsUint8Array(params.privateKey);
         assertIsUint8Array(params.data);
         const keyPair = EC.keyFromPrivate(Buffer.from(params.privateKey));
-        const s = <elliptic.ec.Signature&{recoveryParam: number}>keyPair.sign(Buffer.from(params.data));
+        const s = <elliptic.ec.Signature & { recoveryParam: number }>(
+            keyPair.sign(Buffer.from(params.data))
+        );
         const compact = 27 + s.recoveryParam;
         const buffer = Buffer.alloc(65);
         buffer.writeUInt8(compact, 0);
@@ -384,7 +505,7 @@ export class EmCrypto {
         throw new Error("Invalid recovery param value");
     }
 
-    private async eccVerify(params: Types.Verify_PARAMS) {
+    public async eccVerify(params: Types.Verify_PARAMS) {
         assertArgsValid(params, Types.Verify_PARAMS);
         assertIsUint8Array(params.publicKey);
         assertIsUint8Array(params.data);
@@ -397,12 +518,12 @@ export class EmCrypto {
         const sig = {
             r: r,
             s: s,
-            recoveryParam: recoveryParam
+            recoveryParam: recoveryParam,
         };
         return keyPairPub.verify(Buffer.from(params.data), sig);
     }
 
-    private async eccVerify2(params: Types.Verify2_PARAMS) {
+    public async eccVerify2(params: Types.Verify2_PARAMS) {
         assertArgsValid(params, Types.Verify2_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.r);
@@ -411,10 +532,14 @@ export class EmCrypto {
         buffer.writeUInt8(27, 0);
         Buffer.from(params.r).copy(buffer, 1);
         Buffer.from(params.s).copy(buffer, 33);
-        return this.eccVerify({publicKey: params.publicKey, data: buffer, signature: params.data});
+        return this.eccVerify({
+            publicKey: params.publicKey,
+            data: buffer,
+            signature: params.data,
+        });
     }
 
-    private async eccDerive(params: Types.Derive_PARAMS) {
+    public async eccDerive(params: Types.Derive_PARAMS) {
         assertArgsValid(params, Types.Derive_PARAMS);
         assertIsUint8Array(params.privateKey);
         assertIsUint8Array(params.publicKey);
@@ -422,27 +547,29 @@ export class EmCrypto {
         const keyPairPriv = EC.keyFromPrivate(Buffer.from(params.privateKey));
         const val = keyPairPriv.derive(keyPairPub.getPublic());
         const keyPair = EC.keyFromPrivate(val.toArray());
-        return Utils.toArrayBuffer(this.fillWithZeroesTo32(Buffer.from(keyPair.getPrivate("hex"), "hex")));
+        return Utils.toArrayBuffer(
+            this.fillWithZeroesTo32(Buffer.from(keyPair.getPrivate("hex"), "hex")),
+        );
     }
 
-    private async eccGetOrder(params: undefined) {        
+    public async eccGetOrder(_params?: undefined) {
         const n = EC.curve.n;
         return Uint8Array.from(n.toArray());
     }
 
-    private async eccGetGenerator(params: undefined) {
+    public async eccGetGenerator(_params?: undefined) {
         const g = EC.g;
         return Uint8Array.from(g.encodeCompressed() as any as number[]);
     }
 
-    private async bnGetBitsLength(params: Types.GetBitsLength_PARAMS) {
+    public async bnGetBitsLength(params: Types.GetBitsLength_PARAMS) {
         assertArgsValid(params, Types.GetBitsLength_PARAMS);
         assertIsUint8Array(params.bn);
         const bn = new BN(Buffer.from(params.bn));
         return bn.bitLength();
     }
 
-    private async bnUmod(params: Types.BNumod_PARAMS) {
+    public async bnUmod(params: Types.BNumod_PARAMS) {
         assertArgsValid(params, Types.BNumod_PARAMS);
         assertIsUint8Array(params.bn);
         assertIsUint8Array(params.bn2);
@@ -451,7 +578,7 @@ export class EmCrypto {
         return Uint8Array.from(bn.umod(bn2).toArray());
     }
 
-    private async bnEq(params: Types.BNeq_PARAMS) {
+    public async bnEq(params: Types.BNeq_PARAMS) {
         assertArgsValid(params, Types.BNeq_PARAMS);
         assertIsUint8Array(params.bn);
         assertIsUint8Array(params.bn2);
@@ -460,7 +587,7 @@ export class EmCrypto {
         return bn.eq(bn2);
     }
 
-    private async pointEncode(params: Types.PointEncode_PARAMS) {
+    public async pointEncode(params: Types.PointEncode_PARAMS) {
         assertArgsValid(params, Types.PointEncode_PARAMS);
         assertIsUint8Array(params.point);
         const point = EC.curve.decodePoint(Buffer.from(params.point));
@@ -471,7 +598,7 @@ export class EmCrypto {
         }
     }
 
-    private async pointMul(params: Types.PointMul_PARAMS) {
+    public async pointMul(params: Types.PointMul_PARAMS) {
         assertArgsValid(params, Types.PointMul_PARAMS);
         assertIsUint8Array(params.point);
         assertIsUint8Array(params.bn);
@@ -481,7 +608,7 @@ export class EmCrypto {
         return Uint8Array.from(result.encodeCompressed() as any as number[]);
     }
 
-    private async pointAdd(params: Types.PointAdd_PARAMS) {
+    public async pointAdd(params: Types.PointAdd_PARAMS) {
         assertArgsValid(params, Types.PointAdd_PARAMS);
         assertIsUint8Array(params.point);
         assertIsUint8Array(params.point2);
@@ -490,5 +617,4 @@ export class EmCrypto {
         const result = point.add(point2);
         return Uint8Array.from(result.encodeCompressed() as any as number[]);
     }
-
 }

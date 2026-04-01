@@ -57,7 +57,13 @@
     "watch": "webpack serve"
   },
   "files": [
-    "dist",
+    "dist/index.js",
+    "dist/index.d.ts",
+    "dist/api",
+    "dist/crypto",
+    "dist/extra",
+    "dist/service",
+    "dist/webStreams",
     "assets",
     "LICENSE.md",
     "README.md",
@@ -68,43 +74,39 @@
     "node": ">=4"
   },
   "devDependencies": {
-    "@babel/core": "^7.26.0",
-    "@babel/preset-env": "^7.26.0",
     "@eslint/js": "^9.39.2",
     "@playwright/test": "^1.57.0",
     "@stylistic/eslint-plugin": "^5.6.1",
+    "@types/aes-js": "^3.1.4",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.9.0",
+    "@types/ripemd160": "^2.0.3",
     "@types/webpack": "^5.28.5",
     "@typescript-eslint/eslint-plugin": "^8.51.0",
     "@typescript-eslint/parser": "^8.51.0",
     "assert": "^2.1.0",
-    "babel-jest": "^29.7.0",
     "buffer": "^6.0.3",
     "copy-webpack-plugin": "^14.0.0",
-    "crypto-browserify": "^3.3.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-indent-empty-lines": "^1.0.2",
     "eslint-plugin-prettier": "^5.5.4",
     "jest": "^29.7.0",
     "mongodb": "^7.0.0",
-    "playwright": "^1.57.0",
     "prettier": "^3.7.4",
     "process": "^0.11.10",
-    "stream-browserify": "^3.0.0",
     "ts-jest": "^29.2.5",
     "ts-loader": "^9.5.1",
     "ts-node": "^10.9.1",
     "tslib": "^2.6.2",
     "typescript": "5.8",
-    "vite": "^7.3.0",
-    "vm-browserify": "^1.1.2",
     "webpack": "^5.89.0",
     "webpack-cli": "^5.1.4",
     "webpack-dev-server": "^5.2.2"
   },
   "dependencies": {
-    "elliptic": "^6.6.1"
+    "aes-js": "^3.1.2",
+    "elliptic": "^6.6.1",
+    "ripemd160": "^2.0.3"
   }
 }

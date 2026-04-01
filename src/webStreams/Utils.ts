@@ -1,4 +1,5 @@
-// const Buffer = require('buffer/').Buffer;
+import { CryptoFacade } from "../crypto/CryptoFacade";
+import { Buffer } from "buffer";
 
 export class Utils {
     public static generateNumericId(): number {
@@ -22,82 +23,53 @@ export class Utils {
             encodedPlaintext = plaintext;
         }
 
-        // prepare the secret key for encryption
-        const secretKey = await crypto.subtle.importKey(
-            "raw",
-            Buffer.from(key, "base64"),
-            {
-                name: "AES-GCM",
-                length: 256,
-            },
-            true,
-            ["encrypt", "decrypt"],
-        );
-        // encrypt the text with the secret key
-        const ciphertext = await crypto.subtle.encrypt(
-            {
-                name: "AES-GCM",
-                iv: Buffer.from(iv, "base64"),
-            },
-            secretKey,
-            encodedPlaintext,
+        const ciphertextAndTag = await CryptoFacade.aeadEncrypt(
+            new Uint8Array(Buffer.from(key, "base64")),
+            new Uint8Array(Buffer.from(iv, "base64")),
+            new Uint8Array(0), // No AAD
+            new Uint8Array(encodedPlaintext),
         );
 
-        // return the encrypted text "ciphertext" and the IV
-        // encoded in base64
         return {
-            ciphertext: Buffer.from(ciphertext),
+            ciphertext: Buffer.from(ciphertextAndTag),
             iv: iv,
         };
     }
 
     static async decryptSymmetricBuffer(ciphertext: Buffer, iv: Buffer, key: Buffer) {
-        // prepare the secret key
-        const secretKey = await crypto.subtle.importKey(
-            "raw",
-            key,
-            {
-                name: "AES-GCM",
-                length: 256,
-            },
-            true,
-            ["encrypt", "decrypt"],
+        if (ciphertext.length < 16) {
+            throw new Error("Invalid ciphertext length (too short for tag)");
+        }
+        const data = ciphertext.slice(0, ciphertext.length - 16);
+        const tag = ciphertext.slice(ciphertext.length - 16);
+
+        const cleartext = await CryptoFacade.aeadDecrypt(
+            new Uint8Array(key),
+            new Uint8Array(iv),
+            new Uint8Array(0), // No AAD
+            new Uint8Array(data),
+            new Uint8Array(tag),
         );
-        // decrypt the encrypted text "ciphertext" with the secret key and IV
-        const cleartext = await crypto.subtle.decrypt(
-            {
-                name: "AES-GCM",
-                iv: iv,
-            },
-            secretKey,
-            ciphertext,
-        );
-        // decode the text and return it
+
         return Buffer.from(cleartext);
     }
 
     static async decryptSymmetric(ciphertext: string, iv: string, key: string) {
-        // prepare the secret key
-        const secretKey = await crypto.subtle.importKey(
-            "raw",
-            Buffer.from(key, "base64"),
-            {
-                name: "AES-GCM",
-                length: 256,
-            },
-            true,
-            ["encrypt", "decrypt"],
+        const fullBuffer = Buffer.from(ciphertext, "base64");
+        if (fullBuffer.length < 16) {
+            throw new Error("Invalid ciphertext length (too short for tag)");
+        }
+        const data = fullBuffer.slice(0, fullBuffer.length - 16);
+        const tag = fullBuffer.slice(fullBuffer.length - 16);
+
+        const cleartext = await CryptoFacade.aeadDecrypt(
+            new Uint8Array(Buffer.from(key, "base64")),
+            new Uint8Array(Buffer.from(iv, "base64")),
+            new Uint8Array(0), // No AAD
+            new Uint8Array(data),
+            new Uint8Array(tag),
         );
-        // decrypt the encrypted text "ciphertext" with the secret key and IV
-        const cleartext = await crypto.subtle.decrypt(
-            {
-                name: "AES-GCM",
-                iv: Buffer.from(iv, "base64"),
-            },
-            secretKey,
-            Buffer.from(ciphertext, "base64"),
-        );
-        // decode the text and return it
+
         return new TextDecoder().decode(cleartext);
     }
 

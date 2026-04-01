@@ -46,7 +46,7 @@ export class WebWorker {
     ) {}
 
     async init_e2ee() {
-        this.worker = new Worker(this.assetsDir + "/e2ee-worker.js");
+        this.worker = new Worker(this.assetsDir + "/privmx-worker.js");
         this.worker.onmessage = (event: WorkerLogEvent) => {
             try {
                 if (event.data.type === "rms") {
