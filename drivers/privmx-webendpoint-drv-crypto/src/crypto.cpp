@@ -72,9 +72,9 @@ static std::map<std::string, std::string> keyToHandleMap;
 static std::mutex keyMapMutex;
 
 std::string getOrCreateHandle(const char* key, unsigned int keylen, const std::string& algo,
-                              const std::vector<std::string>& usages) {
+                              const std::vector<std::string>& usages, bool forceReimport = false) {
     std::string keyStr(key, keylen);
-    {
+    if (!forceReimport) {
         std::lock_guard<std::mutex> lock(keyMapMutex);
         auto it = keyToHandleMap.find(keyStr);
         if (it != keyToHandleMap.end()) {
@@ -112,20 +112,31 @@ EM_JS(bool,checkIfWorker,(void),{
     }
 });
 
-std::string hmac(const std::string& engine, const char* key, unsigned int keylen, const char* data, int datalen){
+std::string hmac(const std::string& engine, const char* key, unsigned int keylen, const char* data, int datalen) {
     std::string handle = getOrCreateHandle(key, keylen, "Hmac", {"sign", "verify"});
 
-    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
-        val params = val::object();
-        params.set("engine", engine);
-        params.set("data", createUint8Array(data, datalen));
-        params.set("key", handle);
+    for (int retry = 0; retry < 2; ++retry) {
+        auto future = AsyncEngine::getInstance()->callJsAsync(
+            [=](int callId) {
+                val params = val::object();
+                params.set("engine", engine);
+                params.set("data", createUint8Array(data, datalen));
+                params.set("key", handle);
+                performCryptoCall("hmac", params.as_handle(), callId);
+            },
+            CRYPTO_THREAD);
 
-            performCryptoCall("hmac", params.as_handle(), callId);
-        },
-        CRYPTO_THREAD);
-
-    return extractCryptoResult(future);
+        try {
+            return extractCryptoResult(future);
+        } catch (const std::exception& e) {
+            if (retry == 0 && std::string(e.what()).find("not found") != std::string::npos) {
+                handle = getOrCreateHandle(key, keylen, "Hmac", {"sign", "verify"}, true);
+                continue;
+            }
+            throw;
+        }
+    }
+    throw std::runtime_error("Hmac: Unexpected retry failure");
 }
 
 std::string translateAESConfig(const char* config) {
@@ -204,130 +215,153 @@ int privmxDrvCrypto_hmac(const char* key, unsigned int keylen, const char* data,
 int privmxDrvCrypto_aesEncrypt(const char* key, const char* iv, const char* data, unsigned int datalen,
                                const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateAESConfig(config);
-    
     std::string handle = getOrCreateHandle(key, 32, "AES-CBC", {"encrypt", "decrypt"});
 
-    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
-        val params = val::object();
-        params.set("data", createUint8Array(data, datalen));
-        params.set("key", handle);
-        
-        if (str_config != "aes256Ecb" && iv != nullptr) {
-            params.set("iv", createUint8Array(iv, 16));
-        }
-        
-        performCryptoCall((str_config + "Encrypt").c_str(), params.as_handle(), callId);
-    }, CRYPTO_THREAD);
+    for (int retry = 0; retry < 2; ++retry) {
+        auto future = AsyncEngine::getInstance()->callJsAsync(
+            [=](int callId) {
+                val params = val::object();
+                params.set("data", createUint8Array(data, datalen));
+                params.set("key", handle);
+                if (str_config != "aes256Ecb" && iv != nullptr) {
+                    params.set("iv", createUint8Array(iv, 16));
+                }
+                performCryptoCall((str_config + "Encrypt").c_str(), params.as_handle(), callId);
+            },
+            CRYPTO_THREAD);
 
-    try {
-        std::string res = extractCryptoResult(future);
-        *out = reinterpret_cast<char*>(malloc(res.size()));
-        *outlen = res.size();
-        memcpy(*out, res.data(), res.size());
-        return 0;
-    } catch (...) {
-        return 1;
+        try {
+            std::string res = extractCryptoResult(future);
+            *out = reinterpret_cast<char*>(malloc(res.size()));
+            *outlen = res.size();
+            memcpy(*out, res.data(), res.size());
+            return 0;
+        } catch (const std::exception& e) {
+            if (retry == 0 && std::string(e.what()).find("not found") != std::string::npos) {
+                handle = getOrCreateHandle(key, 32, "AES-CBC", {"encrypt", "decrypt"}, true);
+                continue;
+            }
+            return 1;
+        } catch (...) {
+            return 1;
+        }
     }
+    return 1;
 }
 
-int privmxDrvCrypto_aeadEncrypt(
-    const char* key,
-    const char* iv,
-    const char* aad, unsigned int aadlen,
-    const char* data, unsigned int datalen,
-    const char* config,
-    char** out, unsigned int* outlen,
-    char** tag, unsigned int* taglen
-) {
+int privmxDrvCrypto_aeadEncrypt(const char* key, const char* iv, const char* aad, unsigned int aadlen,
+                                const char* data, unsigned int datalen, const char* config, char** out,
+                                unsigned int* outlen, char** tag, unsigned int* taglen) {
     std::string handle = getOrCreateHandle(key, 32, "AES-GCM", {"encrypt", "decrypt"});
 
-    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
-        val params = val::object();
-        params.set("data", createUint8Array(data, datalen));
-        params.set("key", handle);
-        params.set("iv", createUint8Array(iv, 12));
-        params.set("aad", createUint8Array(aad, aadlen));
-        
-        performCryptoCall("aeadEncrypt", params.as_handle(), callId);
-    }, CRYPTO_THREAD);
+    for (int retry = 0; retry < 2; ++retry) {
+        auto future = AsyncEngine::getInstance()->callJsAsync(
+            [=](int callId) {
+                val params = val::object();
+                params.set("data", createUint8Array(data, datalen));
+                params.set("key", handle);
+                params.set("iv", createUint8Array(iv, 12));
+                params.set("aad", createUint8Array(aad, aadlen));
+                performCryptoCall("aeadEncrypt", params.as_handle(), callId);
+            },
+            CRYPTO_THREAD);
 
-    try {
-        std::string res = extractCryptoResult(future);
-        // In WebCrypto GCM response, the last 16 bytes are the tag.
-        unsigned int res_datalen = res.size() - 16;
-        *out = reinterpret_cast<char*>(malloc(res_datalen));
-        *outlen = res_datalen;
-        memcpy(*out, res.data(), res_datalen);
+        try {
+            std::string res = extractCryptoResult(future);
+            unsigned int res_datalen = res.size() - 16;
+            *out = reinterpret_cast<char*>(malloc(res_datalen));
+            *outlen = res_datalen;
+            memcpy(*out, res.data(), res_datalen);
 
-        *tag = reinterpret_cast<char*>(malloc(16));
-        *taglen = 16;
-        memcpy(*tag, res.data() + res_datalen, 16);
-        return 0;
-    } catch (...) {
-        return 1;
+            *tag = reinterpret_cast<char*>(malloc(16));
+            *taglen = 16;
+            memcpy(*tag, res.data() + res_datalen, 16);
+            return 0;
+        } catch (const std::exception& e) {
+            if (retry == 0 && std::string(e.what()).find("not found") != std::string::npos) {
+                handle = getOrCreateHandle(key, 32, "AES-GCM", {"encrypt", "decrypt"}, true);
+                continue;
+            }
+            return 1;
+        } catch (...) {
+            return 1;
+        }
     }
+    return 1;
 }
 
 int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data, unsigned int datalen,
                                const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateAESConfig(config);
-
     std::string handle = getOrCreateHandle(key, 32, "AES-CBC", {"encrypt", "decrypt"});
 
-    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
-        val params = val::object();
-        params.set("data", createUint8Array(data, datalen));
-        params.set("key", handle);
-        
-        if (str_config != "aes256Ecb" && iv != nullptr) {
-            params.set("iv", createUint8Array(iv, 16));
-        }
-        
-        performCryptoCall((str_config + "Decrypt").c_str(), params.as_handle(), callId);
-    }, CRYPTO_THREAD);
+    for (int retry = 0; retry < 2; ++retry) {
+        auto future = AsyncEngine::getInstance()->callJsAsync(
+            [=](int callId) {
+                val params = val::object();
+                params.set("data", createUint8Array(data, datalen));
+                params.set("key", handle);
+                if (str_config != "aes256Ecb" && iv != nullptr) {
+                    params.set("iv", createUint8Array(iv, 16));
+                }
+                performCryptoCall((str_config + "Decrypt").c_str(), params.as_handle(), callId);
+            },
+            CRYPTO_THREAD);
 
-    try {
-        std::string res = extractCryptoResult(future);
-        *out = reinterpret_cast<char*>(malloc(res.size()));
-        *outlen = res.size();
-        memcpy(*out, res.data(), res.size());
-        return 0;
-    } catch (...) {
-        return 1;
+        try {
+            std::string res = extractCryptoResult(future);
+            *out = reinterpret_cast<char*>(malloc(res.size()));
+            *outlen = res.size();
+            memcpy(*out, res.data(), res.size());
+            return 0;
+        } catch (const std::exception& e) {
+            if (retry == 0 && std::string(e.what()).find("not found") != std::string::npos) {
+                handle = getOrCreateHandle(key, 32, "AES-CBC", {"encrypt", "decrypt"}, true);
+                continue;
+            }
+            return 1;
+        } catch (...) {
+            return 1;
+        }
     }
+    return 1;
 }
 
-int privmxDrvCrypto_aeadDecrypt(
-    const char* key,
-    const char* iv,
-    const char* aad, unsigned int aadlen,
-    const char* data, unsigned int datalen,
-    const char* tag, unsigned int taglen,
-    const char* config,
-    char** out, unsigned int* outlen
-) {
+int privmxDrvCrypto_aeadDecrypt(const char* key, const char* iv, const char* aad, unsigned int aadlen,
+                                const char* data, unsigned int datalen, const char* tag, unsigned int taglen,
+                                const char* config, char** out, unsigned int* outlen) {
     std::string handle = getOrCreateHandle(key, 32, "AES-GCM", {"encrypt", "decrypt"});
 
-    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
-        val params = val::object();
-        params.set("data", createUint8Array(data, datalen));
-        params.set("key", handle);
-        params.set("iv", createUint8Array(iv, 12));
-        params.set("aad", createUint8Array(aad, aadlen));
-        params.set("tag", createUint8Array(tag, taglen));
-        
-        performCryptoCall("aeadDecrypt", params.as_handle(), callId);
-    }, CRYPTO_THREAD);
+    for (int retry = 0; retry < 2; ++retry) {
+        auto future = AsyncEngine::getInstance()->callJsAsync(
+            [=](int callId) {
+                val params = val::object();
+                params.set("data", createUint8Array(data, datalen));
+                params.set("key", handle);
+                params.set("iv", createUint8Array(iv, 12));
+                params.set("aad", createUint8Array(aad, aadlen));
+                params.set("tag", createUint8Array(tag, taglen));
+                performCryptoCall("aeadDecrypt", params.as_handle(), callId);
+            },
+            CRYPTO_THREAD);
 
-    try {
-        std::string res = extractCryptoResult(future);
-        *out = reinterpret_cast<char*>(malloc(res.size()));
-        *outlen = res.size();
-        memcpy(*out, res.data(), res.size());
-        return 0;
-    } catch (...) {
-        return 1;
+        try {
+            std::string res = extractCryptoResult(future);
+            *out = reinterpret_cast<char*>(malloc(res.size()));
+            *outlen = res.size();
+            memcpy(*out, res.data(), res.size());
+            return 0;
+        } catch (const std::exception& e) {
+            if (retry == 0 && std::string(e.what()).find("not found") != std::string::npos) {
+                handle = getOrCreateHandle(key, 32, "AES-GCM", {"encrypt", "decrypt"}, true);
+                continue;
+            }
+            return 1;
+        } catch (...) {
+            return 1;
+        }
     }
+    return 1;
 }
 
 int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* salt, unsigned int saltlen, int rounds, unsigned int length, const char* hash, char** out, unsigned int* outlen){
@@ -353,7 +387,36 @@ int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* s
     }
 }
 
-// privmxDrvCrypto_importKey and privmxDrvCrypto_unregisterKey are now internal only.
+static int unregisterKeyInternal(const char* key, unsigned int keylen) {
+    std::string keyStr(key, keylen);
+    std::string handle;
+    {
+        std::lock_guard<std::mutex> lock(keyMapMutex);
+        auto it = keyToHandleMap.find(keyStr);
+        if (it == keyToHandleMap.end()) {
+            return 0; // Already removed or never imported
+        }
+        handle = it->second;
+        keyToHandleMap.erase(it);
+    }
+
+    auto future = AsyncEngine::getInstance()->callJsAsync(
+        [handle](int callId) {
+            val params = val::object();
+            params.set("id", handle);
+            performCryptoCall("unregisterKey", params.as_handle(), callId);
+        },
+        CRYPTO_THREAD);
+
+    try {
+        future.get();
+        return 0;
+    } catch (...) {
+        return 1;
+    }
+}
+
+// privmxDrvCrypto_importKey and privmxDrvCrypto_unregisterKey (by ID) are now internal only.
 
 int privmxDrvCrypto_freeMem(void* ptr) {
     free(ptr);
