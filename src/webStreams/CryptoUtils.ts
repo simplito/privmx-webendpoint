@@ -35,10 +35,9 @@ async function encryptWithAES256GCM(
     header: BufferLike,
 ): Promise<EncryptionResponse> {
     try {
-        const rawKey = await ensureRawKey(key);
-
+        const cryptKey = key instanceof ArrayBuffer ? new Uint8Array(key) : key;
         const encrypted = await CryptoFacade.aeadEncrypt(
-            new Uint8Array(rawKey),
+            cryptKey,
             new Uint8Array(iv),
             new Uint8Array(header),
             new Uint8Array(data),
@@ -63,7 +62,6 @@ async function decryptWithAES256GCM(
     header: BufferLike,
 ): Promise<DecryptionResponse> {
     try {
-        const rawKey = await ensureRawKey(key);
         const fullBuffer = new Uint8Array(encryptedData);
         if (fullBuffer.length < 16) {
             throw new Error("Invalid encrypted data length (too short for tag)");
@@ -71,8 +69,9 @@ async function decryptWithAES256GCM(
         const data = fullBuffer.slice(0, fullBuffer.length - 16);
         const tag = fullBuffer.slice(fullBuffer.length - 16);
 
+        const cryptKey = key instanceof ArrayBuffer ? new Uint8Array(key) : key;
         const decrypted = await CryptoFacade.aeadDecrypt(
-            new Uint8Array(rawKey),
+            cryptKey,
             new Uint8Array(iv),
             new Uint8Array(header),
             data,
@@ -98,14 +97,6 @@ function isEncryptionSuccess(result: EncryptionResponse): result is EncryptionRe
 
 function isDecryptionSuccess(result: DecryptionResponse): result is DecryptionResult {
     return result.success;
-}
-
-async function ensureRawKey(key: CryptoMaterial): Promise<Uint8Array> {
-    if (key instanceof CryptoKey) {
-        const raw = await crypto.subtle.exportKey("raw", key);
-        return new Uint8Array(raw);
-    }
-    return new Uint8Array(key);
 }
 
 export {

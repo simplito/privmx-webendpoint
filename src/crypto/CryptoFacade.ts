@@ -19,7 +19,7 @@ export class CryptoFacade {
      */
     static async hmac(
         engine: "sha1" | "sha256" | "sha512",
-        key: Uint8Array,
+        key: Uint8Array | CryptoKey | string,
         data: Uint8Array,
     ): Promise<ArrayBuffer> {
         return getEmCrypto().hmac({ engine, key, data });
@@ -43,54 +43,62 @@ export class CryptoFacade {
      * AES-256-CBC PKCS7 Encrypt.
      */
     static async aes256CbcPkcs7Encrypt(
-        key: Uint8Array,
+        key: Uint8Array | CryptoKey | string,
         iv: Uint8Array,
         data: Uint8Array,
+        wipe?: boolean,
     ): Promise<ArrayBuffer> {
-        return getEmCrypto().aes256CbcPkcs7Encrypt({ key, iv, data });
+        // @ts-ignore
+        return getEmCrypto().aes256CbcPkcs7Encrypt({ key, iv, data, wipe });
     }
 
     /**
      * AES-256-CBC PKCS7 Decrypt.
      */
     static async aes256CbcPkcs7Decrypt(
-        key: Uint8Array,
+        key: Uint8Array | CryptoKey | string,
         iv: Uint8Array,
         data: Uint8Array,
+        wipe?: boolean,
     ): Promise<ArrayBuffer> {
-        return getEmCrypto().aes256CbcPkcs7Decrypt({ key, iv, data });
+        // @ts-ignore
+        return getEmCrypto().aes256CbcPkcs7Decrypt({ key, iv, data, wipe });
     }
 
     /**
      * AES-256-GCM (AEAD) Encrypt.
      */
     static async aeadEncrypt(
-        key: Uint8Array,
+        key: Uint8Array | CryptoKey | string,
         iv: Uint8Array,
         aad: Uint8Array,
         data: Uint8Array,
+        wipe?: boolean,
     ): Promise<ArrayBuffer> {
-        return getEmCrypto().aeadEncrypt({ key, iv, aad, data });
+        // @ts-ignore
+        return getEmCrypto().aeadEncrypt({ key, iv, aad, data, wipe });
     }
 
     /**
      * AES-256-GCM (AEAD) Decrypt.
      */
     static async aeadDecrypt(
-        key: Uint8Array,
+        key: Uint8Array | CryptoKey | string,
         iv: Uint8Array,
         aad: Uint8Array,
         data: Uint8Array,
         tag: Uint8Array,
+        wipe?: boolean,
     ): Promise<ArrayBuffer> {
-        return getEmCrypto().aeadDecrypt({ key, iv, aad, data, tag });
+        // @ts-ignore
+        return getEmCrypto().aeadDecrypt({ key, iv, aad, data, tag, wipe });
     }
 
     /**
      * Derive a key using PBKDF2.
      */
     static async pbkdf2(
-        password: string,
+        password: string | CryptoKey,
         salt: string,
         rounds: number,
         length: number,
@@ -110,25 +118,47 @@ export class CryptoFacade {
     /**
      * Derive a shared secret using ECDH.
      */
-    static async eccDerive(privateKey: Uint8Array, publicKey: Uint8Array): Promise<ArrayBuffer> {
+    static async eccDerive(
+        privateKey: Uint8Array | CryptoKey | string,
+        publicKey: Uint8Array,
+    ): Promise<ArrayBuffer> {
         return getEmCrypto().eccDerive({ privateKey, publicKey });
     }
 
     /**
      * Sign data using ECDSA.
      */
-    static async eccSign(privateKey: Uint8Array, data: Uint8Array): Promise<ArrayBuffer> {
+    static async eccSign(
+        privateKey: Uint8Array | CryptoKey | string,
+        data: Uint8Array,
+    ): Promise<ArrayBuffer> {
         return getEmCrypto().eccSign({ privateKey, data });
     }
 
-    /**
-     * Verify an ECDSA signature.
-     */
     static async eccVerify(
         publicKey: Uint8Array,
         data: Uint8Array,
         signature: Uint8Array,
     ): Promise<boolean> {
         return getEmCrypto().eccVerify({ publicKey, data, signature });
+    }
+
+    /**
+     * Import a raw key into the registry and return its ID.
+     */
+    static async importKey(
+        key: Uint8Array,
+        algo: any,
+        usages: KeyUsage[],
+        id?: string,
+    ): Promise<string> {
+        return getEmCrypto().importKey({ key, algo, usages, id });
+    }
+
+    /**
+     * Remove a key from the registry.
+     */
+    static unregisterKey(id: string): void {
+        getEmCrypto().unregisterKey({ id });
     }
 }

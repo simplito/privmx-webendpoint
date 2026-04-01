@@ -22,6 +22,11 @@ import RIPEMD160 = require("ripemd160");
 
 const subtle = typeof crypto !== "undefined" ? crypto.subtle : (globalThis as any).crypto?.subtle;
 
+interface KeyRegistryEntry {
+    key: CryptoKey;
+    wipeAfterImport?: boolean;
+}
+
 export class EmCrypto {
     static HASH_ALGORITHM_MAP: { [name: string]: string } = {
         sha1: "SHA-1",
@@ -31,6 +36,7 @@ export class EmCrypto {
         SHA256: "SHA-256",
         SHA512: "SHA-512",
     };
+    private keys: Map<string, KeyRegistryEntry> = new Map();
 
     private methodsMap: { [K: string]: Function } = {
         randomBytes: this.randomBytes,
@@ -66,6 +72,8 @@ export class EmCrypto {
         ecc_derive: this.eccDerive,
         ecc_getOrder: this.eccGetOrder,
         ecc_getGenerator: this.eccGetGenerator,
+        importKey: this.importKey,
+        unregisterKey: this.unregisterKey,
         bn_getBitsLength: this.bnGetBitsLength,
         bn_umod: this.bnUmod,
         bn_eq: this.bnEq,
@@ -76,9 +84,27 @@ export class EmCrypto {
         getRecoveryParam: this.getRecoveryParam,
     };
 
+    private ensureSafeMemory(params: any): any {
+        if (params instanceof Uint8Array || params instanceof Int8Array) {
+            return new Uint8Array(params); // Creates a copy
+        }
+        if (params instanceof ArrayBuffer) {
+            return params.slice(0);
+        }
+        if (typeof params === "object" && params !== null) {
+            const copy: any = {};
+            for (const key of Object.keys(params)) {
+                copy[key] = this.ensureSafeMemory(params[key]);
+            }
+            return copy;
+        }
+        return params;
+    }
+
     async methodCaller(name: string, params: any): Promise<any> {
+        const safeParams = this.ensureSafeMemory(params);
         if (this.methodsMap[name]) {
-            return this.methodsMap[name](params);
+            return this.methodsMap[name].call(this, safeParams);
         }
         throw new Error(`Method '${name}' is not implemented.`);
     }
@@ -90,10 +116,63 @@ export class EmCrypto {
         return Utils.toArrayBuffer(globalThis.crypto.getRandomValues(buf));
     }
 
+    private async getOrImportKey(
+        keyInput: Uint8Array | CryptoKey | string,
+        algorithm: string | any,
+        usages: KeyUsage[],
+        wipe?: boolean,
+    ): Promise<CryptoKey> {
+        if (keyInput instanceof CryptoKey) {
+            return keyInput;
+        }
+        if (typeof keyInput === "string") {
+            const entry = this.keys.get(keyInput);
+            if (!entry) {
+                throw new Error(`Key with ID '${keyInput}' not found in registry.`);
+            }
+            return entry.key;
+        }
+        if (keyInput instanceof Uint8Array) {
+            if (algorithm === "secp256k1-private" || algorithm === "secp256k1-public") {
+                // For elliptic, we just use the raw bytes for now, but we can store them in registry if needed.
+                // However, getOrImportKey is expected to return something we can use.
+                // If it's pure bytes, we return it as is.
+                return keyInput as any;
+            }
+            const key = await subtle.importKey("raw", keyInput, algorithm, false, usages);
+            if (wipe) {
+                keyInput.fill(0);
+            }
+            return key;
+        }
+        throw new Error("Invalid key input type.");
+    }
+
+    public async importKey(params: {
+        key: Uint8Array;
+        algo: any;
+        usages: KeyUsage[];
+        id?: string;
+    }): Promise<string> {
+        const cryptoKey = await subtle.importKey(
+            "raw",
+            params.key,
+            params.algo,
+            false,
+            params.usages,
+        );
+        const id = params.id || Utils.randomString(16);
+        this.keys.set(id, { key: cryptoKey });
+        return id;
+    }
+
+    public unregisterKey(params: { id: string }): void {
+        this.keys.delete(params.id);
+    }
+
     public async hmac(params: Types.HMAC_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.HMAC_PARAMS);
         assertIsString(params.engine);
-        assertIsUint8Array(params.key);
         assertIsUint8Array(params.data);
         if (params.engine === "sha1") {
             return this.hmacSha1(params.key, params.data);
@@ -106,54 +185,31 @@ export class EmCrypto {
     }
 
     public async hmacSha1(
-        key: ArrayBuffer | Uint8Array,
+        keyInput: Uint8Array | CryptoKey | string,
         data: ArrayBuffer | Uint8Array,
     ): Promise<ArrayBuffer> {
-        const importedKey = await subtle.importKey(
-            "raw",
-            new Uint8Array(key),
-            {
-                name: "HMAC",
-                hash: "SHA-1",
-            },
-            false,
-            ["sign"],
-        );
-        return await subtle.sign("HMAC", importedKey, new Uint8Array(data));
+        const key = await this.getOrImportKey(keyInput, { name: "HMAC", hash: "SHA-1" }, ["sign"]);
+        return await subtle.sign("HMAC", key, new Uint8Array(data));
     }
 
     public async hmacSha256(
-        key: ArrayBuffer | Uint8Array,
+        keyInput: Uint8Array | CryptoKey | string,
         data: ArrayBuffer | Uint8Array,
     ): Promise<ArrayBuffer> {
-        const importedKey = await subtle.importKey(
-            "raw",
-            new Uint8Array(key),
-            {
-                name: "HMAC",
-                hash: "SHA-256",
-            },
-            false,
-            ["sign"],
-        );
-        return subtle.sign("HMAC", importedKey, new Uint8Array(data));
+        const key = await this.getOrImportKey(keyInput, { name: "HMAC", hash: "SHA-256" }, [
+            "sign",
+        ]);
+        return subtle.sign("HMAC", key, new Uint8Array(data));
     }
 
     public async hmacSha512(
-        key: ArrayBuffer | Uint8Array,
+        keyInput: Uint8Array | CryptoKey | string,
         data: ArrayBuffer | Uint8Array,
     ): Promise<ArrayBuffer> {
-        const importedKey = await subtle.importKey(
-            "raw",
-            new Uint8Array(key),
-            {
-                name: "HMAC",
-                hash: "SHA-512",
-            },
-            false,
-            ["sign"],
-        );
-        return subtle.sign("HMAC", importedKey, new Uint8Array(data));
+        const key = await this.getOrImportKey(keyInput, { name: "HMAC", hash: "SHA-512" }, [
+            "sign",
+        ]);
+        return subtle.sign("HMAC", key, new Uint8Array(data));
     }
 
     public async sha1(params: Types.SHA_PARAMS): Promise<ArrayBuffer> {
@@ -201,11 +257,9 @@ export class EmCrypto {
     public async aes256CbcPkcs7Encrypt(params: Types.Aes256CbcPkcs7_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.Aes256CbcPkcs7_PARAMS);
         assertIsUint8Array(params.data);
-        assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
-        const key = await subtle.importKey("raw", new Uint8Array(params.key), "AES-CBC", true, [
-            "encrypt",
-        ]);
+        // @ts-ignore
+        const key = await this.getOrImportKey(params.key, "AES-CBC", ["encrypt"], params.wipe);
         return subtle.encrypt(
             { name: "AES-CBC", iv: new Uint8Array(params.iv) },
             key,
@@ -216,11 +270,9 @@ export class EmCrypto {
     public async aes256CbcPkcs7Decrypt(params: Types.Aes256CbcPkcs7_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.Aes256CbcPkcs7_PARAMS);
         assertIsUint8Array(params.data);
-        assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
-        const key = await subtle.importKey("raw", new Uint8Array(params.key), "AES-CBC", true, [
-            "decrypt",
-        ]);
+        // @ts-ignore
+        const key = await this.getOrImportKey(params.key, "AES-CBC", ["decrypt"], params.wipe);
         return subtle.decrypt(
             { name: "AES-CBC", iv: new Uint8Array(params.iv) },
             key,
@@ -328,7 +380,7 @@ export class EmCrypto {
         const prefix = Buffer.alloc(16);
         prefix.fill(0);
         const data = Buffer.concat([prefix, Buffer.from(params.data)]);
-        const cipher = await this.aes256CbcPkcs7Encrypt({ data, key: kem.kE, iv });
+        const cipher = await this.aes256CbcPkcs7Encrypt({ data, key: kem.kE, iv, wipe: false });
         const tag = await this.hmacSha256(kem.kM, cipher);
         return Utils.toArrayBuffer(
             Buffer.concat([Buffer.from(cipher), Buffer.from(tag).slice(0, params.taglen)]),
@@ -353,18 +405,16 @@ export class EmCrypto {
         }
         const iv = data.slice(0, 16);
         data = data.slice(16);
-        return this.aes256CbcPkcs7Decrypt({ data, key: kem.kE, iv });
+        return this.aes256CbcPkcs7Decrypt({ data, key: kem.kE, iv, wipe: false });
     }
 
     public async aeadEncrypt(params: Types.AeadEncrypt_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.AeadEncrypt_PARAMS);
         assertIsUint8Array(params.data);
-        assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
         assertIsUint8Array(params.aad);
-        const key = await subtle.importKey("raw", new Uint8Array(params.key), "AES-GCM", true, [
-            "encrypt",
-        ]);
+        // @ts-ignore
+        const key = await this.getOrImportKey(params.key, "AES-GCM", ["encrypt"], params.wipe);
         return subtle.encrypt(
             {
                 name: "AES-GCM",
@@ -380,13 +430,11 @@ export class EmCrypto {
     public async aeadDecrypt(params: Types.AeadDecrypt_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.AeadDecrypt_PARAMS);
         assertIsUint8Array(params.data);
-        assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
         assertIsUint8Array(params.aad);
         assertIsUint8Array(params.tag);
-        const key = await subtle.importKey("raw", new Uint8Array(params.key), "AES-GCM", true, [
-            "decrypt",
-        ]);
+        // @ts-ignore
+        const key = await this.getOrImportKey(params.key, "AES-GCM", ["decrypt"], params.wipe);
         const dataWithTag = Buffer.concat([Buffer.from(params.data), Buffer.from(params.tag)]);
         return subtle.decrypt(
             {
@@ -402,18 +450,25 @@ export class EmCrypto {
 
     public async pbkdf2(params: Types.PBKDF2_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.PBKDF2_PARAMS);
-        assertIsString(params.password);
         assertIsString(params.salt);
         assertIsNumber(params.rounds);
         assertIsNumber(params.length);
         assertIsString(params.hash);
-        const key = await subtle.importKey(
-            "raw",
-            new Uint8Array(Buffer.from(params.password, "utf-8")),
-            "PBKDF2",
-            false,
-            ["deriveBits"],
-        );
+
+        let key: CryptoKey;
+        if (params.password instanceof CryptoKey) {
+            key = params.password;
+        } else {
+            assertIsString(params.password);
+            key = await subtle.importKey(
+                "raw",
+                new Uint8Array(Buffer.from(params.password, "utf-8")),
+                "PBKDF2",
+                false,
+                ["deriveBits"],
+            );
+        }
+
         return subtle.deriveBits(
             {
                 name: "PBKDF2",
@@ -475,9 +530,11 @@ export class EmCrypto {
 
     public async eccSign(params: Types.Sign_PARAMS) {
         assertArgsValid(params, Types.Sign_PARAMS);
-        assertIsUint8Array(params.privateKey);
         assertIsUint8Array(params.data);
-        const keyPair = EC.keyFromPrivate(Buffer.from(params.privateKey));
+        const privateKey = await this.getOrImportKey(params.privateKey, "secp256k1-private", [
+            "sign",
+        ]);
+        const keyPair = EC.keyFromPrivate(Buffer.from(privateKey as any));
         const s = <elliptic.ec.Signature & { recoveryParam: number }>(
             keyPair.sign(Buffer.from(params.data))
         );
@@ -541,10 +598,12 @@ export class EmCrypto {
 
     public async eccDerive(params: Types.Derive_PARAMS) {
         assertArgsValid(params, Types.Derive_PARAMS);
-        assertIsUint8Array(params.privateKey);
         assertIsUint8Array(params.publicKey);
         const keyPairPub = EC.keyFromPublic(Buffer.from(params.publicKey));
-        const keyPairPriv = EC.keyFromPrivate(Buffer.from(params.privateKey));
+        const privateKey = await this.getOrImportKey(params.privateKey, "secp256k1-private", [
+            "deriveBits",
+        ]);
+        const keyPairPriv = EC.keyFromPrivate(Buffer.from(privateKey as any));
         const val = keyPairPriv.derive(keyPairPub.getPublic());
         const keyPair = EC.keyFromPrivate(val.toArray());
         return Utils.toArrayBuffer(

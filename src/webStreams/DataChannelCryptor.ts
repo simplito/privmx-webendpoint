@@ -70,9 +70,9 @@ export class DataChannelCryptor {
             keyIdBytes,
         });
 
-        const rawKey = this.keyStore.getRawEncryptionKey();
+        const key = await this.keyStore.getEncryptionKey();
 
-        const encrypted = await CryptoFacade.aeadEncrypt(rawKey, iv, header, plaintext);
+        const encrypted = await CryptoFacade.aeadEncrypt(key, iv, header, plaintext);
 
         const ciphertext = new Uint8Array(encrypted);
 
@@ -93,7 +93,7 @@ export class DataChannelCryptor {
             );
         }
 
-        const rawKey = this.keyStore.getRawKey(parsed.keyId);
+        const key = await this.keyStore.getKey(parsed.keyId);
 
         try {
             const fullBuffer = parsed.ciphertext;
@@ -104,7 +104,7 @@ export class DataChannelCryptor {
             const tag = fullBuffer.slice(fullBuffer.length - 16);
 
             const decrypted = await CryptoFacade.aeadDecrypt(
-                rawKey,
+                key,
                 parsed.iv,
                 parsed.header,
                 data,

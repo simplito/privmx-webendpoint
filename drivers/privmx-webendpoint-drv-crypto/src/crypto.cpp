@@ -20,7 +20,11 @@ limitations under the License.
 #include <string.h>
 
 #include <Pson/BinaryString.hpp>
+#include <future>
+#include <map>
+#include <mutex>
 #include <string>
+#include <vector>
 
 #include "AsyncEngine.hpp"
 #include "Mapper.hpp"
@@ -64,6 +68,40 @@ std::string extractCryptoResult(std::future<Poco::Dynamic::Var>& future) {
     return obj->getValue<Pson::BinaryString>("buff");
 }
 
+static std::map<std::string, std::string> keyToHandleMap;
+static std::mutex keyMapMutex;
+
+std::string getOrCreateHandle(const char* key, unsigned int keylen, const std::string& algo,
+                              const std::vector<std::string>& usages) {
+    std::string keyStr(key, keylen);
+    {
+        std::lock_guard<std::mutex> lock(keyMapMutex);
+        auto it = keyToHandleMap.find(keyStr);
+        if (it != keyToHandleMap.end()) {
+            return it->second;
+        }
+    }
+
+    auto future = AsyncEngine::getInstance()->callJsAsync(
+        [=](int callId) {
+            val params = val::object();
+            params.set("key", createUint8Array(key, keylen));
+            params.set("algo", algo);
+            val usagesArray = val::array();
+            for (const auto& u : usages) usagesArray.call<void>("push", u);
+            params.set("usages", usagesArray);
+            performCryptoCall("importKey", params.as_handle(), callId);
+        },
+        CRYPTO_THREAD);
+
+    std::string handle = extractCryptoResult(future);
+    {
+        std::lock_guard<std::mutex> lock(keyMapMutex);
+        keyToHandleMap[keyStr] = handle;
+    }
+    return handle;
+}
+
 // clang-format off
 
 EM_JS(bool,checkIfWorker,(void),{
@@ -75,11 +113,13 @@ EM_JS(bool,checkIfWorker,(void),{
 });
 
 std::string hmac(const std::string& engine, const char* key, unsigned int keylen, const char* data, int datalen){
+    std::string handle = getOrCreateHandle(key, keylen, "Hmac", {"sign", "verify"});
+
     auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("engine", engine);
         params.set("data", createUint8Array(data, datalen));
-        params.set("key", createUint8Array(key, keylen));
+        params.set("key", handle);
 
             performCryptoCall("hmac", params.as_handle(), callId);
         },
@@ -165,10 +205,12 @@ int privmxDrvCrypto_aesEncrypt(const char* key, const char* iv, const char* data
                                const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateAESConfig(config);
     
+    std::string handle = getOrCreateHandle(key, 32, "AES-CBC", {"encrypt", "decrypt"});
+
     auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("data", createUint8Array(data, datalen));
-        params.set("key", createUint8Array(key, 32));
+        params.set("key", handle);
         
         if (str_config != "aes256Ecb" && iv != nullptr) {
             params.set("iv", createUint8Array(iv, 16));
@@ -197,10 +239,12 @@ int privmxDrvCrypto_aeadEncrypt(
     char** out, unsigned int* outlen,
     char** tag, unsigned int* taglen
 ) {
+    std::string handle = getOrCreateHandle(key, 32, "AES-GCM", {"encrypt", "decrypt"});
+
     auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("data", createUint8Array(data, datalen));
-        params.set("key", createUint8Array(key, 32));
+        params.set("key", handle);
         params.set("iv", createUint8Array(iv, 12));
         params.set("aad", createUint8Array(aad, aadlen));
         
@@ -228,10 +272,12 @@ int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data
                                const char* config, char** out, unsigned int* outlen) {
     std::string str_config = translateAESConfig(config);
 
+    std::string handle = getOrCreateHandle(key, 32, "AES-CBC", {"encrypt", "decrypt"});
+
     auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("data", createUint8Array(data, datalen));
-        params.set("key", createUint8Array(key, 32));
+        params.set("key", handle);
         
         if (str_config != "aes256Ecb" && iv != nullptr) {
             params.set("iv", createUint8Array(iv, 16));
@@ -260,10 +306,12 @@ int privmxDrvCrypto_aeadDecrypt(
     const char* config,
     char** out, unsigned int* outlen
 ) {
+    std::string handle = getOrCreateHandle(key, 32, "AES-GCM", {"encrypt", "decrypt"});
+
     auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
         val params = val::object();
         params.set("data", createUint8Array(data, datalen));
-        params.set("key", createUint8Array(key, 32));
+        params.set("key", handle);
         params.set("iv", createUint8Array(iv, 12));
         params.set("aad", createUint8Array(aad, aadlen));
         params.set("tag", createUint8Array(tag, taglen));
@@ -304,6 +352,8 @@ int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* s
         return 1;
     }
 }
+
+// privmxDrvCrypto_importKey and privmxDrvCrypto_unregisterKey are now internal only.
 
 int privmxDrvCrypto_freeMem(void* ptr) {
     free(ptr);

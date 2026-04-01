@@ -48,7 +48,7 @@ export class KeyStore {
         return this._keys.has(keyId);
     }
 
-    async getEncriptionKey(): Promise<CryptoKey> {
+    async getEncryptionKey(): Promise<CryptoKey> {
         if (!this._encryptionKeyId) {
             throw new Error("No encryption key set.");
         }

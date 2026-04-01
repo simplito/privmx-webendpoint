@@ -13,7 +13,10 @@ export function toArrayBuffer(buffer: Uint8Array | ArrayBuffer): ArrayBuffer {
     if (buffer instanceof ArrayBuffer) {
         return buffer;
     }
-    return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+    return (buffer.buffer as ArrayBuffer).slice(
+        buffer.byteOffset,
+        buffer.byteOffset + buffer.byteLength,
+    );
 }
 
 export function toBuffer(byteArray: ArrayBuffer | Uint8Array): Uint8Array {
@@ -21,4 +24,15 @@ export function toBuffer(byteArray: ArrayBuffer | Uint8Array): Uint8Array {
         return byteArray;
     }
     return new Uint8Array(byteArray);
+}
+
+export function randomString(len: number): string {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let result = "";
+    const randomValues = new Uint8Array(len);
+    globalThis.crypto.getRandomValues(randomValues);
+    for (let i = 0; i < len; i++) {
+        result += chars.charAt(randomValues[i] % chars.length);
+    }
+    return result;
 }
