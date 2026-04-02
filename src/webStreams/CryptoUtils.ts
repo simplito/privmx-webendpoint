@@ -1,7 +1,8 @@
-import { CryptoFacade, FacadeKeyRef } from "../crypto/CryptoFacade";
+import { CryptoFacade } from "../crypto/CryptoFacade";
 
 // Types for function parameters and return values
 type BufferLike = ArrayBuffer | Uint8Array;
+type CryptoMaterial = BufferLike | CryptoKey;
 
 interface EncryptionResult {
     success: true;
@@ -28,14 +29,16 @@ interface DecryptionError {
 type DecryptionResponse = DecryptionResult | DecryptionError;
 
 async function encryptWithAES256GCM(
-    key: FacadeKeyRef,
+    key: CryptoMaterial,
     iv: BufferLike,
     data: BufferLike,
     header: BufferLike,
 ): Promise<EncryptionResponse> {
     try {
+        const rawKey = await ensureRawKey(key);
+
         const encrypted = await CryptoFacade.aeadEncrypt(
-            key,
+            new Uint8Array(rawKey),
             new Uint8Array(iv),
             new Uint8Array(header),
             new Uint8Array(data),
@@ -54,12 +57,13 @@ async function encryptWithAES256GCM(
 }
 
 async function decryptWithAES256GCM(
-    key: FacadeKeyRef,
+    key: CryptoMaterial,
     iv: BufferLike,
     encryptedData: BufferLike,
     header: BufferLike,
 ): Promise<DecryptionResponse> {
     try {
+        const rawKey = await ensureRawKey(key);
         const fullBuffer = new Uint8Array(encryptedData);
         if (fullBuffer.length < 16) {
             throw new Error("Invalid encrypted data length (too short for tag)");
@@ -68,7 +72,7 @@ async function decryptWithAES256GCM(
         const tag = fullBuffer.slice(fullBuffer.length - 16);
 
         const decrypted = await CryptoFacade.aeadDecrypt(
-            key,
+            new Uint8Array(rawKey),
             new Uint8Array(iv),
             new Uint8Array(header),
             data,
@@ -96,6 +100,14 @@ function isDecryptionSuccess(result: DecryptionResponse): result is DecryptionRe
     return result.success;
 }
 
+async function ensureRawKey(key: CryptoMaterial): Promise<Uint8Array> {
+    if (key instanceof CryptoKey) {
+        const raw = await crypto.subtle.exportKey("raw", key);
+        return new Uint8Array(raw);
+    }
+    return new Uint8Array(key);
+}
+
 export {
     encryptWithAES256GCM,
     decryptWithAES256GCM,
@@ -104,5 +116,5 @@ export {
     type EncryptionResponse,
     type DecryptionResponse,
     type BufferLike,
-    type FacadeKeyRef as CryptoMaterial,
+    type CryptoMaterial,
 };

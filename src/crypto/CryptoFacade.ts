@@ -3,12 +3,9 @@ import * as Types from "./Types";
 
 /**
  * Accepted key type for CryptoFacade operations.
- * - `CryptoKey`: a WebCrypto key object
- * - `string`: a keyId referencing a key in the internal registry
- *
- * Raw `Uint8Array` keys are NOT accepted. Use `importKey()` first.
+ * Refer to Types.FacadeKeyRef for definition.
  */
-export type FacadeKeyRef = CryptoKey | string;
+export type FacadeKeyRef = Types.FacadeKeyRef;
 
 /**
  * A user-friendly Javascript facade for cryptographic operations
@@ -62,7 +59,6 @@ export class CryptoFacade {
         wipe?: boolean,
     ): Promise<ArrayBuffer> {
         CryptoFacade.assertKeyRef(key, "aes256CbcPkcs7Encrypt");
-        // @ts-ignore
         return getEmCrypto().aes256CbcPkcs7Encrypt({ key, iv, data, wipe });
     }
 
@@ -76,7 +72,6 @@ export class CryptoFacade {
         wipe?: boolean,
     ): Promise<ArrayBuffer> {
         CryptoFacade.assertKeyRef(key, "aes256CbcPkcs7Decrypt");
-        // @ts-ignore
         return getEmCrypto().aes256CbcPkcs7Decrypt({ key, iv, data, wipe });
     }
 
@@ -91,7 +86,6 @@ export class CryptoFacade {
         wipe?: boolean,
     ): Promise<ArrayBuffer> {
         CryptoFacade.assertKeyRef(key, "aeadEncrypt");
-        // @ts-ignore
         return getEmCrypto().aeadEncrypt({ key, iv, aad, data, wipe });
     }
 
@@ -107,7 +101,6 @@ export class CryptoFacade {
         wipe?: boolean,
     ): Promise<ArrayBuffer> {
         CryptoFacade.assertKeyRef(key, "aeadDecrypt");
-        // @ts-ignore
         return getEmCrypto().aeadDecrypt({ key, iv, aad, data, tag, wipe });
     }
 
@@ -168,7 +161,7 @@ export class CryptoFacade {
      */
     static async importKey(
         key: Uint8Array,
-        algo: any,
+        algo: AlgorithmIdentifier,
         usages: KeyUsage[],
         id?: string,
     ): Promise<string> {
@@ -189,7 +182,7 @@ export class CryptoFacade {
         if (key instanceof Uint8Array || key instanceof ArrayBuffer) {
             throw new TypeError(
                 `CryptoFacade.${method}: Raw key bytes are not allowed. ` +
-                    `Use CryptoFacade.importKey() first to obtain a keyId.`,
+                `Use CryptoFacade.importKey() first to obtain a keyId.`,
             );
         }
     }

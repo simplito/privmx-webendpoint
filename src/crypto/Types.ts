@@ -9,149 +9,151 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+export type FacadeKeyRef = string | Uint8Array | CryptoKey;
+
 export class RANDOM_BYTES_PARAMS {
     length: number = 0;
 }
 
 export class HMAC_PARAMS {
-    engine: string = undefined!;
-    key: Uint8Array | CryptoKey | string = undefined!;
-    data: Uint8Array = undefined!;
+    engine: string;
+    key: FacadeKeyRef;
+    data: Uint8Array;
 }
 
 export class SHA_PARAMS {
-    data: Uint8Array = undefined!;
+    data: Uint8Array;
 }
 
 export class RIPEMD160_PARAMS {
-    data: Uint8Array = undefined!;
+    data: Uint8Array;
 }
 
 export class HASH160_PARAMS {
-    data: Uint8Array = undefined!;
+    data: Uint8Array;
 }
 
 export class AES256ECB_PARAMS {
-    data: Uint8Array = undefined!;
-    key: Uint8Array | CryptoKey | string = undefined!;
+    data: Uint8Array;
+    key: FacadeKeyRef;
 }
 
 export class Aes256CbcPkcs7_PARAMS {
-    data: Uint8Array = undefined!;
-    key: Uint8Array | CryptoKey | string = undefined!;
-    iv: Uint8Array = undefined!;
-    wipe: boolean = false;
+    data: Uint8Array;
+    key: FacadeKeyRef;
+    iv: Uint8Array;
+    wipe?: boolean;
 }
 
 export class Prf_tls12_PARAMS {
-    key: Uint8Array | CryptoKey | string = undefined!;
-    seed: Uint8Array = undefined!;
+    key: FacadeKeyRef;
+    seed: Uint8Array;
     length: number = 0;
 }
 
 export class Kdf_PARAMS {
     length: number = 0;
-    key: Uint8Array | CryptoKey | string = undefined!;
-    label: string = undefined!;
+    key: FacadeKeyRef;
+    label: string;
 }
 
 export class GenerateIv_PARAMS {
-    key: Uint8Array | CryptoKey | string = undefined!;
+    key: FacadeKeyRef;
     idx: number = 0;
 }
 
 export class Aes256CbcPkcs7Encrypt_PARAMS {
-    data: Uint8Array = undefined!;
-    key: Uint8Array | CryptoKey | string = undefined!;
-    iv: Uint8Array = undefined!;
+    data: Uint8Array;
+    key: FacadeKeyRef;
+    iv: Uint8Array;
     taglen: number = 0;
-    wipe: boolean = false;
+    wipe?: boolean;
 }
 
 export class Aes256CbcPkcs7Decrypt_PARAMS {
-    data: Uint8Array = undefined!;
-    key: Uint8Array | CryptoKey | string = undefined!;
+    data: Uint8Array;
+    key: FacadeKeyRef;
     taglen: number = 0;
-    wipe: boolean = false;
+    wipe?: boolean;
 }
 
 export class FromPublicOrPrivateKey_PARAMS {
-    key: Uint8Array = undefined!;
+    key: Uint8Array;
 }
 
 export class Sign_PARAMS {
-    privateKey: Uint8Array | CryptoKey | string = undefined!;
-    data: Uint8Array = undefined!;
+    privateKey: FacadeKeyRef;
+    data: Uint8Array;
 }
 
 export class Verify_PARAMS {
-    publicKey: Uint8Array = undefined!;
-    data: Uint8Array = undefined!;
-    signature: Uint8Array = undefined!;
+    publicKey: Uint8Array;
+    data: Uint8Array;
+    signature: Uint8Array;
 }
 
 export class Verify2_PARAMS {
-    publicKey: Uint8Array = undefined!;
-    data: Uint8Array = undefined!;
-    r: Uint8Array = undefined!;
-    s: Uint8Array = undefined!;
+    publicKey: Uint8Array;
+    data: Uint8Array;
+    r: Uint8Array;
+    s: Uint8Array;
 }
 
 export class Derive_PARAMS {
-    privateKey: Uint8Array | CryptoKey | string = undefined!;
-    publicKey: Uint8Array = undefined!;
+    privateKey: FacadeKeyRef;
+    publicKey: Uint8Array;
 }
 
 export class PBKDF2_PARAMS {
-    password: string | CryptoKey = undefined!;
-    salt: string = undefined!;
+    password: string | CryptoKey;
+    salt: string;
     rounds: number = 0;
     length: number = 0;
-    hash: string = undefined!;
+    hash: string;
 }
 
 export class GetBitsLength_PARAMS {
-    bn: Uint8Array = undefined!;
+    bn: Uint8Array;
 }
 
 export class BNumod_PARAMS {
-    bn: Uint8Array = undefined!;
-    bn2: Uint8Array = undefined!;
+    bn: Uint8Array;
+    bn2: Uint8Array;
 }
 
 export class BNeq_PARAMS {
-    bn: Uint8Array = undefined!;
-    bn2: Uint8Array = undefined!;
+    bn: Uint8Array;
+    bn2: Uint8Array;
 }
 
 export class PointEncode_PARAMS {
-    point: Uint8Array = undefined!;
-    compact: boolean = false;
+    point: Uint8Array;
+    compact: boolean;
 }
 
 export class PointMul_PARAMS {
-    point: Uint8Array = undefined!;
-    bn: Uint8Array = undefined!;
+    point: Uint8Array;
+    bn: Uint8Array;
 }
 
 export class PointAdd_PARAMS {
-    point: Uint8Array = undefined!;
-    point2: Uint8Array = undefined!;
+    point: Uint8Array;
+    point2: Uint8Array;
 }
 
 export class AeadEncrypt_PARAMS {
-    key: Uint8Array | CryptoKey | string = undefined!;
-    iv: Uint8Array = undefined!;
-    aad: Uint8Array = undefined!;
-    data: Uint8Array = undefined!;
-    wipe: boolean = false;
+    key: FacadeKeyRef;
+    iv: Uint8Array;
+    aad: Uint8Array;
+    data: Uint8Array;
+    wipe?: boolean;
 }
 
 export class AeadDecrypt_PARAMS {
-    key: Uint8Array | CryptoKey | string = undefined!;
-    iv: Uint8Array = undefined!;
-    aad: Uint8Array = undefined!;
-    data: Uint8Array = undefined!;
-    tag: Uint8Array = undefined!;
-    wipe: boolean = false;
+    key: FacadeKeyRef;
+    iv: Uint8Array;
+    aad: Uint8Array;
+    data: Uint8Array;
+    tag: Uint8Array;
+    wipe?: boolean;
 }

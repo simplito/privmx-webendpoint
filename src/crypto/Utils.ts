@@ -13,10 +13,7 @@ export function toArrayBuffer(buffer: Uint8Array | ArrayBuffer): ArrayBuffer {
     if (buffer instanceof ArrayBuffer) {
         return buffer;
     }
-    return (buffer.buffer as ArrayBuffer).slice(
-        buffer.byteOffset,
-        buffer.byteOffset + buffer.byteLength,
-    );
+    return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
 }
 
 export function toBuffer(byteArray: ArrayBuffer | Uint8Array): Uint8Array {
@@ -26,12 +23,12 @@ export function toBuffer(byteArray: ArrayBuffer | Uint8Array): Uint8Array {
     return new Uint8Array(byteArray);
 }
 
-export function randomString(len: number): string {
+export function randomString(length: number): string {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let result = "";
-    const randomValues = new Uint8Array(len);
+    const randomValues = new Uint8Array(length);
     globalThis.crypto.getRandomValues(randomValues);
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < length; i++) {
         result += chars.charAt(randomValues[i] % chars.length);
     }
     return result;

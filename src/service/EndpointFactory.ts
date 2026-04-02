@@ -33,7 +33,6 @@ import { StoreApi } from "./StoreApi";
 import { StreamApi } from "./StreamApi";
 import { ThreadApi } from "./ThreadApi";
 import { setGlobalEmCrypto } from "../crypto/index";
-import { CryptoFacade } from "../crypto/CryptoFacade";
 
 /**
  * //doc-gen:ignore
@@ -47,7 +46,6 @@ export class EndpointFactory {
     private static api: Api;
     private static eventQueueInstance: EventQueue;
     private static assetsBasePath: string;
-    public static CryptoFacade = CryptoFacade;
 
     /**
      * Load the Endpoint's WASM assets and initialize the Endpoint library.
