@@ -341,4 +341,78 @@ test.describe("CryptoTest", () => {
             expect(result.chainCodeHex).toEqual(BIP39_DATA.chainCode_withPassword_hex);
         }
     });
+
+    test("Stale Handle Recovery - Driver Level", async ({ page }) => {
+        const result = await page.evaluate(async () => {
+            const cryptoApi = await window.Endpoint.createCryptoApi();
+            const key = new Uint8Array(32).fill(11);
+            const data = new Uint8Array([1, 2, 3]);
+
+            // 1. First call - populates driver-side cache and JS registry
+            await cryptoApi.encryptDataSymmetric(data, key);
+
+            // 2. Simulate manual cleanup in JS (as if from CryptoFacade)
+            // C++ driver still has the handle in its keyToHandleMap.
+            const emCrypto = (window as any).em_crypto;
+            const keys = emCrypto.keys;
+            const lastId = Array.from(keys.keys()).pop() as string;
+            emCrypto.unregisterKey({ id: lastId });
+
+            // 3. Second call - C++ uses cached handle, JS throws 'not found', C++ retries.
+            const enc2 = await cryptoApi.encryptDataSymmetric(data, key);
+            return { enc2: Array.from(enc2) };
+        });
+        expect(result.enc2).toBeDefined();
+    });
+
+    test("Stale Handle Recovery - Facade Level", async ({ page }) => {
+        const result = await page.evaluate(async () => {
+            const cryptoApi = await window.Endpoint.createCryptoApi();
+            const cryptoFacade = (window as any).Endpoint.CryptoFacade;
+            const key = new Uint8Array(32).fill(14); // Change key to avoid cache collision
+            const data = new Uint8Array([7, 8, 9]);
+
+            // 1. First call - populates driver-side cache and JS registry
+            await cryptoApi.encryptDataSymmetric(data, key);
+
+            // 2. Unregister via Facade (official public API)
+            const emCrypto = (window as any).em_crypto;
+            const handle = Array.from(emCrypto.keys.keys()).pop() as string;
+
+            await cryptoFacade.unregisterKey(handle);
+
+            // 3. Second call via WASM - should trigger retry in C++ driver
+            const enc2 = await cryptoApi.encryptDataSymmetric(data, key);
+            return { enc2: Array.from(enc2) };
+        });
+        expect(result.enc2).toBeDefined();
+    });
+
+    test("Concurrency Stress Test - 1000 parallel AES encrypt/decrypt cycles", async ({ page }) => {
+        const result = await page.evaluate(async () => {
+            const cryptoApi = await window.Endpoint.createCryptoApi();
+            const key = new Uint8Array(32).fill(12);
+            const originalText = "concurrency-check-123";
+            const data = new TextEncoder().encode(originalText);
+
+            // 1. Parallel Encryption
+            const encPromises = [];
+            for (let i = 0; i < 1000; i++) {
+                encPromises.push(cryptoApi.encryptDataSymmetric(data, key));
+            }
+            const ciphertexts = await Promise.all(encPromises);
+
+            // 2. Parallel Decryption
+            const decPromises = ciphertexts.map((ct) => cryptoApi.decryptDataSymmetric(ct, key));
+            const decryptedBuffers = await Promise.all(decPromises);
+
+            // 3. Verification
+            const decoder = new TextDecoder();
+            const allMatch = decryptedBuffers.every((buf) => decoder.decode(buf) === originalText);
+
+            return { count: decryptedBuffers.length, allMatch };
+        });
+        expect(result.count).toBe(1000);
+        expect(result.allMatch).toBe(true);
+    });
 });

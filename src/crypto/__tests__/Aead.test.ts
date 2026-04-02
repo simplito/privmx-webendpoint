@@ -68,4 +68,18 @@ describe("AEAD (AES-GCM) Tests", () => {
             CryptoFacade.aeadDecrypt(key, iv, wrongAad, ciphertext, tag),
         ).rejects.toThrow();
     });
+
+    it("should encrypt and decrypt large data buffers (1MB)", async () => {
+        const key = new Uint8Array(32).fill(9);
+        const iv = new Uint8Array(12).fill(10);
+        const aad = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+        const data = new Uint8Array(1024 * 1024).fill(0xaa);
+
+        const encrypted = await CryptoFacade.aeadEncrypt(key, iv, aad, data);
+        const ciphertext = new Uint8Array(encrypted).slice(0, data.length);
+        const tag = new Uint8Array(encrypted).slice(data.length);
+
+        const decrypted = await CryptoFacade.aeadDecrypt(key, iv, aad, ciphertext, tag);
+        expect(new Uint8Array(decrypted)).toEqual(data);
+    });
 });
