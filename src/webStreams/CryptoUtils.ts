@@ -1,8 +1,7 @@
-import { CryptoFacade } from "../crypto/CryptoFacade";
+import { CryptoFacade, FacadeKeyRef } from "../crypto/CryptoFacade";
 
 // Types for function parameters and return values
 type BufferLike = ArrayBuffer | Uint8Array;
-type CryptoMaterial = BufferLike | CryptoKey;
 
 interface EncryptionResult {
     success: true;
@@ -29,15 +28,14 @@ interface DecryptionError {
 type DecryptionResponse = DecryptionResult | DecryptionError;
 
 async function encryptWithAES256GCM(
-    key: CryptoMaterial,
+    key: FacadeKeyRef,
     iv: BufferLike,
     data: BufferLike,
     header: BufferLike,
 ): Promise<EncryptionResponse> {
     try {
-        const cryptKey = key instanceof ArrayBuffer ? new Uint8Array(key) : key;
         const encrypted = await CryptoFacade.aeadEncrypt(
-            cryptKey,
+            key,
             new Uint8Array(iv),
             new Uint8Array(header),
             new Uint8Array(data),
@@ -56,7 +54,7 @@ async function encryptWithAES256GCM(
 }
 
 async function decryptWithAES256GCM(
-    key: CryptoMaterial,
+    key: FacadeKeyRef,
     iv: BufferLike,
     encryptedData: BufferLike,
     header: BufferLike,
@@ -69,9 +67,8 @@ async function decryptWithAES256GCM(
         const data = fullBuffer.slice(0, fullBuffer.length - 16);
         const tag = fullBuffer.slice(fullBuffer.length - 16);
 
-        const cryptKey = key instanceof ArrayBuffer ? new Uint8Array(key) : key;
         const decrypted = await CryptoFacade.aeadDecrypt(
-            cryptKey,
+            key,
             new Uint8Array(iv),
             new Uint8Array(header),
             data,
@@ -107,5 +104,5 @@ export {
     type EncryptionResponse,
     type DecryptionResponse,
     type BufferLike,
-    type CryptoMaterial,
+    type FacadeKeyRef as CryptoMaterial,
 };

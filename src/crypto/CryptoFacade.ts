@@ -2,8 +2,20 @@ import { getEmCrypto } from "./index";
 import * as Types from "./Types";
 
 /**
+ * Accepted key type for CryptoFacade operations.
+ * - `CryptoKey`: a WebCrypto key object
+ * - `string`: a keyId referencing a key in the internal registry
+ *
+ * Raw `Uint8Array` keys are NOT accepted. Use `importKey()` first.
+ */
+export type FacadeKeyRef = CryptoKey | string;
+
+/**
  * A user-friendly Javascript facade for cryptographic operations
  * backed by the internal EmCrypto WebCrypto/Polyfill implementations.
+ *
+ * All key parameters accept only `CryptoKey` or `string` (keyId).
+ * To use raw key bytes, first call `importKey()` to obtain a keyId.
  */
 export class CryptoFacade {
     /**
@@ -19,9 +31,10 @@ export class CryptoFacade {
      */
     static async hmac(
         engine: "sha1" | "sha256" | "sha512",
-        key: Uint8Array | CryptoKey | string,
+        key: FacadeKeyRef,
         data: Uint8Array,
     ): Promise<ArrayBuffer> {
+        CryptoFacade.assertKeyRef(key, "hmac");
         return getEmCrypto().hmac({ engine, key, data });
     }
 
@@ -43,11 +56,12 @@ export class CryptoFacade {
      * AES-256-CBC PKCS7 Encrypt.
      */
     static async aes256CbcPkcs7Encrypt(
-        key: Uint8Array | CryptoKey | string,
+        key: FacadeKeyRef,
         iv: Uint8Array,
         data: Uint8Array,
         wipe?: boolean,
     ): Promise<ArrayBuffer> {
+        CryptoFacade.assertKeyRef(key, "aes256CbcPkcs7Encrypt");
         // @ts-ignore
         return getEmCrypto().aes256CbcPkcs7Encrypt({ key, iv, data, wipe });
     }
@@ -56,11 +70,12 @@ export class CryptoFacade {
      * AES-256-CBC PKCS7 Decrypt.
      */
     static async aes256CbcPkcs7Decrypt(
-        key: Uint8Array | CryptoKey | string,
+        key: FacadeKeyRef,
         iv: Uint8Array,
         data: Uint8Array,
         wipe?: boolean,
     ): Promise<ArrayBuffer> {
+        CryptoFacade.assertKeyRef(key, "aes256CbcPkcs7Decrypt");
         // @ts-ignore
         return getEmCrypto().aes256CbcPkcs7Decrypt({ key, iv, data, wipe });
     }
@@ -69,12 +84,13 @@ export class CryptoFacade {
      * AES-256-GCM (AEAD) Encrypt.
      */
     static async aeadEncrypt(
-        key: Uint8Array | CryptoKey | string,
+        key: FacadeKeyRef,
         iv: Uint8Array,
         aad: Uint8Array,
         data: Uint8Array,
         wipe?: boolean,
     ): Promise<ArrayBuffer> {
+        CryptoFacade.assertKeyRef(key, "aeadEncrypt");
         // @ts-ignore
         return getEmCrypto().aeadEncrypt({ key, iv, aad, data, wipe });
     }
@@ -83,13 +99,14 @@ export class CryptoFacade {
      * AES-256-GCM (AEAD) Decrypt.
      */
     static async aeadDecrypt(
-        key: Uint8Array | CryptoKey | string,
+        key: FacadeKeyRef,
         iv: Uint8Array,
         aad: Uint8Array,
         data: Uint8Array,
         tag: Uint8Array,
         wipe?: boolean,
     ): Promise<ArrayBuffer> {
+        CryptoFacade.assertKeyRef(key, "aeadDecrypt");
         // @ts-ignore
         return getEmCrypto().aeadDecrypt({ key, iv, aad, data, tag, wipe });
     }
@@ -119,9 +136,10 @@ export class CryptoFacade {
      * Derive a shared secret using ECDH.
      */
     static async eccDerive(
-        privateKey: Uint8Array | CryptoKey | string,
+        privateKey: FacadeKeyRef,
         publicKey: Uint8Array,
     ): Promise<ArrayBuffer> {
+        CryptoFacade.assertKeyRef(privateKey, "eccDerive");
         return getEmCrypto().eccDerive({ privateKey, publicKey });
     }
 
@@ -129,9 +147,10 @@ export class CryptoFacade {
      * Sign data using ECDSA.
      */
     static async eccSign(
-        privateKey: Uint8Array | CryptoKey | string,
+        privateKey: FacadeKeyRef,
         data: Uint8Array,
     ): Promise<ArrayBuffer> {
+        CryptoFacade.assertKeyRef(privateKey, "eccSign");
         return getEmCrypto().eccSign({ privateKey, data });
     }
 
@@ -145,6 +164,7 @@ export class CryptoFacade {
 
     /**
      * Import a raw key into the registry and return its ID.
+     * This is the ONLY method that accepts raw Uint8Array key bytes.
      */
     static async importKey(
         key: Uint8Array,
@@ -160,5 +180,17 @@ export class CryptoFacade {
      */
     static unregisterKey(id: string): void {
         getEmCrypto().unregisterKey({ id });
+    }
+
+    /**
+     * Runtime guard: ensures that raw Uint8Array is never passed as a key.
+     */
+    private static assertKeyRef(key: FacadeKeyRef, method: string): void {
+        if (key instanceof Uint8Array || key instanceof ArrayBuffer) {
+            throw new TypeError(
+                `CryptoFacade.${method}: Raw key bytes are not allowed. ` +
+                    `Use CryptoFacade.importKey() first to obtain a keyId.`,
+            );
+        }
     }
 }

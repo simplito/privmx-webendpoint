@@ -10,17 +10,14 @@ interface StoredKey {
 
 export class KeyStore {
     private _keys: Map<string, StoredKey> = new Map<string, StoredKey>();
-    private _rawKeys: Map<string, Uint8Array> = new Map<string, Uint8Array>();
     private _encryptionKeyId: string = undefined;
 
     setKeys(keys: Key[]) {
         this._keys.clear();
-        this._rawKeys.clear();
         this._encryptionKeyId = undefined;
         for (const k of keys) {
             const rawKey = new Uint8Array(k.key);
             this.assertKeyBytes(rawKey);
-            this._rawKeys.set(k.keyId, rawKey);
             this._keys.set(k.keyId, {
                 keyId: k.keyId,
                 cryptoKey: crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, [
@@ -40,10 +37,6 @@ export class KeyStore {
         return key ? key.cryptoKey : undefined;
     }
 
-    getRawKey(keyId: string): Uint8Array | undefined {
-        return this._rawKeys.get(keyId);
-    }
-
     hasKey(keyId: string) {
         return this._keys.has(keyId);
     }
@@ -53,13 +46,6 @@ export class KeyStore {
             throw new Error("No encryption key set.");
         }
         return this._keys.get(this._encryptionKeyId).cryptoKey;
-    }
-
-    getRawEncryptionKey(): Uint8Array {
-        if (!this._encryptionKeyId) {
-            throw new Error("No encryption key set.");
-        }
-        return this._rawKeys.get(this._encryptionKeyId);
     }
 
     getEncryptionKeyId(): string {

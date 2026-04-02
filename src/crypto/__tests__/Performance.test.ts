@@ -6,22 +6,14 @@ describe("Crypto Performance Benchmarks", () => {
         setGlobalEmCrypto();
     });
 
-    it("should compare AEAD performance: raw bytes vs CryptoKey reuse", async () => {
+    it("should demonstrate CryptoKey reuse performance via importKey", async () => {
         const keyBytes = new Uint8Array(32).fill(1);
         const iv = new Uint8Array(12).fill(2);
         const aad = new Uint8Array([1, 2, 3, 4]);
         const data = new Uint8Array(1024).fill(0);
         const iterations = 500;
 
-        // 1. Raw Bytes (repeated import)
-        const startRaw = performance.now();
-        for (let i = 0; i < iterations; i++) {
-            await CryptoFacade.aeadEncrypt(keyBytes, iv, aad, data);
-        }
-        const endRaw = performance.now();
-        const rawTime = endRaw - startRaw;
-
-        // 2. CryptoKey reuse
+        // CryptoKey reuse via importKey
         const keyId = await CryptoFacade.importKey(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
         const startKey = performance.now();
         for (let i = 0; i < iterations; i++) {
@@ -31,28 +23,32 @@ describe("Crypto Performance Benchmarks", () => {
         const keyTime = endKey - startKey;
 
         console.log(`AEAD Performance (${iterations} iterations, 1KB data):`);
-        console.log(`Raw Bytes (import every time): ${rawTime.toFixed(2)}ms`);
         console.log(`CryptoKey Reuse (registry):    ${keyTime.toFixed(2)}ms`);
-        console.log(`Speedup:                       ${(rawTime / keyTime).toFixed(2)}x`);
+        console.log(`Avg per operation:             ${(keyTime / iterations).toFixed(3)}ms`);
 
-        expect(keyTime).toBeLessThan(rawTime);
+        // Should complete in reasonable time
+        expect(keyTime).toBeLessThan(30000);
 
         // Clean up
         CryptoFacade.unregisterKey(keyId);
     });
 
-    it("should verify Key Scrubbing (wipe) works", async () => {
+    it("should verify Key Scrubbing (wipe) works via internal EmCrypto path", async () => {
+        const { getEmCrypto } = require("../index");
+        const emCrypto = getEmCrypto();
+
         const keyBytes = new Uint8Array(32).fill(0xff);
         const iv = new Uint8Array(12).fill(0);
         const aad = new Uint8Array(0);
         const data = new Uint8Array(16).fill(0);
 
         // Check if all are 0xFF
-        expect(keyBytes.every((b) => b === 0xff)).toBe(true);
+        expect(keyBytes.every((b: number) => b === 0xff)).toBe(true);
 
-        await CryptoFacade.aeadEncrypt(keyBytes, iv, aad, data, true);
+        // Use internal EmCrypto directly (wipe is an internal feature)
+        await emCrypto.aeadEncrypt({ key: keyBytes, iv, aad, data, wipe: true });
 
         // Check if all are 0x00 now
-        expect(keyBytes.every((b) => b === 0)).toBe(true);
+        expect(keyBytes.every((b: number) => b === 0)).toBe(true);
     });
 });
