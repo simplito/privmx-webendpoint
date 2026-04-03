@@ -23,8 +23,7 @@ export class SearchApi extends BaseApi {
    * 
     * @param {string} contextId ID of the Context to create the Index in
     * @param {UserWithPubKey[]} users vector of UserWithPubKey structs which indicates who will have access to the created Index
-    * @param {UserWithPubKey[]} managers vector of UserWithPubKey structs which indicates who will have access 
-    * (and management rights) to the created Index
+    * @param {UserWithPubKey[]} managers vector of UserWithPubKey structs which indicates who will have access (and management rights) to the created Index
     * @param {Uint8Array} publicMeta public (unencrypted) metadata
     * @param {Uint8Array} privateMeta private (encrypted) metadata
     * @param {IndexMode} mode The operating mode of the Index, defining how document content is handled.
@@ -56,8 +55,7 @@ export class SearchApi extends BaseApi {
    * 
      * @param {string} indexId ID of the Index to update
      * @param {UserWithPubKey[]} users vector of UserWithPubKey structs which indicates who will have access to the Index
-     * @param {UserWithPubKey[]} managers vector of UserWithPubKey structs which indicates who will have access 
-     * (and management rights) to the Index
+     * @param {UserWithPubKey[]} managers vector of UserWithPubKey structs which indicates who will have access (and management rights) to the Index
      * @param {Uint8Array} publicMeta public (unencrypted) metadata
      * @param {Uint8Array} privateMeta private (encrypted) metadata
      * @param {number} version current version of the updated Index
