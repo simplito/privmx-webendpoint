@@ -21,6 +21,7 @@ limitations under the License.
 #include <privmx/endpoint/crypto/varinterface/ExtKeyVarInterface.hpp>
 #include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
 #include <privmx/endpoint/inbox/varinterface/InboxApiVarInterface.hpp>
+#include <privmx/endpoint/search/varinterface/SearchApiVarInterface.hpp>
 #include <privmx/endpoint/kvdb/varinterface/KvdbApiVarInterface.hpp>
 #include <privmx/endpoint/store/varinterface/StoreApiVarInterface.hpp>
 #include <privmx/endpoint/thread/varinterface/ThreadApiVarInterface.hpp>
@@ -48,6 +49,7 @@ using CryptoApiVar = privmx::endpoint::crypto::CryptoApiVarInterface;
 using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
 using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
 using StreamApiVar = privmx::endpoint::stream::StreamApiLowVarInterface;
+using SearchApiVar = privmx::endpoint::search::SearchApiVarInterface;
 
 using UserVerifierInterface = privmx::endpoint::core::UserVerifierInterface;
 using VerificationRequest = privmx::endpoint::core::VerificationRequest;
@@ -378,6 +380,35 @@ API_FUNCTION(StreamApi, buildSubscriptionQuery)
 API_FUNCTION(StreamApi, trickle)
 API_FUNCTION(StreamApi, acceptOfferOnReconfigure)
 API_FUNCTION(StreamApi, setNewOfferOnReconfigure)
+
+void SearchApi_newSearchApi(int taskId, int connectionPtr, int storeApiPtr, int kvdbApiPtr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, storeApiPtr, kvdbApiPtr]{
+        auto connection = (ConnectionVar*)connectionPtr;
+        auto storeApi = (StoreApiVar*)storeApiPtr;
+        auto kvdbApi = (KvdbApiVar*)kvdbApiPtr;
+        auto searchApi = new SearchApiVar(connection->getApi(), storeApi->getApi(), kvdbApi->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)searchApi;
+    });
+}
+void SearchApi_deleteSearchApi(int taskId, int ptr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
+        delete (SearchApiVar*)ptr;
+    });
+}
+API_FUNCTION(SearchApi, create)
+API_FUNCTION(SearchApi, createSearchIndex)
+API_FUNCTION(SearchApi, updateSearchIndex)
+API_FUNCTION(SearchApi, deleteSearchIndex)
+API_FUNCTION(SearchApi, getSearchIndex)
+API_FUNCTION(SearchApi, listSearchIndexes)
+API_FUNCTION(SearchApi, openSearchIndex)
+API_FUNCTION(SearchApi, closeSearchIndex)
+API_FUNCTION(SearchApi, addDocument)
+API_FUNCTION(SearchApi, updateDocument)
+API_FUNCTION(SearchApi, deleteDocument)
+API_FUNCTION(SearchApi, getDocument)
+API_FUNCTION(SearchApi, listDocuments)
+API_FUNCTION(SearchApi, searchDocuments)
 
 }  // namespace api
 }  // namespace webendpoint

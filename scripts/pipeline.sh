@@ -162,6 +162,7 @@ run_step "Build GMP Library" "$SCRIPT_PATH/build_gmp" $GMP
 run_step "Build POCO C++ Libraries" "$SCRIPT_PATH/build_poco" $POCO
 run_step "Build PSON C++ Library" "$SCRIPT_PATH/build_pson" $PSON_CPP
 run_step "Build secp256k1 Cryptography Library" "$SCRIPT_PATH/build_secp"
+run_step "Build SQLite Library" "$SCRIPT_PATH/build_sqlite"
 run_step "Build Async Engine" "$SCRIPT_PATH/build_async_engine"
 run_step "Build Web Browser Drivers" "$SCRIPT_PATH/build_webdrivers"
 run_step "Build PrivMX Endpoint Module" "$SCRIPT_PATH/build_privmx_endpoint" $PRIVMX_ENDPOINT

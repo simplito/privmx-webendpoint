@@ -673,6 +673,79 @@ export interface StreamPublishResult {
     };
 }
 
+
+// export namespace search {
+/*
+* Defines the mode in which the Search Index operates, specifically regarding 
+* the storage and retrieval of document content.
+* 
+* WITH_CONTENT - stores the full document content internally. 
+* WITHOUT_CONTENT - The Index only stores metadata and terms necessary for search, 
+* but discards the original document content.
+*/
+export enum IndexMode
+{
+    WITH_CONTENT,
+    WITHOUT_CONTENT
+};
+
+/**
+ * Holds all available information about a Search Index.
+ * 
+ * @type {SearchIndex}
+ * 
+ * @param {string} contextId ID of the Context
+ * @param {string} indexId ID of the Search Index
+ * @param {number} createDate Index creation timestamp
+ * @param {string} creator ID of user who created the Index
+ * @param {number} lastModificationDate Index last modification timestamp
+ * @param {string} lastModifier ID of the user who last modified the Index
+ * @param {string[]} users list of users (their IDs) with access to the Thread
+ * @param {string[]} managers list of users (their IDs) with management rights
+ * @param {number} version Version number (changes on updates)
+ * @param {Uint8Array} publicMeta Thread's public metadata
+ * @param {Uint8Array} privateMeta Thread's privateMeta metadata
+ * @param {ContainerPolicy} policy Thread's policies
+ * @param {IndexMode} mode The operating mode of the Index, defining how document content is handled.
+ * @param {number} statusCode status code of retrieval and decryption of the Thread
+ * @param {number} schemaVersion Version of the Search Index data structure and how it is encoded/encrypted
+ */
+export interface SearchIndex
+{
+    contextId: string;
+    indexId: string;
+    createDate: number;
+    creator: string;
+    lastModificationDate: number;
+    lastModifier: string;
+    users: string[];
+    managers: string[];
+    version: number;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    policy: ContainerPolicy;
+    mode: IndexMode;
+    statusCode: number;
+    schemaVersion: number;
+}
+
+/**
+ * An interface representing a document for indexing.
+ * 
+ * @type {Document}
+ * 
+ * @param {number} documentId Document ID
+ * @param {string} name Document name
+ * @param {string} content Document content
+ */
+export interface Document
+{
+    documentId: number,
+    name: string,
+    content: string
+};
+// }
+
 /**
  * Holds error details
  *

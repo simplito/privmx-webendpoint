@@ -10,6 +10,7 @@ import { Connection } from "./Connection";
 import { EventQueue } from "./EventQueue";
 import { BaseApi } from "./BaseApi";
 import { ExtKey } from "./ExtKey";
+import { SearchApi } from "./SearchApi";
 
 export {
     EndpointFactory,
@@ -19,6 +20,7 @@ export {
     KvdbApi,
     CryptoApi,
     StreamApi,
+    SearchApi,
     Connection,
     EventQueue,
     BaseApi,

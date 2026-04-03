@@ -32,6 +32,8 @@ import { KvdbApi } from "./KvdbApi";
 import { StoreApi } from "./StoreApi";
 import { StreamApi } from "./StreamApi";
 import { ThreadApi } from "./ThreadApi";
+import { SearchApi } from "./SearchApi";
+import { SearchApiNative } from "../api/SearchApiNative";
 
 /**
  * //doc-gen:ignore
@@ -323,5 +325,33 @@ export class EndpointFactory {
         connection.apisRefs["streams"] = { _apiServicePtr: ptr };
         connection.nativeApisDeps["streams"] = nativeApi;
         return new StreamApi(nativeApi, ptr, webRtcClient);
+    }
+
+    /**
+    * Creates an instance of the Search API.
+     *
+     * @param {Connection} connection instance of Connection
+     * @param {StoreApi} storeApi instance of ThreadApi
+     * @param {KvdbApi} kvdbApi instance of StoreApi
+     * @returns {SearchApi} instance of SearchApi
+     */
+    static async createSearchApi(
+        connection: Connection,
+        storeApi: StoreApi,
+        kvdbApi: KvdbApi
+    ): Promise<SearchApi> {
+        if ("searches" in connection.apisRefs) {
+            throw new Error("SearchApi already registered for given connection.");
+        }
+        const nativeApi = new SearchApiNative(this.api);
+        const ptr = await nativeApi.newApi(
+            connection.servicePtr,
+            storeApi.servicePtr,
+            kvdbApi.servicePtr
+        );
+        connection.apisRefs["searches"] = { _apiServicePtr: ptr };
+        connection.nativeApisDeps["searches"] = nativeApi;
+        await nativeApi.create(ptr, []);
+        return new SearchApi(nativeApi, ptr);
     }
 }

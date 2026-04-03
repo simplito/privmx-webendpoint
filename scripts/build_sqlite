@@ -1,0 +1,82 @@
+#!/bin/bash
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+
+source "$SCRIPT_PATH/config.sh"
+source "$EMSDK_DIR/emsdk_env.sh"
+
+# ---------------------------------------------------------
+# OS Detection and Host Compiler Configuration
+# ---------------------------------------------------------
+OS_NAME=$(uname -s)
+echo "Detected OS: $OS_NAME"
+
+if [ "$OS_NAME" = "Darwin" ]; then
+    SDK_PATH=$(xcrun --show-sdk-path)
+    export CC_FOR_BUILD="/usr/bin/clang"
+    export CPPFLAGS_FOR_BUILD="-I${SDK_PATH}/usr/include"
+    export CFLAGS_FOR_BUILD="-W"
+    echo "  > Configured for macOS: SDK at $SDK_PATH"
+elif [ "$OS_NAME" = "Linux" ]; then
+    export CC_FOR_BUILD="/usr/bin/cc"
+    export CPPFLAGS_FOR_BUILD=""
+    export CFLAGS_FOR_BUILD=""
+    echo "  > Configured for Linux: Using /usr/bin/cc"
+else
+    echo "Error: Unsupported Operating System: $OS_NAME"
+    exit 1
+fi
+# ---------------------------------------------------------
+
+VERSION=3500400
+SQLITE_DIR="$SOURCE_DIR/sqlite-src-${VERSION}"
+ZIP="sqlite.zip"
+
+if [ -d "$SQLITE_DIR" ]; then
+    echo "$SQLITE_DIR directory exists. Skip download of sources."
+else
+    echo "$SQLITE_DIR directory does not exist. Get sources..."
+    cd "$SOURCE_DIR"
+    curl -fL "https://sqlite.org/2025/sqlite-src-${VERSION}.zip" -o "$ZIP"
+    unzip -q "$ZIP"
+fi
+
+cd "$SQLITE_DIR"
+
+if [ ! -d build-emscripten ]; then
+    mkdir -p build-emscripten
+    cd build-emscripten
+
+    echo "Running Configure..."
+    emconfigure ../configure \
+        --host=none \
+        --prefix="$SYSROOT_DIR" \
+        --fts5 \
+        CFLAGS="-O3 -pthread" \
+        CC_FOR_BUILD="$CC_FOR_BUILD" \
+        CPPFLAGS_FOR_BUILD="$CPPFLAGS_FOR_BUILD" \
+        CFLAGS_FOR_BUILD="$CFLAGS_FOR_BUILD"
+else
+    cd build-emscripten
+fi
+
+echo "Running Make..."
+emmake make -j20
+
+# ---------------------------------------------------------
+# Manual install step (SQLite-specific, OS-independent)
+# ---------------------------------------------------------
+echo "Installing SQLite artifacts into sysroot..."
+
+mkdir -p "$SYSROOT_DIR/lib" "$SYSROOT_DIR/include"
+
+cp libsqlite3.a "$SYSROOT_DIR/lib/"
+cp sqlite3.h "$SYSROOT_DIR/include/"
+
+echo "Installed:"
+echo "  $SYSROOT_DIR/lib/libsqlite3.a"
+echo "  $SYSROOT_DIR/include/sqlite3.h"
+# ---------------------------------------------------------
+
+echo "Build Complete."
