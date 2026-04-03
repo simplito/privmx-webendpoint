@@ -367,6 +367,8 @@ API_FUNCTION(StreamApi, unpublishStream)
 API_FUNCTION(StreamApi, joinStreamRoom)
 API_FUNCTION(StreamApi, listStreams)
 API_FUNCTION(StreamApi, leaveStreamRoom)
+API_FUNCTION(StreamApi, enableStreamRoomRecording)
+API_FUNCTION(StreamApi, getStreamRoomRecordingKeys)
 
 API_FUNCTION(StreamApi, subscribeToRemoteStreams)
 API_FUNCTION(StreamApi, modifyRemoteStreamsSubscriptions)
@@ -379,6 +381,7 @@ API_FUNCTION(StreamApi, unsubscribeFrom)
 API_FUNCTION(StreamApi, buildSubscriptionQuery)
 API_FUNCTION(StreamApi, trickle)
 API_FUNCTION(StreamApi, acceptOfferOnReconfigure)
+API_FUNCTION(StreamApi, setNewOfferOnReconfigure)
 
 void SearchApi_newSearchApi(int taskId, int connectionPtr, int storeApiPtr, int kvdbApiPtr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, storeApiPtr, kvdbApiPtr]{

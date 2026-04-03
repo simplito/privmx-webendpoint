@@ -1,6 +1,6 @@
 {
   "name": "@simplito/privmx-webendpoint",
-  "version": "2.7.0-beta11",
+  "version": "2.7.4",
   "description": "PrivMX Web Endpoint library",
   "author": "Simplito",
   "license": "PrivMX Free License",
@@ -39,7 +39,6 @@
   "scripts": {
     "clean": "rm -rf ./dist",
     "test": "jest src",
-    
     "build": "npm run clean && npm run build:wasm && npm run build:js && scripts/move_wasm_assets",
     "build:wasm": "scripts/pipeline.sh",
     "build:js": "npm run compile && npm run bundle && npm run build:worker && cp ./dist/assets/* ./assets/ && cp ./dist/bundle/rms-processor.js ./assets/",
@@ -47,7 +46,8 @@
     "compile": "tsc",
     "bundle": "webpack",
     "watch:types": "tsc -w",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test --project=chromium",
+    "test:e2e:manybrowsers": "playwright test",
     "lint": "eslint -c eslint.config.mjs .",
     "format": "prettier --write '{src,tests}/**/*.{ts,tsx,css,md}'",
     "format:clang": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format -i",
@@ -81,8 +81,8 @@
     "assert": "^2.1.0",
     "babel-jest": "^29.7.0",
     "buffer": "^6.0.3",
-    "copy-webpack-plugin": "^13.0.1",
-    "crypto-browserify": "^3.12.0",
+    "copy-webpack-plugin": "^14.0.0",
+    "crypto-browserify": "^3.3.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-indent-empty-lines": "^1.0.2",

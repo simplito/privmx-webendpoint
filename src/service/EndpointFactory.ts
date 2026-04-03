@@ -50,36 +50,50 @@ export class EndpointFactory {
     private static eventQueueInstance: EventQueue;
     private static assetsBasePath: string;
 
-    public static debugCall() {
-        const origWait = Atomics.wait;
-        Atomics.wait = (typedArray: any, index, value: any, timeout) => {
-            console.log("Atomics.wait", {
-                index,
-                value,
-                timeout,
-                stack: new Error().stack,
-            });
-            return origWait(typedArray, index, value, timeout);
-        };
-    }
-
     /**
      * Load the Endpoint's WASM assets and initialize the Endpoint library.
      *
      * @param {string} [assetsBasePath] base path/url to the Endpoint's WebAssembly assets (like: endpoint-wasm-module.js, driver-web-context.js and others)
      */
     public static async setup(assetsBasePath?: string): Promise<void> {
-        const basePath =
-            assetsBasePath ||
-            (document.currentScript as HTMLScriptElement).src.split("/").slice(0, -1).join("/");
+        const basePath = this.resolveAssetsBasePath(assetsBasePath);
         this.assetsBasePath = basePath;
-        console.log("DEBUG assetsPath (1)", this.assetsBasePath);
+
         const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
+
         for (const asset of assets) {
-            await this.loadScript(basePath + "/" + asset);
+            await this.loadScript(this.buildAssetUrl(basePath, asset));
         }
+
         const lib = await endpointWasmModule();
         EndpointFactory.init(lib);
+    }
+
+    private static resolveAssetsBasePath(assetsBasePath?: string): string {
+        if (assetsBasePath != null) {
+            return this.normalizeBasePath(assetsBasePath);
+        }
+        return "/";
+    }
+
+    private static normalizeBasePath(path: string): string {
+        const trimmed = path.trim();
+        if (trimmed === "" || trimmed === "/") {
+            return "/";
+        }
+        if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(trimmed)) {
+            return trimmed.replace(/\/+$/, "");
+        }
+        const resolved = new URL(trimmed.replace(/\/+$/, "") + "/", document.baseURI).href;
+        return resolved.replace(/\/+$/, "");
+    }
+
+    private static buildAssetUrl(basePath: string, asset: string): string {
+        const fileName = asset.replace(/^\/+/, "");
+        if (basePath === "/") {
+            return `/${fileName}`;
+        }
+        return new URL(fileName, basePath.endsWith("/") ? basePath : `${basePath}/`).href;
     }
 
     private static async loadScript(url: string): Promise<void> {

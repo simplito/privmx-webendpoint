@@ -48,10 +48,9 @@ export class Queue<T> implements Iterable<T> {
         }
         this.processing = true;
         while (this.items.length > 0) {
-            const item = this.items.shift(); // bierz pierwszy i usuwaj go z kolejki
+            const item = this.items.shift();
             if (!item) continue;
             const randId = Math.random();
-            console.log("Processing started.. randId:", randId);
             try {
                 await this.func(item);
                 await this.awaiter();

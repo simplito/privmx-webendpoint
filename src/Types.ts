@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { ExtKey } from "./service/ExtKey";
-import { StreamRoomId } from "./webStreams/types/ApiTypes";
+import * as StreamsApiTypes from "./webStreams/types/ApiTypes";
 
 // export namespace core {
 export type SortOrder = "desc" | "asc";
@@ -623,6 +623,10 @@ export interface ItemPolicy {
     delete?: PolicyEntry;
 }
 
+export type StreamId = StreamsApiTypes.StreamId;
+export type StreamRoomId = StreamsApiTypes.StreamRoomId;
+export type StreamHandle = number & { _streamHandle: never };
+
 export interface StreamRoom {
     contextId: string;
     streamRoomId: string;
@@ -637,6 +641,7 @@ export interface StreamRoom {
     privateMeta: Uint8Array;
     policy: ContainerPolicy;
     statusCode: number;
+    closed: boolean;
 }
 
 export interface StreamInfo {
@@ -667,9 +672,6 @@ export interface StreamPublishResult {
         userId: string;
     };
 }
-
-/** reserved for future use */
-export interface StreamSettings {}
 
 // export namespace search {
 /*
@@ -884,12 +886,12 @@ export interface TurnCredentials {
     expirationTime: number;
 }
 
-export interface StreamSettings {
-    settings: any;
-    onRemoteTrack: (track: RTCTrackEvent) => void;
+export interface RemoteStreamListener {
+    streamRoomId: StreamRoomId;
+    streamId?: StreamId;
+    onRemoteStreamTrack?: (event: RTCTrackEvent) => void;
+    onRemoteData?: (data: Uint8Array, statusCode: number) => void;
 }
-
-export type StreamHandle = number & { _streamHandle: never };
 
 /**
  * PKI Verification options
@@ -1012,3 +1014,40 @@ export type CollectionChangedEventData = {
     affectedItemsCount: number;
     items: CollectionItemChange[];
 };
+
+export interface RecordingEncKey {
+    id: Uint8Array;
+    key: Uint8Array;
+}
+
+export enum DataChannelCryptorDecryptStatus {
+    /** No error */
+    OK = 0x0000,
+
+    /** Frame too short */
+    FRAME_TOO_SHORT = 0x1001,
+
+    /** Unsupported protocol version */
+    UNSUPPORTED_VERSION = 0x1002,
+
+    /** Invalid IV length */
+    INVALID_IV_LENGTH = 0x1003,
+
+    /** Truncated frame */
+    FRAME_TRUNCATED = 0x1004,
+
+    /** Invalid key ID */
+    INVALID_KEY_ID = 0x1005,
+
+    /** Encryption key not found */
+    KEY_NOT_FOUND = 0x1006,
+
+    /** Invalid encryption key length */
+    INVALID_KEY_LENGTH = 0x1007,
+
+    /** Decryption failed (authentication error) */
+    DECRYPT_AUTH_FAILED = 0x1008,
+
+    /** Invalid data sequence number */
+    INVALID_DATA_SEQUENCE = 0x1009,
+}

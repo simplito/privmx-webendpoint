@@ -192,6 +192,8 @@ API_FUNCTION_HEADER(StreamApi, unpublishStream)
 API_FUNCTION_HEADER(StreamApi, joinStreamRoom)
 API_FUNCTION_HEADER(StreamApi, listStreams)
 API_FUNCTION_HEADER(StreamApi, leaveStreamRoom)
+API_FUNCTION_HEADER(StreamApi, enableStreamRoomRecording)
+API_FUNCTION_HEADER(StreamApi, getStreamRoomRecordingKeys)
 
 API_FUNCTION_HEADER(StreamApi, subscribeToRemoteStreams)
 API_FUNCTION_HEADER(StreamApi, modifyRemoteStreamsSubscriptions)
@@ -204,6 +206,7 @@ API_FUNCTION_HEADER(StreamApi, unsubscribeFrom)
 API_FUNCTION_HEADER(StreamApi, buildSubscriptionQuery)
 API_FUNCTION_HEADER(StreamApi, trickle)
 API_FUNCTION_HEADER(StreamApi, acceptOfferOnReconfigure)
+API_FUNCTION_HEADER(StreamApi, setNewOfferOnReconfigure)
 
 void SearchApi_newSearchApi(int taskId, int connectionPtr, int storePtr, int kvdbPtr);
 void SearchApi_deleteSearchApi(int taskId, int ptr);

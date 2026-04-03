@@ -24,6 +24,14 @@ int privmxDrvCrypto_md(const char* data, int datalen, const char* config, char**
 int privmxDrvCrypto_hmac(const char* key, unsigned int keylen, const char* data, int datalen, const char* config, char** out, unsigned int* outlen);
 int privmxDrvCrypto_aesEncrypt(const char* key, const char* iv, const char* data, unsigned int datalen, const char* config, char** out, unsigned int* outlen);
 int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data, unsigned int datalen, const char* config, char** out, unsigned int* outlen);
+int privmxDrvCrypto_aeadEncrypt(
+    const char* key,const char* iv, const char* aad, unsigned int aadlen, const char* data, unsigned int datalen, const char* config,
+    char** out, unsigned int* outlen, char** tag, unsigned int* taglen
+);
+int privmxDrvCrypto_aeadDecrypt(
+    const char* key, const char* iv, const char* aad, unsigned int aadlen, const char* data, unsigned int datalen, const char* tag, unsigned int taglen,
+        const char* config, char** out, unsigned int* outlen
+);
 int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* salt, unsigned int saltlen, int rounds, unsigned int length, const char* hash, char** out, unsigned int* outlen);
 int privmxDrvCrypto_freeMem(void* ptr);
 

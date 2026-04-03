@@ -33,8 +33,6 @@ export interface VideoStream {
     id: string;
 }
 
-export type RemoteStreamListener = (stream: RTCTrackEvent) => void;
-
 export type PluginHandleId = number & { _pluginHandleId: never };
 export type PluginId = string & { _pluginId: never };
 export type SessionId = number & { _sessionId: never };
@@ -67,5 +65,5 @@ export interface RTCEncodedStream {
 export interface QueueItem {
     taskId: number;
     _room: StreamRoomId;
-    offer: any;
+    jsep?: { sdp: string; type: string };
 }
