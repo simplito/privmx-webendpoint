@@ -55,9 +55,9 @@ export class WebRtcClient {
     public uniqId: string;
     private e2eeWorker: Worker | undefined;
     private webWorkerApi: WebWorker;
+    private keyStore: KeyStore = new KeyStore();
 
     private configuration: RTCConfiguration | undefined;
-    private keyStore: KeyStore = new KeyStore();
 
     private publishStreamHandle: StreamHandle;
 
@@ -110,7 +110,7 @@ export class WebRtcClient {
         });
 
         this.activeSpeakerDetector = new ActiveSpeakerDetector(DEFAULTS);
-        this.dataChannelCryptor = new DataChannelCryptor(this.getKeyStore());
+        this.dataChannelCryptor = new DataChannelCryptor(this.keyStore);
     }
 
     private async ensureLocalAudioLevelMeter(track: MediaStreamTrack) {
@@ -496,9 +496,6 @@ export class WebRtcClient {
         (await this.getWorkerApi()).setKeys(keys);
     }
 
-    getKeyStore(): KeyStore {
-        return this.keyStore;
-    }
 
     private setupSenderTransform(videoSender: RTCRtpSender) {
         if ((window as any).RTCRtpScriptTransform) {

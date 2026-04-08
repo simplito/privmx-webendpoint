@@ -1,77 +1,74 @@
 import { Key } from "../Types";
+import { CryptoFacade } from "../crypto/CryptoFacade";
 
 const AES_GCM_KEY_LENGTH_BYTES = 32;
 
-interface StoredKey {
-    keyId: string;
-    cryptoKey: Promise<CryptoKey>;
-    type: number;
-}
-
 export class KeyStore {
-    private _keys: Map<string, StoredKey> = new Map<string, StoredKey>();
-    private _rawKeys: Map<string, Uint8Array> = new Map<string, Uint8Array>();
-    private _encryptionKeyId: string = undefined;
+    // Maps SHA-256 hex digest of raw key bytes -> registered keyId in CryptoFacade registry
+    private readonly keyHashRegistry = new Map<string, string>();
 
-    setKeys(keys: Key[]) {
-        this._keys.clear();
-        this._rawKeys.clear();
-        this._encryptionKeyId = undefined;
+    private readonly rawKeys = new Map<string, Uint8Array>();
+    private encryptionKeyId: string | undefined = undefined;
+
+    setKeys(keys: Key[]): void {
+        for (const id of this.rawKeys.keys()) {
+            CryptoFacade.unregisterKey(id);
+        }
+        this.rawKeys.clear();
+        this.keyHashRegistry.clear();
+        this.encryptionKeyId = undefined;
         for (const k of keys) {
             const rawKey = new Uint8Array(k.key);
-            this.assertKeyBytes(rawKey);
-            this._rawKeys.set(k.keyId, rawKey);
-            this._keys.set(k.keyId, {
-                keyId: k.keyId,
-                cryptoKey: crypto.subtle.importKey("raw", rawKey, { name: "AES-GCM" }, false, [
-                    "encrypt",
-                    "decrypt",
-                ]),
-                type: k.type,
-            });
+            if (rawKey.length !== AES_GCM_KEY_LENGTH_BYTES) {
+                throw new Error(`Invalid key length: ${rawKey.length}`);
+            }
+            this.rawKeys.set(k.keyId, rawKey);
+            CryptoFacade.importKey(rawKey, { name: "AES-GCM" }, ["encrypt", "decrypt"], k.keyId);
             if (k.type === 0) {
-                this._encryptionKeyId = k.keyId;
+                this.encryptionKeyId = k.keyId;
             }
         }
     }
 
-    async getKey(keyId: string): Promise<CryptoKey | undefined> {
-        const key = this._keys.get(keyId);
-        return key ? key.cryptoKey : undefined;
-    }
-
-    getRawKey(keyId: string): Uint8Array | undefined {
-        return this._rawKeys.get(keyId);
-    }
-
-    hasKey(keyId: string) {
-        return this._keys.has(keyId);
-    }
-
-    async getEncriptionKey(): Promise<CryptoKey> {
-        if (!this._encryptionKeyId) {
-            throw new Error("No encryption key set.");
-        }
-        return this._keys.get(this._encryptionKeyId).cryptoKey;
-    }
-
-    getRawEncryptionKey(): Uint8Array {
-        if (!this._encryptionKeyId) {
-            throw new Error("No encryption key set.");
-        }
-        return this._rawKeys.get(this._encryptionKeyId);
+    hasKey(keyId: string): boolean {
+        return this.rawKeys.has(keyId);
     }
 
     getEncryptionKeyId(): string {
-        if (!this._encryptionKeyId) {
+        if (!this.encryptionKeyId) {
             throw new Error("No encryption key set.");
         }
-        return this._encryptionKeyId;
+        return this.encryptionKeyId;
     }
 
-    private assertKeyBytes(keyBytes: Uint8Array): void {
-        if (keyBytes.length !== AES_GCM_KEY_LENGTH_BYTES) {
-            throw new Error(`Invalid key length: ${keyBytes.length}`);
+    getRawKey(keyId: string): Uint8Array | undefined {
+        return this.rawKeys.get(keyId);
+    }
+
+    getRawEncryptionKey(): Uint8Array {
+        if (!this.encryptionKeyId) {
+            throw new Error("No encryption key set.");
         }
+        return this.rawKeys.get(this.encryptionKeyId);
+    }
+
+    async importKeyIfAbsent(
+        key: Uint8Array,
+        algo: AlgorithmIdentifier,
+        usages: KeyUsage[],
+    ): Promise<string> {
+        const hashBuffer = await crypto.subtle.digest("SHA-256", key as unknown as BufferSource);
+        const keyHash = Array.from(new Uint8Array(hashBuffer))
+            .map(b => b.toString(16).padStart(2, "0"))
+            .join("");
+
+        const existing = this.keyHashRegistry.get(keyHash);
+        if (existing !== undefined) {
+            return existing;
+        }
+
+        const keyId = await CryptoFacade.importKey(key, algo, usages);
+        this.keyHashRegistry.set(keyHash, keyId);
+        return keyId;
     }
 }
