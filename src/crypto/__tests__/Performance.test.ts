@@ -41,18 +41,14 @@ describe("Crypto Performance Benchmarks", () => {
         CryptoFacade.unregisterKey(keyId);
     });
 
-    it("should verify Key Scrubbing (wipe) works", async () => {
+    it("should always wipe raw key bytes after use", async () => {
         const keyBytes = new Uint8Array(32).fill(0xff);
         const iv = new Uint8Array(12).fill(0);
         const aad = new Uint8Array(0);
         const data = new Uint8Array(16).fill(0);
 
-        // Check if all are 0xFF
         expect(keyBytes.every((b) => b === 0xff)).toBe(true);
-
-        await getEmCrypto().aeadEncrypt({ key: keyBytes, iv, aad, data, wipe: true });
-
-        // Check if all are 0x00 now
+        await getEmCrypto().aeadEncrypt({ key: keyBytes, iv, aad, data });
         expect(keyBytes.every((b) => b === 0)).toBe(true);
     });
 });

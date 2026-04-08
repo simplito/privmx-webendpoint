@@ -56,10 +56,9 @@ export class CryptoFacade {
         key: FacadeKeyRef,
         iv: Uint8Array,
         data: Uint8Array,
-        wipe?: boolean,
     ): Promise<ArrayBuffer> {
         CryptoFacade.assertKeyRef(key, "aes256CbcPkcs7Encrypt");
-        return getEmCrypto().aes256CbcPkcs7Encrypt({ key, iv, data, wipe });
+        return getEmCrypto().aes256CbcPkcs7Encrypt({ key, iv, data });
     }
 
     /**
@@ -69,10 +68,9 @@ export class CryptoFacade {
         key: FacadeKeyRef,
         iv: Uint8Array,
         data: Uint8Array,
-        wipe?: boolean,
     ): Promise<ArrayBuffer> {
         CryptoFacade.assertKeyRef(key, "aes256CbcPkcs7Decrypt");
-        return getEmCrypto().aes256CbcPkcs7Decrypt({ key, iv, data, wipe });
+        return getEmCrypto().aes256CbcPkcs7Decrypt({ key, iv, data });
     }
 
     /**
@@ -83,10 +81,9 @@ export class CryptoFacade {
         iv: Uint8Array,
         aad: Uint8Array,
         data: Uint8Array,
-        wipe?: boolean,
     ): Promise<ArrayBuffer> {
         CryptoFacade.assertKeyRef(key, "aeadEncrypt");
-        return getEmCrypto().aeadEncrypt({ key, iv, aad, data, wipe });
+        return getEmCrypto().aeadEncrypt({ key, iv, aad, data });
     }
 
     /**
@@ -98,10 +95,9 @@ export class CryptoFacade {
         aad: Uint8Array,
         data: Uint8Array,
         tag: Uint8Array,
-        wipe?: boolean,
     ): Promise<ArrayBuffer> {
         CryptoFacade.assertKeyRef(key, "aeadDecrypt");
-        return getEmCrypto().aeadDecrypt({ key, iv, aad, data, tag, wipe });
+        return getEmCrypto().aeadDecrypt({ key, iv, aad, data, tag });
     }
 
     /**

@@ -42,7 +42,6 @@ export class Aes256CbcPkcs7_PARAMS {
     data: Uint8Array;
     key: FacadeKeyRef;
     iv: Uint8Array;
-    wipe?: boolean;
 }
 
 export class Prf_tls12_PARAMS {
@@ -67,14 +66,12 @@ export class Aes256CbcPkcs7Encrypt_PARAMS {
     key: FacadeKeyRef;
     iv: Uint8Array;
     taglen: number = 0;
-    wipe?: boolean;
 }
 
 export class Aes256CbcPkcs7Decrypt_PARAMS {
     data: Uint8Array;
     key: FacadeKeyRef;
     taglen: number = 0;
-    wipe?: boolean;
 }
 
 export class FromPublicOrPrivateKey_PARAMS {
@@ -146,7 +143,6 @@ export class AeadEncrypt_PARAMS {
     iv: Uint8Array;
     aad: Uint8Array;
     data: Uint8Array;
-    wipe?: boolean;
 }
 
 export class AeadDecrypt_PARAMS {
@@ -155,5 +151,4 @@ export class AeadDecrypt_PARAMS {
     aad: Uint8Array;
     data: Uint8Array;
     tag: Uint8Array;
-    wipe?: boolean;
 }

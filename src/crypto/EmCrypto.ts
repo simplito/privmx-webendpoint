@@ -87,53 +87,44 @@ export class EmCrypto {
         getRecoveryParam: this.getRecoveryParam,
     };
 
-    /**
-     * Deep-clones input parameters to ensure that internal cryptographic operations
-     * are working with isolated memory buffers. Handles specialized objects like
-     * CryptoKey by preserving them.
-     */
-    private ensureSafeMemory(params: unknown): unknown {
-        // 1. Primitive types (including null) don't need cloning
-        if (params === null || typeof params !== "object") {
-            return params;
-        }
-
-        // 2. Preserve CryptoKey handles (they are opaque and immutable in WebCrypto)
-        if (
-            params instanceof CryptoKey ||
-            (params.constructor && params.constructor.name === "CryptoKey")
-        ) {
-            return params;
-        }
-
-        // 3. Handle Buffers and their views
-        if (params instanceof Uint8Array || params instanceof Int8Array) {
-            return new Uint8Array(params);
-        }
-        if (params instanceof ArrayBuffer) {
-            return params.slice(0);
-        }
-
-        // 4. Handle Arrays recursively
-        if (Array.isArray(params)) {
-            return params.map((item: unknown) => this.ensureSafeMemory(item));
-        }
-
-        // 5. Generic object deep copy fallback (recursive)
-        const source = params as Record<string, unknown>;
-        const copy: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(source)) {
-            copy[key] = this.ensureSafeMemory(value);
-        }
-        return copy;
-    }
-
     async methodCaller(name: string, params: unknown): Promise<unknown> {
-        const safeParams = this.ensureSafeMemory(params);
         if (this.methodsMap[name]) {
-            return (this.methodsMap[name] as (p: unknown) => Promise<unknown>).call(this, safeParams);
+            return (this.methodsMap[name] as (p: unknown) => Promise<unknown>).call(this, this.copyWasmBuffers(params));
         }
         throw new Error(`Method '${name}' is not implemented.`);
+    }
+
+    /**
+     * Copies Uint8Array fields in the flat params object passed by the WASM bridge,
+     * detaching them from the WASM linear memory heap before any async suspension.
+     * WASM linear memory is backed by a SharedArrayBuffer when threading is enabled,
+     * and SubtleCrypto.importKey rejects views over shared memory. SharedArrayBuffer
+     * .slice() returns another SharedArrayBuffer, so we must copy bytes manually
+     * into a brand-new ArrayBuffer via set().
+     */
+    private copyWasmBuffers(params: unknown): unknown {
+        if (params === null || typeof params !== "object" || params instanceof CryptoKey) {
+            return params;
+        }
+        if (params instanceof Uint8Array) {
+            return this.copyUint8Array(params);
+        }
+        const src = params as Record<string, unknown>;
+        const out: Record<string, unknown> = {};
+        for (const key of Object.keys(src)) {
+            const v = src[key];
+            out[key] = v instanceof Uint8Array ? this.copyUint8Array(v) : v;
+        }
+        return out;
+    }
+
+    /**
+     * Copies a Uint8Array into a fresh plain
+     */
+    private copyUint8Array(src: Uint8Array): Uint8Array {
+        const dst = new Uint8Array(src.byteLength);
+        dst.set(src);
+        return dst;
     }
 
     public async randomBytes(params: Types.RANDOM_BYTES_PARAMS): Promise<ArrayBuffer> {
@@ -147,7 +138,6 @@ export class EmCrypto {
         keyInput: Uint8Array | CryptoKey | string,
         algorithm: AlgorithmIdentifier,
         usages: KeyUsage[],
-        wipe?: boolean,
     ): Promise<CryptoKey> {
         if (keyInput instanceof CryptoKey) {
             return keyInput;
@@ -162,9 +152,6 @@ export class EmCrypto {
         if (keyInput instanceof Uint8Array) {
             const algoName = typeof algorithm === "string" ? algorithm : algorithm.name;
             if (algoName === "secp256k1-private" || algoName === "secp256k1-public") {
-                // For elliptic, we just use the raw bytes for now, but we can store them in registry if needed.
-                // However, getOrImportKey is expected to return something we can use.
-                // If it's pure bytes, we return it as is.
                 return keyInput as unknown as CryptoKey;
             }
             const key = await subtle.importKey(
@@ -174,9 +161,7 @@ export class EmCrypto {
                 false,
                 usages,
             );
-            if (wipe) {
-                keyInput.fill(0);
-            }
+            keyInput.fill(0);
             return key;
         }
         throw new Error("Invalid key input type.");
@@ -197,6 +182,7 @@ export class EmCrypto {
         );
         const id = params.id || Utils.randomString(16);
         this.keys.set(id, { key: cryptoKey });
+        params.key.fill(0);
         return id;
     }
 
@@ -209,47 +195,28 @@ export class EmCrypto {
         assertIsString(params.engine);
         assertIsUint8Array(params.data);
         if (params.engine === "sha1") {
-            return this.hmacSha1(params.key, params.data);
+            return this.hmacSha1({ key: params.key, data: params.data });
         } else if (params.engine === "sha256") {
-            return this.hmacSha256(params.key, params.data);
+            return this.hmacSha256({ key: params.key, data: params.data });
         } else if (params.engine === "sha512") {
-            return this.hmacSha512(params.key, params.data);
+            return this.hmacSha512({ key: params.key, data: params.data });
         }
         throw new Error("hmac: invalid engine arg");
     }
 
-    public async hmacSha1(
-        keyInput: Uint8Array | CryptoKey | string,
-        data: ArrayBuffer | Uint8Array,
-    ): Promise<ArrayBuffer> {
-        const key = await this.getOrImportKey(keyInput, { name: "HMAC", hash: "SHA-1" } as unknown as AlgorithmIdentifier, ["sign"]);
-        return await subtle.sign("HMAC", key, new Uint8Array(data));
+    public async hmacSha1(params: { key: Uint8Array | CryptoKey | string; data: ArrayBuffer | Uint8Array }): Promise<ArrayBuffer> {
+        const key = await this.getOrImportKey(params.key, { name: "HMAC", hash: "SHA-1" } as unknown as AlgorithmIdentifier, ["sign"]);
+        return await subtle.sign("HMAC", key, new Uint8Array(params.data));
     }
 
-    public async hmacSha256(
-        keyInput: Uint8Array | CryptoKey | string,
-        data: ArrayBuffer | Uint8Array,
-    ): Promise<ArrayBuffer> {
-        const key = await this.getOrImportKey(keyInput, { name: "HMAC", hash: "SHA-256" } as unknown as AlgorithmIdentifier, [
-            "sign",
-        ]);
-        return subtle.sign("HMAC", key, new Uint8Array(data));
+    public async hmacSha256(params: { key: Uint8Array | CryptoKey | string; data: ArrayBuffer | Uint8Array }): Promise<ArrayBuffer> {
+        const key = await this.getOrImportKey(params.key, { name: "HMAC", hash: "SHA-256" } as unknown as AlgorithmIdentifier, ["sign"]);
+        return subtle.sign("HMAC", key, new Uint8Array(params.data));
     }
 
-    public async hmacSha512(
-        keyInput: Uint8Array | CryptoKey | string,
-        data: ArrayBuffer | Uint8Array,
-    ): Promise<ArrayBuffer> {
-        try {
-            const key = await this.getOrImportKey(keyInput, { name: "HMAC", hash: "SHA-512" } as unknown as AlgorithmIdentifier, [
-                "sign",
-            ]);
-            return subtle.sign("HMAC", key, new Uint8Array(data));
-        }
-        catch (e) {
-            console.log(e);
-            throw e;
-        }
+    public async hmacSha512(params: { key: Uint8Array | CryptoKey | string; data: ArrayBuffer | Uint8Array }): Promise<ArrayBuffer> {
+        const key = await this.getOrImportKey(params.key, { name: "HMAC", hash: "SHA-512" } as unknown as AlgorithmIdentifier, ["sign"]);
+        return subtle.sign("HMAC", key, new Uint8Array(params.data));
     }
 
     public async sha1(params: Types.SHA_PARAMS): Promise<ArrayBuffer> {
@@ -280,8 +247,10 @@ export class EmCrypto {
         assertArgsValid(params, Types.AES256ECB_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
-        const aesEcb = new aesjs.ModeOfOperation.ecb(new Uint8Array(params.key));
+        const keyCopy = new Uint8Array(params.key);
+        const aesEcb = new aesjs.ModeOfOperation.ecb(keyCopy);
         const encryptedBytes = aesEcb.encrypt(new Uint8Array(params.data));
+        keyCopy.fill(0);
         return Utils.toArrayBuffer(Buffer.from(encryptedBytes));
     }
 
@@ -289,8 +258,10 @@ export class EmCrypto {
         assertArgsValid(params, Types.AES256ECB_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
-        const aesEcb = new aesjs.ModeOfOperation.ecb(new Uint8Array(params.key));
+        const keyCopy = new Uint8Array(params.key);
+        const aesEcb = new aesjs.ModeOfOperation.ecb(keyCopy);
         const decryptedBytes = aesEcb.decrypt(new Uint8Array(params.data));
+        keyCopy.fill(0);
         return Utils.toArrayBuffer(Buffer.from(decryptedBytes));
     }
 
@@ -298,7 +269,7 @@ export class EmCrypto {
         assertArgsValid(params, Types.Aes256CbcPkcs7_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.iv);
-        const key = await this.getOrImportKey(params.key, "AES-CBC", ["encrypt"], params.wipe);
+        const key = await this.getOrImportKey(params.key, "AES-CBC", ["encrypt"]);
         return subtle.encrypt(
             { name: "AES-CBC", iv: new Uint8Array(params.iv) as unknown as BufferSource },
             key,
@@ -310,7 +281,7 @@ export class EmCrypto {
         assertArgsValid(params, Types.Aes256CbcPkcs7_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.iv);
-        const key = await this.getOrImportKey(params.key, "AES-CBC", ["decrypt"], params.wipe);
+        const key = await this.getOrImportKey(params.key, "AES-CBC", ["decrypt"]);
         return subtle.decrypt(
             { name: "AES-CBC", iv: new Uint8Array(params.iv) as unknown as BufferSource },
             key,
@@ -323,11 +294,10 @@ export class EmCrypto {
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
-        const aesCbc = new aesjs.ModeOfOperation.cbc(
-            new Uint8Array(params.key),
-            new Uint8Array(params.iv),
-        );
+        const keyCopy = new Uint8Array(params.key);
+        const aesCbc = new aesjs.ModeOfOperation.cbc(keyCopy, new Uint8Array(params.iv));
         const encryptedBytes = aesCbc.encrypt(new Uint8Array(params.data));
+        keyCopy.fill(0);
         return Utils.toArrayBuffer(Buffer.from(encryptedBytes));
     }
 
@@ -336,11 +306,10 @@ export class EmCrypto {
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
-        const aesCbc = new aesjs.ModeOfOperation.cbc(
-            new Uint8Array(params.key),
-            new Uint8Array(params.iv),
-        );
+        const keyCopy = new Uint8Array(params.key);
+        const aesCbc = new aesjs.ModeOfOperation.cbc(keyCopy, new Uint8Array(params.iv));
         const decryptedBytes = aesCbc.decrypt(new Uint8Array(params.data));
+        keyCopy.fill(0);
         return Utils.toArrayBuffer(Buffer.from(decryptedBytes));
     }
 
@@ -352,14 +321,14 @@ export class EmCrypto {
         let result = Buffer.alloc(0);
         let a = new Uint8Array(params.seed);
         while (result.length < params.length) {
-            a = new Uint8Array(await this.hmacSha256(new Uint8Array(params.key), a));
+            a = new Uint8Array(await this.hmacSha256({ key: new Uint8Array(params.key), data: a }));
             result = Buffer.concat([
                 result,
                 Buffer.from(
-                    await this.hmacSha256(
-                        new Uint8Array(params.key),
-                        Buffer.concat([a, new Uint8Array(params.seed)]),
-                    ),
+                    await this.hmacSha256({
+                        key: new Uint8Array(params.key),
+                        data: Buffer.concat([a, new Uint8Array(params.seed)]),
+                    }),
                 ),
             ]);
         }
@@ -418,8 +387,8 @@ export class EmCrypto {
         const prefix = Buffer.alloc(16);
         prefix.fill(0);
         const data = Buffer.concat([prefix, Buffer.from(params.data)]);
-        const cipher = await this.aes256CbcPkcs7Encrypt({ data, key: kem.kE, iv, wipe: false });
-        const tag = await this.hmacSha256(kem.kM, cipher);
+        const cipher = await this.aes256CbcPkcs7Encrypt({ data, key: kem.kE, iv });
+        const tag = await this.hmacSha256({ key: kem.kM, data: cipher });
         return Utils.toArrayBuffer(
             Buffer.concat([Buffer.from(cipher), Buffer.from(tag).slice(0, params.taglen)]),
         );
@@ -437,13 +406,13 @@ export class EmCrypto {
         let data = Buffer.from(params.data);
         const tag = data.slice(data.length - params.taglen);
         data = data.slice(0, data.length - params.taglen);
-        const rTag = Buffer.from(await this.hmacSha256(kem.kM, data)).slice(0, params.taglen);
+        const rTag = Buffer.from(await this.hmacSha256({ key: kem.kM, data })).slice(0, params.taglen);
         if (!tag.equals(rTag)) {
             throw new Error("Wrong message security tag");
         }
         const iv = data.slice(0, 16);
         data = data.slice(16);
-        return this.aes256CbcPkcs7Decrypt({ data, key: kem.kE, iv, wipe: false });
+        return this.aes256CbcPkcs7Decrypt({ data, key: kem.kE, iv });
     }
 
     public async aeadEncrypt(params: Types.AeadEncrypt_PARAMS): Promise<ArrayBuffer> {
@@ -451,7 +420,7 @@ export class EmCrypto {
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.iv);
         assertIsUint8Array(params.aad);
-        const key = await this.getOrImportKey(params.key, "AES-GCM", ["encrypt"], params.wipe);
+        const key = await this.getOrImportKey(params.key, "AES-GCM", ["encrypt"]);
         return subtle.encrypt(
             {
                 name: "AES-GCM",
@@ -470,7 +439,7 @@ export class EmCrypto {
         assertIsUint8Array(params.iv);
         assertIsUint8Array(params.aad);
         assertIsUint8Array(params.tag);
-        const key = await this.getOrImportKey(params.key, "AES-GCM", ["decrypt"], params.wipe);
+        const key = await this.getOrImportKey(params.key, "AES-GCM", ["decrypt"]);
         const dataWithTag = Buffer.concat([Buffer.from(params.data), Buffer.from(params.tag)]);
         return subtle.decrypt(
             {
