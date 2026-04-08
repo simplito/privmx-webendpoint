@@ -15,6 +15,7 @@ import {
     DataChannelCryptorDecryptStatus,
 } from "../Types";
 import { KeyStore } from "./KeyStore";
+import { Utils } from "./Utils";
 import { PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
 import { StreamId, StreamRoomId } from "./types/ApiTypes";
@@ -87,7 +88,7 @@ export class WebRtcClient {
     private bootstrapDataChannel: RTCDataChannel | undefined;
 
     constructor(private assetsDir: string) {
-        this.uniqId = "" + Math.random() + "-" + Math.random();
+        this.uniqId = Utils.getRandomString(8) + "-" + Utils.getRandomString(8);
         this.sequenceNumberOfSender = 1;
         this.peerConnectionsManager = new PeerConnectionManager(
             (roomId: StreamRoomId) => {
@@ -477,7 +478,7 @@ export class WebRtcClient {
                 throw new Error("ReconfigureQueue does not exist.");
             }
             this.peerConnectionReconfigureQueue.enqueue({
-                taskId: Math.floor(1 + Math.random() * 10000),
+                taskId: Utils.generateNumericId(),
                 _room: roomId,
             });
             try {
@@ -666,7 +667,7 @@ export class WebRtcClient {
             throw new Error("ReconfigureQueue does not exist.");
         }
         this.peerConnectionReconfigureQueue.enqueue({
-            taskId: Math.floor(1 + Math.random() * 10000),
+            taskId: Utils.generateNumericId(),
             _room,
             jsep: offer,
         });

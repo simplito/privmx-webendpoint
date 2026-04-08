@@ -57,7 +57,11 @@ export class KeyStore {
         algo: AlgorithmIdentifier,
         usages: KeyUsage[],
     ): Promise<string> {
-        const hashBuffer = await crypto.subtle.digest("SHA-256", key as unknown as BufferSource);
+        const prefix = new TextEncoder().encode("secret:");
+        const input = new Uint8Array(prefix.length + key.length);
+        input.set(prefix);
+        input.set(key, prefix.length);
+        const hashBuffer = await crypto.subtle.digest("SHA-256", input as unknown as BufferSource);
         const keyHash = Array.from(new Uint8Array(hashBuffer))
             .map(b => b.toString(16).padStart(2, "0"))
             .join("");
