@@ -12,7 +12,7 @@ describe("AEAD (AES-GCM) Tests", () => {
         const aad = new Uint8Array([1, 2, 3, 4]);
         const data = new Uint8Array([10, 20, 30, 40, 50]);
 
-        const keyId = await CryptoFacade.importKey(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
+        const keyId = await CryptoFacade.importKeyAndWipeMaterial(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
         const encrypted = await CryptoFacade.aeadEncrypt(keyId, iv, aad, data);
         expect(encrypted.byteLength).toBe(data.length + 16);
 
@@ -30,7 +30,7 @@ describe("AEAD (AES-GCM) Tests", () => {
         const aad = new Uint8Array(0);
         const data = new TextEncoder().encode("Hello AEAD!");
 
-        const keyId = await CryptoFacade.importKey(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
+        const keyId = await CryptoFacade.importKeyAndWipeMaterial(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
         const encrypted = await CryptoFacade.aeadEncrypt(keyId, iv, aad, data);
         const ciphertext = new Uint8Array(encrypted).slice(0, data.length);
         const tag = new Uint8Array(encrypted).slice(data.length);
@@ -46,7 +46,7 @@ describe("AEAD (AES-GCM) Tests", () => {
         const aad = new Uint8Array(0);
         const data = new Uint8Array([1, 2, 3]);
 
-        const keyId = await CryptoFacade.importKey(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
+        const keyId = await CryptoFacade.importKeyAndWipeMaterial(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
         const encrypted = await CryptoFacade.aeadEncrypt(keyId, iv, aad, data);
         const ciphertext = new Uint8Array(encrypted).slice(0, data.length);
         const tag = new Uint8Array(encrypted).slice(data.length);
@@ -63,7 +63,7 @@ describe("AEAD (AES-GCM) Tests", () => {
         const aad = new Uint8Array([1, 2, 3]);
         const data = new Uint8Array([4, 5, 6]);
 
-        const keyId = await CryptoFacade.importKey(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
+        const keyId = await CryptoFacade.importKeyAndWipeMaterial(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
         const encrypted = await CryptoFacade.aeadEncrypt(keyId, iv, aad, data);
         const ciphertext = new Uint8Array(encrypted).slice(0, data.length);
         const tag = new Uint8Array(encrypted).slice(data.length);
@@ -82,7 +82,7 @@ describe("AEAD (AES-GCM) Tests", () => {
         const aad = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
         const data = new Uint8Array(1024 * 1024).fill(0xaa);
 
-        const keyId = await CryptoFacade.importKey(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
+        const keyId = await CryptoFacade.importKeyAndWipeMaterial(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
         const encrypted = await CryptoFacade.aeadEncrypt(keyId, iv, aad, data);
         const ciphertext = new Uint8Array(encrypted).slice(0, data.length);
         const tag = new Uint8Array(encrypted).slice(data.length);
