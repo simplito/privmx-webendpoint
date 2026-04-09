@@ -57,13 +57,7 @@
     "watch": "webpack serve"
   },
   "files": [
-    "dist/index.js",
-    "dist/index.d.ts",
-    "dist/api",
-    "dist/crypto",
-    "dist/extra",
-    "dist/service",
-    "dist/webStreams",
+    "dist",
     "assets",
     "LICENSE.md",
     "README.md",
