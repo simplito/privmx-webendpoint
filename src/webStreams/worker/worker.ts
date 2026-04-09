@@ -37,28 +37,18 @@ export class EncryptTransform {
         return 0;
     }
 
-    private async resolveKeyId(key: Uint8Array): Promise<string> {
-        return this.keyStore.importKeyIfAbsent(key, { name: "AES-GCM" }, ["encrypt", "decrypt"]);
-    }
-
     private async encryptFrame_aes(
-        rawKey: Uint8Array,
+        keyId: string,
         iv: Uint8Array,
         data: Uint8Array,
         header: Uint8Array,
     ): Promise<Uint8Array> {
-        const keyId = await this.resolveKeyId(rawKey);
-        const encrypted = await CryptoFacade.aeadEncrypt(
-            keyId,
-            iv,
-            header,
-            data,
-        );
+        const encrypted = await CryptoFacade.aeadEncrypt(keyId, iv, header, data);
         return new Uint8Array(encrypted);
     }
 
     private async decryptFrame_aes(
-        rawKey: Uint8Array,
+        keyId: string,
         iv: Uint8Array,
         encryptedData: Uint8Array,
         header: Uint8Array,
@@ -66,7 +56,6 @@ export class EncryptTransform {
         if (encryptedData.length < 16) {
             return null;
         }
-        const keyId = await this.resolveKeyId(rawKey);
         const data = encryptedData.slice(0, encryptedData.length - 16);
         const tag = encryptedData.slice(encryptedData.length - 16);
         try {
@@ -89,9 +78,8 @@ export class EncryptTransform {
 
         const iv = Utils.genIvAsBuffer();
         const keyId = this.keyStore.getEncryptionKeyId();
-        const rawKey = this.keyStore.getRawEncryptionKey();
 
-        const encrypted = await this.encryptFrame_aes(rawKey, iv, frameBody, frameHeader);
+        const encrypted = await this.encryptFrame_aes(keyId, iv, frameBody, frameHeader);
         if (!encrypted) {
             throw new Error("Cannot encrypt frame");
         }
@@ -167,8 +155,7 @@ export class EncryptTransform {
                 controller.enqueue(encodedFrame);
                 return;
             }
-            const rawKey = this.keyStore.getRawKey(keyId);
-            const plain = await this.decryptFrame_aes(rawKey, iv, payload, frameHeader);
+            const plain = await this.decryptFrame_aes(keyId, iv, payload, frameHeader);
 
             if (!plain) {
                 controller.enqueue(encodedFrame);
@@ -206,6 +193,7 @@ self.addEventListener("message", async (event: MessageEvent) => {
     } else if (operation === "setKeys") {
         const data = event.data as events.SetKeysEvent;
         keyStore.setKeys(data.keys);
+        self.postMessage({ operation: "setKeys-ack" });
     } else if (operation === "rms") {
         lastRMS = Math.round(event.data.rms as number);
     }

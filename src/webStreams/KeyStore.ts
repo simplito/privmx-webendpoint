@@ -23,7 +23,7 @@ export class KeyStore {
                 throw new Error(`Invalid key length: ${rawKey.length}`);
             }
             this.rawKeys.set(k.keyId, rawKey);
-            CryptoFacade.importKey(rawKey, { name: "AES-GCM" }, ["encrypt", "decrypt"], k.keyId);
+            CryptoFacade.importKeyAndWipeMaterial(rawKey, { name: "AES-GCM" }, ["encrypt", "decrypt"], k.keyId);
             if (k.type === 0) {
                 this.encryptionKeyId = k.keyId;
             }
@@ -71,7 +71,7 @@ export class KeyStore {
             return existing;
         }
 
-        const keyId = await CryptoFacade.importKey(key, algo, usages);
+        const keyId = await CryptoFacade.importKeyAndWipeMaterial(key, algo, usages);
         this.keyHashRegistry.set(keyHash, keyId);
         return keyId;
     }

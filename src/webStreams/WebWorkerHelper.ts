@@ -1,21 +1,5 @@
 import { Key } from "../Types";
 import { InitializeEvent, SetKeysEvent } from "./worker/WorkerEvents";
-// export class WebWorkerOld {
-//     worker: Worker | undefined;
-//     constructor(private encKey: EncKey) {
-//         // this.worker = new Worker(new URL("./worker/worker.ts", import.meta.url), {name: "worker"});
-//         this.worker = new Worker(new URL("worker.js", import.meta.url), { name: "worker" });
-//         this.worker.onerror = e => console.error(e);
-
-//         this.worker.postMessage({
-//             operation: 'initialize',
-//             key: encKey.key, iv: encKey.iv
-//         });
-//     }
-//     getWorker() {
-//         return this.worker;
-//     }
-// }
 
 interface WorkerLogEvent {
     data:
@@ -74,14 +58,23 @@ export class WebWorker {
         return this.worker;
     }
 
-    setKeys(keys: Key[]) {
+    setKeys(keys: Key[]): Promise<void> {
         if (!this.worker) {
             console.warn("Cannot pass keys to e2ee worker as it is not initialized yet.");
-            return;
+            return Promise.resolve();
         }
-        this.worker.postMessage(<SetKeysEvent>{
-            operation: "setKeys",
-            keys,
+        return new Promise<void>((resolve) => {
+            const ackListener = (ev: MessageEvent) => {
+                if (ev.data?.operation === "setKeys-ack") {
+                    this.worker!.removeEventListener("message", ackListener);
+                    resolve();
+                }
+            };
+            this.worker!.addEventListener("message", ackListener);
+            this.worker!.postMessage(<SetKeysEvent>{
+                operation: "setKeys",
+                keys,
+            });
         });
     }
 
@@ -100,12 +93,4 @@ export class WebWorker {
 
         return worker;
     }
-}
-
-// function workerScript() {
-//     self.onmessage = WorkerSpec.onmessage;
-// }
-
-function workerScript() {
-    return "";
 }

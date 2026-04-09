@@ -13,7 +13,7 @@ describe("Crypto Robustness: Stale Handle Recovery", () => {
         const data = new TextEncoder().encode("robustness test");
 
         // 1. Initial import and use
-        const keyId = await CryptoFacade.importKey(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
+        const keyId = await CryptoFacade.importKeyAndWipeMaterial(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
         const encrypted1 = await CryptoFacade.aeadEncrypt(keyId, iv, aad, data);
         expect(encrypted1).toBeDefined();
 
@@ -31,7 +31,7 @@ describe("Crypto Robustness: Stale Handle Recovery", () => {
         // High level API doesn't have automatic "re-import on failure" for handles yet,
         // but the C++ driver DOES.
         // Let's verify that re-importing with same bytes works and doesn't conflict.
-        const keyId2 = await CryptoFacade.importKey(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
+        const keyId2 = await CryptoFacade.importKeyAndWipeMaterial(keyBytes, "AES-GCM", ["encrypt", "decrypt"]);
         const encrypted2 = await CryptoFacade.aeadEncrypt(keyId2, iv, aad, data);
         expect(encrypted2).toEqual(encrypted1);
     });

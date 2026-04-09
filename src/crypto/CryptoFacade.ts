@@ -154,8 +154,9 @@ export class CryptoFacade {
     /**
      * Import a raw key into the registry and return its ID.
      * This is the ONLY method that accepts raw Uint8Array key bytes.
+     * Uint8Array will be filled with zeros afterwards
      */
-    static async importKey(
+    static async importKeyAndWipeMaterial(
         key: Uint8Array,
         algo: AlgorithmIdentifier,
         usages: KeyUsage[],
