@@ -8,7 +8,9 @@ export class Utils {
 
     public static getRandomString(size: number): string {
         const bytes = crypto.getRandomValues(new Uint8Array(size));
-        return Array.from(bytes).map(b => (b & 0xf).toString(16)).join("");
+        return Array.from(bytes)
+            .map((b) => (b & 0xf).toString(16))
+            .join("");
     }
 
     static genIvAsBuffer() {

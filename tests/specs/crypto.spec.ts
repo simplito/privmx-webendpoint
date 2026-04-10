@@ -342,7 +342,6 @@ test.describe("CryptoTest", () => {
         }
     });
 
-
     test("Stale Handle Recovery - Driver Level", async ({ page }) => {
         const result = await page.evaluate(async () => {
             const cryptoApi = await window.Endpoint.createCryptoApi();
@@ -393,5 +392,4 @@ test.describe("CryptoTest", () => {
         expect(result.count).toBe(1000);
         expect(result.allMatch).toBe(true);
     });
-
 });

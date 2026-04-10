@@ -124,10 +124,7 @@ export class CryptoFacade {
     /**
      * Derive a shared secret using ECDH.
      */
-    static async eccDerive(
-        privateKey: FacadeKeyRef,
-        publicKey: Uint8Array,
-    ): Promise<ArrayBuffer> {
+    static async eccDerive(privateKey: FacadeKeyRef, publicKey: Uint8Array): Promise<ArrayBuffer> {
         CryptoFacade.assertKeyRef(privateKey, "eccDerive");
         return getEmCrypto().eccDerive({ privateKey, publicKey });
     }
@@ -135,10 +132,7 @@ export class CryptoFacade {
     /**
      * Sign data using ECDSA.
      */
-    static async eccSign(
-        privateKey: FacadeKeyRef,
-        data: Uint8Array,
-    ): Promise<ArrayBuffer> {
+    static async eccSign(privateKey: FacadeKeyRef, data: Uint8Array): Promise<ArrayBuffer> {
         CryptoFacade.assertKeyRef(privateKey, "eccSign");
         return getEmCrypto().eccSign({ privateKey, data });
     }
@@ -179,7 +173,7 @@ export class CryptoFacade {
         if (key instanceof Uint8Array || key instanceof ArrayBuffer) {
             throw new TypeError(
                 `CryptoFacade.${method}: Raw key bytes are not allowed. ` +
-                `Use CryptoFacade.importKey() first to obtain a keyId.`,
+                    `Use CryptoFacade.importKey() first to obtain a keyId.`,
             );
         }
     }

@@ -23,7 +23,11 @@ describe("Crypto Performance Benchmarks", () => {
         const rawTime = endRaw - startRaw;
 
         // 2. CryptoKey reuse
-        const keyId = await CryptoFacade.importKeyAndWipeMaterial(new Uint8Array(keyBytesTemplate), "AES-GCM", ["encrypt", "decrypt"]);
+        const keyId = await CryptoFacade.importKeyAndWipeMaterial(
+            new Uint8Array(keyBytesTemplate),
+            "AES-GCM",
+            ["encrypt", "decrypt"],
+        );
         const startKey = performance.now();
         for (let i = 0; i < iterations; i++) {
             await CryptoFacade.aeadEncrypt(keyId, iv, aad, data);

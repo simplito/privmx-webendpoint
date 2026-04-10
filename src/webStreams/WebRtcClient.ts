@@ -66,7 +66,10 @@ export class WebRtcClient {
     private peerCredentials: TurnCredentials[] | undefined;
 
     private remoteStreamsListeners: Map<StreamRoomId, RemoteStreamListener[]> = new Map();
-    private pendingDataChannelMessages: Map<StreamRoomId, Array<{ remoteStreamId: number; data: Uint8Array; statusCode: number }>> = new Map();
+    private pendingDataChannelMessages: Map<
+        StreamRoomId,
+        Array<{ remoteStreamId: number; data: Uint8Array; statusCode: number }>
+    > = new Map();
     private sequenceNumberByRemoteStreamId: Map<number, number> = new Map();
     private dataChannelByRemoteStreamId: Map<number, RTCDataChannel> = new Map();
     private dataChannelCryptor: DataChannelCryptor;
@@ -510,7 +513,6 @@ export class WebRtcClient {
         this.keyStore.setKeys(keys);
         await (await this.getWorkerApi()).setKeys(keys);
     }
-
 
     private setupSenderTransform(videoSender: RTCRtpSender) {
         if ((window as any).RTCRtpScriptTransform) {

@@ -176,7 +176,6 @@ export class EncryptTransform {
     }
 }
 
-
 self.addEventListener("message", async (event: MessageEvent) => {
     if (!event || !event.data || typeof event.data !== "object" || !event.data.operation) return;
     const { operation, kind } = event.data;

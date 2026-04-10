@@ -23,7 +23,7 @@ import RIPEMD160 = require("ripemd160");
 const subtle =
     typeof crypto !== "undefined"
         ? crypto.subtle
-        : ((globalThis as unknown) as { crypto?: { subtle?: SubtleCrypto } }).crypto?.subtle!;
+        : (globalThis as unknown as { crypto?: { subtle?: SubtleCrypto } }).crypto?.subtle!;
 
 interface KeyRegistryEntry {
     key: CryptoKey;
@@ -89,7 +89,10 @@ export class EmCrypto {
 
     async methodCaller(name: string, params: unknown): Promise<unknown> {
         if (this.methodsMap[name]) {
-            return (this.methodsMap[name] as (p: unknown) => Promise<unknown>).call(this, this.copyWasmBuffers(params));
+            return (this.methodsMap[name] as (p: unknown) => Promise<unknown>).call(
+                this,
+                this.copyWasmBuffers(params),
+            );
         }
         throw new Error(`Method '${name}' is not implemented.`);
     }
@@ -204,18 +207,39 @@ export class EmCrypto {
         throw new Error("hmac: invalid engine arg");
     }
 
-    public async hmacSha1(params: { key: Uint8Array | CryptoKey | string; data: ArrayBuffer | Uint8Array }): Promise<ArrayBuffer> {
-        const key = await this.getOrImportKey(params.key, { name: "HMAC", hash: "SHA-1" } as unknown as AlgorithmIdentifier, ["sign"]);
+    public async hmacSha1(params: {
+        key: Uint8Array | CryptoKey | string;
+        data: ArrayBuffer | Uint8Array;
+    }): Promise<ArrayBuffer> {
+        const key = await this.getOrImportKey(
+            params.key,
+            { name: "HMAC", hash: "SHA-1" } as unknown as AlgorithmIdentifier,
+            ["sign"],
+        );
         return await subtle.sign("HMAC", key, new Uint8Array(params.data));
     }
 
-    public async hmacSha256(params: { key: Uint8Array | CryptoKey | string; data: ArrayBuffer | Uint8Array }): Promise<ArrayBuffer> {
-        const key = await this.getOrImportKey(params.key, { name: "HMAC", hash: "SHA-256" } as unknown as AlgorithmIdentifier, ["sign"]);
+    public async hmacSha256(params: {
+        key: Uint8Array | CryptoKey | string;
+        data: ArrayBuffer | Uint8Array;
+    }): Promise<ArrayBuffer> {
+        const key = await this.getOrImportKey(
+            params.key,
+            { name: "HMAC", hash: "SHA-256" } as unknown as AlgorithmIdentifier,
+            ["sign"],
+        );
         return subtle.sign("HMAC", key, new Uint8Array(params.data));
     }
 
-    public async hmacSha512(params: { key: Uint8Array | CryptoKey | string; data: ArrayBuffer | Uint8Array }): Promise<ArrayBuffer> {
-        const key = await this.getOrImportKey(params.key, { name: "HMAC", hash: "SHA-512" } as unknown as AlgorithmIdentifier, ["sign"]);
+    public async hmacSha512(params: {
+        key: Uint8Array | CryptoKey | string;
+        data: ArrayBuffer | Uint8Array;
+    }): Promise<ArrayBuffer> {
+        const key = await this.getOrImportKey(
+            params.key,
+            { name: "HMAC", hash: "SHA-512" } as unknown as AlgorithmIdentifier,
+            ["sign"],
+        );
         return subtle.sign("HMAC", key, new Uint8Array(params.data));
     }
 
@@ -406,7 +430,10 @@ export class EmCrypto {
         let data = Buffer.from(params.data);
         const tag = data.slice(data.length - params.taglen);
         data = data.slice(0, data.length - params.taglen);
-        const rTag = Buffer.from(await this.hmacSha256({ key: kem.kM, data })).slice(0, params.taglen);
+        const rTag = Buffer.from(await this.hmacSha256({ key: kem.kM, data })).slice(
+            0,
+            params.taglen,
+        );
         if (!tag.equals(rTag)) {
             throw new Error("Wrong message security tag");
         }
@@ -536,9 +563,11 @@ export class EmCrypto {
     public async eccSign(params: Types.Sign_PARAMS) {
         assertArgsValid(params, Types.Sign_PARAMS);
         assertIsUint8Array(params.data);
-        const privateKey = await this.getOrImportKey(params.privateKey, "secp256k1-private" as unknown as AlgorithmIdentifier, [
-            "sign",
-        ]);
+        const privateKey = await this.getOrImportKey(
+            params.privateKey,
+            "secp256k1-private" as unknown as AlgorithmIdentifier,
+            ["sign"],
+        );
         const keyPair = EC.keyFromPrivate(Buffer.from(privateKey as unknown as Uint8Array));
         const s = <elliptic.ec.Signature & { recoveryParam: number }>(
             keyPair.sign(Buffer.from(params.data))
@@ -605,9 +634,11 @@ export class EmCrypto {
         assertArgsValid(params, Types.Derive_PARAMS);
         assertIsUint8Array(params.publicKey);
         const keyPairPub = EC.keyFromPublic(Buffer.from(params.publicKey));
-        const privateKey = await this.getOrImportKey(params.privateKey, "secp256k1-private" as unknown as AlgorithmIdentifier, [
-            "deriveBits",
-        ]);
+        const privateKey = await this.getOrImportKey(
+            params.privateKey,
+            "secp256k1-private" as unknown as AlgorithmIdentifier,
+            ["deriveBits"],
+        );
         const keyPairPriv = EC.keyFromPrivate(Buffer.from(privateKey as unknown as Uint8Array));
         const val = keyPairPriv.derive(keyPairPub.getPublic());
         const keyPair = EC.keyFromPrivate(val.toArray());
