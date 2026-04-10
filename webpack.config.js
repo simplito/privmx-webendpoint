@@ -10,9 +10,7 @@ module.exports = {
   plugins: [
     new webpack.ProvidePlugin({
         Buffer: ["buffer", "Buffer"],
-    }),
-    new webpack.ProvidePlugin({
-      process: "process/browser",
+        process: "process/browser",
     }),
     new CopyPlugin({
       patterns: [
@@ -35,18 +33,15 @@ module.exports = {
   resolve: {
     extensions: [".tsx", ".ts", ".js"],
     fallback: {
-        "crypto": require.resolve("crypto-browserify"), 
-        "assert": require.resolve("assert/"),
-        "stream": require.resolve("stream-browserify"),
-        "buffer": require.resolve("buffer"),
-        "vm": require.resolve("vm-browserify"),
-        "process/browser": require.resolve("process/browser"),
-          
-      }, 
+      "buffer": require.resolve("buffer"),
+      "assert": require.resolve("assert/"),
+      "process/browser": require.resolve("process/browser"),
+    }, 
   },
   output: {
     filename: (pathData) => {
-      return pathData.chunk.name == "bundle" ? "privmx-endpoint-web.js" : "privmx-endpoint-web.[name].js";
+      if (pathData.chunk.name === "bundle") return "privmx-endpoint-web.js";
+      return "privmx-endpoint-web.[name].js";
     },
     globalObject: "this",
     path: path.resolve(__dirname, "dist/bundle"),
@@ -58,5 +53,10 @@ module.exports = {
       },
       type: "umd",
     },
+  },
+  performance: {
+    hints: false,
+    maxEntrypointSize: 1048576, // 1MB
+    maxAssetSize: 1048576, // 1MB
   },
 };
