@@ -27,16 +27,14 @@ export type { AudioLevelsStats } from "./AudioManager";
 
 export class WebRtcClient {
     private configuration: RTCConfiguration | undefined;
-    private publishStreamHandle: StreamHandle;
     private peerCredentials: TurnCredentials[] | undefined;
     private readonly sequenceNumberByRemoteStreamId: Map<number, number> = new Map();
-    private readonly dataChannelByRemoteStreamId: Map<number, RTCDataChannel> = new Map();
     private sequenceNumberOfSender: number;
-    private streamsApiInterface: StreamsCallbackInterface;
     private readonly logger: Logger;
     private readonly peerConnectionReconfigureQueue: Queue<QueueItem>;
     private lastProcessedAnswer: { [roomId: string]: Jsep } = {};
     private bootstrapDataChannel: RTCDataChannel | undefined;
+    private streamsApiInterface: StreamsCallbackInterface | undefined;
 
     constructor(
         private readonly peerConnectionsManager: PeerConnectionManager,
@@ -77,15 +75,17 @@ export class WebRtcClient {
         let clientRef: WebRtcClient | undefined;
 
         const peerConnectionsManager = new PeerConnectionManager(
-            (roomId: StreamRoomId) => {
+            (roomId: StreamRoomId, streamHandle?: StreamHandle) => {
                 if (!clientRef) throw new Error("WebRtcClient not yet initialized");
                 return clientRef.createPeerConnectionMultiForRoom(
                     roomId,
                     clientRef.getPeerConnectionConfiguration(),
+                    streamHandle,
                 );
             },
             (sessionId: SessionId, candidate: RTCIceCandidate) => {
                 if (!clientRef) throw new Error("WebRtcClient not yet initialized");
+                if (!clientRef.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
                 return clientRef.streamsApiInterface.trickle(sessionId, candidate);
             },
         );
@@ -96,9 +96,8 @@ export class WebRtcClient {
             }
         });
 
-        const audioManager = new AudioManager(assetsDir, async (rms) => {
-            const worker = await e2eeTransformManager.getWorker();
-            worker.postMessage({ operation: "rms", rms });
+        const audioManager = new AudioManager(assetsDir, (rms) => {
+            e2eeTransformManager.sendLocalRms(rms);
         });
 
         const client = new WebRtcClient(
@@ -119,8 +118,9 @@ export class WebRtcClient {
         this.audioManager.setAudioLevelCallback(func);
     }
 
-    public bindApiInterface(streamsApiInterface: StreamsCallbackInterface): void {
-        this.streamsApiInterface = streamsApiInterface;
+    /** Called by StreamApiNative to wire the signalling callbacks after WASM initialises. */
+    public bindApiInterface(impl: StreamsCallbackInterface): void {
+        this.streamsApiInterface = impl;
     }
 
     public addRemoteStreamListener(listener: RemoteStreamListener): void {
@@ -128,10 +128,6 @@ export class WebRtcClient {
     }
 
     public getStreamStateChangeDispatcher(): StateChangeDispatcher {
-        return this.eventsDispatcher;
-    }
-
-    public getWebRtcEventDispatcher(): StateChangeDispatcher {
         return this.eventsDispatcher;
     }
 
@@ -163,9 +159,19 @@ export class WebRtcClient {
         this.peerConnectionsManager.closePeerConnectionBySessionIfExists(roomId, connectionType);
     }
 
-    /** Returns the RTCPeerConnection for the publisher side of a room (used by WebRtcInterfaceImpl). */
-    public getPublisherPeerConnection(roomId: StreamRoomId): RTCPeerConnection {
-        return this.peerConnectionsManager.getConnectionWithSession(roomId, "publisher").pc;
+    /** Creates an SDP offer for the publisher connection and sets it as local description. */
+    public async createPublisherOffer(roomId: StreamRoomId): Promise<string> {
+        const pc = this.peerConnectionsManager.getConnectionWithSession(roomId, "publisher").pc;
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        if (!offer.sdp) throw new Error("createOffer returned no SDP");
+        return offer.sdp;
+    }
+
+    /** Sets the remote description (answer) on the publisher connection. */
+    public async setPublisherRemoteDescription(roomId: StreamRoomId, sdp: string, type: RTCSdpType): Promise<void> {
+        const pc = this.peerConnectionsManager.getConnectionWithSession(roomId, "publisher").pc;
+        await pc.setRemoteDescription(new RTCSessionDescription({ sdp, type }));
     }
 
     async setTurnCredentials(turnCredentials: TurnCredentials[]): Promise<void> {
@@ -178,10 +184,9 @@ export class WebRtcClient {
         stream?: MediaStream,
         dataTracks?: StreamTrack[],
     ): Promise<RTCPeerConnection> {
-        this.publishStreamHandle = streamHandle;
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
 
-        this.peerConnectionsManager.initialize(streamRoomId, "publisher");
+        this.peerConnectionsManager.initialize(streamRoomId, "publisher", -1 as SessionId, streamHandle);
         const pc = this.peerConnectionsManager.getConnectionWithSession(
             streamRoomId,
             "publisher",
@@ -214,15 +219,10 @@ export class WebRtcClient {
         streamRoomId: StreamRoomId,
         stream: MediaStream,
     ): void {
-        const session = this.peerConnectionsManager.getConnectionWithSession(
-            streamRoomId,
-            "publisher",
-        );
         for (const track of stream.getAudioTracks()) {
             this.audioManager.stopLocalAudioLevelMeter(track);
         }
-        session.pc.close();
-        session.pc = undefined;
+        this.closeConnection(streamRoomId, "publisher");
     }
 
     async updatePeerConnectionWithLocalStream(
@@ -273,6 +273,7 @@ export class WebRtcClient {
     createPeerConnectionMultiForRoom(
         roomId: StreamRoomId,
         configuration: RTCConfiguration,
+        streamHandle?: StreamHandle,
     ): RTCPeerConnection {
         const extConf: RTCConfigurationWithInsertableStreams = {
             ...configuration,
@@ -293,10 +294,12 @@ export class WebRtcClient {
             } else {
                 this.logger.debug("connection state: ", connection.connectionState);
             }
-            this.eventsDispatcher.emit({
-                streamHandle: this.publishStreamHandle,
-                state: connection.connectionState,
-            });
+            if (streamHandle !== undefined) {
+                this.eventsDispatcher.emit({
+                    streamHandle,
+                    state: connection.connectionState,
+                });
+            }
         });
 
         connection.addEventListener("datachannel", (event) => {
@@ -351,7 +354,6 @@ export class WebRtcClient {
                     }
                 }
             };
-            this.dataChannelByRemoteStreamId.set(Number(dc.label), dc);
         });
 
         connection.addEventListener("iceconnectionstatechange", (event) => {
@@ -441,10 +443,6 @@ export class WebRtcClient {
         } catch (e) {
             console.error("Error on onSubscriberAttached", e);
         }
-    }
-
-    public async onSubscriptionUpdatedSingle(room: StreamRoomId, offer: Jsep): Promise<Jsep> {
-        return this.reconfigureSingle(room, offer);
     }
 
     private async reconfigureSingle(room: StreamRoomId, offer: Jsep): Promise<Jsep> {

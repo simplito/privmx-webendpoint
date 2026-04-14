@@ -1,3 +1,4 @@
+import { StreamHandle } from "../Types";
 import { StreamRoomId } from "./types/ApiTypes";
 import { SessionId } from "./WebRtcClientTypes";
 
@@ -19,7 +20,7 @@ export class PeerConnectionManager {
     } = {};
 
     constructor(
-        private createPeerConnection: (room: StreamRoomId) => RTCPeerConnection,
+        private createPeerConnection: (room: StreamRoomId, streamHandle?: StreamHandle) => RTCPeerConnection,
         private onTrickle: (sessionId: SessionId, candidate: RTCIceCandidate) => void,
     ) {}
 
@@ -27,6 +28,7 @@ export class PeerConnectionManager {
         room: StreamRoomId,
         connectionType: ConnectionType,
         sessionId: SessionId = -1 as SessionId,
+        streamHandle?: StreamHandle,
     ) {
         // Prevent re-initialization if it already exists
         if (
@@ -42,7 +44,7 @@ export class PeerConnectionManager {
         }
 
         // Create the RTCPeerConnection
-        const pc = this.createPeerConnection(room);
+        const pc = this.createPeerConnection(room, streamHandle);
 
         // Prepare the connection object immediately so we can access the queue in the listener
         const newConnection: JanusConnection = {

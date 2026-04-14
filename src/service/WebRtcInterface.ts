@@ -22,41 +22,6 @@ export interface RoomModel {
 export type CreateAnswerAndSetDescriptionsModel = SdpWithRoomModel;
 export type SetAnswerAndSetRemoteDescriptionModel = SdpWithRoomModel;
 
-export interface StreamsUpdatedData {
-    videoroom: "updated";
-    room: StreamRoomId;
-    streams: UpdatedStreamData[];
-    jsep?: Jsep;
-}
-
-export interface UpdatedStreamData {
-    type: "audio" | "video" | "data";
-    streamId: number;
-    streamMid: number;
-    stream_display: string;
-    mindex: number;
-    mid: string;
-    send: boolean;
-    ready: boolean;
-}
-export interface CurrentPublishersData {
-    room: StreamRoomId;
-    publishers: NewPublisherEvent[];
-}
-
-export interface NewPublisherEvent {
-    id: number;
-    video_codec: string;
-    streams: VideoRoomStreamTrack[];
-}
-
-export interface VideoRoomStreamTrack {
-    type: string;
-    codec: string;
-    mid: string;
-    mindex: number;
-}
-
 export interface WebRtcInterface {
     createOfferAndSetLocalDescription(model: RoomModel): Promise<string>;
     createAnswerAndSetDescriptions(model: CreateAnswerAndSetDescriptionsModel): Promise<string>;

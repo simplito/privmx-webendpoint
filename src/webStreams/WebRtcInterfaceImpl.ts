@@ -10,12 +10,10 @@ limitations under the License.
 */
 
 import {
-    CurrentPublishersData,
     Jsep,
     RoomModel,
     SdpWithRoomModel,
     SetAnswerAndSetRemoteDescriptionModel,
-    StreamsUpdatedData,
     UpdateKeysModel,
     WebRtcInterface,
 } from "../service/WebRtcInterface";
@@ -58,10 +56,7 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     }
 
     async createOfferAndSetLocalDescription(model: RoomModel) {
-        const peerConnection = this.getClient().getPublisherPeerConnection(model.roomId);
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        return offer.sdp; // sdp
+        return this.getClient().createPublisherOffer(model.roomId);
     }
 
     async createAnswerAndSetDescriptions(model: SdpWithRoomModel): Promise<string> {
@@ -71,10 +66,7 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     }
 
     async setAnswerAndSetRemoteDescription(model: SetAnswerAndSetRemoteDescriptionModel) {
-        const peerConnection = this.getClient().getPublisherPeerConnection(model.roomId);
-        await peerConnection.setRemoteDescription(
-            new RTCSessionDescription({ sdp: model.sdp, type: model.type }),
-        );
+        await this.getClient().setPublisherRemoteDescription(model.roomId, model.sdp, model.type);
     }
 
     async close(roomId: StreamRoomId) {

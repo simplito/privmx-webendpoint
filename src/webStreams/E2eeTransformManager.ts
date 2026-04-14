@@ -133,6 +133,12 @@ export class E2eeTransformManager {
         }
     }
 
+    /** Posts the local microphone RMS level to the worker so it can be embedded in outgoing frames. */
+    async sendLocalRms(rms: number): Promise<void> {
+        const worker = await this.getWorker();
+        worker.postMessage({ operation: "rms", rms });
+    }
+
     async teardownReceiver(receiver: RTCRtpReceiver): Promise<void> {
         const worker = await this.getWorker();
         const enc = this.encByReceiver.get(receiver);
