@@ -4,7 +4,7 @@ import { Key, TurnCredentials, StreamHandle, DataChannelCryptorDecryptStatus } f
 import { KeyStore } from "./KeyStore";
 import { ConnectionType, PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
-import { StreamId, StreamRoomId } from "./types/ApiTypes";
+import { StreamRoomId } from "./types/ApiTypes";
 import { Queue } from "./Queue";
 import { Jsep } from "../service/WebRtcInterface";
 import { StateChangeDispatcher } from "../service/EventDispatcher";
@@ -21,9 +21,6 @@ export interface StreamsCallbackInterface {
     acceptOffer(sessionId: SessionId, sdp: Jsep): Promise<void>;
 }
 
-export interface WebRtcStateEvents {
-    connected: { streamId: StreamId };
-}
 
 export { AudioLevelFuncCallback };
 export type { AudioLevelsStats } from "./AudioManager";

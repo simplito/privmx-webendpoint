@@ -10,7 +10,6 @@ import {
     StreamTrackInit,
 } from "../webStreams/types/ApiTypes";
 import { BaseApi } from "./BaseApi";
-// import { StreamApiNative } from "../api/StreamApiNative";
 import {
     ContainerPolicy,
     PagingList,
@@ -334,7 +333,6 @@ export class StreamApi extends BaseApi {
                 value.published === false
             ) {
                 mediaTracks.push(value.track);
-                // value.published = true;
                 toPublish = true;
             }
 

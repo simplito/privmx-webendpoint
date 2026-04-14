@@ -1,45 +1,30 @@
-export enum LogLevel {
-    ERROR = 0,
-    WARN = 1,
-    INFO = 2,
-    DEBUG = 3,
-}
-
 export class Logger {
-    private level: LogLevel;
+    private level: number;
 
-    constructor(level: LogLevel = LogLevel.WARN) {
+    constructor(level: number = 1) {
         this.level = level;
     }
 
-    setLevel(level: LogLevel) {
-        this.level = level;
-    }
-
-    getLevel(): LogLevel {
-        return this.level;
-    }
-
-    private log(level: LogLevel, prefix: string, args: any[]) {
+    private log(level: number, prefix: string, args: unknown[]) {
         if (level <= this.level) {
             const timestamp = new Date().toISOString();
             console.log(`[${timestamp}] [${prefix}]`, ...args);
         }
     }
 
-    debug(...args: any[]) {
-        this.log(LogLevel.DEBUG, "DEBUG", args);
+    debug(...args: unknown[]) {
+        this.log(3, "DEBUG", args);
     }
 
-    info(...args: any[]) {
-        this.log(LogLevel.INFO, "INFO", args);
+    info(...args: unknown[]) {
+        this.log(2, "INFO", args);
     }
 
-    warn(...args: any[]) {
-        this.log(LogLevel.WARN, "WARN", args);
+    warn(...args: unknown[]) {
+        this.log(1, "WARN", args);
     }
 
-    error(...args: any[]) {
-        this.log(LogLevel.ERROR, "ERROR", args);
+    error(...args: unknown[]) {
+        this.log(0, "ERROR", args);
     }
 }
