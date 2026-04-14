@@ -32,6 +32,7 @@ import { KvdbApi } from "./KvdbApi";
 import { StoreApi } from "./StoreApi";
 import { StreamApi } from "./StreamApi";
 import { ThreadApi } from "./ThreadApi";
+import { setGlobalEmCrypto } from "../crypto/index";
 
 /**
  * //doc-gen:ignore
@@ -55,7 +56,8 @@ export class EndpointFactory {
         const basePath = this.resolveAssetsBasePath(assetsBasePath);
         this.assetsBasePath = basePath;
 
-        const assets = ["driver-web-context.js", "endpoint-wasm-module.js"];
+        setGlobalEmCrypto();
+        const assets = ["endpoint-wasm-module.js"];
 
         for (const asset of assets) {
             await this.loadScript(this.buildAssetUrl(basePath, asset));

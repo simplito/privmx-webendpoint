@@ -165,7 +165,6 @@ run_step "Build secp256k1 Cryptography Library" "$SCRIPT_PATH/build_secp"
 run_step "Build Async Engine" "$SCRIPT_PATH/build_async_engine"
 run_step "Build Web Browser Drivers" "$SCRIPT_PATH/build_webdrivers"
 run_step "Build PrivMX Endpoint Module" "$SCRIPT_PATH/build_privmx_endpoint" $PRIVMX_ENDPOINT
-run_step "Build Driver Web Context" "$SCRIPT_PATH/build_driver_web_context"
 run_step "Build API Interface" "$SCRIPT_PATH/build_api" $PRIVMX_ENDPOINT
 run_step "Add Built Assets to package" "$SCRIPT_PATH/move_wasm_assets"
 
