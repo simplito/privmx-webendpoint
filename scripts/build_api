@@ -9,6 +9,10 @@ fi
 PRIVMX_ENDPOINT_VERSION_IN=$1
 PRIVMX_ENDPOINT_VERSION="${PRIVMX_ENDPOINT_VERSION_IN//\//_}"
 
+# Optional second argument: "debug" enables debug build flags.
+# Defaults to "release".
+PRIVMX_BUILD_TYPE="${2:-release}"
+
 source "$SCRIPT_PATH/config.sh"
 source "$EMSDK_DIR/emsdk_env.sh"
 
@@ -26,14 +30,17 @@ case "$RESULT" in
         echo "No changes on Endpoint API Interface- skipping build"
         ;;
     1)
-        echo "changes - rebuild..."
+        echo "changes - rebuild... (build type: $PRIVMX_BUILD_TYPE)"
         cd "$PRIVMX_WEBENDPOINT_API_SRC"
         cp "$PRIVMX_ENDPOINT_SRC-$PRIVMX_ENDPOINT_VERSION/emscripten/jslibrary/websocket.js" "$PRIVMX_WEBENDPOINT_API_SRC/js/"
         rm -rf ./build-emscripten
         mkdir -p build-emscripten && cd build-emscripten
         echo "EMSDK_DIR PASSED TO CMAKE: $EMSDK_DIR"
         echo "====================================="
-        SDK_DIR=$EMSDK_DIR emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
+        SDK_DIR=$EMSDK_DIR emcmake cmake .. \
+            -D CMAKE_BUILD_TYPE=MinSizeRel \
+            -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -D PRIVMX_BUILD_TYPE="$PRIVMX_BUILD_TYPE"
         SDK_DIR=$EMSDK_DIR emmake make -j20
 
         set +e

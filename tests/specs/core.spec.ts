@@ -462,37 +462,4 @@ test.describe("CoreTest: Worker count", () => {
         expect(times["4w"]).toBeGreaterThan(0);
         expect(times["8w"]).toBeGreaterThan(0);
     });
-
-    // -------------------------------------------------------------------------
-    // CPU-bound benchmark: Promise.all(N x signData)
-    // signData is secp256k1 ECDSA — pure C++ crypto, no network round-trip.
-    // This isolates the worker-pool throughput from bridge/network latency.
-    // -------------------------------------------------------------------------
-
-    async function measureSignData(
-        page: Page,
-        workerCount: number,
-        opCount: number,
-    ): Promise<number> {
-        await page.goto("/tests/harness/index.html");
-        await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-
-        await page.evaluate(async (wc: number) => {
-            await window.Endpoint.setup({ assetsBasePath: "../../assets", workerCount: wc });
-        }, workerCount);
-
-        await page.waitForTimeout(200 + workerCount * 20);
-
-        return page.evaluate(async (opCount: number) => {
-            const cryptoApi = await window.Endpoint.createCryptoApi();
-            const privKey = await cryptoApi.generatePrivateKey();
-            const data = new Uint8Array(128).fill(0xab);
-
-            const t0 = performance.now();
-            await Promise.all(
-                Array.from({ length: opCount }, () => cryptoApi.signData(data, privKey)),
-            );
-            return performance.now() - t0;
-        }, opCount);
-    }
 });

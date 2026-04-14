@@ -47,10 +47,40 @@ The project uses a combined pipeline to compile the C++ core to Wasm and bundle 
 
 | Command | Description |
 | --- | --- |
-| `npm run build` | Runs the full pipeline: Clean -> Build Wasm -> Compile TS -> Bundle Webpack. |
-| `npm run build:wasm` | Compiles the C++ source code to WebAssembly using `scripts/pipeline.sh`. |
+| `npm run build` | Full release build: Clean → Build Wasm → Compile TS → Bundle Webpack. |
+| `npm run build:debug` | Full debug build (see below). |
+| `npm run build:wasm` | Compiles the C++ source to WebAssembly (release flags). |
+| `npm run build:wasm:debug` | Compiles the C++ source to WebAssembly (debug flags). |
 | `npm run build:js` | Compiles TypeScript (`tsc`) and bundles assets (`webpack`). |
 | `npm run watch:types` | Watches for TypeScript changes. |
+
+### Release vs Debug builds
+
+By default all builds are **release** builds: `-O3`, LTO enabled, `ASSERTIONS=0`, `SAFE_HEAP=0`.
+
+A **debug** build swaps in the following flags for the WASM module:
+
+| Flag | Release | Debug |
+| --- | --- | --- |
+| Optimisation | `-O3` + `-flto` | `-O0 -g` |
+| Emscripten assertions | `ASSERTIONS=0` | `ASSERTIONS=2` |
+| Heap safety checks | `SAFE_HEAP=0` | `SAFE_HEAP=1` |
+| Stack overflow check | off | `STACK_OVERFLOW_CHECK=2` |
+| Demangled stack traces | off | `DEMANGLE_SUPPORT=1` |
+| C++ `DEBUG` macro | not defined | defined |
+
+```bash
+# Full debug build (WASM + JS)
+npm run build:debug
+
+# WASM only (faster iteration)
+npm run build:wasm:debug
+
+# Or pass the env variable directly to the pipeline script
+PRIVMX_BUILD_TYPE=debug npm run build:wasm
+```
+
+> **Note:** Debug builds are significantly larger and slower than release builds. Use them only for local development and troubleshooting.
 
 ## Testing
 
