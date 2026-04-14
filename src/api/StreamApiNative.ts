@@ -24,6 +24,7 @@ import {
 import { WebRtcClient } from "../webStreams/WebRtcClient";
 import { SessionId } from "../webStreams/WebRtcClientTypes";
 import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
+import { WindowWithWasmHandler } from "../webStreams/types/WebRtcExtensions";
 import { Api } from "./Api";
 import { BaseNative } from "./BaseNative";
 import * as Types from "../Types";
@@ -261,11 +262,10 @@ export class StreamApiNative extends BaseNative {
 
     protected bindWebRtcInterfaceAsHandler(bindingId: number): void {
         this.webRtcInterfaceImpl = new WebRtcInterfaceImpl(this.webRtcClient);
-        let windowBinder = (window as any).webRtcInterfaceToNativeHandler;
-        if (!windowBinder) {
-            windowBinder = {};
+        const win = window as unknown as WindowWithWasmHandler;
+        if (!win.webRtcInterfaceToNativeHandler) {
+            win.webRtcInterfaceToNativeHandler = {};
         }
-        windowBinder[bindingId] = this.webRtcInterfaceImpl;
-        (window as any).webRtcInterfaceToNativeHandler = windowBinder;
+        win.webRtcInterfaceToNativeHandler[bindingId] = this.webRtcInterfaceImpl;
     }
 }

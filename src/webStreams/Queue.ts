@@ -1,38 +1,10 @@
-export interface QueueTask<T> {
-    func(item: T): Promise<void>;
-}
-
-export class Queue<T> implements Iterable<T> {
+export class Queue<T> {
     private items: T[] = [];
     private func: ((item: T) => Promise<void>) | undefined;
     private processing: boolean = false;
 
     enqueue(item: T): void {
         this.items.push(item);
-    }
-
-    dequeue(): T | undefined {
-        return this.items.shift();
-    }
-
-    peek(): T | undefined {
-        return this.items[0];
-    }
-
-    get size(): number {
-        return this.items.length;
-    }
-
-    isEmpty(): boolean {
-        return this.items.length === 0;
-    }
-
-    clear(): void {
-        this.items.length = 0;
-    }
-
-    toArray(): T[] {
-        return this.items.slice();
     }
 
     assignProcessorFunc(func: (item: T) => Promise<void>) {
@@ -47,28 +19,17 @@ export class Queue<T> implements Iterable<T> {
             throw new Error("No task processor function assigned");
         }
         this.processing = true;
+        let itemIndex = 0;
         while (this.items.length > 0) {
             const item = this.items.shift();
             if (!item) continue;
-            const randId = Math.random();
+            const itemId = itemIndex++;
             try {
                 await this.func(item);
             } catch (err) {
-                console.error("Error while processing queue item", randId, err);
+                console.error("Error while processing queue item", itemId, err);
             }
         }
-
         this.processing = false;
-    }
-
-    [Symbol.iterator](): Iterator<T> {
-        let idx = 0;
-        const arr = this.items;
-        return {
-            next(): IteratorResult<T> {
-                if (idx < arr.length) return { value: arr[idx++], done: false };
-                return { value: undefined as any, done: true };
-            },
-        };
     }
 }

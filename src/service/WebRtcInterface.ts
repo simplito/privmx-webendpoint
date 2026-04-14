@@ -9,7 +9,7 @@ export class UpdateKeysModel {
 
 export interface Jsep {
     sdp: string;
-    type: string;
+    type: RTCSdpType;
 }
 export interface SdpWithRoomModel extends Jsep {
     roomId: StreamRoomId;

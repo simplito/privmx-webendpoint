@@ -34,3 +34,7 @@ export interface WindowWithRTCRtpScriptTransform extends Window {
         options: RTCRtpScriptTransformOptions,
     ) => unknown;
 }
+
+export interface WindowWithWasmHandler extends Window {
+    webRtcInterfaceToNativeHandler: Record<number, unknown>;
+}

@@ -58,10 +58,7 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     }
 
     async createOfferAndSetLocalDescription(model: RoomModel) {
-        const peerConnection = this.getClient()
-            .getConnectionManager()
-            .getConnectionWithSession(model.roomId, "publisher").pc;
-
+        const peerConnection = this.getClient().getPublisherPeerConnection(model.roomId);
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
         return offer.sdp; // sdp
@@ -70,31 +67,19 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
     async createAnswerAndSetDescriptions(model: SdpWithRoomModel): Promise<string> {
         const offer: Jsep = { sdp: model.sdp, type: model.type };
         await this.getClient().onSubscriptionUpdated(model.roomId, offer);
-        return this.webRtcClient.lastProcessedAnswer[model.roomId].sdp;
+        return this.getClient().getLastProcessedAnswer(model.roomId).sdp;
     }
 
     async setAnswerAndSetRemoteDescription(model: SetAnswerAndSetRemoteDescriptionModel) {
-        const janusSession = this.getClient()
-            .getConnectionManager()
-            .getConnectionWithSession(model.roomId, "publisher");
-        if (!("pc" in janusSession)) {
-            throw new Error(
-                "WebRtcInterfaceImpl: No peerConnection available on setAnswerAndSetRemoteDescription",
-            );
-        }
-        const peerConnection = janusSession.pc;
+        const peerConnection = this.getClient().getPublisherPeerConnection(model.roomId);
         await peerConnection.setRemoteDescription(
-            new RTCSessionDescription({ sdp: model.sdp, type: model.type as RTCSdpType }),
+            new RTCSessionDescription({ sdp: model.sdp, type: model.type }),
         );
     }
 
     async close(roomId: StreamRoomId) {
-        this.getClient()
-            .getConnectionManager()
-            .closePeerConnectionBySessionIfExists(roomId, "subscriber");
-        this.getClient()
-            .getConnectionManager()
-            .closePeerConnectionBySessionIfExists(roomId, "publisher");
+        this.getClient().closeConnection(roomId, "subscriber");
+        this.getClient().closeConnection(roomId, "publisher");
     }
 
     async updateKeys(model: UpdateKeysModel) {
@@ -106,8 +91,7 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         sessionId: number,
         connectionType: ConnectionType,
     ): Promise<void> {
-        this.getClient()
-            .getConnectionManager()
-            .updateSessionForConnection(streamRoomId, connectionType, sessionId as SessionId);
+        this.getClient().updateConnectionSessionId(streamRoomId, sessionId as SessionId, connectionType);
     }
+
 }

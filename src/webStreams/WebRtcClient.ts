@@ -1,9 +1,8 @@
-import { JanusPluginHandle, JanusSession, QueueItem, SessionId } from "./WebRtcClientTypes";
+import { QueueItem, SessionId } from "./WebRtcClientTypes";
 import { WebRtcConfig } from "./WebRtcConfig";
 import { Key, TurnCredentials, StreamHandle, DataChannelCryptorDecryptStatus } from "../Types";
 import { KeyStore } from "./KeyStore";
-import { Utils } from "./Utils";
-import { PeerConnectionManager } from "./PeerConnectionsManager";
+import { ConnectionType, PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
 import { StreamId, StreamRoomId } from "./types/ApiTypes";
 import { Queue } from "./Queue";
@@ -16,11 +15,6 @@ import { E2eeTransformManager } from "./E2eeTransformManager";
 import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry";
 import { RemoteStreamListener } from "../Types";
 import { RTCConfigurationWithInsertableStreams } from "./types/WebRtcExtensions";
-
-export declare class RTCRtpScriptTransform {
-    constructor(worker: any, options: any);
-    transform: (frame: any, controller: any) => void;
-}
 
 export interface StreamsCallbackInterface {
     trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void>;
@@ -35,8 +29,6 @@ export { AudioLevelFuncCallback };
 export type { AudioLevelsStats } from "./AudioManager";
 
 export class WebRtcClient {
-    public readonly uniqId: string;
-
     private configuration: RTCConfiguration | undefined;
     private publishStreamHandle: StreamHandle;
     private peerCredentials: TurnCredentials[] | undefined;
@@ -46,7 +38,7 @@ export class WebRtcClient {
     private streamsApiInterface: StreamsCallbackInterface;
     private readonly logger: Logger;
     private readonly peerConnectionReconfigureQueue: Queue<QueueItem>;
-    public lastProcessedAnswer: { [roomId: string]: Jsep } = {};
+    private lastProcessedAnswer: { [roomId: string]: Jsep } = {};
     private bootstrapDataChannel: RTCDataChannel | undefined;
 
     constructor(
@@ -58,16 +50,15 @@ export class WebRtcClient {
         private readonly e2eeTransformManager: E2eeTransformManager,
         private readonly listenerRegistry: RemoteStreamListenerRegistry,
     ) {
-        this.uniqId = Utils.getRandomString(8) + "-" + Utils.getRandomString(8);
         this.sequenceNumberOfSender = 1;
         this.logger = new Logger();
 
         this.peerConnectionReconfigureQueue = new Queue<QueueItem>();
-        this.peerConnectionReconfigureQueue.assignProcessorFunc(async (_item: QueueItem) => {
-            if (_item.jsep && _item.jsep.type === "offer") {
-                await this.reconfigureSingle(_item._room, _item.jsep);
+        this.peerConnectionReconfigureQueue.assignProcessorFunc(async (item: QueueItem) => {
+            if (item.jsep && item.jsep.type === "offer") {
+                await this.reconfigureSingle(item.room, item.jsep);
             } else {
-                await this.reconfigureSingleCreateOffer(_item._room);
+                await this.reconfigureSingleCreateOffer(item.room);
             }
         });
     }
@@ -147,8 +138,37 @@ export class WebRtcClient {
         return this.eventsDispatcher;
     }
 
-    public getConnectionManager(): PeerConnectionManager {
-        return this.peerConnectionsManager;
+    /** Returns the last processed SDP answer for the given room, or throws if not yet available. */
+    public getLastProcessedAnswer(room: StreamRoomId): Jsep {
+        const answer = this.lastProcessedAnswer[room];
+        if (!answer) {
+            throw new Error(`No processed answer for room: ${room}`);
+        }
+        return answer;
+    }
+
+    /** Initialises a subscriber peer connection for the given room. */
+    public initializeSubscriberConnection(roomId: StreamRoomId): void {
+        this.peerConnectionsManager.initialize(roomId, "subscriber");
+    }
+
+    /** Updates the session ID for an existing peer connection (called after signalling). */
+    public updateConnectionSessionId(
+        roomId: StreamRoomId,
+        sessionId: SessionId,
+        connectionType: ConnectionType,
+    ): void {
+        this.peerConnectionsManager.updateSessionForConnection(roomId, connectionType, sessionId);
+    }
+
+    /** Closes a peer connection by type (used by WebRtcInterfaceImpl on room close). */
+    public closeConnection(roomId: StreamRoomId, connectionType: ConnectionType): void {
+        this.peerConnectionsManager.closePeerConnectionBySessionIfExists(roomId, connectionType);
+    }
+
+    /** Returns the RTCPeerConnection for the publisher side of a room (used by WebRtcInterfaceImpl). */
+    public getPublisherPeerConnection(roomId: StreamRoomId): RTCPeerConnection {
+        return this.peerConnectionsManager.getConnectionWithSession(roomId, "publisher").pc;
     }
 
     async setTurnCredentials(turnCredentials: TurnCredentials[]): Promise<void> {
@@ -164,10 +184,8 @@ export class WebRtcClient {
         this.publishStreamHandle = streamHandle;
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
 
-        const peerConnManager = this.getConnectionManager();
-        peerConnManager.initialize(streamRoomId, "publisher");
-
-        const pc = this.getConnectionManager().getConnectionWithSession(
+        this.peerConnectionsManager.initialize(streamRoomId, "publisher");
+        const pc = this.peerConnectionsManager.getConnectionWithSession(
             streamRoomId,
             "publisher",
         ).pc;
@@ -199,7 +217,7 @@ export class WebRtcClient {
         streamRoomId: StreamRoomId,
         stream: MediaStream,
     ): void {
-        const session = this.getConnectionManager().getConnectionWithSession(
+        const session = this.peerConnectionsManager.getConnectionWithSession(
             streamRoomId,
             "publisher",
         );
@@ -217,10 +235,8 @@ export class WebRtcClient {
         tracksToRemove: MediaStreamTrack[],
     ): Promise<RTCPeerConnection> {
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
-        const peerConnManager = this.getConnectionManager();
-        peerConnManager.initialize(streamRoomId, "publisher");
-
-        const pc = this.getConnectionManager().getConnectionWithSession(
+        this.peerConnectionsManager.initialize(streamRoomId, "publisher");
+        const pc = this.peerConnectionsManager.getConnectionWithSession(
             streamRoomId,
             "publisher",
         ).pc;
@@ -256,12 +272,10 @@ export class WebRtcClient {
         });
     }
 
-    /** @internal */
+    /** @internal — called by PeerConnectionManager's factory callback */
     createPeerConnectionMultiForRoom(
         roomId: StreamRoomId,
         configuration: RTCConfiguration,
-        _handle?: JanusPluginHandle,
-        _session?: JanusSession,
     ): RTCPeerConnection {
         const extConf: RTCConfigurationWithInsertableStreams = {
             ...configuration,
@@ -346,8 +360,8 @@ export class WebRtcClient {
         connection.addEventListener("iceconnectionstatechange", (event) => {
             this.logger.debug("iceconnectionstatechange: ", event);
         });
-        connection.addEventListener("negotiationneeded", (_event) => {
-            this.logger.debug("negotiationneeded: ", _event);
+        connection.addEventListener("negotiationneeded", (event) => {
+            this.logger.debug("negotiationneeded: ", event);
         });
         connection.addEventListener("signalingstatechange", (event) => {
             this.logger.debug("signalingstatechange: ", event);
@@ -366,8 +380,8 @@ export class WebRtcClient {
         return this.configuration;
     }
 
-    async updateKeys(_streamRoomId: StreamRoomId, keys: Key[]): Promise<void> {
-        this.logger.debug("=======> UPDATE KEYS", _streamRoomId, keys.length);
+    async updateKeys(streamRoomId: StreamRoomId, keys: Key[]): Promise<void> {
+        this.logger.debug("=======> UPDATE KEYS", streamRoomId, keys.length);
         this.keyStore.setKeys(keys);
         await this.e2eeTransformManager.setKeys(keys);
     }
@@ -400,7 +414,7 @@ export class WebRtcClient {
         const receiver = event.receiver;
         const publisherId = Number(event.streams[0].id);
 
-        const peerConnection = this.getConnectionManager().getConnectionWithSession(
+        const peerConnection = this.peerConnectionsManager.getConnectionWithSession(
             roomId,
             "subscriber",
         ).pc;
@@ -418,12 +432,11 @@ export class WebRtcClient {
     }
 
     public async onSubscriptionUpdated(
-        _room: StreamRoomId,
-        offer: { sdp: string; type: string },
+        room: StreamRoomId,
+        offer: Jsep,
     ): Promise<void> {
         this.peerConnectionReconfigureQueue.enqueue({
-            taskId: Utils.generateNumericId(),
-            _room,
+            room,
             jsep: offer,
         });
         try {
@@ -433,15 +446,15 @@ export class WebRtcClient {
         }
     }
 
-    public async onSubscriptionUpdatedSingle(_room: StreamRoomId, offer: any): Promise<Jsep> {
-        return this.reconfigureSingle(_room, offer);
+    public async onSubscriptionUpdatedSingle(room: StreamRoomId, offer: Jsep): Promise<Jsep> {
+        return this.reconfigureSingle(room, offer);
     }
 
     private async reconfigureSingle(room: StreamRoomId, offer: Jsep): Promise<Jsep> {
         if (!this.configuration) {
             throw new Error("Configuration missing.");
         }
-        const janusConnection = this.getConnectionManager().getConnectionWithSession(
+        const janusConnection = this.peerConnectionsManager.getConnectionWithSession(
             room,
             "subscriber",
         );
@@ -450,15 +463,15 @@ export class WebRtcClient {
         this.logger.debug("1. Setting up remoteDescription...");
 
         if (!this.bootstrapDataChannel) {
-            const bootstrap = peerConnection.createDataChannel("JanusDataChannel");
-            bootstrap.onerror = (e) => {
+            this.bootstrapDataChannel = peerConnection.createDataChannel("JanusDataChannel");
+            this.bootstrapDataChannel.onerror = (e) => {
                 console.error(e);
                 throw new Error("Cannot initialize Bootstrap dataChannel");
             };
         }
 
         await peerConnection.setRemoteDescription(
-            new RTCSessionDescription({ type: offer.type as RTCSdpType, sdp: offer.sdp }),
+            new RTCSessionDescription({ type: offer.type, sdp: offer.sdp }),
         );
         this.logger.debug("offer from Janus: ", JSON.stringify(offer, null, 2));
 
@@ -472,15 +485,19 @@ export class WebRtcClient {
         this.logger.debug("3. Setting up localDescription...");
         await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
 
-        this.lastProcessedAnswer[room] = answer as Jsep;
-        return answer as Jsep;
+        if (!answer.type || !answer.sdp) {
+            throw new Error("createAnswer returned incomplete description");
+        }
+        const jsepAnswer: Jsep = { sdp: answer.sdp, type: answer.type };
+        this.lastProcessedAnswer[room] = jsepAnswer;
+        return jsepAnswer;
     }
 
     private async reconfigureSingleCreateOffer(room: StreamRoomId): Promise<Jsep> {
         if (!this.configuration) {
             throw new Error("Configuration missing.");
         }
-        const janusConnection = this.getConnectionManager().getConnectionWithSession(
+        const janusConnection = this.peerConnectionsManager.getConnectionWithSession(
             room,
             "publisher",
         );
@@ -491,6 +508,9 @@ export class WebRtcClient {
             new RTCSessionDescription({ type: "offer", sdp: offer.sdp }),
         );
 
-        return offer as Jsep;
+        if (!offer.type || !offer.sdp) {
+            throw new Error("createOffer returned incomplete description");
+        }
+        return { sdp: offer.sdp, type: offer.type };
     }
 }

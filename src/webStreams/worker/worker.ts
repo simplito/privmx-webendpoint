@@ -20,6 +20,14 @@ export interface TransformContext {
     publisherId?: number;
 }
 
+interface RTCTransformEvent extends Event {
+    transformer: {
+        options: unknown;
+        readable: ReadableStream<unknown>;
+        writable: WritableStream<unknown>;
+    };
+}
+
 interface TransformerOptions {
     operation: "encode" | "decode";
     kind: "audio" | "video";
@@ -69,10 +77,10 @@ export class EncryptTransform {
     async encryptFrame(
         encodedFrame: RTCEncodedAudioFrame | RTCEncodedVideoFrame,
         kind: string,
-        controller: TransformStreamDefaultController<any>,
+        controller: TransformStreamDefaultController<unknown>,
     ) {
         const headerLen =
-            kind === "video" ? this.getHeaderSizeByType((encodedFrame as any).type) : 1;
+            kind === "video" ? this.getHeaderSizeByType((encodedFrame as RTCEncodedVideoFrame).type) : 1;
         const frameHeader = new Uint8Array(encodedFrame.data, 0, headerLen);
         const frameBody = new Uint8Array(encodedFrame.data, headerLen);
 
@@ -110,7 +118,7 @@ export class EncryptTransform {
     async decryptFrame(
         encodedFrame: RTCEncodedVideoFrame | RTCEncodedAudioFrame,
         kind: string,
-        controller: TransformStreamDefaultController<any>,
+        controller: TransformStreamDefaultController<unknown>,
         receiverId?: string,
         publisherId?: number,
     ) {
@@ -133,7 +141,8 @@ export class EncryptTransform {
         const currTime = Date.now();
         if (recvRMSTimestamp + 100 < currTime) {
             recvRMSTimestamp = currTime;
-            (self as any).postMessage({ type: "rms", rms: recvRMS, receiverId, publisherId });
+            const msg: events.RmsOutEvent = { type: "rms", rms: recvRMS, receiverId, publisherId };
+            (self as unknown as Worker).postMessage(msg);
         }
 
         const keyIdLenPos = rmsPos - 1;
@@ -176,25 +185,34 @@ export class EncryptTransform {
     }
 }
 
-self.addEventListener("message", async (event: MessageEvent) => {
+self.addEventListener("message", async (event: MessageEvent<events.WorkerInboundEvent>) => {
     if (!event || !event.data || typeof event.data !== "object" || !event.data.operation) return;
-    const { operation, kind } = event.data;
+    const msg = event.data;
 
-    if (operation === "initialize") {
+    if (msg.operation === "initialize") {
         logDebug("worker initialize call");
-    } else if (operation === "init-pipeline") {
-        pipelines.set(event.data.id, { ready: false });
-        self.postMessage({ operation: "init-pipeline", id: event.data.id });
-    } else if (operation === "encode" || operation === "decode") {
-        const { readableStream, writableStream, id, publisherId } = event.data;
-        const context: TransformContext = { id, publisherId };
-        handleTransform(context, operation, kind, readableStream, writableStream);
-    } else if (operation === "setKeys") {
-        const data = event.data as events.SetKeysEvent;
-        keyStore.setKeys(data.keys);
-        self.postMessage({ operation: "setKeys-ack" });
-    } else if (operation === "rms") {
-        lastRMS = Math.round(event.data.rms as number);
+    } else if (msg.operation === "init-pipeline") {
+        pipelines.set(msg.id, { ready: false });
+        const ack: events.InitPipelineAckEvent = { operation: "init-pipeline", id: msg.id };
+        (self as unknown as Worker).postMessage(ack);
+    } else if (msg.operation === "encode" || msg.operation === "decode") {
+        const context: TransformContext = {
+            id: "id" in msg ? msg.id : undefined,
+            publisherId: "publisherId" in msg ? msg.publisherId : undefined,
+        };
+        handleTransform(
+            context,
+            msg.operation,
+            msg.kind,
+            msg.readableStream,
+            msg.writableStream,
+        );
+    } else if (msg.operation === "setKeys") {
+        keyStore.setKeys(msg.keys);
+        const ack: events.SetKeysAckEvent = { operation: "setKeys-ack" };
+        (self as unknown as Worker).postMessage(ack);
+    } else if (msg.operation === "rms") {
+        lastRMS = Math.round(msg.rms);
     }
 });
 
@@ -226,8 +244,8 @@ function handleTransform(
     context: TransformContext,
     operation: string,
     kind: string,
-    readableStream: ReadableStream,
-    writableStream: WritableStream,
+    readableStream: ReadableStream<unknown>,
+    writableStream: WritableStream<unknown>,
 ) {
     let transformStream: TransformStream;
     logDebug("handleTransform: " + JSON.stringify({ operation, context }));
@@ -240,7 +258,7 @@ function handleTransform(
         const pipeline = readableStream
             .pipeThrough(transformStream)
             .pipeTo(writableStream)
-            .catch((err: any) => {
+            .catch((err: unknown) => {
                 if (!String(err).includes("Destination stream closed")) {
                     console.error("pipeline error", err);
                 }
@@ -252,8 +270,10 @@ function handleTransform(
     }
 }
 
-if ((self as any).RTCTransformEvent) {
-    (self as any).onrtctransform = (event: any) => {
+if ((self as unknown as { RTCTransformEvent: unknown }).RTCTransformEvent) {
+    (self as unknown as { onrtctransform: (event: RTCTransformEvent) => void }).onrtctransform = (
+        event: RTCTransformEvent,
+    ) => {
         const transformer = event.transformer;
         const options = transformer.options as TransformerOptions;
 
@@ -276,13 +296,15 @@ if ((self as any).RTCTransformEvent) {
 /**
  * LOGGING UTILS
  */
-function logDebug(msg: any) {
+function logDebug(msg: unknown) {
     if (!DEBUG) return;
-    self.postMessage({ type: "debug", data: msg });
+    const dbg: events.DebugEvent = { type: "debug", data: msg };
+    (self as unknown as Worker).postMessage(dbg);
 }
 
-function logError(msg: any) {
-    self.postMessage({ type: "error", data: msg });
+function logError(msg: unknown) {
+    const err: events.ErrorEvent = { type: "error", data: msg };
+    (self as unknown as Worker).postMessage(err);
 }
 
 logDebug("Worker Initialized");
