@@ -8,7 +8,7 @@ export class LocalAudioLevelMeter {
 
     constructor(
         private track: MediaStreamTrack,
-        private onLevel: (rmsDb: number) => void,
+        protected onLevel: (rmsDb: number) => void,
     ) {}
 
     async init(workletUrl: string) {

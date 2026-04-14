@@ -317,7 +317,7 @@ export class EndpointFactory {
         if ("streams" in connection.apisRefs) {
             throw new Error("StreamApi already registered for given connection.");
         }
-        const webRtcClient = new WebRtcClient(this.assetsBasePath);
+        const webRtcClient = WebRtcClient.create(this.assetsBasePath);
         const nativeApi = new StreamApiNative(this.api, webRtcClient);
 
         const ptr = await nativeApi.newApi(connection.servicePtr, eventApi.servicePtr);

@@ -1,19 +1,6 @@
-import {
-    EncPair,
-    JanusPluginHandle,
-    JanusSession,
-    QueueItem,
-    SessionId,
-} from "./WebRtcClientTypes";
-import { WebWorker } from "./WebWorkerHelper";
+import { JanusPluginHandle, JanusSession, QueueItem, SessionId } from "./WebRtcClientTypes";
 import { WebRtcConfig } from "./WebRtcConfig";
-import {
-    Key,
-    TurnCredentials,
-    StreamHandle,
-    RemoteStreamListener,
-    DataChannelCryptorDecryptStatus,
-} from "../Types";
+import { Key, TurnCredentials, StreamHandle, DataChannelCryptorDecryptStatus } from "../Types";
 import { KeyStore } from "./KeyStore";
 import { Utils } from "./Utils";
 import { PeerConnectionManager } from "./PeerConnectionsManager";
@@ -21,11 +8,14 @@ import { Logger } from "./Logger";
 import { StreamId, StreamRoomId } from "./types/ApiTypes";
 import { Queue } from "./Queue";
 import { Jsep } from "../service/WebRtcInterface";
-import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
-import { ActiveSpeakerDetector, DEFAULTS, SpeakerState } from "./audio/ActiveSpeakerDetector";
 import { StateChangeDispatcher } from "../service/EventDispatcher";
 import { StreamTrack } from "../service/StreamApi";
 import { DataChannelCryptor, DataChannelCryptorError } from "./DataChannelCryptor";
+import { AudioManager, AudioLevelFuncCallback } from "./AudioManager";
+import { E2eeTransformManager } from "./E2eeTransformManager";
+import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry";
+import { RemoteStreamListener } from "../Types";
+import { RTCConfigurationWithInsertableStreams } from "./types/WebRtcExtensions";
 
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
@@ -37,70 +27,41 @@ export interface StreamsCallbackInterface {
     acceptOffer(sessionId: SessionId, sdp: Jsep): Promise<void>;
 }
 
-export interface UserAudioStats {
-    streamId: number;
-    rms: number;
-    active: boolean;
-}
-
 export interface WebRtcStateEvents {
     connected: { streamId: StreamId };
 }
 
-export interface AudioLevelsStats {
-    levels: SpeakerState[];
-}
+export { AudioLevelFuncCallback };
+export type { AudioLevelsStats } from "./AudioManager";
 
-type AudioLevelFuncCallback = (changes: AudioLevelsStats) => void;
 export class WebRtcClient {
-    public uniqId: string;
-    private e2eeWorker: Worker | undefined;
-    private webWorkerApi: WebWorker;
-    private keyStore: KeyStore = new KeyStore();
+    public readonly uniqId: string;
 
     private configuration: RTCConfiguration | undefined;
-
     private publishStreamHandle: StreamHandle;
-
-    // to moze byc uzyte kiedy wymagany jest update credentials (jak straca waznosc)
     private peerCredentials: TurnCredentials[] | undefined;
-
-    private remoteStreamsListeners: Map<StreamRoomId, RemoteStreamListener[]> = new Map();
-    private sequenceNumberByRemoteStreamId: Map<number, number> = new Map();
-    private dataChannelByRemoteStreamId: Map<number, RTCDataChannel> = new Map();
-    private dataChannelCryptor: DataChannelCryptor;
+    private readonly sequenceNumberByRemoteStreamId: Map<number, number> = new Map();
+    private readonly dataChannelByRemoteStreamId: Map<number, RTCDataChannel> = new Map();
     private sequenceNumberOfSender: number;
-    private peerConnectionsManager: PeerConnectionManager;
     private streamsApiInterface: StreamsCallbackInterface;
-    private activeSpeakerDetector: ActiveSpeakerDetector;
-    private audioLevelCallback: AudioLevelFuncCallback;
-
-    // private mediaServerAvailPublishers: {[publisherId: number]: Publisher} = {};
-    private encByReceiver = new WeakMap<RTCRtpReceiver, EncPair>();
-    private logger: Logger = new Logger();
-
-    private peerConnectionReconfigureQueue: Queue<QueueItem> | undefined;
+    private readonly logger: Logger;
+    private readonly peerConnectionReconfigureQueue: Queue<QueueItem>;
     public lastProcessedAnswer: { [roomId: string]: Jsep } = {};
-    private lastMeasuredLocalRMS: number = LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
-    private eventsDispatcher: StateChangeDispatcher = new StateChangeDispatcher();
-    private localAudioLevelMeters: Map<string, LocalAudioLevelMeter> = new Map();
-
     private bootstrapDataChannel: RTCDataChannel | undefined;
 
-    constructor(private assetsDir: string) {
+    constructor(
+        private readonly peerConnectionsManager: PeerConnectionManager,
+        private readonly keyStore: KeyStore,
+        private readonly dataChannelCryptor: DataChannelCryptor,
+        private readonly eventsDispatcher: StateChangeDispatcher,
+        private readonly audioManager: AudioManager,
+        private readonly e2eeTransformManager: E2eeTransformManager,
+        private readonly listenerRegistry: RemoteStreamListenerRegistry,
+    ) {
         this.uniqId = Utils.getRandomString(8) + "-" + Utils.getRandomString(8);
         this.sequenceNumberOfSender = 1;
-        this.peerConnectionsManager = new PeerConnectionManager(
-            (roomId: StreamRoomId) => {
-                return this.createPeerConnectionMultiForRoom(
-                    roomId,
-                    this.getPeerConnectionConfiguration(),
-                );
-            },
-            (sessionId: SessionId, candidate: RTCIceCandidate) => {
-                return this.streamsApiInterface.trickle(sessionId, candidate);
-            },
-        );
+        this.logger = new Logger();
+
         this.peerConnectionReconfigureQueue = new Queue<QueueItem>();
         this.peerConnectionReconfigureQueue.assignProcessorFunc(async (_item: QueueItem) => {
             if (_item.jsep && _item.jsep.type === "offer") {
@@ -109,140 +70,88 @@ export class WebRtcClient {
                 await this.reconfigureSingleCreateOffer(_item._room);
             }
         });
-
-        this.activeSpeakerDetector = new ActiveSpeakerDetector(DEFAULTS);
-        this.dataChannelCryptor = new DataChannelCryptor(this.keyStore);
     }
 
-    private async ensureLocalAudioLevelMeter(track: MediaStreamTrack) {
-        if (this.localAudioLevelMeters.has(track.id)) {
-            return;
-        }
-        const worker = await this.getWorker();
-        const meter = new LocalAudioLevelMeter(track, (onRms) => {
-            const rmsToReport = track.enabled ? onRms : LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
-            worker.postMessage({ operation: "rms", rms: rmsToReport });
-            this.lastMeasuredLocalRMS = onRms;
+    /**
+     * Wires all dependencies and returns a ready WebRtcClient instance.
+     *
+     * PeerConnectionManager requires a factory callback that calls back into
+     * WebRtcClient, so construction is bootstrapped via late binding.
+     */
+    static create(assetsDir: string): WebRtcClient {
+        const keyStore = new KeyStore();
+        const dataChannelCryptor = new DataChannelCryptor(keyStore);
+        const eventsDispatcher = new StateChangeDispatcher();
+        const listenerRegistry = new RemoteStreamListenerRegistry();
+
+        // PeerConnectionManager's factory callback is bound after the client is
+        // constructed via a shared mutable reference to avoid circular dep.
+        let clientRef: WebRtcClient | undefined;
+
+        const peerConnectionsManager = new PeerConnectionManager(
+            (roomId: StreamRoomId) => {
+                if (!clientRef) throw new Error("WebRtcClient not yet initialized");
+                return clientRef.createPeerConnectionMultiForRoom(
+                    roomId,
+                    clientRef.getPeerConnectionConfiguration(),
+                );
+            },
+            (sessionId: SessionId, candidate: RTCIceCandidate) => {
+                if (!clientRef) throw new Error("WebRtcClient not yet initialized");
+                return clientRef.streamsApiInterface.trickle(sessionId, candidate);
+            },
+        );
+
+        const e2eeTransformManager = new E2eeTransformManager(assetsDir, (publisherId, rms) => {
+            if (clientRef) {
+                clientRef.audioManager.onRemoteFrameRms(publisherId, rms);
+            }
         });
-        this.localAudioLevelMeters.set(track.id, meter);
-        try {
-            await meter.init(this.assetsDir + "/rms-processor.js");
-        } catch (e) {
-            this.localAudioLevelMeters.delete(track.id);
-            meter.stop();
-            throw e;
-        }
+
+        const audioManager = new AudioManager(assetsDir, async (rms) => {
+            const worker = await e2eeTransformManager.getWorker();
+            worker.postMessage({ operation: "rms", rms });
+        });
+
+        const client = new WebRtcClient(
+            peerConnectionsManager,
+            keyStore,
+            dataChannelCryptor,
+            eventsDispatcher,
+            audioManager,
+            e2eeTransformManager,
+            listenerRegistry,
+        );
+
+        clientRef = client;
+        return client;
     }
 
-    private stopLocalAudioLevelMeter(track: MediaStreamTrack) {
-        const meter = this.localAudioLevelMeters.get(track.id);
-        if (!meter) {
-            return;
-        }
-        this.localAudioLevelMeters.delete(track.id);
-        meter.stop();
+    public setAudioLevelCallback(func: AudioLevelFuncCallback): void {
+        this.audioManager.setAudioLevelCallback(func);
     }
 
-    public setAudioLevelCallback(func: AudioLevelFuncCallback) {
-        this.audioLevelCallback = func;
-    }
-
-    public bindApiInterface(streamsApiInterface: StreamsCallbackInterface) {
+    public bindApiInterface(streamsApiInterface: StreamsCallbackInterface): void {
         this.streamsApiInterface = streamsApiInterface;
     }
 
-    public addRemoteStreamListener(listener: RemoteStreamListener) {
-        let listeners = this.remoteStreamsListeners.get(listener.streamRoomId) || [];
-
-        const exists = listeners.find((x) => x.streamId === listener.streamId);
-        if (exists) {
-            throw new Error("RemoteStreamListener with given params already exists.");
-        }
-
-        listeners.push(listener);
-        this.remoteStreamsListeners.set(listener.streamRoomId, listeners);
+    public addRemoteStreamListener(listener: RemoteStreamListener): void {
+        this.listenerRegistry.add(listener);
     }
 
-    public getStreamStateChangeDispatcher() {
+    public getStreamStateChangeDispatcher(): StateChangeDispatcher {
         return this.eventsDispatcher;
     }
 
-    public getConnectionManager() {
-        if (!this.peerConnectionsManager) {
-            throw new Error("No peerConnectionManager initialized.");
-        }
+    public getWebRtcEventDispatcher(): StateChangeDispatcher {
+        return this.eventsDispatcher;
+    }
+
+    public getConnectionManager(): PeerConnectionManager {
         return this.peerConnectionsManager;
     }
 
-    public getWebRtcEventDispatcher() {
-        return this.eventsDispatcher;
-    }
-
-    protected async getWorker(): Promise<Worker> {
-        if (!this.e2eeWorker) {
-            const workerApi = await this.getWorkerApi();
-            this.e2eeWorker = workerApi.getWorker();
-        }
-        if (!this.e2eeWorker) {
-            throw new Error("Worker not initialized.");
-        }
-        return this.e2eeWorker;
-    }
-
-    protected async initPipeline(receiverTrackId: string, publisherId: number): Promise<void> {
-        const worker = await this.getWorker();
-        const waitPromise = new Promise<void>((resolve) => {
-            const listener = (ev: MessageEvent) => {
-                if (ev.data.operation === "init-pipeline" && ev.data.id === receiverTrackId) {
-                    worker.removeEventListener("message", listener);
-                    resolve();
-                }
-            };
-            worker.addEventListener("message", listener);
-            worker.postMessage({
-                operation: "init-pipeline",
-                id: receiverTrackId,
-                publisherId: publisherId,
-            });
-        });
-
-        return waitPromise;
-    }
-
-    protected async getWorkerApi(): Promise<WebWorker> {
-        if (!this.webWorkerApi) {
-            this.webWorkerApi = new WebWorker(this.assetsDir, (frameInfo) => {
-                if (this.audioLevelCallback && typeof this.audioLevelCallback === "function") {
-                    // report local rms to activeSpeakerDetector to have notifications for local streams
-                    this.activeSpeakerDetector.onFrame({
-                        id: 0,
-                        rms: this.lastMeasuredLocalRMS,
-                        timestamp: Date.now(),
-                    });
-                    const speakers = this.activeSpeakerDetector.onFrame({
-                        id: frameInfo.publisherId,
-                        rms: frameInfo.rms,
-                        timestamp: Date.now(),
-                    });
-                    // if (laudestParticipant === frameInfo.publisherId) {
-                    this.audioLevelCallback({ levels: speakers });
-                    // }
-                }
-            });
-            await this.webWorkerApi.init_e2ee();
-        }
-        return this.webWorkerApi;
-    }
-
-    protected getPeerConnectionConfiguration(): RTCConfiguration {
-        if (!this.configuration) {
-            // throw new Error("No peerConnectionConfiguration created");
-            this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
-        }
-        return this.configuration;
-    }
-
-    async setTurnCredentials(turnCredentials: TurnCredentials[]) {
+    async setTurnCredentials(turnCredentials: TurnCredentials[]): Promise<void> {
         this.peerCredentials = turnCredentials;
     }
 
@@ -264,16 +173,12 @@ export class WebRtcClient {
         ).pc;
 
         if (stream.getTracks().length > 0) {
-            const tracks = stream.getTracks();
-            this.e2eeWorker = await this.getWorker();
-            for (const track of tracks) {
+            for (const track of stream.getTracks()) {
                 if (track.kind === "audio") {
-                    // add RMSProcessor
-                    await this.ensureLocalAudioLevelMeter(track);
+                    await this.audioManager.ensureLocalAudioLevelMeter(track);
                 }
-
                 const streamSender = pc.addTrack(track, stream);
-                this.setupSenderTransform(streamSender);
+                await this.e2eeTransformManager.setupSenderTransform(streamSender);
             }
         }
 
@@ -290,11 +195,16 @@ export class WebRtcClient {
         return pc;
     }
 
-    removeSenderPeerConnectionOnUnpublish(streamRoomId: StreamRoomId, stream: MediaStream) {
-        const peerConnManager = this.getConnectionManager();
-        const session = peerConnManager.getConnectionWithSession(streamRoomId, "publisher");
+    removeSenderPeerConnectionOnUnpublish(
+        streamRoomId: StreamRoomId,
+        stream: MediaStream,
+    ): void {
+        const session = this.getConnectionManager().getConnectionWithSession(
+            streamRoomId,
+            "publisher",
+        );
         for (const track of stream.getAudioTracks()) {
-            this.stopLocalAudioLevelMeter(track);
+            this.audioManager.stopLocalAudioLevelMeter(track);
         }
         session.pc.close();
         session.pc = undefined;
@@ -315,40 +225,19 @@ export class WebRtcClient {
             "publisher",
         ).pc;
 
-        if (tracksToAdd.length > 0) {
-            this.e2eeWorker = await this.getWorker();
-
-            for (const track of tracksToAdd) {
-                if (track.kind === "audio") {
-                    await this.ensureLocalAudioLevelMeter(track);
-                }
-                const videoSender = pc.addTrack(track, localStream);
-                if ((window as any).RTCRtpScriptTransform) {
-                    const options = {
-                        operation: "encode",
-                    };
-                    (videoSender as any).transform = new RTCRtpScriptTransform(
-                        this.e2eeWorker,
-                        options,
-                    );
-                } else {
-                    const senderStreams = (videoSender as any).createEncodedStreams();
-                    this.e2eeWorker.postMessage(
-                        {
-                            operation: "encode",
-                            readableStream: senderStreams.readable,
-                            writableStream: senderStreams.writable,
-                        },
-                        [senderStreams.readable, senderStreams.writable],
-                    );
-                }
+        for (const track of tracksToAdd) {
+            if (track.kind === "audio") {
+                await this.audioManager.ensureLocalAudioLevelMeter(track);
             }
+            const videoSender = pc.addTrack(track, localStream);
+            await this.e2eeTransformManager.setupSenderTransform(videoSender);
         }
+
         if (tracksToRemove.length > 0) {
             const senders = pc.getSenders();
             for (const oldTrack of tracksToRemove) {
                 if (oldTrack.kind === "audio") {
-                    this.stopLocalAudioLevelMeter(oldTrack);
+                    this.audioManager.stopLocalAudioLevelMeter(oldTrack);
                 }
                 const sender = senders.find((s) => s.track === oldTrack);
                 if (sender) {
@@ -359,7 +248,7 @@ export class WebRtcClient {
         return pc;
     }
 
-    async encryptDataChannelData(data: Uint8Array) {
+    async encryptDataChannelData(data: Uint8Array): Promise<Uint8Array> {
         const nextSequenceNumber = ++this.sequenceNumberOfSender;
         return this.dataChannelCryptor.encryptToWireFormat({
             plaintext: data,
@@ -367,21 +256,22 @@ export class WebRtcClient {
         });
     }
 
-    private createPeerConnectionMultiForRoom(
+    /** @internal */
+    createPeerConnectionMultiForRoom(
         roomId: StreamRoomId,
-        configuration: RTCConfiguration & { encodedInsertableStreams?: boolean },
+        configuration: RTCConfiguration,
         _handle?: JanusPluginHandle,
         _session?: JanusSession,
     ): RTCPeerConnection {
-        const extConf = configuration;
-        (extConf as any).encodedInsertableStreams = true;
+        const extConf: RTCConfigurationWithInsertableStreams = {
+            ...configuration,
+            encodedInsertableStreams: true,
+        };
         const connection = new RTCPeerConnection(extConf);
 
-        // gethering state change
         connection.addEventListener("icegatheringstatechange", (event) => {
             this.logger.debug("on ice state change: ", event);
         });
-        // ice candidate error
         connection.addEventListener("icecandidateerror", (event) => {
             this.logger.debug("on ice error: ", event);
         });
@@ -417,20 +307,21 @@ export class WebRtcClient {
                           : new Uint8Array(dataEvent.data.buffer);
 
                 try {
-                    const lastSeq = this.sequenceNumberByRemoteStreamId.get(remoteStreamId) || 0;
+                    const lastSeq =
+                        this.sequenceNumberByRemoteStreamId.get(remoteStreamId) || 0;
                     const decrypted = await this.dataChannelCryptor.decryptFromWireFormat({
                         frame,
                         lastSequenceNumber: lastSeq,
                     });
                     this.sequenceNumberByRemoteStreamId.set(remoteStreamId, decrypted.seq);
                     this.logger.debug(
-                        "Calling listener for dataChannel with values: ",
+                        "Calling listener for dataChannel: ",
                         roomId,
                         remoteStreamId,
                         decrypted.data,
                         DataChannelCryptorDecryptStatus.OK,
                     );
-                    this.callRegisteredListenersForDataChannel(
+                    this.listenerRegistry.dispatchData(
                         roomId,
                         remoteStreamId,
                         decrypted.data,
@@ -438,7 +329,7 @@ export class WebRtcClient {
                     );
                 } catch (e) {
                     if (e instanceof DataChannelCryptorError) {
-                        this.callRegisteredListenersForDataChannel(
+                        this.listenerRegistry.dispatchData(
                             roomId,
                             remoteStreamId,
                             new Uint8Array(),
@@ -455,9 +346,8 @@ export class WebRtcClient {
         connection.addEventListener("iceconnectionstatechange", (event) => {
             this.logger.debug("iceconnectionstatechange: ", event);
         });
-        connection.addEventListener("negotiationneeded", async (_event) => {
+        connection.addEventListener("negotiationneeded", (_event) => {
             this.logger.debug("negotiationneeded: ", _event);
-            // await this.startNegotiationMulti(roomId, (_event as any).target);
         });
         connection.addEventListener("signalingstatechange", (event) => {
             this.logger.debug("signalingstatechange: ", event);
@@ -468,118 +358,30 @@ export class WebRtcClient {
         return connection;
     }
 
-    private async startNegotiationMulti(
-        roomId: StreamRoomId,
-        _rtcPeerConnection: RTCPeerConnection,
-        _withIceRestart?: boolean,
-    ) {
-        try {
-            if (!this.peerConnectionReconfigureQueue) {
-                throw new Error("ReconfigureQueue does not exist.");
-            }
-            this.peerConnectionReconfigureQueue.enqueue({
-                taskId: Utils.generateNumericId(),
-                _room: roomId,
-            });
-            try {
-                await this.peerConnectionReconfigureQueue.processAll();
-            } catch (e) {
-                console.error("Error on onSubscriberAttached", e);
-            }
-        } catch (e) {
-            console.error("Error on startNegotiationMulti", e);
+    /** @internal */
+    getPeerConnectionConfiguration(): RTCConfiguration {
+        if (!this.configuration) {
+            this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
         }
+        return this.configuration;
     }
 
-    async updateKeys(_streamRoomId: StreamRoomId, keys: Key[]) {
+    async updateKeys(_streamRoomId: StreamRoomId, keys: Key[]): Promise<void> {
         this.logger.debug("=======> UPDATE KEYS", _streamRoomId, keys.length);
         this.keyStore.setKeys(keys);
-        await (await this.getWorkerApi()).setKeys(keys);
+        await this.e2eeTransformManager.setKeys(keys);
     }
 
-    private setupSenderTransform(videoSender: RTCRtpSender) {
-        if ((window as any).RTCRtpScriptTransform) {
-            const options = {
-                operation: "encode",
-            };
-            (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
-        } else {
-            this.logger.debug("Worker - encoding frames using EncodedStreams");
-            const senderStreams = (videoSender as any).createEncodedStreams();
-            this.e2eeWorker.postMessage(
-                {
-                    operation: "encode",
-                    readableStream: senderStreams.readable,
-                    writableStream: senderStreams.writable,
-                },
-                [senderStreams.readable, senderStreams.writable],
-            );
-        }
-    }
-
-    private async setupReceiverTransform(
-        receiver: RTCRtpReceiver,
-        publisherId: number,
-        worker: Worker,
-    ) {
-        if ("RTCRtpScriptTransform" in window && !receiver.transform) {
-            this.logger.debug("-> using RtpScriptTransform");
-            const id = receiver.track.id;
-            receiver.transform = new window.RTCRtpScriptTransform(worker, {
-                operation: "decode",
-                id,
-                publisherId,
-            });
+    private async waitUntilConnected(pc: RTCPeerConnection): Promise<void> {
+        if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
             return;
         }
-        this.logger.debug("-> using EncodedStreams");
-
-        // Fallback: Encoded Streams
-        if (
-            !this.encByReceiver.has(receiver) &&
-            "createEncodedStreams" in receiver &&
-            typeof receiver.createEncodedStreams === "function"
-        ) {
-            this.logger.debug("-> call for createEncodedStreams()");
-            const { readable, writable } = await receiver.createEncodedStreams();
-            const enc = {
-                readable,
-                writable,
-                id: receiver.track.id,
-                publisherId: publisherId,
-                posted: false,
-            };
-            this.encByReceiver.set(receiver, enc);
-
-            this.logger.debug("-> posting EncodedStreams to worker (should happen only once)");
-
-            await this.initPipeline(enc.id, enc.publisherId);
-
-            worker.postMessage(
-                {
-                    operation: "decode",
-                    id: enc.id,
-                    publisherId: enc.publisherId,
-                    readableStream: enc.readable,
-                    writableStream: enc.writable,
-                },
-                [enc.readable, enc.writable], // transfer ownership
-            );
-        } else {
-            this.logger.debug("-> EncodedStreams posted to worker already.");
-        }
-    }
-
-    private async waitUntilConnected(pc: RTCPeerConnection) {
-        if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed")
-            return Promise.resolve();
         return new Promise<void>((resolve, reject) => {
             const onChange = () => {
                 if (
                     pc.iceConnectionState === "connected" ||
                     pc.iceConnectionState === "completed"
                 ) {
-                    // pc.removeEventListener('iceconnectionstatechange', onChange);
                     resolve();
                 } else if (
                     pc.iceConnectionState === "failed" ||
@@ -594,17 +396,7 @@ export class WebRtcClient {
         });
     }
 
-    private async teardownReceiver(receiver: RTCRtpReceiver, worker: Worker) {
-        const enc = this.encByReceiver.get(receiver);
-        if (enc) {
-            worker.postMessage({ operation: "stop", id: enc.id });
-            this.encByReceiver.delete(receiver);
-        }
-    }
-
-    private async addRemoteTrack(roomId: StreamRoomId, event: RTCTrackEvent) {
-        const worker = await this.getWorker();
-        const track = event.track;
+    private async addRemoteTrack(roomId: StreamRoomId, event: RTCTrackEvent): Promise<void> {
         const receiver = event.receiver;
         const publisherId = Number(event.streams[0].id);
 
@@ -616,55 +408,19 @@ export class WebRtcClient {
         await this.waitUntilConnected(peerConnection);
 
         this.logger.debug("setupReceiverTransform...");
-        await this.setupReceiverTransform(receiver, publisherId, worker);
-        track.addEventListener("ended", async () => await this.teardownReceiver(receiver, worker));
-
-        this.callRegisteredListeners(roomId, event);
-    }
-
-    private callRegisteredListeners(roomId: StreamRoomId, event: RTCTrackEvent) {
-        const remoteStreamId = Number(event.streams[0].id);
-        const listeners = this.remoteStreamsListeners.get(roomId);
-        if (!listeners) {
-            return;
-        }
-        const filteredListeners = listeners.filter(
-            (x) => x.streamId === remoteStreamId || x.streamId === undefined,
+        await this.e2eeTransformManager.setupReceiverTransform(receiver, publisherId);
+        event.track.addEventListener(
+            "ended",
+            async () => await this.e2eeTransformManager.teardownReceiver(receiver),
         );
-        for (const listener of filteredListeners) {
-            if (
-                listener.onRemoteStreamTrack &&
-                typeof listener.onRemoteStreamTrack === "function"
-            ) {
-                listener.onRemoteStreamTrack(event);
-            }
-        }
+
+        this.listenerRegistry.dispatchTrack(roomId, event);
     }
 
-    private callRegisteredListenersForDataChannel(
-        roomId: StreamRoomId,
-        remoteStreamId: number,
-        data: Uint8Array,
-        statusCode: number,
-    ) {
-        const listeners = this.remoteStreamsListeners.get(roomId);
-        if (!listeners || listeners.length === 0) {
-            return;
-        }
-        const filteredListeners = listeners.filter(
-            (x) => x.streamId === remoteStreamId || x.streamId === undefined,
-        );
-        for (const listener of filteredListeners) {
-            if (listener.onRemoteData && typeof listener.onRemoteData === "function") {
-                listener.onRemoteData(data, statusCode);
-            }
-        }
-    }
-
-    public async onSubscriptionUpdated(_room: StreamRoomId, offer: { sdp: string; type: string }) {
-        if (!this.peerConnectionReconfigureQueue) {
-            throw new Error("ReconfigureQueue does not exist.");
-        }
+    public async onSubscriptionUpdated(
+        _room: StreamRoomId,
+        offer: { sdp: string; type: string },
+    ): Promise<void> {
         this.peerConnectionReconfigureQueue.enqueue({
             taskId: Utils.generateNumericId(),
             _room,
@@ -677,7 +433,7 @@ export class WebRtcClient {
         }
     }
 
-    public async onSubscriptionUpdatedSingle(_room: StreamRoomId, offer: any) {
+    public async onSubscriptionUpdatedSingle(_room: StreamRoomId, offer: any): Promise<Jsep> {
         return this.reconfigureSingle(_room, offer);
     }
 
@@ -697,7 +453,7 @@ export class WebRtcClient {
             const bootstrap = peerConnection.createDataChannel("JanusDataChannel");
             bootstrap.onerror = (e) => {
                 console.error(e);
-                throw new Error("Cannot initialize Bootrstrap dataChannel");
+                throw new Error("Cannot initialize Bootstrap dataChannel");
             };
         }
 
@@ -716,7 +472,6 @@ export class WebRtcClient {
         this.logger.debug("3. Setting up localDescription...");
         await peerConnection.setLocalDescription(new RTCSessionDescription(answer));
 
-        // this.subscriberAttachedProcessing = false
         this.lastProcessedAnswer[room] = answer as Jsep;
         return answer as Jsep;
     }
