@@ -20,7 +20,10 @@ export class PeerConnectionManager {
     } = {};
 
     constructor(
-        private createPeerConnection: (room: StreamRoomId, streamHandle?: StreamHandle) => RTCPeerConnection,
+        private createPeerConnection: (
+            room: StreamRoomId,
+            streamHandle?: StreamHandle,
+        ) => RTCPeerConnection,
         private onTrickle: (sessionId: SessionId, candidate: RTCIceCandidate) => void,
     ) {}
 

@@ -46,9 +46,7 @@ export class AudioManager {
             return;
         }
         const meter = new LocalAudioLevelMeter(track, (onRms) => {
-            const rmsToReport = track.enabled
-                ? onRms
-                : LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
+            const rmsToReport = track.enabled ? onRms : LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
             this.onRmsForWorker(rmsToReport);
             this.lastMeasuredLocalRMS = onRms;
         });

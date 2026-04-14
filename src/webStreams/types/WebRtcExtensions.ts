@@ -29,10 +29,7 @@ export interface RTCConfigurationWithInsertableStreams extends RTCConfiguration 
 }
 
 export interface WindowWithRTCRtpScriptTransform extends Window {
-    RTCRtpScriptTransform: new (
-        worker: Worker,
-        options: RTCRtpScriptTransformOptions,
-    ) => unknown;
+    RTCRtpScriptTransform: new (worker: Worker, options: RTCRtpScriptTransformOptions) => unknown;
 }
 
 export interface WindowWithWasmHandler extends Window {

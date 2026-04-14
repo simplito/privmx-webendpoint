@@ -2,10 +2,10 @@ import * as EndpointTypes from "../Types";
 import { Utils } from "../webStreams/Utils";
 import { AudioLevelsStats, WebRtcClient } from "../webStreams/WebRtcClient";
 import {
-    DataChannelMeta,
     Stream,
     StreamCreateMeta,
     StreamId,
+    StreamTrack,
     StreamTrackId,
     StreamTrackInit,
 } from "../webStreams/types/ApiTypes";
@@ -25,15 +25,6 @@ import {
     RemoteStreamListener,
 } from "../Types";
 import { StreamApiNative } from "../api/StreamApiNative";
-
-export interface StreamTrack {
-    id: StreamTrackId;
-    streamHandle: StreamHandle;
-    track?: MediaStreamTrack;
-    dataChannelMeta: DataChannelMeta;
-    published: Boolean;
-    markedToRemove?: boolean;
-}
 
 /**
  * `StreamApi` is a class representing Endpoint's API for Stream Rooms.
@@ -158,7 +149,9 @@ export class StreamApi extends BaseApi {
      *
      * @param {string} streamRoomId ID of the Stream Room
      */
-    public async enableStreamRoomRecording(streamRoomId: EndpointTypes.StreamRoomId): Promise<void> {
+    public async enableStreamRoomRecording(
+        streamRoomId: EndpointTypes.StreamRoomId,
+    ): Promise<void> {
         return this.native.enableStreamRoomRecording(this.servicePtr, [streamRoomId]);
     }
 

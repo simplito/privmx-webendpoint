@@ -4,11 +4,10 @@ import { Key, TurnCredentials, StreamHandle, DataChannelCryptorDecryptStatus } f
 import { KeyStore } from "./KeyStore";
 import { ConnectionType, PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
-import { StreamRoomId } from "./types/ApiTypes";
+import { StreamRoomId, StreamTrack } from "./types/ApiTypes";
 import { Queue } from "./Queue";
 import { Jsep } from "../service/WebRtcInterface";
 import { StateChangeDispatcher } from "../service/EventDispatcher";
-import { StreamTrack } from "../service/StreamApi";
 import { DataChannelCryptor, DataChannelCryptorError } from "./DataChannelCryptor";
 import { AudioManager, AudioLevelFuncCallback } from "./AudioManager";
 import { E2eeTransformManager } from "./E2eeTransformManager";
@@ -20,7 +19,6 @@ export interface StreamsCallbackInterface {
     trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void>;
     acceptOffer(sessionId: SessionId, sdp: Jsep): Promise<void>;
 }
-
 
 export { AudioLevelFuncCallback };
 export type { AudioLevelsStats } from "./AudioManager";
@@ -85,7 +83,8 @@ export class WebRtcClient {
             },
             (sessionId: SessionId, candidate: RTCIceCandidate) => {
                 if (!clientRef) throw new Error("WebRtcClient not yet initialized");
-                if (!clientRef.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
+                if (!clientRef.streamsApiInterface)
+                    throw new Error("StreamsApiInterface not yet bound");
                 return clientRef.streamsApiInterface.trickle(sessionId, candidate);
             },
         );
@@ -169,7 +168,11 @@ export class WebRtcClient {
     }
 
     /** Sets the remote description (answer) on the publisher connection. */
-    public async setPublisherRemoteDescription(roomId: StreamRoomId, sdp: string, type: RTCSdpType): Promise<void> {
+    public async setPublisherRemoteDescription(
+        roomId: StreamRoomId,
+        sdp: string,
+        type: RTCSdpType,
+    ): Promise<void> {
         const pc = this.peerConnectionsManager.getConnectionWithSession(roomId, "publisher").pc;
         await pc.setRemoteDescription(new RTCSessionDescription({ sdp, type }));
     }
@@ -186,7 +189,12 @@ export class WebRtcClient {
     ): Promise<RTCPeerConnection> {
         this.configuration = WebRtcConfig.generateTurnConfiguration(this.peerCredentials);
 
-        this.peerConnectionsManager.initialize(streamRoomId, "publisher", -1 as SessionId, streamHandle);
+        this.peerConnectionsManager.initialize(
+            streamRoomId,
+            "publisher",
+            -1 as SessionId,
+            streamHandle,
+        );
         const pc = this.peerConnectionsManager.getConnectionWithSession(
             streamRoomId,
             "publisher",
@@ -215,10 +223,7 @@ export class WebRtcClient {
         return pc;
     }
 
-    removeSenderPeerConnectionOnUnpublish(
-        streamRoomId: StreamRoomId,
-        stream: MediaStream,
-    ): void {
+    removeSenderPeerConnectionOnUnpublish(streamRoomId: StreamRoomId, stream: MediaStream): void {
         for (const track of stream.getAudioTracks()) {
             this.audioManager.stopLocalAudioLevelMeter(track);
         }
@@ -321,8 +326,7 @@ export class WebRtcClient {
                           : new Uint8Array(dataEvent.data.buffer);
 
                 try {
-                    const lastSeq =
-                        this.sequenceNumberByRemoteStreamId.get(remoteStreamId) || 0;
+                    const lastSeq = this.sequenceNumberByRemoteStreamId.get(remoteStreamId) || 0;
                     const decrypted = await this.dataChannelCryptor.decryptFromWireFormat({
                         frame,
                         lastSequenceNumber: lastSeq,
@@ -430,10 +434,7 @@ export class WebRtcClient {
         this.listenerRegistry.dispatchTrack(roomId, event);
     }
 
-    public async onSubscriptionUpdated(
-        room: StreamRoomId,
-        offer: Jsep,
-    ): Promise<void> {
+    public async onSubscriptionUpdated(room: StreamRoomId, offer: Jsep): Promise<void> {
         this.peerConnectionReconfigureQueue.enqueue({
             room,
             jsep: offer,

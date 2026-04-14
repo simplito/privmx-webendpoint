@@ -32,30 +32,24 @@ describe("RemoteStreamListenerRegistry", () => {
 
         it("allows listeners with different streamIds in the same room", () => {
             registry.add({ streamRoomId: ROOM, streamId: sid(1) });
-            expect(() =>
-                registry.add({ streamRoomId: ROOM, streamId: sid(2) }),
-            ).not.toThrow();
+            expect(() => registry.add({ streamRoomId: ROOM, streamId: sid(2) })).not.toThrow();
         });
 
         it("allows the same streamId in different rooms", () => {
             registry.add({ streamRoomId: ROOM, streamId: sid(1) });
-            expect(() =>
-                registry.add({ streamRoomId: ROOM_2, streamId: sid(1) }),
-            ).not.toThrow();
+            expect(() => registry.add({ streamRoomId: ROOM_2, streamId: sid(1) })).not.toThrow();
         });
 
         it("allows a wildcard listener (streamId undefined) alongside specific ones", () => {
             registry.add({ streamRoomId: ROOM });
-            expect(() =>
-                registry.add({ streamRoomId: ROOM, streamId: sid(5) }),
-            ).not.toThrow();
+            expect(() => registry.add({ streamRoomId: ROOM, streamId: sid(5) })).not.toThrow();
         });
 
         it("throws when adding a duplicate (same room + same streamId)", () => {
             registry.add({ streamRoomId: ROOM, streamId: sid(3) });
-            expect(() =>
-                registry.add({ streamRoomId: ROOM, streamId: sid(3) }),
-            ).toThrow("RemoteStreamListener with given params already exists.");
+            expect(() => registry.add({ streamRoomId: ROOM, streamId: sid(3) })).toThrow(
+                "RemoteStreamListener with given params already exists.",
+            );
         });
 
         it("throws when adding a second wildcard listener in the same room", () => {
@@ -148,9 +142,7 @@ describe("RemoteStreamListenerRegistry", () => {
         });
 
         it("is a no-op when there are no listeners for the room", () => {
-            expect(() =>
-                registry.dispatchData(ROOM, 1, new Uint8Array(), 0),
-            ).not.toThrow();
+            expect(() => registry.dispatchData(ROOM, 1, new Uint8Array(), 0)).not.toThrow();
         });
 
         it("does not call listeners in a different room", () => {

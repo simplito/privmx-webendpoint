@@ -32,6 +32,15 @@ export interface DataChannelMeta {
     dataChannel?: RTCDataChannel;
 }
 
+export interface StreamTrack {
+    id: StreamTrackId;
+    streamHandle: StreamHandle;
+    track?: MediaStreamTrack;
+    dataChannelMeta: DataChannelMeta;
+    published: Boolean;
+    markedToRemove?: boolean;
+}
+
 export interface StreamTrackInit {
     track?: MediaStreamTrack;
     createDataChannel?: boolean;

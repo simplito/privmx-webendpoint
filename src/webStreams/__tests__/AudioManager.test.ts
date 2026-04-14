@@ -55,7 +55,6 @@ function makeTrack(id: string, kind: "audio" | "video" = "audio"): MediaStreamTr
     } as unknown as MediaStreamTrack;
 }
 
-
 describe("AudioManager", () => {
     let onRmsForWorker: jest.Mock;
     let manager: AudioManager;

@@ -80,7 +80,9 @@ export class EncryptTransform {
         controller: TransformStreamDefaultController<unknown>,
     ) {
         const headerLen =
-            kind === "video" ? this.getHeaderSizeByType((encodedFrame as RTCEncodedVideoFrame).type) : 1;
+            kind === "video"
+                ? this.getHeaderSizeByType((encodedFrame as RTCEncodedVideoFrame).type)
+                : 1;
         const frameHeader = new Uint8Array(encodedFrame.data, 0, headerLen);
         const frameBody = new Uint8Array(encodedFrame.data, headerLen);
 
@@ -200,13 +202,7 @@ self.addEventListener("message", async (event: MessageEvent<events.WorkerInbound
             id: "id" in msg ? msg.id : undefined,
             publisherId: "publisherId" in msg ? msg.publisherId : undefined,
         };
-        handleTransform(
-            context,
-            msg.operation,
-            msg.kind,
-            msg.readableStream,
-            msg.writableStream,
-        );
+        handleTransform(context, msg.operation, msg.kind, msg.readableStream, msg.writableStream);
     } else if (msg.operation === "setKeys") {
         keyStore.setKeys(msg.keys);
         const ack: events.SetKeysAckEvent = { operation: "setKeys-ack" };

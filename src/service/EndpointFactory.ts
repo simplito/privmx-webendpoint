@@ -39,6 +39,11 @@ import { setGlobalEmCrypto } from "../crypto/index";
  */
 declare function endpointWasmModule(): Promise<any>; // Provided by emscripten js glue code
 
+export interface EndpointSetupOptions {
+    assetsBasePath?: string;
+    workerCount?: number;
+}
+
 /**
  * Contains static factory methods - generators for Connection and APIs.
  */
@@ -50,11 +55,29 @@ export class EndpointFactory {
     /**
      * Load the Endpoint's WASM assets and initialize the Endpoint library.
      *
-     * @param {string} [assetsBasePath] base path/url to the Endpoint's WebAssembly assets (like: endpoint-wasm-module.js, driver-web-context.js and others)
+     * @param {string | EndpointSetupOptions} [options] either a base path string (legacy) or an options object
+     * @param {string} [options.assetsBasePath] base path/url to the Endpoint's WebAssembly assets
+     * @param {number} [options.workerCount] number of async-engine worker threads (default: 4, minimum: 2)
      */
-    public static async setup(assetsBasePath?: string): Promise<void> {
+    public static async setup(options?: string | EndpointSetupOptions): Promise<void> {
+        const resolved: EndpointSetupOptions =
+            typeof options === "object" && options !== null
+                ? options
+                : { assetsBasePath: options as string | undefined };
+        const { assetsBasePath, workerCount } = resolved;
+
         const basePath = this.resolveAssetsBasePath(assetsBasePath);
         this.assetsBasePath = basePath;
+
+        // Must be set before endpointWasmModule() is called — the C++ AsyncEngine
+        // constructor reads this global during WASM module initialization (on the
+        // worker thread), before the main thread gets control back.
+        if (workerCount !== undefined) {
+            (window as unknown as Record<string, unknown>)["__privmxWorkerCount"] = Math.max(
+                2,
+                Math.floor(workerCount),
+            );
+        }
 
         setGlobalEmCrypto();
         const assets = ["endpoint-wasm-module.js"];

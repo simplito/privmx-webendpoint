@@ -83,7 +83,10 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         sessionId: number,
         connectionType: ConnectionType,
     ): Promise<void> {
-        this.getClient().updateConnectionSessionId(streamRoomId, sessionId as SessionId, connectionType);
+        this.getClient().updateConnectionSessionId(
+            streamRoomId,
+            sessionId as SessionId,
+            connectionType,
+        );
     }
-
 }

@@ -54,8 +54,9 @@ interface FakeWorkerApi {
 
 jest.mock("../WebWorkerHelper", () => {
     return {
-        WebWorker: jest.fn().mockImplementation(
-            (_assetsDir: string, onFrame: FakeWorkerApi["onFrame"]) => {
+        WebWorker: jest
+            .fn()
+            .mockImplementation((_assetsDir: string, onFrame: FakeWorkerApi["onFrame"]) => {
                 let worker: FakeWorker;
                 const api: FakeWorkerApi = {
                     init_e2ee: jest.fn().mockImplementation(() => {
@@ -70,8 +71,7 @@ jest.mock("../WebWorkerHelper", () => {
                     onFrame,
                 };
                 return api;
-            },
-        ),
+            }),
     };
 });
 
