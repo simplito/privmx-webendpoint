@@ -20,14 +20,14 @@ OS_NAME=$(uname -s)
 echo "Detected OS: $OS_NAME"
 
 if [ "$OS_NAME" = "Darwin" ]; then
-    SDK_PATH=$(xcrun --show-sdk-path)    
-    export CC_FOR_BUILD="/usr/bin/clang"    
+    SDK_PATH=$(xcrun --show-sdk-path)
+    export CC_FOR_BUILD="/usr/bin/clang"
     export CPPFLAGS_FOR_BUILD="-I${SDK_PATH}/usr/include"
     export CFLAGS_FOR_BUILD="-W"
     echo "  > Configured for macOS: SDK at $SDK_PATH"
 elif [ "$OS_NAME" = "Linux" ]; then
-    export CC_FOR_BUILD="/usr/bin/cc"    
-    export CPPFLAGS_FOR_BUILD="" 
+    export CC_FOR_BUILD="/usr/bin/cc"
+    export CPPFLAGS_FOR_BUILD=""
     export CFLAGS_FOR_BUILD=""
     echo "  > Configured for Linux: Using /usr/bin/cc"
 else
@@ -38,8 +38,7 @@ fi
 
 GMP_DIR="$SOURCE_DIR/gmp-${VERSION}"
 
-if [ -d "$GMP_DIR" ];
-then
+if [ -d "$GMP_DIR" ]; then
     echo "$GMP_DIR directory exists. Skip download of sources."
 else
     echo "$GMP_DIR directory does not exist. Get sources..."
@@ -48,54 +47,27 @@ else
     tar -xf gmp.tar.xz
 fi
 
+cd "$GMP_DIR"
+mkdir -p build-emscripten && cd build-emscripten
 
-echo "Checking checksum: $GMP_DIR ..."
-set +e
-$SCRIPT_PATH/check_dir_checksum "$GMP_DIR"
-RESULT=$?
-set -e
-case "$RESULT" in
-    0)
-        echo "No changes - skipping build"
-        ;;
-    1)
-        echo "changes - rebuild..."
-        cd "$GMP_DIR"
+if [ ! -f Makefile ]; then
+    echo "Running Configure..."
+    emconfigure ../configure \
+        --disable-assembly \
+        --host none \
+        --enable-cxx \
+        --prefix=$SYSROOT_DIR \
+        CC_FOR_BUILD="$CC_FOR_BUILD" \
+        CPPFLAGS_FOR_BUILD="$CPPFLAGS_FOR_BUILD" \
+        CFLAGS_FOR_BUILD="$CFLAGS_FOR_BUILD" \
+        CFLAGS="-Os" \
+        CXXFLAGS="-Os"
+else
+    echo "Makefile exists — skipping configure."
+fi
 
-        if [ ! -d "$GMP_DIR/build-emscripten" ]; then
-            mkdir -p build-emscripten && cd build-emscripten
-            
-            echo "Running Configure..."
-            emconfigure ../configure \
-                --disable-assembly \
-                --host none \
-                --enable-cxx \
-                --prefix=$SYSROOT_DIR \
-                CC_FOR_BUILD="$CC_FOR_BUILD" \
-                CPPFLAGS_FOR_BUILD="$CPPFLAGS_FOR_BUILD" \
-                CFLAGS_FOR_BUILD="$CFLAGS_FOR_BUILD" \
-                CFLAGS="-Os" \
-                CXXFLAGS="-Os"
-        else
-            cd build-emscripten
-        fi
-
-        echo "Running Make..."
-        emmake make -j20
-        emmake make check || echo "WARNING: Tests failed (Expected during cross-compilation)"
-        emmake make install
-        echo "Build Complete."
-
-        set +e
-        $SCRIPT_PATH/check_dir_checksum "$GMP_DIR"
-        set -e
-        ;;
-    2)
-        echo "\n\n\nBłąd wejścia" >&2
-        exit 2
-        ;;
-    *)
-        echo "\n\n\nNieznany kod wyjścia: $RESULT" >&2
-        exit 3
-        ;;
-esac
+echo "Running Make..."
+emmake make -j20
+emmake make check || echo "WARNING: Tests failed (Expected during cross-compilation)"
+emmake make install
+echo "Build Complete."

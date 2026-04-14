@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+
 SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 
 if [ -z "$1" ]; then
@@ -9,52 +10,33 @@ fi
 PRIVMX_ENDPOINT_VERSION_IN=$1
 PRIVMX_ENDPOINT_VERSION="${PRIVMX_ENDPOINT_VERSION_IN//\//_}"
 
-# Optional second argument: "debug" enables debug build flags.
-# Defaults to "release".
+# Optional second argument: "debug" enables debug build flags. Defaults to "release".
 PRIVMX_BUILD_TYPE="${2:-release}"
 
 source "$SCRIPT_PATH/config.sh"
 source "$EMSDK_DIR/emsdk_env.sh"
 
-echo "Checking API Interface checksum: $PRIVMX_WEBENDPOINT_API_SRC ..."
-set +e
-$SCRIPT_PATH/check_dir_checksum "$PRIVMX_WEBENDPOINT_API_SRC"
-RESULT=$?
-set -e
-if [ -f "$PRIVMX_WEBENDPOINT_API_SRC/need_rebuild" ]; then
-    RESULT=1;
-    rm -f "$PRIVMX_WEBENDPOINT_API_SRC/need_rebuild"
+cd "$PRIVMX_WEBENDPOINT_API_SRC"
+cp "$PRIVMX_ENDPOINT_SRC-$PRIVMX_ENDPOINT_VERSION/emscripten/jslibrary/websocket.js" "$PRIVMX_WEBENDPOINT_API_SRC/js/"
+
+mkdir -p build-emscripten && cd build-emscripten
+
+# Reconfigure if: no cache yet, OR the requested build type differs from the cached one.
+CACHED_BUILD_TYPE=""
+if [ -f CMakeCache.txt ]; then
+    CACHED_BUILD_TYPE=$(grep -m1 "^PRIVMX_BUILD_TYPE:STRING=" CMakeCache.txt | cut -d= -f2 || true)
 fi
-case "$RESULT" in
-    0)
-        echo "No changes on Endpoint API Interface- skipping build"
-        ;;
-    1)
-        echo "changes - rebuild... (build type: $PRIVMX_BUILD_TYPE)"
-        cd "$PRIVMX_WEBENDPOINT_API_SRC"
-        cp "$PRIVMX_ENDPOINT_SRC-$PRIVMX_ENDPOINT_VERSION/emscripten/jslibrary/websocket.js" "$PRIVMX_WEBENDPOINT_API_SRC/js/"
-        rm -rf ./build-emscripten
-        mkdir -p build-emscripten && cd build-emscripten
-        echo "EMSDK_DIR PASSED TO CMAKE: $EMSDK_DIR"
-        echo "====================================="
-        SDK_DIR=$EMSDK_DIR emcmake cmake .. \
-            -D CMAKE_BUILD_TYPE=MinSizeRel \
-            -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
-            -D PRIVMX_BUILD_TYPE="$PRIVMX_BUILD_TYPE"
-        SDK_DIR=$EMSDK_DIR emmake make -j20
 
-        set +e
-        $SCRIPT_PATH/check_dir_checksum "$PRIVMX_WEBENDPOINT_API_SRC"
-        set -e
-        ;;
-    2)
-        echo "\n\n\nBłąd wejścia" >&2
-        exit 2
-        ;;
-    *)
-        echo "\n\n\nNieznany kod wyjścia: $RESULT" >&2
-        exit 3
-        ;;
-esac
+if [ ! -f CMakeCache.txt ] || [ "$CACHED_BUILD_TYPE" != "$PRIVMX_BUILD_TYPE" ]; then
+    echo "Configuring (build type: $PRIVMX_BUILD_TYPE)..."
+    echo "EMSDK_DIR PASSED TO CMAKE: $EMSDK_DIR"
+    echo "====================================="
+    SDK_DIR=$EMSDK_DIR emcmake cmake .. \
+        -D CMAKE_BUILD_TYPE=MinSizeRel \
+        -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
+        -D PRIVMX_BUILD_TYPE="$PRIVMX_BUILD_TYPE"
+else
+    echo "CMakeCache.txt exists with matching build type ($PRIVMX_BUILD_TYPE) — skipping cmake configure."
+fi
 
-
+SDK_DIR=$EMSDK_DIR emmake make -j20
