@@ -4,10 +4,9 @@ import { Key, TurnCredentials, StreamHandle, DataChannelCryptorDecryptStatus } f
 import { KeyStore } from "./KeyStore";
 import { ConnectionType, PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
-import { StreamRoomId, StreamTrack } from "./types/ApiTypes";
+import { Jsep, StreamRoomId, StreamTrack } from "./types/ApiTypes";
 import { Queue } from "./Queue";
-import { Jsep } from "../service/WebRtcInterface";
-import { StateChangeDispatcher } from "../service/EventDispatcher";
+import { StateChangeDispatcher } from "./EventDispatcher";
 import { DataChannelCryptor, DataChannelCryptorError } from "./DataChannelCryptor";
 import { AudioManager, AudioLevelFuncCallback } from "./AudioManager";
 import { E2eeTransformManager } from "./E2eeTransformManager";

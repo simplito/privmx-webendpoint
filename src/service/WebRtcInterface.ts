@@ -1,16 +1,12 @@
 import { Key } from "../Types";
 import { ConnectionType } from "../webStreams/PeerConnectionsManager";
-import { StreamRoomId } from "../webStreams/types/ApiTypes";
+import { Jsep, StreamRoomId } from "../webStreams/types/ApiTypes";
 
 export class UpdateKeysModel {
     streamRoomId: StreamRoomId;
     keys: Key[];
 }
 
-export interface Jsep {
-    sdp: string;
-    type: RTCSdpType;
-}
 export interface SdpWithRoomModel extends Jsep {
     roomId: StreamRoomId;
 }

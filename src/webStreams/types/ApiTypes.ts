@@ -49,3 +49,8 @@ export interface StreamTrackInit {
 export type StreamTrackId = string & { __streamTrackId: never };
 
 export type StreamRoomId = string & { __streamRoomId: never };
+
+export interface Jsep {
+    sdp: string;
+    type: RTCSdpType;
+}
