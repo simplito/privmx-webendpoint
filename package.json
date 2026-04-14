@@ -38,6 +38,7 @@
   },
   "scripts": {
     "clean": "rm -rf ./dist",
+    "clean:wasm": "scripts/clean_wasm",
     "test": "jest src",
     "build": "npm run clean && npm run build:wasm && npm run build:js && scripts/move_wasm_assets",
     "build:debug": "npm run clean && npm run build:wasm:debug && npm run build:js && scripts/move_wasm_assets",

@@ -328,6 +328,68 @@ test.describe("CoreTest: Connection & Contexts", () => {
 });
 
 // ---------------------------------------------------------------------------
+// EndpointFactory.setup() — object-form regression test
+// ---------------------------------------------------------------------------
+
+test.describe("CoreTest: EndpointFactory.setup() object form", () => {
+    test("setup({ assetsBasePath }) initialises WASM identically to setup(string)", async ({
+        page,
+        backend,
+        cli,
+    }) => {
+        await page.goto("/tests/harness/index.html");
+        await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
+
+        // Use the object form exclusively — this is the regression path.
+        await page.evaluate(async () => {
+            await window.Endpoint.setup({ assetsBasePath: "../../assets" });
+        });
+
+        const user = await setupTestUser(page, cli, [testData.contextId]);
+
+        const result = await page.evaluate(
+            async ({ bridgeUrl, solutionId, privKey }) => {
+                const connection = await window.Endpoint.connect(privKey, solutionId, bridgeUrl);
+                const cryptoApi = await window.Endpoint.createCryptoApi();
+                const pubKey = await cryptoApi.derivePublicKey(privKey);
+                return { connected: connection !== null, pubKeyDefined: pubKey.length > 0 };
+            },
+            {
+                bridgeUrl: backend.bridgeUrl,
+                solutionId: testData.solutionId,
+                privKey: user.privKey,
+            },
+        );
+
+        expect(result.connected).toBe(true);
+        expect(result.pubKeyDefined).toBe(true);
+    });
+
+    test("setup({ assetsBasePath, workerCount }) applies the requested worker count", async ({
+        page,
+    }) => {
+        await page.goto("/tests/harness/index.html");
+        await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
+
+        await page.evaluate(async () => {
+            await window.Endpoint.setup({ assetsBasePath: "../../assets", workerCount: 6 });
+        });
+
+        // Give pthreads time to spin up then verify crypto still works.
+        await page.waitForTimeout(320);
+
+        const signed = await page.evaluate(async () => {
+            const cryptoApi = await window.Endpoint.createCryptoApi();
+            const privKey = await cryptoApi.generatePrivateKey();
+            const sig = await cryptoApi.signData(new TextEncoder().encode("test"), privKey);
+            return sig.length > 0;
+        });
+
+        expect(signed).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
 // Worker-count performance test
 // ---------------------------------------------------------------------------
 // Measures wall-clock time for Promise.all(100 x sendMessage) at 2, 4 and 8

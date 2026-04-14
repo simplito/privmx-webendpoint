@@ -1,6 +1,6 @@
 import { Key } from "../Types";
-import { ConnectionType } from "../webStreams/PeerConnectionsManager";
-import { Jsep, StreamRoomId } from "../webStreams/types/ApiTypes";
+import { ConnectionType } from "./PeerConnectionsManager";
+import { Jsep, StreamRoomId } from "./types/ApiTypes";
 
 export class UpdateKeysModel {
     streamRoomId: StreamRoomId;
@@ -30,3 +30,15 @@ export interface WebRtcInterface {
     close(roomId: StreamRoomId): Promise<void>;
     updateKeys(model: UpdateKeysModel): Promise<void>;
 }
+
+// Discriminated union covering every method the C++ WASM layer can invoke.
+export type WebRtcMethodCall =
+    | { name: "createOfferAndSetLocalDescription"; params: RoomModel }
+    | { name: "createAnswerAndSetDescriptions"; params: SdpWithRoomModel }
+    | { name: "setAnswerAndSetRemoteDescription"; params: SetAnswerAndSetRemoteDescriptionModel }
+    | {
+          name: "updateSessionId";
+          params: { streamRoomId: StreamRoomId; sessionId: number; connectionType: ConnectionType };
+      }
+    | { name: "close"; params: StreamRoomId }
+    | { name: "updateKeys"; params: UpdateKeysModel };

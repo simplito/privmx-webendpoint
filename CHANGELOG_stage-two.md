@@ -189,34 +189,64 @@ The project previously had a hand-rolled incremental build cache (`check_dir_che
 
 ---
 
+## TypeScript — `service/WebRtcInterface.ts` dissolved into `webStreams/`
+
+**`src/webStreams/WebRtcInterface.ts`** — new file (replaces `src/service/WebRtcInterface.ts`)
+- Contains all types previously in `service/WebRtcInterface.ts`: `UpdateKeysModel`, `RoomModel`, `SdpWithRoomModel`, `CreateAnswerAndSetDescriptionsModel`, `SetAnswerAndSetRemoteDescriptionModel`, `WebRtcInterface`.
+- Added `WebRtcMethodCall` discriminated union — exhaustive tagged union of every method the C++ WASM layer can invoke, with per-method `params` types.
+- `src/service/WebRtcInterface.ts` deleted — no remaining importers.
+
+**`src/webStreams/WebRtcInterfaceImpl.ts`**
+- `MethodMap` type now derived from `WebRtcMethodCall` using mapped/conditional types: `{ [K in WebRtcMethodCall["name"]]: (params: Extract<WebRtcMethodCall, { name: K }>["params"]) => Promise<unknown> }`. Adding or removing a method from `WebRtcMethodCall` produces a compile error here automatically.
+- `updateSessionId` entry in `methodsMap` uses an inline arrow that destructures `params.streamRoomId / sessionId / connectionType` — matching the discriminated union's `params` shape.
+- Imports changed from `"../service/WebRtcInterface"` → `"./WebRtcInterface"`.
+
+---
+
+## Build system — debug/release for async engine and drivers
+
+**`async-engine/CMakeLists.txt`**
+- Added `PRIVMX_BUILD_TYPE` cache variable (same pattern as `webendpoint-cpp`).
+- Debug: `-O0 -g -DDEBUG`. Release: `-O3`.
+
+**`drivers/privmx-webendpoint-drv-crypto/CMakeLists.txt`**  
+**`drivers/privmx-webendpoint-drv-ecc/CMakeLists.txt`**  
+**`drivers/privmx-webendpoint-drv-net/CMakeLists.txt`**
+- Same `PRIVMX_BUILD_TYPE` pattern added to all three.
+
+**`scripts/build_async_engine`**
+- Reads `PRIVMX_BUILD_TYPE` from environment (defaults to `release`).
+- Reconfigures when build type changes (same CMakeCache.txt detection as `build_api`).
+- Passes `-D PRIVMX_BUILD_TYPE=...` to cmake.
+
+**`scripts/build_webdrivers`**
+- Same changes as `build_async_engine`, applied to all three driver builds.
+- Extracted a `configure_if_needed` helper to avoid repeating the detection logic three times.
+
+---
+
+## Build system — `clean:wasm` script
+
+**`scripts/clean_wasm`** — new script
+- Removes `build-emscripten/` from every first-party C++ component (async engine, webendpoint api, all three drivers) and every third-party dependency under `dependency_sources/`.
+- Running this followed by `npm run build:wasm` guarantees a fully clean rebuild from configured sources.
+
+**`package.json`**
+- Added `"clean:wasm": "scripts/clean_wasm"` script.
+
+---
+
+## Tests — `EndpointFactory.setup()` object form
+
+**`tests/specs/core.spec.ts`**
+- Added describe block `"CoreTest: EndpointFactory.setup() object form"` with two tests:
+  - **`setup({ assetsBasePath })` without `workerCount`** — reloads page, calls the object form, connects to bridge, verifies connection and key derivation work end-to-end.
+  - **`setup({ assetsBasePath, workerCount: 6 })`** — reloads page, calls with explicit worker count, waits for pthreads, asserts `signData` returns a non-empty signature.
+
+---
+
 ## Documentation
 
 **`README.md`**
 - Updated Build Scripts table to include `build:debug` and `build:wasm:debug`.
 - Added "Release vs Debug builds" section with a comparison table of all flag differences and usage examples.
-
----
-
-## Nice to do next
-
-### TypeScript — continued coupling removal
-
-- **Move `service/WebRtcInterface.ts` entirely into `webStreams/`** — the file now only contains types/interfaces used exclusively by `webStreams/` (`UpdateKeysModel`, `RoomModel`, `SdpWithRoomModel`, `WebRtcInterface`, etc.). Moving it would eliminate the last `service/` → `webStreams/` reverse dependency.
-
-- **Type `methodCall` parameter per method** — currently `params: unknown` is cast back to `unknown` internally. A proper discriminated union `{ name: "close"; params: StreamRoomId } | { name: "updateKeys"; params: UpdateKeysModel } | ...` would make the C++↔TS bridge fully type-safe end-to-end.
-
-- **`service/WebRtcInterface.ts` — `WebRtcInterface` interface ownership** — the interface is implemented only in `webStreams/WebRtcInterfaceImpl` and called only from C++ via `window`. Moving it to `webStreams/` matches where it's actually used.
-
-### Build system
-
-- **`build_async_engine` — pass `PRIVMX_BUILD_TYPE`** — the async engine has its own CMakeLists but currently always builds in `MinSizeRel`. It should participate in debug/release switching the same way `build_api` does, so WASM debug assertions extend to the async engine layer too.
-
-- **`build_webdrivers` — same as above** — the three driver builds (`crypto`, `ecc`, `net`) are similarly hardcoded to `MinSizeRel`.
-
-- **Clean script** — `npm run clean` likely only clears `dist/`. A companion `clean:wasm` that removes `build-emscripten/` directories in all C++ components would make full rebuilds reproducible without manual directory deletion.
-
-### Tests
-
-- **Worker count — hard assertion for `measureSendMessages`** — the send-messages benchmark currently only asserts `> 0` (soft, just checks it runs). Once the bottleneck analysis shows the server is the limiting factor for low op counts, either increase message count enough to expose parallelism or switch to a local-only proxy that doesn't hit the bridge.
-
-- **E2E coverage for `EndpointFactory.setup({ workerCount })` object form** — all existing E2E tests still call `setup(string)`. At least one test should exercise the object path to prevent regression.
