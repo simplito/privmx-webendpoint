@@ -66,10 +66,6 @@ export class WebRtcClient {
     private peerCredentials: TurnCredentials[] | undefined;
 
     private remoteStreamsListeners: Map<StreamRoomId, RemoteStreamListener[]> = new Map();
-    private pendingDataChannelMessages: Map<
-        StreamRoomId,
-        Array<{ remoteStreamId: number; data: Uint8Array; statusCode: number }>
-    > = new Map();
     private sequenceNumberByRemoteStreamId: Map<number, number> = new Map();
     private dataChannelByRemoteStreamId: Map<number, RTCDataChannel> = new Map();
     private dataChannelCryptor: DataChannelCryptor;
@@ -165,19 +161,6 @@ export class WebRtcClient {
 
         listeners.push(listener);
         this.remoteStreamsListeners.set(listener.streamRoomId, listeners);
-
-        const pending = this.pendingDataChannelMessages.get(listener.streamRoomId);
-        if (pending && pending.length > 0) {
-            this.pendingDataChannelMessages.delete(listener.streamRoomId);
-            for (const msg of pending) {
-                this.callRegisteredListenersForDataChannel(
-                    listener.streamRoomId,
-                    msg.remoteStreamId,
-                    msg.data,
-                    msg.statusCode,
-                );
-            }
-        }
     }
 
     public getStreamStateChangeDispatcher() {
@@ -666,9 +649,6 @@ export class WebRtcClient {
     ) {
         const listeners = this.remoteStreamsListeners.get(roomId);
         if (!listeners || listeners.length === 0) {
-            const pending = this.pendingDataChannelMessages.get(roomId) ?? [];
-            pending.push({ remoteStreamId, data, statusCode });
-            this.pendingDataChannelMessages.set(roomId, pending);
             return;
         }
         const filteredListeners = listeners.filter(
