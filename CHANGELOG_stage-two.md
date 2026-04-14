@@ -158,8 +158,65 @@ The project previously had a hand-rolled incremental build cache (`check_dir_che
 
 ---
 
+## TypeScript — Dependency Direction (`service/` → `webStreams/`)
+
+**`src/webStreams/EventDispatcher.ts`** — new file (moved from `src/service/EventDispatcher.ts`)
+- `StateChangeDispatcher`, `StateChangeEvent`, `StateChangeFilter`, `StateChangeListener` now live in `webStreams/`.
+- `src/service/EventDispatcher.ts` deleted.
+- `WebRtcClient.ts` import updated: `"../service/EventDispatcher"` → `"./EventDispatcher"`.
+
+**`src/webStreams/types/ApiTypes.ts`**
+- Added `Jsep` interface (moved out of `src/service/WebRtcInterface.ts`).
+
+**`src/service/WebRtcInterface.ts`**
+- Removed local `Jsep` definition; now imports it from `../webStreams/types/ApiTypes`.
+- `SdpWithRoomModel extends Jsep` still works via the imported type.
+
+**`src/api/StreamApiNative.ts`**
+- `Jsep` import updated: `"../service/WebRtcInterface"` → `"../webStreams/types/ApiTypes"`.
+- Removed unused `SdpWithRoomModel` import.
+
+---
+
+## TypeScript — `WebRtcInterfaceImpl` dead code and typing
+
+**`src/webStreams/WebRtcInterfaceImpl.ts`**
+- Removed `getClient()` method — it only guarded `this.webRtcClient` which is a non-optional constructor parameter; the guard was permanently dead. All call sites now use `this.webRtcClient` directly.
+- Introduced `MethodMap` type — a concrete record mapping each method name to its exact signature, replacing `{ [K: string]: Function }`.
+- `methodsMap` entries use `.bind(this)` instead of the previous `this.methodsMap[name].call(this, params)` hack.
+- `methodCall` parameter narrowed from `params: any` / `Promise<any>` to `params: unknown` / `Promise<unknown>`.
+- `Jsep` import moved from `"../service/WebRtcInterface"` to `"./types/ApiTypes"`.
+
+---
+
 ## Documentation
 
 **`README.md`**
 - Updated Build Scripts table to include `build:debug` and `build:wasm:debug`.
 - Added "Release vs Debug builds" section with a comparison table of all flag differences and usage examples.
+
+---
+
+## Nice to do next
+
+### TypeScript — continued coupling removal
+
+- **Move `service/WebRtcInterface.ts` entirely into `webStreams/`** — the file now only contains types/interfaces used exclusively by `webStreams/` (`UpdateKeysModel`, `RoomModel`, `SdpWithRoomModel`, `WebRtcInterface`, etc.). Moving it would eliminate the last `service/` → `webStreams/` reverse dependency.
+
+- **Type `methodCall` parameter per method** — currently `params: unknown` is cast back to `unknown` internally. A proper discriminated union `{ name: "close"; params: StreamRoomId } | { name: "updateKeys"; params: UpdateKeysModel } | ...` would make the C++↔TS bridge fully type-safe end-to-end.
+
+- **`service/WebRtcInterface.ts` — `WebRtcInterface` interface ownership** — the interface is implemented only in `webStreams/WebRtcInterfaceImpl` and called only from C++ via `window`. Moving it to `webStreams/` matches where it's actually used.
+
+### Build system
+
+- **`build_async_engine` — pass `PRIVMX_BUILD_TYPE`** — the async engine has its own CMakeLists but currently always builds in `MinSizeRel`. It should participate in debug/release switching the same way `build_api` does, so WASM debug assertions extend to the async engine layer too.
+
+- **`build_webdrivers` — same as above** — the three driver builds (`crypto`, `ecc`, `net`) are similarly hardcoded to `MinSizeRel`.
+
+- **Clean script** — `npm run clean` likely only clears `dist/`. A companion `clean:wasm` that removes `build-emscripten/` directories in all C++ components would make full rebuilds reproducible without manual directory deletion.
+
+### Tests
+
+- **Worker count — hard assertion for `measureSendMessages`** — the send-messages benchmark currently only asserts `> 0` (soft, just checks it runs). Once the bottleneck analysis shows the server is the limiting factor for low op counts, either increase message count enough to expose parallelism or switch to a local-only proxy that doesn't hit the bridge.
+
+- **E2E coverage for `EndpointFactory.setup({ workerCount })` object form** — all existing E2E tests still call `setup(string)`. At least one test should exercise the object path to prevent regression.
