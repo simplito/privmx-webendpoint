@@ -1970,7 +1970,6 @@ test.describe("StreamTest", () => {
                     }
                     v.srcObject = e.streams[0];
                 };
-
                 api.addRemoteStreamListener({
                     onRemoteStreamTrack: onRemoteTrack,
                     streamRoomId: roomId,
@@ -2008,7 +2007,6 @@ test.describe("StreamTest", () => {
         await page1.reload();
         await initPage(page1);
         await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
-
         // --- STEP 4: RE-PUBLISH ---
         await page1.evaluate(
             async ({ roomId }) => {
@@ -2027,7 +2025,6 @@ test.describe("StreamTest", () => {
         const expectedNewStreamId = await page2.evaluate(
             async ({ roomId, initialStreamIds }) => {
                 const api = window.streamApi!;
-
                 let newStream: any;
                 for (let i = 0; i < 60; i++) {
                     const streams = await api.listStreams(roomId);

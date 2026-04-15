@@ -250,3 +250,117 @@ The project previously had a hand-rolled incremental build cache (`check_dir_che
 **`README.md`**
 - Updated Build Scripts table to include `build:debug` and `build:wasm:debug`.
 - Added "Release vs Debug builds" section with a comparison table of all flag differences and usage examples.
+
+---
+
+## TypeScript — `webStreams/` Dependency Injection Refactor
+
+Broke the 9-dependency `WebRtcClient` god class into focused, single-responsibility services wired together via constructor injection. `WebRtcClient` is now a thin facade whose every method body is a one-liner delegation.
+
+### New files
+
+**`src/webStreams/PublisherManager.ts`**
+- Owns the publisher-side peer connection for a stream room.
+- Responsibilities: initialise publisher PC, add/remove media tracks, install E2EE sender transforms, start/stop local audio level metering, create SDP offer, set remote description, session ID updates.
+
+**`src/webStreams/SubscriberManager.ts`**
+- Owns the subscriber-side peer connection for a stream room.
+- Responsibilities: SDP offer/answer reconfigure queue (serialised via `Queue<QueueItem>`), bootstrap data channel creation, `lastProcessedAnswer` state, ICE connection wait before installing receiver transforms, `ended` track teardown, session ID updates.
+
+**`src/webStreams/DataChannelSession.ts`**
+- Owns all encrypted data channel state for one client session.
+- Outbound: increments a single monotonic sequence number and calls `DataChannelCryptor.encryptToWireFormat`.
+- Inbound: tracks last-seen sequence number per remote stream ID, calls `DataChannelCryptor.decryptFromWireFormat`.
+- Replaces the scattered `sequenceNumberOfSender` field and `sequenceNumberByRemoteStreamId` map that previously lived in `WebRtcClient` and `PeerConnectionFactory` respectively.
+
+**`src/webStreams/KeySyncManager.ts`**
+- Single method `updateKeys(streamRoomId, keys)` — atomically calls `KeyStore.setKeys()` (main-thread AEAD key registry) and `E2eeWorker.setKeys()` (worker-thread key registry) so they never drift.
+
+**`src/webStreams/PeerConnectionFactory.ts`**
+- Builds `RTCPeerConnection` instances with all event listeners wired: ICE/connection-state logging, `connectionstatechange` → `StateChangeDispatcher`, `datachannel` → decrypt-and-dispatch via `DataChannelSession`, `track` → forwarded to `SubscriberManager` via callback.
+- Owns TURN credential storage (`setTurnCredentials`); generates `RTCConfiguration` inline (replaces `WebRtcConfig`).
+- Injects `DataChannelSession` for data channel decryption instead of owning `DataChannelCryptor` and a sequence-number map directly.
+
+### Changed files
+
+**`src/webStreams/WebRtcClient.ts`** — rewritten as thin DI facade
+- Constructor reduced from 9 raw infrastructure objects to 8 grouped dependencies:
+  - `publisher: PublisherManager` — outbound media cluster
+  - `subscriber: SubscriberManager` — inbound SDP/track cluster
+  - `dataChannel: DataChannelSession` — data channel encryption cluster
+  - `keys: KeySyncManager` — key synchronisation cluster
+  - `eventsDispatcher: StateChangeDispatcher` — cross-cutting
+  - `listenerRegistry: RemoteStreamListenerRegistry` — cross-cutting
+  - `pcFactory: PeerConnectionFactory` — construction plumbing
+  - `audioManager: AudioManager` — audio level callbacks
+- Every public method is now a single delegation call; no business logic remains in the facade.
+- `static create(assetsDir)` is the sole place where concrete types are instantiated; the rest of the class works exclusively through injected interfaces.
+- Removed `reconfigureSingle`, `waitUntilConnected`, `addRemoteTrack` / `onRemoteTrack` — moved to `SubscriberManager`.
+- Removed `createPeerConnectionMultiForRoom` — moved to `PeerConnectionFactory`.
+- `closeConnection` and `updateConnectionSessionId` now dispatch by `connectionType` to `publisher.close` / `subscriber.close` and `publisher.updateSessionId` / `subscriber.updateSessionId` respectively, without exposing `PeerConnectionManager` through the facade.
+
+**`src/webStreams/PeerConnectionsManager.ts`** — simplified
+- Removed `configuration` / `RTCConfiguration` parameter from constructor; configuration is now owned by `PeerConnectionFactory`.
+- `createPeerConnection` factory callback signature unchanged; factory closure captures TURN credentials directly.
+- Minor cleanup: guard conditions consolidated, `candidateQueue` flush uses a `for...of` loop.
+
+### Deleted files
+
+**`src/webStreams/WebRtcConfig.ts`** — deleted
+- The single static method `generateTurnConfiguration()` is inlined into `PeerConnectionFactory.create()`. No callers remain.
+
+---
+
+## Bug fix — ICE trickle candidate serialisation
+
+**`src/api/StreamApiNative.ts`**
+
+- Replaced `JSON.stringify(candidate)` in `trickle()` with a new `private static serializeCandidate(c: RTCIceCandidate): string` helper.
+- **Root cause**: `RTCIceCandidate.toJSON()` (which `JSON.stringify` calls) emits only four fields — `candidate`, `sdpMid`, `sdpMLineIndex`, `usernameFragment`. PrivMX Bridge requires `address` (a `stringOrNull` field) and rejects requests where it is absent, logging `rtcCandidate -> Key 'address' is required`.
+- **Fix**: `serializeCandidate` copies every property directly from the `RTCIceCandidate` object (the browser already parses all SDP fields into typed properties). All 14 fields are emitted; fields that are `null` in the browser object are serialised as JSON `null`.
+  - Fields serialised: `address`, `candidate`, `component`, `foundation`, `port`, `priority`, `protocol`, `relatedAddress`, `relatedPort`, `sdpMLineIndex`, `sdpMid`, `tcpType`, `type`, `usernameFragment`.
+
+---
+
+## Bug fix — E2E data-channel encryption test timing
+
+**`tests/specs/streamDataChannels.spec.ts`**
+
+- Fixed `"E2E: data channel frames are encrypted on the wire and decrypted at the receiver"` timing out at 60 s.
+- **Root cause**: the previous implementation sent the plaintext message once (with a catch-retry loop) and then polled page1 for receipt. If `sendData` did not throw — because U2's data channel was open — the retry loop exited, even though U1's subscriber WebRTC data channel may not have been established yet. U1 would never receive that single send.
+- **Fix**: Steps 4 and 5 are merged into a single concurrent step:
+  - U2 runs a background send loop that sends every second for up to 30 s, continuing after each successful or failed send (stopping only when `__stopSend` is set by the test runner).
+  - U1 concurrently polls `window.__received` via `expect.poll` with a 30 s timeout.
+  - Once U1 receives the message, the test runner sets `__stopSend` on page2 and awaits the send loop.
+  - This guarantees at least one message arrives at U1 regardless of when the subscriber WebRTC connection establishes.
+- Overall test timeout raised from 60 s to 90 s to accommodate the extended connection window.
+
+---
+
+## Bug fix — `RTCRtpScriptTransform` missing `kind` breaks video frame header layout
+
+**`src/webStreams/E2eeTransformManager.ts`**
+
+- `setupSenderTransform`: added `kind: sender.track?.kind` to the `RTCRtpScriptTransform` options object passed to the worker.
+- `setupReceiverTransform`: added `kind: receiver.track.kind` to the `RTCRtpScriptTransform` options object passed to the worker.
+- **Root cause**: The `kind` field was never forwarded through `RTCRtpScriptTransformOptions`. The worker's `onrtctransform` handler received `kind === undefined`, causing `EncryptTransform` to treat video frames as audio (`headerLen = 1` instead of the video-correct 10 / 3 / 1 bytes). Both the encoder and decoder used the same wrong header length, so AES-GCM AAD matched and decryption did not fail — but the unencrypted header was too short, leaving 9 bytes of codec-critical data encrypted for key frames and 2 bytes for delta frames.
+- **Effect**: In the basic streaming path the video decoder tolerated the broken header layout. In the Page Reload & Recovery scenario a fresh subscriber peer connection received frames whose codec headers were partially encrypted; the decoder could not produce a first decodable frame, so `readyState` never advanced beyond 0 regardless of how long the stream ran.
+- **Fix**: `kind` is now always included in the options. The worker's `onrtctransform` handler already reads it; `handleTransform` propagates it to `EncryptTransform.encryptFrame` / `decryptFrame` where it selects the correct header length.
+
+**`src/webStreams/types/WebRtcExtensions.ts`**
+
+- Added `kind?: string` to `RTCRtpScriptTransformOptions` interface so the new field compiles without a cast.
+
+**`src/webStreams/worker/worker.ts`**
+
+- `onrtctransform` handler: added `?? "video"` fallback when `kind` is absent (guards against older callers that pre-date this fix).
+
+---
+
+## Bug fix — subscriber bootstrap data channel created unconditionally on every reconfigure
+
+**`src/webStreams/SubscriberManager.ts`**
+
+- In the refactored code, a `bootstrapDataChannels: Map<StreamRoomId, RTCDataChannel>` guard was introduced that correctly prevented duplicate data channel creation per room. However, Janus requires a `"JanusDataChannel"` data channel to appear in **every** offer/answer exchange so that the data-channel `m=` section is present in the SDP the subscriber sends back.
+- **Root cause of the regression**: The original `WebRtcClient` code declared `private bootstrapDataChannel: RTCDataChannel | undefined` but never assigned it, making the guard `if (!this.bootstrapDataChannel)` permanently `true` — a data channel was created on every `reconfigureSingle` call. The refactor accidentally introduced a working guard that broke Janus SDP negotiation.
+- **Fix**: The `bootstrapDataChannels` Map is removed. `reconfigureSingle` creates `pc.createDataChannel("JanusDataChannel")` unconditionally at the top of every call, matching the original behaviour.

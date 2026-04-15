@@ -1,7 +1,7 @@
 import { StreamHandle } from "../Types";
 import { StreamRoomId } from "./types/ApiTypes";
-import { SessionId } from "./WebRtcClientTypes";
 
+export type SessionId = number & { _sessionId: never };
 export type ConnectionType = "publisher" | "subscriber";
 
 export interface JanusConnection {
@@ -12,7 +12,7 @@ export interface JanusConnection {
 }
 
 export class PeerConnectionManager {
-    private connections: {
+    private readonly connections: {
         [roomId: string]: {
             publisher?: JanusConnection;
             subscriber?: JanusConnection;
@@ -20,114 +20,83 @@ export class PeerConnectionManager {
     } = {};
 
     constructor(
-        private createPeerConnection: (
+        private readonly createPeerConnection: (
             room: StreamRoomId,
             streamHandle?: StreamHandle,
         ) => RTCPeerConnection,
-        private onTrickle: (sessionId: SessionId, candidate: RTCIceCandidate) => void,
+        private readonly onTrickle: (sessionId: SessionId, candidate: RTCIceCandidate) => void,
     ) {}
 
-    public initialize(
+    initialize(
         room: StreamRoomId,
         connectionType: ConnectionType,
         sessionId: SessionId = -1 as SessionId,
         streamHandle?: StreamHandle,
-    ) {
-        // Prevent re-initialization if it already exists
-        if (
-            room in this.connections &&
-            connectionType in this.connections[room] &&
-            this.connections[room][connectionType]?.pc
-        ) {
-            return;
-        }
+    ): void {
+        if (this.hasConnection(room, connectionType)) return;
 
-        if (!(room in this.connections)) {
-            this.connections[room] = {};
-        }
+        if (!(room in this.connections)) this.connections[room] = {};
 
-        // Create the RTCPeerConnection
         const pc = this.createPeerConnection(room, streamHandle);
-
-        // Prepare the connection object immediately so we can access the queue in the listener
-        const newConnection: JanusConnection = {
-            sessionId: sessionId,
+        const conn: JanusConnection = {
+            sessionId,
             hasSubscriptions: false,
             pc,
             candidateQueue: [],
         };
-
-        // Assign immediately so the listener has access to the reference
-        this.connections[room][connectionType] = newConnection;
+        this.connections[room][connectionType] = conn;
 
         pc.addEventListener("icecandidate", (event) => {
-            if (!event.candidate) {
-                return;
-            }
-
-            const conn = this.connections[room][connectionType];
-            if (!conn) return;
-
-            const currentSessionId = conn.sessionId;
-            if (currentSessionId && currentSessionId > -1) {
+            if (!event.candidate) return;
+            const current = this.connections[room][connectionType];
+            if (!current) return;
+            if (current.sessionId > -1) {
                 try {
-                    this.onTrickle(currentSessionId, event.candidate);
+                    this.onTrickle(current.sessionId, event.candidate);
                 } catch (err) {
                     console.warn("Failed to trickle candidate", err);
                 }
             } else {
-                conn.candidateQueue.push(event.candidate);
+                current.candidateQueue.push(event.candidate);
             }
         });
     }
 
-    public updateSessionForConnection(
+    updateSessionForConnection(
         room: StreamRoomId,
         connectionType: ConnectionType,
         session: SessionId,
-    ) {
-        if (!(room in this.connections) || !(connectionType in this.connections[room])) {
+    ): void {
+        if (!this.hasConnection(room, connectionType)) {
             this.initialize(room, connectionType);
         }
-        const conn = this.connections[room][connectionType];
-        conn!.sessionId = session;
+        const conn = this.connections[room][connectionType]!;
+        conn.sessionId = session;
 
-        if (conn!.candidateQueue.length > 0) {
-            conn!.candidateQueue.forEach((candidate) => {
-                try {
-                    this.onTrickle(session, candidate);
-                } catch (err) {
-                    console.warn("Failed to trickle buffered candidate", err);
-                }
-            });
-            conn!.candidateQueue = [];
+        for (const candidate of conn.candidateQueue) {
+            try {
+                this.onTrickle(session, candidate);
+            } catch (err) {
+                console.warn("Failed to trickle buffered candidate", err);
+            }
         }
+        conn.candidateQueue = [];
     }
 
-    public hasConnection(room: StreamRoomId, connectionType: ConnectionType) {
-        return !!(this.connections[room] && this.connections[room][connectionType]);
+    hasConnection(room: StreamRoomId, connectionType: ConnectionType): boolean {
+        return !!this.connections[room]?.[connectionType]?.pc;
     }
 
-    public getConnectionWithSession(
-        room: StreamRoomId,
-        connectionType: ConnectionType,
-    ): JanusConnection {
+    getConnectionWithSession(room: StreamRoomId, connectionType: ConnectionType): JanusConnection {
         if (!this.hasConnection(room, connectionType)) {
             this.initialize(room, connectionType);
         }
         return this.connections[room][connectionType]!;
     }
 
-    public closePeerConnectionBySessionIfExists(
-        room: StreamRoomId,
-        connectionType: ConnectionType,
-    ): void {
+    closePeerConnectionBySessionIfExists(room: StreamRoomId, connectionType: ConnectionType): void {
         if (this.hasConnection(room, connectionType)) {
-            const conn = this.connections[room][connectionType];
-            if (conn?.pc) {
-                conn.pc.close();
-            }
-            // Optional: Clean up the reference to allow garbage collection
+            this.connections[room][connectionType]?.pc.close();
             delete this.connections[room][connectionType];
         }
     }

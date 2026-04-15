@@ -2,26 +2,16 @@ import { Key } from "../../Types";
 
 // ---- Inbound messages (main thread → worker) ----
 
-export interface InitializeEvent {
-    operation: "initialize";
-}
-
-export interface InitPipelineEvent {
-    operation: "init-pipeline";
-    id: string;
-    publisherId: number;
-}
-
 export interface EncodeEvent {
     operation: "encode";
-    kind: "audio" | "video";
+    kind?: "audio" | "video";
     readableStream: ReadableStream<unknown>;
     writableStream: WritableStream<unknown>;
 }
 
 export interface DecodeEvent {
     operation: "decode";
-    kind: "audio" | "video";
+    kind?: "audio" | "video";
     id: string;
     publisherId: number;
     readableStream: ReadableStream<unknown>;
@@ -43,21 +33,9 @@ export interface StopEvent {
     id: string;
 }
 
-export type WorkerInboundEvent =
-    | InitializeEvent
-    | InitPipelineEvent
-    | EncodeEvent
-    | DecodeEvent
-    | SetKeysEvent
-    | RmsEvent
-    | StopEvent;
+export type WorkerInboundEvent = EncodeEvent | DecodeEvent | SetKeysEvent | RmsEvent | StopEvent;
 
 // ---- Outbound messages (worker → main thread) ----
-
-export interface InitPipelineAckEvent {
-    operation: "init-pipeline";
-    id: string;
-}
 
 export interface SetKeysAckEvent {
     operation: "setKeys-ack";
@@ -80,9 +58,4 @@ export interface ErrorEvent {
     data: unknown;
 }
 
-export type WorkerOutboundEvent =
-    | InitPipelineAckEvent
-    | SetKeysAckEvent
-    | RmsOutEvent
-    | DebugEvent
-    | ErrorEvent;
+export type WorkerOutboundEvent = SetKeysAckEvent | RmsOutEvent | DebugEvent | ErrorEvent;

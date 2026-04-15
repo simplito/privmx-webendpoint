@@ -12,6 +12,7 @@ export interface RTCRtpScriptTransformOptions {
     operation: "encode" | "decode";
     id?: string;
     publisherId?: number;
+    kind?: string;
 }
 
 export interface RTCRtpSenderWithTransform extends RTCRtpSender {

@@ -1,5 +1,4 @@
 import * as EndpointTypes from "../Types";
-import { Utils } from "../webStreams/Utils";
 import { AudioLevelsStats, WebRtcClient } from "../webStreams/WebRtcClient";
 import {
     Stream,
@@ -261,7 +260,9 @@ export class StreamApi extends BaseApi {
             throw new Error("Cannot find stream by id");
         }
 
-        const streamTrackId = Utils.getRandomString(16) as StreamTrackId;
+        const streamTrackId = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+            .map((b) => (b & 0xf).toString(16))
+            .join("") as StreamTrackId;
         const streamTrack: StreamTrack = {
             id: streamTrackId,
             streamHandle: streamHandle,

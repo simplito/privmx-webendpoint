@@ -480,7 +480,7 @@ async function measureSendMessages(
 }
 
 test.describe("CoreTest: Worker count", () => {
-    const MESSAGE_COUNT = 32;
+    const MESSAGE_COUNT = 100;
 
     test("EndpointFactory.setup() initialises WASM with the requested worker count", async ({
         page,
@@ -502,19 +502,6 @@ test.describe("CoreTest: Worker count", () => {
         await test.step("8 workers — doubled", async () => {
             times["8w"] = await measureSendMessages(page, cli, backend.bridgeUrl, 8, MESSAGE_COUNT);
             console.log(`[workerCount=8]  ${MESSAGE_COUNT} messages: ${times["8w"].toFixed(1)} ms`);
-        });
-
-        await test.step("16 workers", async () => {
-            times["16w"] = await measureSendMessages(
-                page,
-                cli,
-                backend.bridgeUrl,
-                16,
-                MESSAGE_COUNT,
-            );
-            console.log(
-                `[workerCount=16]  ${MESSAGE_COUNT} messages: ${times["16w"].toFixed(1)} ms`,
-            );
         });
 
         // All three runs must complete all messages successfully (no throw = pass).

@@ -135,15 +135,10 @@ export class Connection extends BaseApi {
     }
 
     private async freeApis() {
-        console.warn("freeApis disabled for debugging purposes. Please re-enable");
-
-        // for (const apiId in this.apisRefs) {
-        //   if (this.nativeApisDeps[apiId]) {
-
-        //     await this.nativeApisDeps[apiId].deleteApi(
-        //       this.apisRefs[apiId]._apiServicePtr
-        //     );
-        //   }
-        // }
+        for (const apiId in this.apisRefs) {
+            if (this.nativeApisDeps[apiId]) {
+                await this.nativeApisDeps[apiId].deleteApi(this.apisRefs[apiId]._apiServicePtr);
+            }
+        }
     }
 }

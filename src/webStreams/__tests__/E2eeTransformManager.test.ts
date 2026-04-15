@@ -1,13 +1,13 @@
 import { E2eeTransformManager } from "../E2eeTransformManager";
-import { WebWorker } from "../WebWorkerHelper";
+import { E2eeWorker } from "../E2eeWorker";
 import {
     WindowWithRTCRtpScriptTransform,
     RTCRtpReceiverWithTransform,
     RTCRtpSenderWithTransform,
 } from "../types/WebRtcExtensions";
 
-// ---- minimal window stub (jest runs in "node" env, not jsdom) ----
-// Use a mutable reference so individual tests can reset it between runs.
+// ---- window stub (Jest runs in node, not jsdom) ------------------------------
+
 let testWindow: WindowWithRTCRtpScriptTransform;
 
 function resetTestWindow(): void {
@@ -16,64 +16,30 @@ function resetTestWindow(): void {
 }
 resetTestWindow();
 
-// ---- helpers ----
+// ---- E2eeWorker mock --------------------------------------------------------
 
-interface WorkerMessage {
-    operation: string;
-    id?: string;
-    publisherId?: number;
-    readableStream?: unknown;
-    writableStream?: unknown;
-}
-
-class FakeWorker {
-    private listeners: Array<(ev: MessageEvent) => void> = [];
-    public postedMessages: Array<{ data: WorkerMessage; transfer?: unknown[] }> = [];
-
-    addEventListener(_type: string, fn: (ev: MessageEvent) => void): void {
-        this.listeners.push(fn);
-    }
-    removeEventListener(_type: string, fn: (ev: MessageEvent) => void): void {
-        this.listeners = this.listeners.filter((l) => l !== fn);
-    }
-    postMessage(data: WorkerMessage, transfer?: unknown[]): void {
-        this.postedMessages.push({ data, transfer });
-    }
-    emit(data: WorkerMessage): void {
-        this.listeners.forEach((fn) => fn({ data } as MessageEvent));
-    }
-}
-
-interface FakeWorkerApi {
-    init_e2ee: jest.Mock;
-    getWorker: jest.Mock<FakeWorker>;
-    setKeys: jest.Mock;
-    _worker: FakeWorker;
-    onFrame: (frameInfo: { rms: number; publisherId: number }) => void;
-}
-
-jest.mock("../WebWorkerHelper", () => {
+function makeMockWorker(): jest.Mocked<E2eeWorker> {
     return {
-        WebWorker: jest
-            .fn()
-            .mockImplementation((_assetsDir: string, onFrame: FakeWorkerApi["onFrame"]) => {
-                let worker: FakeWorker;
-                const api: FakeWorkerApi = {
-                    init_e2ee: jest.fn().mockImplementation(() => {
-                        worker = new FakeWorker();
-                        return Promise.resolve();
-                    }),
-                    getWorker: jest.fn(() => worker),
-                    setKeys: jest.fn().mockResolvedValue(undefined),
-                    get _worker() {
-                        return worker;
-                    },
-                    onFrame,
-                };
-                return api;
-            }),
-    };
-});
+        get: jest.fn().mockResolvedValue({ _fakeWorker: true }),
+        setKeys: jest.fn().mockResolvedValue(undefined),
+        sendRms: jest.fn().mockResolvedValue(undefined),
+        postEncode: jest.fn().mockResolvedValue(undefined),
+        postDecode: jest.fn().mockResolvedValue(undefined),
+        postStop: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<E2eeWorker>;
+}
+
+// ---- RTCRtp stubs -----------------------------------------------------------
+
+function makeSender(): RTCRtpSenderWithTransform {
+    return {
+        transform: undefined,
+        createEncodedStreams: jest.fn().mockReturnValue({
+            readable: { _type: "readable" },
+            writable: { _type: "writable" },
+        }),
+    } as unknown as RTCRtpSenderWithTransform;
+}
 
 function makeReceiver(trackId = "track-1"): RTCRtpReceiverWithTransform {
     return {
@@ -86,100 +52,21 @@ function makeReceiver(trackId = "track-1"): RTCRtpReceiverWithTransform {
     } as unknown as RTCRtpReceiverWithTransform;
 }
 
+// ---- tests ------------------------------------------------------------------
+
 describe("E2eeTransformManager", () => {
+    let worker: jest.Mocked<E2eeWorker>;
     let manager: E2eeTransformManager;
-    let onFrameSpy: jest.Mock;
 
     beforeEach(() => {
         resetTestWindow();
-        onFrameSpy = jest.fn();
-        manager = new E2eeTransformManager("/assets", onFrameSpy);
-        (WebWorker as jest.Mock).mockClear();
+        worker = makeMockWorker();
+        manager = new E2eeTransformManager(worker);
     });
 
-    async function getWorkerAndApi(): Promise<{ worker: FakeWorker; api: FakeWorkerApi }> {
-        await manager.getWorker();
-        const api = (await manager.getWorkerApi()) as unknown as FakeWorkerApi;
-        return { worker: api._worker, api };
-    }
-
-    describe("getWorker", () => {
-        it("lazily initialises WebWorker on first call", async () => {
-            await manager.getWorker();
-            expect(WebWorker).toHaveBeenCalledTimes(1);
-        });
-
-        it("returns the same worker on subsequent calls", async () => {
-            const w1 = await manager.getWorker();
-            const w2 = await manager.getWorker();
-            expect(w1).toBe(w2);
-            expect(WebWorker).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe("setKeys", () => {
-        it("delegates to WebWorker.setKeys", async () => {
-            const { api } = await getWorkerAndApi();
-            const keys = [{ keyId: "k1", key: new Uint8Array(32), type: 0 }];
-            await manager.setKeys(keys);
-            expect(api.setKeys).toHaveBeenCalledWith(keys);
-        });
-    });
-
-    describe("initPipeline", () => {
-        it("posts init-pipeline and resolves when the worker echoes back", async () => {
-            const { worker } = await getWorkerAndApi();
-            const promise = manager.initPipeline("track-abc", 7);
-
-            // initPipeline does `await this.getWorker()` internally — let that
-            // microtask settle so the message listener is registered before we emit.
-            await Promise.resolve();
-            worker.emit({ operation: "init-pipeline", id: "track-abc" });
-
-            await expect(promise).resolves.toBeUndefined();
-
-            const sent = worker.postedMessages.find((m) => m.data.operation === "init-pipeline");
-            expect(sent?.data).toMatchObject({
-                operation: "init-pipeline",
-                id: "track-abc",
-                publisherId: 7,
-            });
-        });
-
-        it("does not resolve when a different track id is echoed", async () => {
-            const { worker } = await getWorkerAndApi();
-            let resolved = false;
-            manager.initPipeline("track-A", 1).then(() => {
-                resolved = true;
-            });
-
-            await Promise.resolve();
-            worker.emit({ operation: "init-pipeline", id: "track-B" }); // wrong id
-            await Promise.resolve();
-            expect(resolved).toBe(false);
-        });
-    });
-
-    describe("setupSenderTransform — RTCRtpScriptTransform unavailable", () => {
-        it("posts an encode message with the encoded streams", async () => {
-            const { worker } = await getWorkerAndApi();
-            const readable = { _type: "readable" };
-            const writable = { _type: "writable" };
-            const sender: RTCRtpSenderWithTransform = {
-                createEncodedStreams: jest.fn().mockReturnValue({ readable, writable }),
-            } as unknown as RTCRtpSenderWithTransform;
-
-            await manager.setupSenderTransform(sender);
-
-            const msg = worker.postedMessages.find((m) => m.data.operation === "encode");
-            expect(msg?.data).toMatchObject({
-                operation: "encode",
-                readableStream: readable,
-                writableStream: writable,
-            });
-            expect(msg?.transfer).toEqual([readable, writable]);
-        });
-    });
+    // -------------------------------------------------------------------------
+    // setupSenderTransform
+    // -------------------------------------------------------------------------
 
     describe("setupSenderTransform — RTCRtpScriptTransform available", () => {
         beforeEach(() => {
@@ -188,49 +75,54 @@ describe("E2eeTransformManager", () => {
                 .mockImplementation(() => ({ _isTransform: true }));
         });
 
-        it("assigns a transform on the sender instead of posting a message", async () => {
-            const { worker } = await getWorkerAndApi();
-            const sender = {} as RTCRtpSenderWithTransform;
+        it("assigns a transform on the sender", async () => {
+            const sender = makeSender();
+            await manager.setupSenderTransform(sender);
+            expect(sender.transform).toBeDefined();
+        });
+
+        it("does NOT call createEncodedStreams", async () => {
+            const sender = makeSender();
+            await manager.setupSenderTransform(sender);
+            expect(sender.createEncodedStreams).not.toHaveBeenCalled();
+        });
+
+        it("calls e2eeWorker.get() to obtain the worker instance", async () => {
+            await manager.setupSenderTransform(makeSender());
+            expect(worker.get).toHaveBeenCalledTimes(1);
+        });
+
+        it("constructs RTCRtpScriptTransform with operation=encode", async () => {
+            await manager.setupSenderTransform(makeSender());
+            expect(testWindow.RTCRtpScriptTransform).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ operation: "encode" }),
+            );
+        });
+    });
+
+    describe("setupSenderTransform — EncodedStreams fallback", () => {
+        it("calls createEncodedStreams and posts encode to worker", async () => {
+            const sender = makeSender();
+            const { readable, writable } = sender.createEncodedStreams();
+            (sender.createEncodedStreams as jest.Mock).mockClear();
 
             await manager.setupSenderTransform(sender);
 
-            expect(sender.transform).toBeDefined();
-            const encodeMsg = worker.postedMessages.find((m) => m.data.operation === "encode");
-            expect(encodeMsg).toBeUndefined();
+            expect(sender.createEncodedStreams).toHaveBeenCalledTimes(1);
+            expect(worker.postEncode).toHaveBeenCalledWith(readable, writable);
+        });
+
+        it("does NOT assign sender.transform", async () => {
+            const sender = makeSender();
+            await manager.setupSenderTransform(sender);
+            expect(sender.transform).toBeUndefined();
         });
     });
 
-    describe("setupReceiverTransform — EncodedStreams fallback", () => {
-        it("calls createEncodedStreams and posts a decode message", async () => {
-            const { worker } = await getWorkerAndApi();
-            const receiver = makeReceiver("track-recv");
-
-            setTimeout(() => {
-                worker.emit({ operation: "init-pipeline", id: "track-recv" });
-            }, 0);
-
-            await manager.setupReceiverTransform(receiver, 99);
-
-            const decodeMsg = worker.postedMessages.find((m) => m.data.operation === "decode");
-            expect(decodeMsg?.data).toMatchObject({
-                operation: "decode",
-                id: "track-recv",
-                publisherId: 99,
-            });
-        });
-
-        it("does not call createEncodedStreams a second time for the same receiver", async () => {
-            const { worker } = await getWorkerAndApi();
-            const receiver = makeReceiver("track-dedup");
-            const createStreamsSpy = receiver.createEncodedStreams as jest.Mock;
-
-            setTimeout(() => worker.emit({ operation: "init-pipeline", id: "track-dedup" }), 0);
-            await manager.setupReceiverTransform(receiver, 1);
-            await manager.setupReceiverTransform(receiver, 1);
-
-            expect(createStreamsSpy).toHaveBeenCalledTimes(1);
-        });
-    });
+    // -------------------------------------------------------------------------
+    // setupReceiverTransform
+    // -------------------------------------------------------------------------
 
     describe("setupReceiverTransform — RTCRtpScriptTransform available", () => {
         beforeEach(() => {
@@ -240,44 +132,99 @@ describe("E2eeTransformManager", () => {
         });
 
         it("assigns a transform on the receiver", async () => {
-            const receiver = makeReceiver("track-script");
+            const receiver = makeReceiver("track-rx");
             await manager.setupReceiverTransform(receiver, 5);
             expect(receiver.transform).toBeDefined();
         });
 
-        it("does not call createEncodedStreams", async () => {
-            const receiver = makeReceiver("track-script2");
-            const createStreamsSpy = receiver.createEncodedStreams as jest.Mock;
+        it("does NOT call createEncodedStreams", async () => {
+            const receiver = makeReceiver("track-rx");
             await manager.setupReceiverTransform(receiver, 5);
-            expect(createStreamsSpy).not.toHaveBeenCalled();
+            expect(receiver.createEncodedStreams).not.toHaveBeenCalled();
+        });
+
+        it("constructs RTCRtpScriptTransform with operation=decode, correct id and publisherId", async () => {
+            const receiver = makeReceiver("track-rx-id");
+            await manager.setupReceiverTransform(receiver, 42);
+            expect(testWindow.RTCRtpScriptTransform).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({
+                    operation: "decode",
+                    id: "track-rx-id",
+                    publisherId: 42,
+                }),
+            );
+        });
+
+        it("falls through to EncodedStreams when transform is already assigned", async () => {
+            const receiver = makeReceiver("track-already-transformed");
+            (receiver as any).transform = { _existing: true };
+
+            await manager.setupReceiverTransform(receiver, 1);
+
+            // RTCRtpScriptTransform constructor should not have been called
+            expect(testWindow.RTCRtpScriptTransform).not.toHaveBeenCalled();
         });
     });
 
-    describe("teardownReceiver", () => {
-        it("posts a stop message for a receiver that was set up", async () => {
-            const { worker } = await getWorkerAndApi();
-            const receiver = makeReceiver("track-tear");
+    describe("setupReceiverTransform — EncodedStreams fallback", () => {
+        it("calls createEncodedStreams and posts decode to worker", async () => {
+            const receiver = makeReceiver("track-enc");
+            await manager.setupReceiverTransform(receiver, 99);
 
-            setTimeout(() => worker.emit({ operation: "init-pipeline", id: "track-tear" }), 0);
-            await manager.setupReceiverTransform(receiver, 2);
+            expect(receiver.createEncodedStreams).toHaveBeenCalledTimes(1);
+            expect(worker.postDecode).toHaveBeenCalledWith(
+                "track-enc",
+                99,
+                expect.anything(),
+                expect.anything(),
+            );
+        });
+
+        it("does not call createEncodedStreams a second time for the same receiver", async () => {
+            const receiver = makeReceiver("track-dedup-enc");
+            await manager.setupReceiverTransform(receiver, 1);
+            await manager.setupReceiverTransform(receiver, 1);
+
+            expect(receiver.createEncodedStreams).toHaveBeenCalledTimes(1);
+            expect(worker.postDecode).toHaveBeenCalledTimes(1);
+        });
+
+        it("is a no-op when createEncodedStreams is not a function", async () => {
+            const receiver = makeReceiver("track-no-api");
+            delete (receiver as any).createEncodedStreams;
+
+            await expect(manager.setupReceiverTransform(receiver, 1)).resolves.toBeUndefined();
+            expect(worker.postDecode).not.toHaveBeenCalled();
+        });
+    });
+
+    // -------------------------------------------------------------------------
+    // teardownReceiver
+    // -------------------------------------------------------------------------
+
+    describe("teardownReceiver", () => {
+        it("posts a stop message for a receiver set up via EncodedStreams", async () => {
+            const receiver = makeReceiver("track-tear");
+            await manager.setupReceiverTransform(receiver, 7);
             await manager.teardownReceiver(receiver);
 
-            const stopMsg = worker.postedMessages.find((m) => m.data.operation === "stop");
-            expect(stopMsg?.data).toMatchObject({ operation: "stop", id: "track-tear" });
+            expect(worker.postStop).toHaveBeenCalledWith("track-tear");
         });
 
         it("is a no-op for a receiver that was never set up", async () => {
-            await getWorkerAndApi();
             const receiver = makeReceiver("unknown");
             await expect(manager.teardownReceiver(receiver)).resolves.toBeUndefined();
+            expect(worker.postStop).not.toHaveBeenCalled();
         });
-    });
 
-    describe("onFrame callback", () => {
-        it("forwards publisherId and rms to the provided callback", async () => {
-            const { api } = await getWorkerAndApi();
-            api.onFrame({ rms: 0.42, publisherId: 3 });
-            expect(onFrameSpy).toHaveBeenCalledWith(3, 0.42);
+        it("removes the receiver from the registry so a second teardown is also a no-op", async () => {
+            const receiver = makeReceiver("track-double-tear");
+            await manager.setupReceiverTransform(receiver, 3);
+            await manager.teardownReceiver(receiver);
+            await manager.teardownReceiver(receiver);
+
+            expect(worker.postStop).toHaveBeenCalledTimes(1);
         });
     });
 });
