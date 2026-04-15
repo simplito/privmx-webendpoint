@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi";
-import { KvdbApiNative } from "../api/KvdbApiNative";
+import { KvdbApiNative } from "../native/KvdbApiNative";
 import {
     PagingQuery,
     PagingList,
@@ -25,7 +25,7 @@ import {
 
 export class KvdbApi extends BaseApi {
     constructor(
-        protected native: KvdbApiNative,
+        private native: KvdbApiNative,
         ptr: number,
     ) {
         super(ptr);

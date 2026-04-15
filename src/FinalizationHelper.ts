@@ -1,5 +1,3 @@
-import { ApiStatic } from "./api/ApiStatic";
-import { ExtKeyNative } from "./api/ExtKeyNative";
 
 interface NativeObjInfo {
     ptr: number;
@@ -29,7 +27,6 @@ export class FinalizationHelper {
 
     private constructor(private wasmLib: any) {
         this.finalizationRegistry = new FinalizationRegistry((onCleanup) => {
-            const api = ApiStatic.getInstance();
             this.finalizationQueue.push(onCleanup.onFree);
             this.scheduleCleanup();
         });

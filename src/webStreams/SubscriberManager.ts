@@ -1,5 +1,5 @@
 import { Jsep, StreamRoomId } from "./types/ApiTypes";
-import { PeerConnectionManager, SessionId } from "./PeerConnectionsManager";
+import { PeerConnectionManager, SessionId } from "./PeerConnectionManager";
 
 interface QueueItem {
     room: StreamRoomId;

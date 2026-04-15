@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { EndpointFactory } from "./service/EndpointFactory";
-import { NativeError } from "./api/NativeError";
+import { NativeError } from "./native/NativeError";
 import {
     EventQueue,
     StoreApi,

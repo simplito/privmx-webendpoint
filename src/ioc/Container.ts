@@ -37,3 +37,27 @@ export class Container {
         return entry.factory(this) as Promise<T>;
     }
 }
+
+/**
+ * Application-lifetime container.
+ * Holds singletons that are created once during `EndpointFactory.setup()` and
+ * live for the entire lifetime of the application: EventQueue, CryptoApi, the
+ * raw WASM Api handle, etc.
+ */
+export class GlobalContainer extends Container {}
+
+/**
+ * Per-connection scoped container.
+ * Created once per `EndpointFactory.connect()` / `connectPublic()` call.
+ * Holds ThreadApi, StoreApi, KvdbApi, EventApi, InboxApi, StreamApi — all
+ * tied to a single authenticated Connection instance.
+ */
+export class ConnectionContainer extends Container {}
+
+/**
+ * Per-stream-session scoped container.
+ * Created once per `EndpointFactory.createStreamApi()` call inside a
+ * ConnectionContainer.  Holds the entire WebRTC sub-graph: KeyStore,
+ * PeerConnectionManager, E2eeWorker, AudioManager, etc.
+ */
+export class WebRtcContainer extends Container {}

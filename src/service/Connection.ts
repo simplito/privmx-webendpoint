@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi";
-import { ConnectionNative } from "../api/ConnectionNative";
+import { ConnectionNative } from "../native/ConnectionNative";
 import {
     PagingQuery,
     PagingList,
@@ -20,19 +20,27 @@ import {
     ConnectionEventType,
     ConnectionEventSelectorType,
 } from "../Types";
-import { BaseNative } from "../api/BaseNative";
+import { BaseNative } from "../native/BaseNative";
 import { UserVerifierInterface } from "./UserVerifierInterface";
 
 export class Connection extends BaseApi {
-    /**
-     * //doc-gen:ignore
-     */
-    apisRefs: { [apiId: string]: { _apiServicePtr: number } } = {};
+    private apisRefs: { [apiId: string]: { _apiServicePtr: number } } = {};
+    private nativeApisDeps: { [apiId: string]: BaseNative } = {};
 
     /**
      * //doc-gen:ignore
      */
-    nativeApisDeps: { [apiId: string]: BaseNative } = {};
+    registerApi(id: string, ptr: number, native: BaseNative): void {
+        this.apisRefs[id] = { _apiServicePtr: ptr };
+        this.nativeApisDeps[id] = native;
+    }
+
+    /**
+     * //doc-gen:ignore
+     */
+    hasApi(id: string): boolean {
+        return id in this.apisRefs;
+    }
 
     constructor(
         private native: ConnectionNative,

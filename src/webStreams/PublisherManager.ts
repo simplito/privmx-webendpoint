@@ -1,6 +1,6 @@
 import { StreamHandle } from "../Types";
 import { StreamRoomId, StreamTrack } from "./types/ApiTypes";
-import { PeerConnectionManager, SessionId } from "./PeerConnectionsManager";
+import { PeerConnectionManager, SessionId } from "./PeerConnectionManager";
 import { AudioManager } from "./AudioManager";
 import { E2eeTransformManager } from "./E2eeTransformManager";
 

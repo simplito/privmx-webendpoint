@@ -9,13 +9,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Api } from "../api/Api";
-import { ApiStatic } from "../api/ApiStatic";
-import { ConnectionNative } from "../api/ConnectionNative";
+import { Api } from "../native/Api";
+import { ConnectionNative } from "../native/ConnectionNative";
 import { FinalizationHelper } from "../FinalizationHelper";
 import { PKIVerificationOptions } from "../Types";
 import { Connection } from "./Connection";
-import { Container } from "./Container";
 import { CryptoApi } from "./CryptoApi";
 import { EventApi } from "./EventApi";
 import { EventQueue } from "./EventQueue";
@@ -24,8 +22,9 @@ import { KvdbApi } from "./KvdbApi";
 import { StoreApi } from "./StoreApi";
 import { StreamApi } from "./StreamApi";
 import { ThreadApi } from "./ThreadApi";
-import { T } from "./Tokens";
-import { registerGlobalServices, registerConnectionServices } from "./buildConnectionApis";
+import { GlobalContainer, ConnectionContainer } from "../ioc/Container";
+import { T } from "../ioc/Tokens";
+import { registerGlobalServices, registerConnectionServices } from "../ioc/buildConnectionApis";
 import { setGlobalEmCrypto } from "../crypto/index";
 
 /**
@@ -42,13 +41,13 @@ export interface EndpointSetupOptions {
  * Contains static factory methods - generators for Connection and APIs.
  */
 export class EndpointFactory {
-    private static globalContainer: Container;
+    private static globalContainer: GlobalContainer;
     private static assetsBasePath: string;
     private static api: Api;
 
     // Per-Connection containers, keyed by the Connection instance.
     // WeakMap ensures no memory leak when a Connection is garbage-collected.
-    private static readonly connectionContainers = new WeakMap<Connection, Container>();
+    private static readonly connectionContainers = new WeakMap<Connection, ConnectionContainer>();
 
     /**
      * Load the Endpoint's WASM assets and initialize the Endpoint library.
@@ -134,10 +133,9 @@ export class EndpointFactory {
      */
     private static init(lib: any) {
         this.api = new Api(lib);
-        ApiStatic.init(this.api);
         FinalizationHelper.init(lib);
 
-        this.globalContainer = new Container();
+        this.globalContainer = new GlobalContainer();
         registerGlobalServices(this.globalContainer, this.api, this.assetsBasePath);
     }
 
@@ -173,10 +171,10 @@ export class EndpointFactory {
      * Returns (creating if necessary) the connection-scoped container for the
      * given `Connection` instance.  All per-connection API singletons live here.
      */
-    private static getConnectionContainer(connection: Connection): Container {
+    private static getConnectionContainer(connection: Connection): ConnectionContainer {
         let c = this.connectionContainers.get(connection);
         if (!c) {
-            c = new Container();
+            c = new ConnectionContainer();
             c.registerValue(T.ConnectionPtr, connection);
             registerConnectionServices(c, this.api, this.assetsBasePath);
             this.connectionContainers.set(connection, c);

@@ -1,6 +1,6 @@
 import { Key, TurnCredentials, StreamHandle, RemoteStreamListener } from "../Types";
 import { Jsep, StreamRoomId, StreamTrack } from "./types/ApiTypes";
-import { ConnectionType, SessionId } from "./PeerConnectionsManager";
+import { ConnectionType, SessionId } from "./PeerConnectionManager";
 import { PeerConnectionFactory } from "./PeerConnectionFactory";
 import { PublisherManager } from "./PublisherManager";
 import { SubscriberManager } from "./SubscriberManager";

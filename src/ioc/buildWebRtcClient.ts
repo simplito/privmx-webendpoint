@@ -7,12 +7,12 @@ import { StateChangeDispatcher } from "../webStreams/EventDispatcher";
 import { KeyStore } from "../webStreams/KeyStore";
 import { KeySyncManager } from "../webStreams/KeySyncManager";
 import { PeerConnectionFactory } from "../webStreams/PeerConnectionFactory";
-import { PeerConnectionManager } from "../webStreams/PeerConnectionsManager";
+import { PeerConnectionManager } from "../webStreams/PeerConnectionManager";
 import { PublisherManager } from "../webStreams/PublisherManager";
 import { RemoteStreamListenerRegistry } from "../webStreams/RemoteStreamListenerRegistry";
 import { SubscriberManager } from "../webStreams/SubscriberManager";
 import { WebRtcClient } from "../webStreams/WebRtcClient";
-import { Container } from "./Container";
+import { WebRtcContainer, Container } from "./Container";
 import { T } from "./Tokens";
 
 /**
@@ -81,10 +81,10 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
 }
 
 /**
- * Registers all connection-scoped WebRTC singletons into the container.
+ * Registers all WebRTC-session-scoped singletons into a WebRtcContainer.
  * Call this once per createStreamApi() invocation before resolving T.WebRtcClient.
  */
-export function registerWebRtcServices(c: Container): void {
+export function registerWebRtcServices(c: WebRtcContainer): void {
     c.registerSingleton(T.KeyStore,    async () => new KeyStore());
     c.registerSingleton(T.StateChangeDispatcher, async () => new StateChangeDispatcher());
     c.registerSingleton(T.ListenerRegistry,      async () => new RemoteStreamListenerRegistry());

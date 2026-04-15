@@ -17,10 +17,9 @@ import {
     WebRtcInterface,
     WebRtcMethodCall,
 } from "./WebRtcInterface";
-import { ConnectionType } from "./PeerConnectionsManager";
+import { ConnectionType, SessionId } from "./PeerConnectionManager";
 import { Jsep, StreamRoomId } from "./types/ApiTypes";
 import { WebRtcClient } from "./WebRtcClient";
-import { SessionId } from "./PeerConnectionsManager";
 
 type MethodMap = {
     [K in WebRtcMethodCall["name"]]: (
