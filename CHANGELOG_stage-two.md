@@ -357,6 +357,61 @@ Broke the 9-dependency `WebRtcClient` god class into focused, single-responsibil
 
 ---
 
+## Refactor — IoC Container for the full TypeScript service layer
+
+Introduced a minimal async IoC container (`Container`) and a token registry (`Tokens`) that now govern the entire object graph — from the WASM `Api` singleton down to per-connection API instances and the WebRTC sub-graph. `EndpointFactory` is reduced to a thin facade that delegates all construction to containers.
+
+### New files
+
+**`src/service/Container.ts`**
+- 43-line async IoC container; no framework, no decorators, no reflect-metadata.
+- Three registration modes: `registerSingleton` (factory called once, result cached), `registerTransient` (factory called on every resolve), `registerValue` (pre-built instance stored as a resolved singleton).
+- Circular dependencies are broken by resolving inside callback closures that execute after all registrations are set up.
+
+**`src/service/Tokens.ts`**
+- String-literal token constants for every managed object; scope prefix encodes lifetime:
+  - `global:` — created once in `EndpointFactory.setup()`, live for the application lifetime (`Api`, `AssetsBasePath`, `EventQueue`, `CryptoApi`).
+  - `conn:` — created once per `Connection` instance (`ThreadApi`, `StoreApi`, `KvdbApi`, `EventApi`, `InboxApi`, `StreamApi`, `ConnectionPtr`).
+  - `rtc:` — created once per `createStreamApi()` call, scoped to the WebRTC session.
+
+**`src/service/buildConnectionApis.ts`**
+- `registerGlobalServices(c, api, assetsBasePath)` — registers `EventQueue` and `CryptoApi` as global singletons.
+- `registerConnectionServices(c, api, assetsBasePath)` — registers all six connection-scoped API singletons. Dependency rules encoded as container registrations:
+  - `InboxApi` lazily resolves `ThreadApi` + `StoreApi` from the same container (no caller needs to pass them explicitly).
+  - `StreamApi` lazily resolves `EventApi`, then creates an isolated WebRTC sub-graph container and calls `registerWebRtcServices`.
+- All factories still populate `connection.apisRefs` / `connection.nativeApisDeps` so `Connection.disconnect()` cleanup is unchanged.
+
+**`src/service/buildWebRtcClient.ts`**
+- `registerWebRtcServices(c)` — registers all `rtc:*` singletons (`KeyStore`, `DataChannelCryptor`, `DataChannelSession`, `StateChangeDispatcher`, `ListenerRegistry`, `E2eeWorker`, `E2eeTransformManager`, `AudioManager`, `WebRtcClient`).
+- `buildWebRtcClient(c)` — resolves deps, creates `PeerConnectionFactory` and `PeerConnectionManager` with lazy callback closures (breaking the `PeerConnectionFactory → SubscriberManager` and `PeerConnectionManager → WebRtcClient` cycles), registers all internally-constructed objects back into the container, returns the `WebRtcClient`.
+
+### Changed files
+
+**`src/service/EndpointFactory.ts`** — reduced to a facade
+- Static `api: Api` field retained for synchronous access during connection creation.
+- `init()` calls `registerGlobalServices(globalContainer, api, assetsBasePath)` instead of wiring objects inline.
+- `getEventQueue()` and `createCryptoApi()` delegate to `globalContainer.resolve(T.EventQueue / T.CryptoApi)`.
+- `connect()` / `connectPublic()` use `this.api` directly (no container resolution needed — connection creation is not a singleton).
+- `getConnectionContainer(connection)` — lazily creates a per-connection `Container`, registers `T.ConnectionPtr`, calls `registerConnectionServices`, and caches it in a `WeakMap<Connection, Container>` (no memory leak when connections are GC'd).
+- All six `createXApi` methods are now one-liner delegators: `return this.getConnectionContainer(connection).resolve<XApi>(T.XApi)`.
+- `createInboxApi(connection, _threadApi?, _storeApi?)` — `threadApi` / `storeApi` parameters made optional and ignored; the container resolves them automatically. **Signature is backwards-compatible.**
+- `createStreamApi(connection, _eventApi?)` — same pattern; `eventApi` parameter made optional and ignored. **Backwards-compatible.**
+- `CryptoApi` is now a **global singleton**: the same instance is returned on every `createCryptoApi()` call (previously a fresh instance was constructed each time).
+
+**`src/api/StreamApiNative.ts`**
+- Constructor signature changed: `constructor(api: Api, private readonly webRtcInterfaceImpl: WebRtcInterfaceImpl)` — takes the already-built `WebRtcInterfaceImpl` instead of a `WebRtcClient`. The native layer no longer owns or constructs the interface bridge.
+- Removed `WebRtcClient` and `SessionId` imports.
+- Removed `webRtcInterfacePtr` field and the `bindApiInterface` wiring that was in the old constructor.
+- `bindWebRtcInterfaceAsHandler` renamed to `registerWebRtcInterfaceHandler` (private); no longer constructs a new `WebRtcInterfaceImpl` — uses the one passed at construction.
+- `selfPtr` changed from `protected` to `public` so `EndpointFactory` can reference it in the trickle/acceptOffer closures it wires after `newApi()`.
+
+**`src/webStreams/WebRtcClient.ts`**
+- Removed `static create(assetsDir)` factory method — construction is now entirely in `buildWebRtcClient.ts` via the IoC container.
+- Added `trickle(sessionId, candidate): Promise<void>` public method — delegates to `streamsApiInterface.trickle(...)` with a null-guard, so `buildWebRtcClient.ts` can route ICE candidates without accessing the private `streamsApiInterface` field.
+- Removed imports for `KeyStore`, `DataChannelCryptor`, `PeerConnectionManager`, `E2eeWorker`, `E2eeTransformManager` — no longer needed after removal of `static create`.
+
+---
+
 ## Bug fix — subscriber bootstrap data channel created unconditionally on every reconfigure
 
 **`src/webStreams/SubscriberManager.ts`**

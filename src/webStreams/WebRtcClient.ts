@@ -2,17 +2,12 @@ import { Key, TurnCredentials, StreamHandle, RemoteStreamListener } from "../Typ
 import { Jsep, StreamRoomId, StreamTrack } from "./types/ApiTypes";
 import { ConnectionType, SessionId } from "./PeerConnectionsManager";
 import { PeerConnectionFactory } from "./PeerConnectionFactory";
-import { PeerConnectionManager } from "./PeerConnectionsManager";
 import { PublisherManager } from "./PublisherManager";
 import { SubscriberManager } from "./SubscriberManager";
 import { DataChannelSession } from "./DataChannelSession";
 import { KeySyncManager } from "./KeySyncManager";
-import { KeyStore } from "./KeyStore";
-import { DataChannelCryptor } from "./DataChannelCryptor";
 import { StateChangeDispatcher } from "./EventDispatcher";
 import { AudioManager, AudioLevelFuncCallback } from "./AudioManager";
-import { E2eeWorker } from "./E2eeWorker";
-import { E2eeTransformManager } from "./E2eeTransformManager";
 import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry";
 
 export interface StreamsCallbackInterface {
@@ -52,79 +47,16 @@ export class WebRtcClient {
     ) {}
 
     // -------------------------------------------------------------------------
-    // Static factory — the only place where concrete types are instantiated.
-    // Everything below the constructor works exclusively through injected deps.
-    // -------------------------------------------------------------------------
-
-    static create(assetsDir: string): WebRtcClient {
-        const keyStore = new KeyStore();
-        const dataChannelCryptor = new DataChannelCryptor(keyStore);
-        const dataChannelSession = new DataChannelSession(dataChannelCryptor);
-        const eventsDispatcher = new StateChangeDispatcher();
-        const listenerRegistry = new RemoteStreamListenerRegistry();
-
-        const e2eeWorker = new E2eeWorker(assetsDir, (publisherId, rms) => {
-            audioManager.onRemoteFrameRms(publisherId, rms);
-        });
-        const e2eeTransformManager = new E2eeTransformManager(e2eeWorker);
-        const audioManager = new AudioManager(assetsDir, (rms) => e2eeWorker.sendRms(rms));
-
-        // subscriber is created after pcm because SubscriberManager needs pcm,
-        // and pcFactory needs the subscriber's onRemoteTrack callback.
-        // We break the cycle with a late-bound reference (same pattern as before).
-        let subscriberRef: SubscriberManager | undefined;
-
-        const pcFactory = new PeerConnectionFactory(
-            eventsDispatcher,
-            dataChannelSession,
-            e2eeTransformManager,
-            listenerRegistry,
-            async (roomId, event) => {
-                if (!subscriberRef) throw new Error("SubscriberManager not yet initialized");
-                await subscriberRef.onRemoteTrack(roomId, event);
-            },
-        );
-
-        // clientRef is needed so the ICE trickle callback can reach streamsApiInterface
-        let clientRef: WebRtcClient | undefined;
-
-        const pcm = new PeerConnectionManager(
-            (room, streamHandle) => pcFactory.create(room, streamHandle),
-            (sessionId, candidate) => {
-                if (!clientRef) throw new Error("WebRtcClient not yet initialized");
-                if (!clientRef.streamsApiInterface)
-                    throw new Error("StreamsApiInterface not yet bound");
-                return clientRef.streamsApiInterface.trickle(sessionId, candidate);
-            },
-        );
-
-        const publisher = new PublisherManager(pcm, audioManager, e2eeTransformManager);
-        const subscriber = new SubscriberManager(pcm, e2eeTransformManager, listenerRegistry);
-        const keys = new KeySyncManager(keyStore, e2eeWorker);
-
-        subscriberRef = subscriber;
-
-        const client = new WebRtcClient(
-            publisher,
-            subscriber,
-            dataChannelSession,
-            keys,
-            eventsDispatcher,
-            listenerRegistry,
-            pcFactory,
-            audioManager,
-        );
-
-        clientRef = client;
-        return client;
-    }
-
-    // -------------------------------------------------------------------------
     // Public API — StreamApi calls these methods
     // -------------------------------------------------------------------------
 
     bindApiInterface(impl: StreamsCallbackInterface): void {
         this.streamsApiInterface = impl;
+    }
+
+    trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void> {
+        if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
+        return this.streamsApiInterface.trickle(sessionId, candidate);
     }
 
     setAudioLevelCallback(func: AudioLevelFuncCallback): void {

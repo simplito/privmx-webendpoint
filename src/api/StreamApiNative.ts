@@ -21,8 +21,6 @@ import {
     TurnCredentials,
     UserWithPubKey,
 } from "../Types";
-import { WebRtcClient } from "../webStreams/WebRtcClient";
-import { SessionId } from "../webStreams/PeerConnectionsManager";
 import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
 import { WindowWithWasmHandler } from "../webStreams/types/WebRtcExtensions";
 import { Api } from "./Api";
@@ -35,28 +33,18 @@ export class StreamApiNative extends BaseNative {
     public static getBindingId() {
         return ++this.bindingId;
     }
-    protected webRtcInterfacePtr: number = -1;
-    protected selfPtr: number = -1;
-    protected webRtcInterfaceImpl: WebRtcInterfaceImpl | null;
+    public selfPtr: number = -1;
 
     constructor(
         api: Api,
-        protected webRtcClient: WebRtcClient,
+        private readonly webRtcInterfaceImpl: WebRtcInterfaceImpl,
     ) {
         super(api);
-        webRtcClient.bindApiInterface({
-            trickle: (sessionId: SessionId, candidate: RTCIceCandidate) => {
-                return this.trickle(this.selfPtr, [sessionId, candidate]);
-            },
-            acceptOffer: (sessionId: SessionId, sdp: Jsep) => {
-                return this.acceptOfferOnReconfigure(this.selfPtr, [sessionId, sdp]);
-            },
-        });
     }
 
     async newApi(connectionPtr: number, eventApiPtr: number): Promise<number> {
         const bindingId = StreamApiNative.getBindingId();
-        this.bindWebRtcInterfaceAsHandler(bindingId);
+        this.registerWebRtcInterfaceHandler(bindingId);
         this.selfPtr = await this.runAsync<number>((taskId) =>
             this.api.lib.StreamApi_newStreamApi(taskId, connectionPtr, eventApiPtr, bindingId),
         );
@@ -287,8 +275,7 @@ export class StreamApiNative extends BaseNative {
         );
     }
 
-    protected bindWebRtcInterfaceAsHandler(bindingId: number): void {
-        this.webRtcInterfaceImpl = new WebRtcInterfaceImpl(this.webRtcClient);
+    private registerWebRtcInterfaceHandler(bindingId: number): void {
         const win = window as unknown as WindowWithWasmHandler;
         if (!win.webRtcInterfaceToNativeHandler) {
             win.webRtcInterfaceToNativeHandler = {};
