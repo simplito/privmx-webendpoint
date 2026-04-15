@@ -98,6 +98,9 @@ export class PeerConnectionManager {
         if (this.hasConnection(room, connectionType)) {
             this.connections[room][connectionType]?.pc.close();
             delete this.connections[room][connectionType];
+            if (!this.connections[room]?.publisher && !this.connections[room]?.subscriber) {
+                delete this.connections[room];
+            }
         }
     }
 }

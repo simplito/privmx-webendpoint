@@ -5,6 +5,7 @@ import { PeerConnectionFactory } from "./PeerConnectionFactory";
 import { PublisherManager } from "./PublisherManager";
 import { SubscriberManager } from "./SubscriberManager";
 import { DataChannelSession } from "./DataChannelSession";
+import { E2eeWorker } from "./E2eeWorker";
 import { KeySyncManager } from "./KeySyncManager";
 import { StateChangeDispatcher } from "./EventDispatcher";
 import { AudioManager, AudioLevelFuncCallback } from "./AudioManager";
@@ -44,6 +45,7 @@ export class WebRtcClient {
         private readonly listenerRegistry: RemoteStreamListenerRegistry,
         private readonly pcFactory: PeerConnectionFactory,
         private readonly audioManager: AudioManager,
+        private readonly e2eeWorker: E2eeWorker,
     ) {}
 
     // -------------------------------------------------------------------------
@@ -158,5 +160,10 @@ export class WebRtcClient {
         } else {
             this.subscriber.close(roomId);
         }
+    }
+
+    destroy(): void {
+        this.e2eeWorker.stop();
+        this.audioManager.destroy();
     }
 }

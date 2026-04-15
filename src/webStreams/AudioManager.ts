@@ -68,4 +68,12 @@ export class AudioManager {
         this.localAudioLevelMeters.delete(track.id);
         meter.stop();
     }
+
+    destroy(): void {
+        for (const meter of this.localAudioLevelMeters.values()) {
+            meter.stop();
+        }
+        this.localAudioLevelMeters.clear();
+        this.audioLevelCallback = undefined;
+    }
 }

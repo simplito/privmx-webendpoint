@@ -76,9 +76,10 @@ export class EncryptTransform {
         const frameBody = new Uint8Array(encodedFrame.data, headerLen);
 
         const iv = genIvAsBuffer();
-        const keyId = this.keyStore.getEncryptionKeyId();
-        const encrypted = await this.encryptAes(keyId, iv, frameBody, frameHeader);
-        const keyIdBytes = new TextEncoder().encode(keyId);
+        const internalKeyId = this.keyStore.getEncryptionKeyId();
+        const wireKeyId     = this.keyStore.getEncryptionExternalKeyId();
+        const encrypted = await this.encryptAes(internalKeyId, iv, frameBody, frameHeader);
+        const keyIdBytes = new TextEncoder().encode(wireKeyId);
 
         const posOfCipher = frameHeader.byteLength;
         const posOfIv = posOfCipher + encrypted.byteLength;
@@ -142,7 +143,7 @@ export class EncryptTransform {
             return null;
         }
 
-        const plain = await this.decryptAes(keyId, iv, payload, frameHeader);
+        const plain = await this.decryptAes(this.keyStore.resolveKeyId(keyId), iv, payload, frameHeader);
         if (!plain) {
             controller.enqueue(encodedFrame);
             return null;

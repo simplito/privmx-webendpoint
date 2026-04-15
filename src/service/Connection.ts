@@ -26,13 +26,15 @@ import { UserVerifierInterface } from "./UserVerifierInterface";
 export class Connection extends BaseApi {
     private apisRefs: { [apiId: string]: { _apiServicePtr: number } } = {};
     private nativeApisDeps: { [apiId: string]: BaseNative } = {};
+    private jsApiInstances: { [apiId: string]: BaseApi } = {};
 
     /**
      * //doc-gen:ignore
      */
-    registerApi(id: string, ptr: number, native: BaseNative): void {
+    registerApi(id: string, ptr: number, native: BaseNative, jsApi?: BaseApi): void {
         this.apisRefs[id] = { _apiServicePtr: ptr };
         this.nativeApisDeps[id] = native;
+        if (jsApi) this.jsApiInstances[id] = jsApi;
     }
 
     /**
@@ -144,6 +146,7 @@ export class Connection extends BaseApi {
 
     private async freeApis() {
         for (const apiId in this.apisRefs) {
+            this.jsApiInstances[apiId]?.destroyRefs();
             if (this.nativeApisDeps[apiId]) {
                 await this.nativeApisDeps[apiId].deleteApi(this.apisRefs[apiId]._apiServicePtr);
             }

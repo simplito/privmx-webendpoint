@@ -90,4 +90,9 @@ export class E2eeWorker {
         const worker = await this.get();
         worker.postMessage({ operation: "stop", id } satisfies StopEvent);
     }
+
+    stop(): void {
+        this.worker?.terminate();
+        this.worker = undefined;
+    }
 }

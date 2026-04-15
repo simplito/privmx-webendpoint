@@ -45,7 +45,8 @@ export class DataChannelCryptor {
 
     async encryptToWireFormat(params: EncryptToWireFormatParams): Promise<Uint8Array> {
         const { plaintext, sequenceNumber } = params;
-        const keyId = this.keyStore.getEncryptionKeyId();
+        const internalKeyId  = this.keyStore.getEncryptionKeyId();
+        const keyId          = this.keyStore.getEncryptionExternalKeyId();
 
         this.assertKeyId(keyId);
 
@@ -70,7 +71,7 @@ export class DataChannelCryptor {
             keyIdBytes,
         });
 
-        const encrypted = await CryptoFacade.aeadEncrypt(keyId, iv, header, plaintext);
+        const encrypted = await CryptoFacade.aeadEncrypt(internalKeyId, iv, header, plaintext);
 
         const ciphertext = new Uint8Array(encrypted);
 
@@ -100,7 +101,7 @@ export class DataChannelCryptor {
             const tag = fullBuffer.slice(fullBuffer.length - 16);
 
             const decrypted = await CryptoFacade.aeadDecrypt(
-                parsed.keyId,
+                this.keyStore.resolveKeyId(parsed.keyId),
                 parsed.iv,
                 parsed.header,
                 data,

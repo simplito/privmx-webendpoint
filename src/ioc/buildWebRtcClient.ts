@@ -65,7 +65,7 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
 
     const client = new WebRtcClient(
         publisher, subscriber, dataChannel, keys,
-        dispatcher, registry, pcFactory, audioManager,
+        dispatcher, registry, pcFactory, audioManager, e2eeWorker,
     );
 
     // Register all internally-constructed objects so the lazy callbacks above

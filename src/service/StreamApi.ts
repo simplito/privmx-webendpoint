@@ -41,6 +41,11 @@ export class StreamApi extends BaseApi {
     private streams: Map<StreamHandle, Stream> = new Map();
     private streamTracks: Map<string, StreamTrack> = new Map();
 
+    public override destroyRefs(): void {
+        this.client.destroy();
+        super.destroyRefs();
+    }
+
     /**
      * Creates a new Stream Room in given Context.
      *

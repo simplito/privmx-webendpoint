@@ -157,7 +157,8 @@ export function registerConnectionServices(
         });
 
         await native.create(ptr, []);
-        conn.registerApi("streams", ptr, native);
-        return new StreamApi(native, ptr, webRtcClient);
+        const streamApi = new StreamApi(native, ptr, webRtcClient);
+        conn.registerApi("streams", ptr, native, streamApi);
+        return streamApi;
     });
 }

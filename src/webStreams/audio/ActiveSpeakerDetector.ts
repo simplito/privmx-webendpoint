@@ -36,9 +36,14 @@ interface ActiveSpeakerDetectorOptions {
     holdMs: number;
 }
 
+/**
+ * How long after the last frame we keep a speaker entry alive.
+ * Speakers that go silent for longer than this are pruned from the map.
+ */
+const SPEAKER_PRUNE_AFTER_MS = 10_000;
+
 export class ActiveSpeakerDetector {
     private speakers = new Map<SpeakerId, SpeakerState>();
-    private activeSpeaker: SpeakerId | null = null;
 
     constructor(private opts: ActiveSpeakerDetectorOptions) {}
 
@@ -67,14 +72,24 @@ export class ActiveSpeakerDetector {
         return this.selectActiveSpeakers(timestamp);
     }
 
-    private selectActiveSpeakers(now: number): SpeakerState[] {
-        let bestId: SpeakerId | null = null;
-        let bestRms = -Infinity;
+    removeSpeaker(id: SpeakerId): void {
+        this.speakers.delete(id);
+    }
 
+    private selectActiveSpeakers(now: number): SpeakerState[] {
         for (const [id, state] of this.speakers.entries()) {
             state.active =
                 now - state.lastAboveThresholdTs <= this.opts.activityWindowMs &&
                 now - state.activeSince < this.opts.holdMs;
+
+            // Only prune entries that have had at least one real above-threshold frame.
+            // Entries still at -Infinity were just created and should not be evicted yet.
+            if (
+                isFinite(state.lastAboveThresholdTs) &&
+                now - state.lastAboveThresholdTs > SPEAKER_PRUNE_AFTER_MS
+            ) {
+                this.speakers.delete(id);
+            }
         }
 
         return Array.from(this.speakers.values());

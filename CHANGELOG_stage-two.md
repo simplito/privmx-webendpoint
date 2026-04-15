@@ -419,3 +419,103 @@ Introduced a minimal async IoC container (`Container`) and a token registry (`To
 - In the refactored code, a `bootstrapDataChannels: Map<StreamRoomId, RTCDataChannel>` guard was introduced that correctly prevented duplicate data channel creation per room. However, Janus requires a `"JanusDataChannel"` data channel to appear in **every** offer/answer exchange so that the data-channel `m=` section is present in the SDP the subscriber sends back.
 - **Root cause of the regression**: The original `WebRtcClient` code declared `private bootstrapDataChannel: RTCDataChannel | undefined` but never assigned it, making the guard `if (!this.bootstrapDataChannel)` permanently `true` — a data channel was created on every `reconfigureSingle` call. The refactor accidentally introduced a working guard that broke Janus SDP negotiation.
 - **Fix**: The `bootstrapDataChannels` Map is removed. `reconfigureSingle` creates `pc.createDataChannel("JanusDataChannel")` unconditionally at the top of every call, matching the original behaviour.
+
+---
+
+## Refactor — Named container subclasses, `src/ioc/` directory, and `src/native/` rename
+
+### Named container subclasses
+
+**`src/ioc/Container.ts`** (was `src/service/Container.ts`)
+- Three concrete subclasses added after `Container`, each expressing a lifetime scope in its name:
+  - `GlobalContainer extends Container` — used for the application-lifetime singleton graph (WASM Api, EventQueue, CryptoApi).
+  - `ConnectionContainer extends Container` — used for the per-Connection graph (ThreadApi, StoreApi, KvdbApi, EventApi, InboxApi, StreamApi). One instance per `connect()` / `connectPublic()` call; keyed in the `WeakMap`.
+  - `WebRtcContainer extends Container` — used for the per-stream-session WebRTC sub-graph (KeyStore, E2eeWorker, AudioManager, PeerConnectionManager, etc.). One instance per `createStreamApi()` call.
+- `EndpointFactory` field types updated: `globalContainer: GlobalContainer`, `connectionContainers: WeakMap<Connection, ConnectionContainer>`.
+- `buildConnectionApis.ts` — `registerGlobalServices` parameter typed as `GlobalContainer`, `registerConnectionServices` as `ConnectionContainer`, `registerWebRtcServices` as `WebRtcContainer`. `new Container()` calls in `buildConnectionApis` replaced with `new WebRtcContainer()`.
+
+### IoC infrastructure moved to `src/ioc/`
+
+The four IoC files that were mixed into `src/service/` are now in their own directory:
+
+| Old path | New path |
+|---|---|
+| `src/service/Container.ts` | `src/ioc/Container.ts` |
+| `src/service/Tokens.ts` | `src/ioc/Tokens.ts` |
+| `src/service/buildConnectionApis.ts` | `src/ioc/buildConnectionApis.ts` |
+| `src/service/buildWebRtcClient.ts` | `src/ioc/buildWebRtcClient.ts` |
+
+`src/service/EndpointFactory.ts` imports updated: `"./Container"` → `"../ioc/Container"`, `"./Tokens"` → `"../ioc/Tokens"`, `"./buildConnectionApis"` → `"../ioc/buildConnectionApis"`.
+
+### WASM binding layer renamed `src/api/` → `src/native/`
+
+The directory `src/api/` held low-level `*Native.ts` files wrapping raw WASM C++ pointers. The name `api` was ambiguous (the high-level service API classes also live under `src/service/`). Renamed to `src/native/` to clarify that this layer directly bridges TypeScript and native WASM code.
+
+All 14 import sites updated (`../api/` → `../native/`):
+`EndpointFactory.ts`, `buildConnectionApis.ts`, `Connection.ts`, `ExtKey.ts`, `ThreadApi.ts`, `KvdbApi.ts`, `EventQueue.ts`, `StreamApi.ts`, `src/index.ts`, `StoreApi.ts`, `InboxApi.ts`, `EventApi.ts`, `CryptoApi.ts`, `BaseApi.ts`.
+
+---
+
+## Fix — WebRTC streaming state leaks and lifecycle issues
+
+A comprehensive audit of the `webStreams/` layer identified 10 state management issues. All are fixed in this commit.
+
+### Resource leaks on session teardown
+
+**`E2eeWorker.ts`** — `stop()` method added
+- The Web Worker spawned lazily on first use was never terminated when a streaming session ended, leaving a background thread alive indefinitely.
+- `stop()` calls `this.worker.terminate()` and clears the reference. Called from `WebRtcClient.destroy()`.
+
+**`AudioManager.ts`** — `destroy()` method added
+- `LocalAudioLevelMeter` instances (each holding a live `AudioContext`, `AudioWorkletNode`, and `MediaStreamAudioSourceNode`) were individually removable via `stopLocalAudioLevelMeter()` but had no bulk teardown path.
+- `destroy()` iterates `localAudioLevelMeters`, calls `stop()` on each, clears the map, and clears the callback reference. Called from `WebRtcClient.destroy()`.
+
+**`WebRtcClient.ts`** — `destroy()` method added
+- Chains `e2eeWorker.stop()` and `audioManager.destroy()`.
+- `e2eeWorker` added as a constructor parameter (was previously unreachable from this class).
+- `buildWebRtcClient.ts` updated to pass `e2eeWorker` to the constructor.
+
+**`StreamApi.ts`** — `destroyRefs()` override added
+- Overrides `BaseApi.destroyRefs()` to call `this.client.destroy()` before delegating to `super.destroyRefs()`.
+
+**`Connection.ts`** — `jsApiInstances` registry + `destroyRefs()` call in `freeApis()`
+- Added `private jsApiInstances: { [apiId: string]: BaseApi }` to track JS-layer API objects alongside the existing native deps map.
+- `registerApi(id, ptr, native, jsApi?)` gains an optional fourth parameter; when provided, the instance is stored in `jsApiInstances`.
+- `freeApis()` now calls `jsApiInstances[apiId]?.destroyRefs()` before `nativeApisDeps[apiId].deleteApi(ptr)`, so JS-side resources are released first.
+
+**`buildConnectionApis.ts`** — passes `StreamApi` instance to `registerApi`
+- `StreamApi` is constructed, then `conn.registerApi("streams", ptr, native, streamApi)` registers it so `Connection.freeApis()` can call `streamApi.destroyRefs()` → `client.destroy()` on disconnect.
+
+### State and memory leaks during session
+
+**`SubscriberManager.ts`** — `close()` now cleans up room-keyed state
+- `lastProcessedAnswer[roomId]` deleted on `close(roomId)` — previously accumulated one SDP string per room forever.
+- Bootstrap data channels created per-reconfigure are now tracked in `bootstrapChannels: Map<StreamRoomId, RTCDataChannel[]>` and explicitly closed in `closeBootstrapChannels()`, called from `close(roomId)`.
+
+**`PeerConnectionManager.ts`** — empty room shells pruned after close
+- After deleting `connections[room][connectionType]`, if both `publisher` and `subscriber` are now absent, the outer `connections[room]` object is also deleted. Previously the map accumulated empty `{}` shells for every room that was ever used.
+
+### Global state hazard in `KeyStore` / `CryptoFacade`
+
+**`KeyStore.ts`** — session-scoped key ID prefix
+- `CryptoFacade` maintains a **global** `Map<keyId, CryptoKey>` registry. When `setKeys()` cleared and re-registered keys, it used the server-assigned key ID as the registry key directly. If two `KeyStore` instances (two streaming sessions, or after a reconnect) received the same key ID from the server, `setKeys()` on one would evict keys still in use by the other.
+- **Fix**: each `KeyStore` generates a `crypto.randomUUID()` session prefix at construction time. All keys are registered in CryptoFacade as `"<prefix>:<externalKeyId>"`. A new `externalToInternal: Map<string, string>` table maps wire key IDs to internal registry keys.
+- New API: `resolveKeyId(externalKeyId): string` — translates a wire key ID to its internal CryptoFacade key ID. `getEncryptionExternalKeyId(): string` — returns the wire-format key ID (prefix stripped) for embedding in frames.
+- `hasKey(externalKeyId)` checks the external map (unchanged semantics for callers).
+
+**`DataChannelCryptor.ts`** — uses new `KeyStore` API
+- `encryptToWireFormat`: calls `getEncryptionExternalKeyId()` for the wire frame and `getEncryptionKeyId()` for CryptoFacade.
+- `decryptFromWireFormat`: calls `resolveKeyId(wireKeyId)` before passing to `CryptoFacade.aeadDecrypt`.
+
+**`EncryptTransform.ts`** — uses new `KeyStore` API (same pattern)
+- `encryptFrame`: `internalKeyId = getEncryptionKeyId()`, `wireKeyId = getEncryptionExternalKeyId()`.
+- `decryptFrame`: `resolveKeyId(wireKeyId)` used before the CryptoFacade decrypt call.
+
+### `ActiveSpeakerDetector` dead code and unbounded growth
+
+**`src/webStreams/audio/ActiveSpeakerDetector.ts`**
+- Removed `private activeSpeaker: SpeakerId | null` — the field was written in `selectActiveSpeakers` (old code) but never read anywhere. Dead state.
+- Removed dead `bestId`/`bestRms` locals from `selectActiveSpeakers` — were declared but neither computed nor returned.
+- Added automatic speaker pruning: entries whose `lastAboveThresholdTs` is `isFinite` (i.e., have had at least one real above-threshold frame) and have been silent for longer than `SPEAKER_PRUNE_AFTER_MS` (10 seconds) are deleted from the `speakers` Map. Entries initialised to `-Infinity` (newly seen speakers) are exempt from immediate pruning.
+- Added `removeSpeaker(id)` public method for explicit removal when a remote stream ends.
+- **Effect**: in long sessions with many transient participants the `speakers` Map no longer grows without bound, and the array returned to the audio level callback no longer contains entries for long-gone streams.

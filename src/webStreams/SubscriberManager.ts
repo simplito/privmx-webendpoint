@@ -17,6 +17,7 @@ import { Logger } from "./Logger";
 export class SubscriberManager {
     private readonly reconfigureQueue: Queue<QueueItem>;
     private readonly lastProcessedAnswer: { [roomId: string]: Jsep } = {};
+    private readonly bootstrapChannels: Map<StreamRoomId, RTCDataChannel[]> = new Map();
     private readonly logger = new Logger();
 
     constructor(
@@ -72,11 +73,23 @@ export class SubscriberManager {
 
     close(roomId: StreamRoomId): void {
         this.pcm.closePeerConnectionBySessionIfExists(roomId, "subscriber");
+        delete this.lastProcessedAnswer[roomId];
+        this.closeBootstrapChannels(roomId);
     }
 
     // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
+
+    private closeBootstrapChannels(roomId: StreamRoomId): void {
+        const channels = this.bootstrapChannels.get(roomId);
+        if (channels) {
+            for (const dc of channels) {
+                try { dc.close(); } catch { /* ignore */ }
+            }
+            this.bootstrapChannels.delete(roomId);
+        }
+    }
 
     private waitUntilConnected(pc: RTCPeerConnection): Promise<void> {
         if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
@@ -109,9 +122,11 @@ export class SubscriberManager {
 
         // Create a bootstrap data channel on every reconfigure so that Janus
         // sees the data-channel m= line in each offer/answer exchange.
-        // (Matches the original behaviour where the guard field was never assigned.)
         const dc = pc.createDataChannel("JanusDataChannel");
         dc.onerror = (e) => console.error("Bootstrap data channel error:", e);
+        const existing = this.bootstrapChannels.get(room) ?? [];
+        existing.push(dc);
+        this.bootstrapChannels.set(room, existing);
 
         await pc.setRemoteDescription(
             new RTCSessionDescription({ type: offer.type, sdp: offer.sdp }),
