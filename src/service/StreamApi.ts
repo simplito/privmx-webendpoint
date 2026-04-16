@@ -517,6 +517,6 @@ export class StreamApi extends BaseApi {
             throw new Error(`There is no DataTrack with given streamTrackId: ${streamTrackId}`);
         }
         const frame = await this.client.encryptDataChannelData(data);
-        dataChannel.send(frame);
+        dataChannel.send(new Uint8Array(frame));
     }
 }

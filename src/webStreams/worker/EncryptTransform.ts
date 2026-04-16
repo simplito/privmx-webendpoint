@@ -14,6 +14,9 @@ function numAsOneByteUint(num: number): Uint8Array {
 
 const NUM_AS_UINT8_SIZE = 1;
 
+/** The three encoded video frame types defined by the WebRTC Encoded Transform spec. */
+export type RTCEncodedVideoFrameType = "key" | "delta" | "empty";
+
 export interface TransformContext {
     id?: string;
     publisherId?: number;

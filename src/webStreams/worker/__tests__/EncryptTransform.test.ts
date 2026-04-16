@@ -1,6 +1,6 @@
 import { setGlobalEmCrypto } from "../../../crypto/index";
 import { KeyStore } from "../../KeyStore";
-import { EncryptTransform } from "../EncryptTransform";
+import { EncryptTransform, RTCEncodedVideoFrameType } from "../EncryptTransform";
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -162,7 +162,7 @@ describe("EncryptTransform", () => {
     describe("encryptFrame + decryptFrame — video", () => {
         it.each<RTCEncodedVideoFrameType>(["key", "delta", "empty"])(
             "%s frame: body is encrypted, header preserved, decrypts correctly",
-            async (frameType) => {
+            async (frameType: RTCEncodedVideoFrameType) => {
                 const { ks } = await makeKeyStore(0x55);
                 const et = new EncryptTransform(ks);
 
