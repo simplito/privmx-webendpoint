@@ -15,8 +15,11 @@ import {
 import { E2eeWorker } from "./E2eeWorker";
 
 /**
- * Wires the E2EE worker into WebRTC sender/receiver pipelines.
- * Supports both RTCRtpScriptTransform (modern) and EncodedStreams (fallback).
+ * Wires the E2EE worker into WebRTC sender and receiver pipelines.
+ *
+ * Prefers the modern `RTCRtpScriptTransform` API (available in Chrome ≥ 94 and
+ * Safari ≥ 15.4). Falls back to the `createEncodedStreams()` API when
+ * `RTCRtpScriptTransform` is absent (Firefox, older browsers).
  */
 export class E2eeTransformManager {
     private readonly encByReceiver = new WeakMap<RTCRtpReceiver, EncPair>();
@@ -24,6 +27,12 @@ export class E2eeTransformManager {
 
     constructor(private readonly e2eeWorker: E2eeWorker) {}
 
+    /**
+     * Installs an E2EE sender transform on `sender`.
+     *
+     * Uses `RTCRtpScriptTransform` when available; otherwise transfers the
+     * sender's encoded-stream pair to the worker via `postEncode`.
+     */
     async setupSenderTransform(sender: RTCRtpSender): Promise<void> {
         const win = window as unknown as WindowWithRTCRtpScriptTransform;
         const senderExt = sender as RTCRtpSenderWithTransform;
@@ -40,6 +49,13 @@ export class E2eeTransformManager {
         }
     }
 
+    /**
+     * Installs an E2EE receiver transform on `receiver` for the given `publisherId`.
+     *
+     * Uses `RTCRtpScriptTransform` when available. Falls back to `createEncodedStreams()`,
+     * guarding against double-posting the same stream pair to the worker.
+     * No-ops if `createEncodedStreams` is not supported by the browser.
+     */
     async setupReceiverTransform(receiver: RTCRtpReceiver, publisherId: number): Promise<void> {
         const win = window as unknown as WindowWithRTCRtpScriptTransform;
         const receiverExt = receiver as RTCRtpReceiverWithTransform;
@@ -77,6 +93,11 @@ export class E2eeTransformManager {
         await this.e2eeWorker.postDecode(enc.id, enc.publisherId, enc.readable, enc.writable);
     }
 
+    /**
+     * Tears down the E2EE receiver pipeline for `receiver` by posting a stop
+     * message to the worker and removing the entry from the internal map.
+     * No-ops if no transform was registered for `receiver`.
+     */
     async teardownReceiver(receiver: RTCRtpReceiver): Promise<void> {
         const enc = this.encByReceiver.get(receiver);
         if (enc) {

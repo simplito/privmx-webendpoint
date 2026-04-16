@@ -31,10 +31,18 @@ export class SubscriberManager {
         });
     }
 
+    /**
+     * Initialises the subscriber `RTCPeerConnection` for `roomId` so it is
+     * ready to receive incoming SDP offers from the server.
+     */
     initialize(roomId: StreamRoomId): void {
         this.pcm.initialize(roomId, "subscriber");
     }
 
+    /**
+     * Enqueues a new SDP offer from the server and serially processes the
+     * queue, ensuring reconfigures are never interleaved.
+     */
     async onSubscriptionUpdated(room: StreamRoomId, offer: Jsep): Promise<void> {
         this.reconfigureQueue.enqueue({ room, jsep: offer });
         try {
@@ -44,12 +52,23 @@ export class SubscriberManager {
         }
     }
 
+    /**
+     * Returns the last SDP answer produced for `room` during reconfiguration.
+     * Used by `WebRtcInterfaceImpl` to reply to the server's accept-offer call.
+     * @throws if no answer has been produced for the given room yet.
+     */
     getLastProcessedAnswer(room: StreamRoomId): Jsep {
         const answer = this.lastProcessedAnswer[room];
         if (!answer) throw new Error(`No processed answer for room: ${room}`);
         return answer;
     }
 
+    /**
+     * Wires a newly arrived remote track into the E2EE receiver pipeline and
+     * notifies registered `RemoteStreamListener` callbacks. Waits for ICE to
+     * reach connected/completed state before installing the transform to avoid
+     * a race between the transform pipeline and DTLS negotiation.
+     */
     async onRemoteTrack(roomId: StreamRoomId, event: RTCTrackEvent): Promise<void> {
         const receiver = event.receiver;
         const publisherId = Number(event.streams[0].id);
@@ -67,19 +86,23 @@ export class SubscriberManager {
         this.listenerRegistry.dispatchTrack(roomId, event);
     }
 
+    /**
+     * Updates the Janus session ID for the subscriber connection in `roomId`
+     * and flushes any ICE candidates that were queued before the session was assigned.
+     */
     updateSessionId(roomId: StreamRoomId, sessionId: SessionId): void {
         this.pcm.updateSessionForConnection(roomId, "subscriber", sessionId);
     }
 
+    /**
+     * Closes the subscriber peer connection for `roomId`, removes the cached
+     * SDP answer, and closes all bootstrap data channels for that room.
+     */
     close(roomId: StreamRoomId): void {
         this.pcm.closePeerConnectionBySessionIfExists(roomId, "subscriber");
         delete this.lastProcessedAnswer[roomId];
         this.closeBootstrapChannels(roomId);
     }
-
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
 
     private closeBootstrapChannels(roomId: StreamRoomId): void {
         const channels = this.bootstrapChannels.get(roomId);
@@ -118,12 +141,10 @@ export class SubscriberManager {
 
     private async reconfigureSingle(room: StreamRoomId, offer: Jsep): Promise<void> {
         const pc = this.pcm.getConnectionWithSession(room, "subscriber").pc;
-        this.logger.debug("SUBSCRIBER RECV OFFER FROM PUBLISHER:", offer.sdp);
 
         // Create a bootstrap data channel on every reconfigure so that Janus
         // sees the data-channel m= line in each offer/answer exchange.
         const dc = pc.createDataChannel("JanusDataChannel");
-        dc.onerror = (e) => console.error("Bootstrap data channel error:", e);
         const existing = this.bootstrapChannels.get(room) ?? [];
         existing.push(dc);
         this.bootstrapChannels.set(room, existing);

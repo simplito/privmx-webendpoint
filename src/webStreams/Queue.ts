@@ -1,16 +1,35 @@
+/**
+ * Simple serial async queue.
+ *
+ * Items are enqueued synchronously and processed one at a time by the function
+ * registered via `assignProcessorFunc`. Calling `processAll` while a drain is
+ * already in progress returns the same in-flight promise, preventing concurrent
+ * drains.
+ */
 export class Queue<T> {
     private items: T[] = [];
     private func: ((item: T) => Promise<void>) | undefined;
     private drainPromise: Promise<void> | undefined;
 
+    /** Appends `item` to the back of the queue. */
     enqueue(item: T): void {
         this.items.push(item);
     }
 
-    assignProcessorFunc(func: (item: T) => Promise<void>) {
+    /**
+     * Registers the async function used to process each item.
+     * Must be called before `processAll`.
+     */
+    assignProcessorFunc(func: (item: T) => Promise<void>): void {
         this.func = func;
     }
 
+    /**
+     * Processes all currently queued items serially, then resolves.
+     * If called while a drain is already running, joins the existing drain
+     * promise rather than starting a new one.
+     * @throws if no processor function has been assigned.
+     */
     async processAll(): Promise<void> {
         if (this.drainPromise) {
             return this.drainPromise;

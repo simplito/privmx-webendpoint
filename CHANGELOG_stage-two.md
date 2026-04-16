@@ -561,3 +561,56 @@ A thorough review of the four audio-layer files identified style, correctness, a
 - Renamed constructor parameter `onRmsForWorker` → `sendRmsToWorker`. The `on*` prefix conventionally means "event handler / callback invoked by this object"; this parameter is a sink — it is called _by_ `AudioManager` to push data _to_ the worker. The rename removes the ambiguity.
 - Renamed arrow-function parameter `onRms` → `rmsDb` in `ensureLocalAudioLevelMeter`'s callback — `onRms` followed the same misleading `on*` pattern and shadowed the callback-name convention with a value name.
 - Added a comment documenting the intentional mute/detector discrepancy: when the track is muted, `sendRmsToWorker` receives `RMS_VALUE_OF_SILENCE` (so the encrypted frame trailer signals silence to remote peers) but `lastMeasuredLocalRMS` stores the real dBFS value (so the user's own microphone entry in the active-speaker detector continues to reflect actual mic activity while muted).
+
+---
+
+## Refactor — `StreamApi` simplification
+
+**`src/service/StreamApi.ts`**
+
+- `addStreamTrack`: collapsed the double guard (`has` + `get`) into a single `get` with a null check. Replaced the `alreadyAddedId` string sentinel (empty string as false-y flag across two code blocks) with early `return`/`throw` inside the loop. Replaced the manual 16-byte hex ID generator with `crypto.randomUUID()`.
+- `listStreams`: removed the pointless `const remoteStreams = ...; return remoteStreams` indirection — direct `return`.
+- `publishStream`: moved the stream existence guard to the top before any collection work. Replaced the shared `toPublish` flag (which conflated media-track and data-track publication into one boolean) with two independent branches and a single `track.published = true` after both; tracks are now marked published only when actually added to either list.
+- `updateStream`: moved guard and stream lookup to the top; simplified loop to an early-`continue` filter-first pattern.
+- `unpublishStream`: collapsed `has` + `get` into a single `get` + null check. Replaced `filterMapByValue` helper with an inline `for...of` that deletes entries in place.
+- `filterMapByValue`: deleted — was a generic helper used exactly once.
+- `removeStreamTrack`: changed `for (const [key, streamTrack] of this.streamTracks.entries())` to `for (const streamTrack of this.streamTracks.values())` — `key` was never used.
+- `addAudioLevelStatsListener`: removed redundant `typeof onStats === "function"` guard; added missing explicit `Promise<void>` return type.
+- `sendData`: added missing explicit `Promise<void>` return type.
+- `createStream`: removed Polish inline comment.
+- `streamTracks` field type tightened from `Map<string, StreamTrack>` to `Map<StreamTrackId, StreamTrack>`.
+- `subscribeToRemoteStreams`: removed stale section comments (`// native part`, `// server / core part`).
+
+---
+
+## Documentation and production-readiness pass — `webStreams/` layer
+
+Removed all remaining debug-only noise and added JSDoc to every undocumented public method across the internal WebRTC service classes.
+
+### Debug artifacts removed
+
+- **`SubscriberManager.reconfigureSingle`**: removed `this.logger.debug("SUBSCRIBER RECV OFFER...")` (logged raw SDP) and `dc.onerror = console.error` on the bootstrap data channel (non-fatal; error is swallowed by the caller's `try/catch`).
+- **`DataChannelCryptor`**: removed the `new Logger()` construction inside `decryptFromWireFormat` (a hot path called per data frame); promoted to a `private readonly logger` field on the class.
+
+### JSDoc added
+
+Full JSDoc coverage added to all previously undocumented public methods in:
+`WebRtcClient`, `PublisherManager`, `SubscriberManager`, `PeerConnectionManager`, `PeerConnectionFactory`, `KeySyncManager`, `DataChannelSession`, `DataChannelCryptor`, `E2eeTransformManager`, `E2eeWorker`, `RemoteStreamListenerRegistry`, `StateChangeDispatcher`, `Queue`, `Logger`, `Container`.
+
+---
+
+## Fix — doc/code audit of `webStreams/` internal service layer
+
+A review of every JSDoc comment against its implementation found the following discrepancies:
+
+**`StateChangeDispatcher.removeOnStateChangeListener` — listener leak bug**
+- The method compared registered entries using reference equality (`value.filter === filter`). Both call sites in `StreamApi` pass inline object literals (`{ streamHandle }`) — two different literals with the same shape are never reference-equal, so listeners registered in `publishStream` were **never removed** on `unpublishStream`. Over sessions with many publish/unpublish cycles this silently accumulated listeners.
+- **Fix**: changed the comparison to `value.filter.streamHandle === filter.streamHandle` (value equality on the typed `StreamHandle` field).
+- Doc updated: "strictly equal to `filter`" → "whose `streamHandle` equals `filter.streamHandle`".
+
+**`KeySyncManager` — "atomically" was factually wrong**
+- The class and method JSDoc both used "atomically" to describe updating `KeyStore` then `E2eeWorker`. The two updates are sequential async operations with a window between them. Reworded to describe the sequential update order and explain why the gap is safe in practice (the worker only reads keys when processing frames, which does not interleave with the update sequence).
+- `streamRoomId` parameter was described as if it scoped the update; in the implementation it is only passed to `logger.debug`. Doc corrected to note "used only for debug logging".
+
+**`PeerConnectionManager.hasConnection` — "live" was imprecise**
+- Doc said "a live peer connection exists". The implementation checks for a registered object reference — a `closed` `RTCPeerConnection` is still truthy. Changed to "a peer connection is registered" with a note that it may be in any state including `"closed"`.

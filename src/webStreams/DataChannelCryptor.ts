@@ -37,12 +37,28 @@ export interface ParsedEncryptedFrame {
     header: Uint8Array; // AAD
 }
 
+/**
+ * Serialises and deserialises encrypted data channel frames.
+ *
+ * Wire format:
+ * ```
+ * [Version:1B][SeqNum:4B big-endian][IV:12B][KeyIdLen:1B][KeyId:Var][Ciphertext+Tag:Var]
+ * ```
+ * Everything before the ciphertext is used as AAD for AES-256-GCM.
+ * Sequence numbers are strictly increasing per remote stream for replay protection.
+ */
 export class DataChannelCryptor {
     private readonly textEncoder = new TextEncoder();
     private readonly textDecoder = new TextDecoder();
+    private readonly logger = new Logger();
 
     constructor(private keyStore: KeyStore) {}
 
+    /**
+     * Encrypts `params.plaintext` using the active session key and returns the
+     * complete wire-format frame including version, sequence number, IV, key ID,
+     * and AES-GCM ciphertext+tag.
+     */
     async encryptToWireFormat(params: EncryptToWireFormatParams): Promise<Uint8Array> {
         const { plaintext, sequenceNumber } = params;
         const internalKeyId  = this.keyStore.getEncryptionKeyId();
@@ -78,12 +94,19 @@ export class DataChannelCryptor {
         return this.concat(header, ciphertext);
     }
 
+    /**
+     * Parses and decrypts a wire-format frame, verifying the sequence number
+     * is strictly greater than `params.lastSequenceNumber` (replay protection).
+     *
+     * @returns the decrypted payload and the accepted sequence number.
+     * @throws `DataChannelCryptorError` on authentication failure, replay,
+     *         unrecognised key ID, or a malformed frame.
+     */
     async decryptFromWireFormat(
         params: DecryptFromWireFormatParams,
     ): Promise<{ data: Uint8Array; seq: number }> {
         const parsed = this.parseEncryptedFrame(params.frame, params.lastSequenceNumber);
-        const logger = new Logger();
-        logger.debug("decryptFromWireFormat", params, parsed);
+        this.logger.debug("decryptFromWireFormat", params, parsed);
 
         if (!this.keyStore.hasKey(parsed.keyId)) {
             throw new DataChannelCryptorError(

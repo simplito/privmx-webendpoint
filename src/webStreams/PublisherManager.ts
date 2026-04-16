@@ -15,6 +15,14 @@ export class PublisherManager {
         private readonly e2eeTransformManager: E2eeTransformManager,
     ) {}
 
+    /**
+     * Creates the publisher `RTCPeerConnection` for `streamRoomId`, adds all
+     * tracks from `stream` (starting audio level metering for audio tracks and
+     * installing E2EE sender transforms), and creates an ordered data channel
+     * for each entry in `dataTracks`.
+     *
+     * @returns the newly created `RTCPeerConnection`.
+     */
     async createWithLocalStream(
         streamHandle: StreamHandle,
         streamRoomId: StreamRoomId,
@@ -47,6 +55,14 @@ export class PublisherManager {
         return pc;
     }
 
+    /**
+     * Adds and removes tracks on the existing publisher connection for
+     * `streamRoomId`. Audio level metering is started for newly added audio
+     * tracks and stopped for removed ones. E2EE sender transforms are installed
+     * on each newly added track.
+     *
+     * @returns the existing `RTCPeerConnection` after the track update.
+     */
     async updateLocalStream(
         streamRoomId: StreamRoomId,
         localStream: MediaStream,
@@ -75,6 +91,11 @@ export class PublisherManager {
         return pc;
     }
 
+    /**
+     * Creates an SDP offer on the publisher connection for `roomId`, sets it
+     * as the local description, and returns the raw SDP string.
+     * @throws if `createOffer` returns no SDP.
+     */
     async createOffer(roomId: StreamRoomId): Promise<string> {
         const pc = this.pcm.getConnectionWithSession(roomId, "publisher").pc;
         const offer = await pc.createOffer();
@@ -83,11 +104,18 @@ export class PublisherManager {
         return offer.sdp;
     }
 
+    /**
+     * Sets the remote SDP answer on the publisher connection for `roomId`.
+     */
     async setRemoteDescription(roomId: StreamRoomId, sdp: string, type: RTCSdpType): Promise<void> {
         const pc = this.pcm.getConnectionWithSession(roomId, "publisher").pc;
         await pc.setRemoteDescription(new RTCSessionDescription({ sdp, type }));
     }
 
+    /**
+     * Stops audio level metering for all audio tracks in `stream` and closes
+     * the publisher peer connection for `streamRoomId`.
+     */
     removeAndCleanup(streamRoomId: StreamRoomId, stream: MediaStream): void {
         for (const track of stream.getAudioTracks()) {
             this.audioManager.stopLocalAudioLevelMeter(track);
@@ -95,10 +123,18 @@ export class PublisherManager {
         this.pcm.closePeerConnectionBySessionIfExists(streamRoomId, "publisher");
     }
 
+    /**
+     * Updates the Janus session ID for the publisher connection in `roomId`
+     * and flushes any ICE candidates that were queued before the session was assigned.
+     */
     updateSessionId(roomId: StreamRoomId, sessionId: SessionId): void {
         this.pcm.updateSessionForConnection(roomId, "publisher", sessionId);
     }
 
+    /**
+     * Closes the publisher peer connection for `roomId` and removes it from
+     * the connection map.
+     */
     close(roomId: StreamRoomId): void {
         this.pcm.closePeerConnectionBySessionIfExists(roomId, "publisher");
     }

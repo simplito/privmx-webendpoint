@@ -10,10 +10,16 @@ import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry";
 import { RTCConfigurationWithInsertableStreams } from "./types/WebRtcExtensions";
 
 /**
- * Builds RTCPeerConnection instances with all event listeners wired.
- * Owns ICE/connection-state logging, data channel decryption dispatch,
- * and connection-state change events. Track events are forwarded via callback
- * so the subscriber layer can handle E2EE setup after ICE connects.
+ * Builds `RTCPeerConnection` instances with all event listeners wired.
+ *
+ * Responsibilities:
+ * - Constructs the `RTCConfiguration` from the current TURN credentials.
+ * - Logs ICE/signalling state changes via `Logger`.
+ * - Forwards `connectionstatechange` events to `StateChangeDispatcher`.
+ * - Decrypts incoming data channel frames and dispatches them via
+ *   `RemoteStreamListenerRegistry`.
+ * - Forwards `track` events to a caller-supplied `onRemoteTrack` callback so
+ *   the subscriber layer can install E2EE receiver transforms after ICE connects.
  */
 export class PeerConnectionFactory {
     private turnCredentials: TurnCredentials[] = [];
@@ -30,10 +36,19 @@ export class PeerConnectionFactory {
         ) => Promise<void>,
     ) {}
 
+    /**
+     * Replaces the TURN server credentials used in all subsequent `create()` calls.
+     */
     setTurnCredentials(credentials: TurnCredentials[]): void {
         this.turnCredentials = credentials;
     }
 
+    /**
+     * Creates a new `RTCPeerConnection` for `roomId` with all event listeners
+     * attached. If `streamHandle` is provided, `connectionstatechange` events
+     * are forwarded to `StateChangeDispatcher` so `StreamApi` can surface them
+     * to the application layer.
+     */
     create(roomId: StreamRoomId, streamHandle?: StreamHandle): RTCPeerConnection {
         const configuration: RTCConfigurationWithInsertableStreams = {
             iceServers: this.turnCredentials.map((c) => ({

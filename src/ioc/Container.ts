@@ -18,15 +18,28 @@ interface Registration<T> {
 export class Container {
     private readonly reg = new Map<string | symbol, Registration<unknown>>();
 
+    /**
+     * Registers a singleton factory for `token`. The factory is called at most
+     * once; all subsequent `resolve` calls return the same cached `Promise`.
+     */
     registerSingleton<T>(token: string | symbol, factory: Factory<T>): void {
         this.reg.set(token, { factory: factory as Factory<unknown>, singleton: true, cached: undefined });
     }
 
+    /**
+     * Registers a pre-constructed `value` as a resolved singleton for `token`.
+     * Equivalent to `registerSingleton(token, () => Promise.resolve(value))`.
+     */
     registerValue<T>(token: string | symbol, value: T): void {
         const resolved = Promise.resolve(value);
         this.reg.set(token, { factory: () => resolved, singleton: true, cached: resolved });
     }
 
+    /**
+     * Resolves the value registered for `token`.
+     * For singletons, returns the cached `Promise` after the first call.
+     * @throws if nothing has been registered for `token`.
+     */
     resolve<T>(token: string | symbol): Promise<T> {
         const entry = this.reg.get(token);
         if (!entry) throw new Error(`Container: no registration for token "${String(token)}"`);
