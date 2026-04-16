@@ -1,21 +1,45 @@
+/**
+ * Numeric WebRTC stream ID as assigned by the remote peer.
+ * Matches the `publisherId` used throughout the webStreams layer
+ * (derived from `Number(RTCTrackEvent.streams[0].id)`).
+ * The value -1 is reserved for the local microphone.
+ */
+export type PublisherId = number;
+
 export const DEFAULTS = {
-    rmsEmaAlpha: 0.2, // szybka reakcja na mowę
-    noiseEmaAlpha: 0.02, // wolna adaptacja tła
-    thresholdOffset: 6, // dB (jeśli RMS w dB)
+    rmsEmaAlpha: 0.2,    // fast reaction to speech
+    noiseEmaAlpha: 0.02, // slow background adaptation
+    thresholdOffset: 6,  // dB above noise floor to consider speech
     activityWindowMs: 400,
     holdMs: 200,
 };
 
-type SpeakerId = number;
-
-interface FrameInput {
-    id: SpeakerId;
+export interface FrameInput {
+    id: PublisherId;
     rms: number;
     timestamp: number; // ms
 }
 
 export interface SpeakerState {
-    streamId: number;
+    readonly streamId: PublisherId;
+    readonly emaRms: number;
+    readonly noiseFloor: number;
+    readonly lastAboveThresholdTs: number;
+    readonly activeSince: number;
+    readonly active: boolean;
+}
+
+interface ActiveSpeakerDetectorOptions {
+    rmsEmaAlpha: number;
+    noiseEmaAlpha: number;
+    thresholdOffset: number;
+    activityWindowMs: number;
+    holdMs: number;
+}
+
+// Internal mutable version — not exposed to callers
+interface MutableSpeakerState {
+    streamId: PublisherId;
     emaRms: number;
     noiseFloor: number;
     lastAboveThresholdTs: number;
@@ -23,27 +47,17 @@ export interface SpeakerState {
     active: boolean;
 }
 
-interface ActiveSpeakerDetectorOptions {
-    // EMA
-    rmsEmaAlpha: number; // np. 0.2
-    noiseEmaAlpha: number; // np. 0.02 (wolniejsze)
-
-    // progi
-    thresholdOffset: number; // ile powyżej noise floor uznajemy mowę
-
-    // czas
-    activityWindowMs: number;
-    holdMs: number;
-}
-
 /**
- * How long after the last frame we keep a speaker entry alive.
+ * How long after the last above-threshold frame we keep a speaker entry alive.
  * Speakers that go silent for longer than this are pruned from the map.
  */
 const SPEAKER_PRUNE_AFTER_MS = 10_000;
 
+/** Reserved ID for the local microphone — cannot collide with remote stream IDs (which are >= 0). */
+export const LOCAL_PUBLISHER_ID: PublisherId = -1;
+
 export class ActiveSpeakerDetector {
-    private speakers = new Map<SpeakerId, SpeakerState>();
+    private speakers = new Map<PublisherId, MutableSpeakerState>();
 
     constructor(private opts: ActiveSpeakerDetectorOptions) {}
 
@@ -62,25 +76,27 @@ export class ActiveSpeakerDetector {
 
         if (state.emaRms >= adaptiveThreshold) {
             state.lastAboveThresholdTs = timestamp;
-            state.activeSince = timestamp;
-            state.active = true;
-        } else {
-            state.active = false;
-            state.activeSince = 0;
+            if (!isFinite(state.activeSince)) {
+                // Record the start of this continuous active window
+                state.activeSince = timestamp;
+            }
+        }
+        else {
+            state.activeSince = -Infinity;
         }
 
         return this.selectActiveSpeakers(timestamp);
     }
 
-    removeSpeaker(id: SpeakerId): void {
+    removeSpeaker(id: PublisherId): void {
         this.speakers.delete(id);
     }
 
     private selectActiveSpeakers(now: number): SpeakerState[] {
         for (const [id, state] of this.speakers.entries()) {
-            state.active =
-                now - state.lastAboveThresholdTs <= this.opts.activityWindowMs &&
-                now - state.activeSince < this.opts.holdMs;
+            const withinWindow = now - state.lastAboveThresholdTs <= this.opts.activityWindowMs;
+            const withinHold = isFinite(state.activeSince) && now - state.activeSince < this.opts.holdMs;
+            state.active = withinWindow && withinHold;
 
             // Only prune entries that have had at least one real above-threshold frame.
             // Entries still at -Infinity were just created and should not be evicted yet.
@@ -95,7 +111,7 @@ export class ActiveSpeakerDetector {
         return Array.from(this.speakers.values());
     }
 
-    private getOrCreateState(id: SpeakerId, rms: number): SpeakerState {
+    private getOrCreateState(id: PublisherId, rms: number): MutableSpeakerState {
         let state = this.speakers.get(id);
         if (!state) {
             state = {
@@ -103,8 +119,8 @@ export class ActiveSpeakerDetector {
                 emaRms: rms,
                 noiseFloor: rms,
                 lastAboveThresholdTs: -Infinity,
+                activeSince: -Infinity,
                 active: false,
-                activeSince: 0,
             };
             this.speakers.set(id, state);
         }

@@ -1,4 +1,5 @@
 import { AudioManager } from "../AudioManager";
+import { LOCAL_PUBLISHER_ID } from "../audio/ActiveSpeakerDetector";
 import { LocalAudioLevelMeter } from "../audio/LocalAudioLevelMeter";
 
 // ---- minimal browser-API stubs needed by AudioManager ----
@@ -91,12 +92,12 @@ describe("AudioManager", () => {
             expect(result.levels.some((s: { streamId: number }) => s.streamId === 7)).toBe(true);
         });
 
-        it("always feeds streamId=0 (local) into the detector before the remote frame", () => {
+        it("always feeds LOCAL_PUBLISHER_ID (local) into the detector before the remote frame", () => {
             const cb = jest.fn();
             manager.setAudioLevelCallback(cb);
             manager.onRemoteFrameRms(5, 0.1);
             const result = cb.mock.calls[0][0];
-            expect(result.levels.some((s: { streamId: number }) => s.streamId === 0)).toBe(true);
+            expect(result.levels.some((s: { streamId: number }) => s.streamId === LOCAL_PUBLISHER_ID)).toBe(true);
         });
     });
 
@@ -148,7 +149,7 @@ describe("AudioManager", () => {
             const initSpy = jest
                 .spyOn(LocalAudioLevelMeter.prototype, "init")
                 .mockImplementation(async function (this: LocalAudioLevelMeter) {
-                    capturedOnLevel = this.onLevel;
+                    capturedOnLevel = (this as unknown as { onLevel: (rms: number) => void }).onLevel;
                 });
 
             const track = makeTrack("track-rms");
@@ -165,7 +166,7 @@ describe("AudioManager", () => {
             const initSpy = jest
                 .spyOn(LocalAudioLevelMeter.prototype, "init")
                 .mockImplementation(async function (this: LocalAudioLevelMeter) {
-                    capturedOnLevel = this.onLevel;
+                    capturedOnLevel = (this as unknown as { onLevel: (rms: number) => void }).onLevel;
                 });
 
             const track = makeTrack("track-muted");

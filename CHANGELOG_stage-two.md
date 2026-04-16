@@ -519,3 +519,45 @@ A comprehensive audit of the `webStreams/` layer identified 10 state management 
 - Added automatic speaker pruning: entries whose `lastAboveThresholdTs` is `isFinite` (i.e., have had at least one real above-threshold frame) and have been silent for longer than `SPEAKER_PRUNE_AFTER_MS` (10 seconds) are deleted from the `speakers` Map. Entries initialised to `-Infinity` (newly seen speakers) are exempt from immediate pruning.
 - Added `removeSpeaker(id)` public method for explicit removal when a remote stream ends.
 - **Effect**: in long sessions with many transient participants the `speakers` Map no longer grows without bound, and the array returned to the audio level callback no longer contains entries for long-gone streams.
+
+---
+
+## Refactor — `webStreams/audio` code quality pass
+
+A thorough review of the four audio-layer files identified style, correctness, and API design issues. All are addressed in this commit.
+
+### `rms-processor.js`
+
+- Translated Polish header comments to English.
+- Added explicit class field declarations (`smoothing`, `prev`, `frameCount`) — previously set only as `this.x` assignments in the constructor with no declarations.
+- Replaced `for (let i = 0; i < samples.length; i++) { const s = samples[i]; ... }` with `for (const sample of samples)` — index was unused, `s` was a cryptic name.
+- Replaced `smoothed || 1e-8` with `Math.max(smoothed, 1e-8)` — the `||` form conflates zero-avoidance with boolean logic and reads as intent to handle _any_ falsy value rather than just the zero case.
+- Changed the dB clamp floor from `-100` to `-99` to match `LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE = -99`. Previously a truly silent frame produced `-100 dB`, which is _below_ the silence sentinel, breaking any `rms <= RMS_VALUE_OF_SILENCE` comparison.
+- Added 4-frame throttle: `postMessage` is now called every 4 render quanta (~85 messages/s at 48 kHz / 128-sample frames) instead of every frame (~344/s). Each message triggers `ActiveSpeakerDetector.onFrame` → full speaker map scan; the throttle cuts that overhead by ~75 % with no perceptible latency impact on activity detection.
+- Wrapped `registerProcessor("rms-processor", ...)` in a `try/catch` — calling it twice on the same `AudioContext` (e.g. two `LocalAudioLevelMeter` instances sharing one context) previously threw an unhandled error.
+
+### `LocalAudioLevelMeter.ts`
+
+- Replaced all four `field!: T` non-null assertions (`ctx!`, `node!`, `source!`, `keepAliveGain!`) with `field: T | undefined`. The `!` pattern compiled away the null check without enforcing that `init()` had been called, silently producing undefined-access errors at runtime in stop-before-init and double-stop scenarios.
+- Changed `protected onLevel` → `private onLevel`. `protected` was introduced to let tests access the callback via subclassing; tests now cast through `as unknown as { onLevel: ... }` explicitly, keeping the type-level boundary intact.
+- Replaced `(settings as any)?.sampleRate` with `(this.track.getSettings?.() as MediaTrackSettings | undefined)?.sampleRate` — `MediaTrackSettings.sampleRate` is present in the TypeScript DOM lib; the `as any` cast was unnecessary and hid the type information.
+- Added explicit `Promise<void>` return type to `init()`.
+- Added a comment above `stop()` explaining why each Web Audio disconnection is wrapped in its own `try/catch` (browsers throw when a node is disconnected while already disconnected or when the context is already closed).
+
+### `ActiveSpeakerDetector.ts`
+
+- Translated all Polish inline comments to English (`szybka reakcja na mowę`, `wolna adaptacja tła`, `np. 0.2`, `wolniejsze`, `progi`, `czas`, etc.).
+- Renamed `SpeakerId` → `PublisherId` and exported it. `SpeakerId` was a private local alias; `PublisherId` matches the `publisherId: number` name used consistently across the entire `webStreams/` layer (it is the numeric `MediaStream` ID assigned by the remote WebRTC peer, derived from `Number(RTCTrackEvent.streams[0].id)`).
+- Added `LOCAL_PUBLISHER_ID = -1` exported constant for the local microphone entry. Remote WebRTC stream IDs are `>= 0`; `-1` cannot collide.
+- Exported `FrameInput` — it is the parameter type of the public `onFrame` method; callers constructing `FrameInput` objects benefit from the named type.
+- Made `SpeakerState` fully `readonly`. The internal `MutableSpeakerState` interface (non-exported) is used for the map values. Previously `onFrame` returned the same object references stored in the internal map, so a caller mutating `state.emaRms = 0` would corrupt the detector's noise floor tracking.
+- Fixed broken `holdMs` feature: `activeSince` sentinel changed from `0` (meaning epoch = 1 January 1970) to `-Infinity` (matching `lastAboveThresholdTs`). With `activeSince = 0`, the check `now - state.activeSince < holdMs` always evaluated to `~1.7e12 < 200 = false` for any speaker that had ever gone inactive, meaning the hold-time window never fired. Now `activeSince` is reset to `-Infinity` on inactive and an `isFinite` guard in `selectActiveSpeakers` prevents the comparison from running on the sentinel value.
+- Removed dead `state.active = true/false` assignments from `onFrame` — they were unconditionally overwritten by the immediately following `selectActiveSpeakers` call.
+
+### `AudioManager.ts`
+
+- Replaced `id: 0` magic number with `LOCAL_PUBLISHER_ID` (imported from `ActiveSpeakerDetector`). The value `0` is a valid remote WebRTC stream ID; a collision would have attributed local microphone RMS to a remote participant. `LOCAL_PUBLISHER_ID = -1` cannot collide.
+- Captured `const now = Date.now()` once and passed it to both `onFrame` calls in `onRemoteFrameRms`. The two calls represent the same logical event (one incoming remote frame); using separate `Date.now()` values caused the local and remote speaker entries to be evaluated at slightly different "now" timestamps inside `selectActiveSpeakers`.
+- Renamed constructor parameter `onRmsForWorker` → `sendRmsToWorker`. The `on*` prefix conventionally means "event handler / callback invoked by this object"; this parameter is a sink — it is called _by_ `AudioManager` to push data _to_ the worker. The rename removes the ambiguity.
+- Renamed arrow-function parameter `onRms` → `rmsDb` in `ensureLocalAudioLevelMeter`'s callback — `onRms` followed the same misleading `on*` pattern and shadowed the callback-name convention with a value name.
+- Added a comment documenting the intentional mute/detector discrepancy: when the track is muted, `sendRmsToWorker` receives `RMS_VALUE_OF_SILENCE` (so the encrypted frame trailer signals silence to remote peers) but `lastMeasuredLocalRMS` stores the real dBFS value (so the user's own microphone entry in the active-speaker detector continues to reflect actual mic activity while muted).

@@ -1,4 +1,4 @@
-import { ActiveSpeakerDetector, DEFAULTS, SpeakerState } from "./audio/ActiveSpeakerDetector";
+import { ActiveSpeakerDetector, DEFAULTS, LOCAL_PUBLISHER_ID, SpeakerState } from "./audio/ActiveSpeakerDetector";
 import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
 
 export interface AudioLevelsStats {
@@ -15,7 +15,7 @@ export class AudioManager {
 
     constructor(
         private readonly assetsDir: string,
-        private readonly onRmsForWorker: (rms: number) => void,
+        private readonly sendRmsToWorker: (rms: number) => void,
     ) {
         this.activeSpeakerDetector = new ActiveSpeakerDetector(DEFAULTS);
     }
@@ -28,15 +28,19 @@ export class AudioManager {
         if (!this.audioLevelCallback) {
             return;
         }
+
+        // Use a single timestamp for both frames so the detector sees them as simultaneous.
+        const now = Date.now();
+
         this.activeSpeakerDetector.onFrame({
-            id: 0,
+            id: LOCAL_PUBLISHER_ID,
             rms: this.lastMeasuredLocalRMS,
-            timestamp: Date.now(),
+            timestamp: now,
         });
         const speakers = this.activeSpeakerDetector.onFrame({
             id: publisherId,
             rms,
-            timestamp: Date.now(),
+            timestamp: now,
         });
         this.audioLevelCallback({ levels: speakers });
     }
@@ -45,15 +49,20 @@ export class AudioManager {
         if (this.localAudioLevelMeters.has(track.id)) {
             return;
         }
-        const meter = new LocalAudioLevelMeter(track, (onRms) => {
-            const rmsToReport = track.enabled ? onRms : LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
-            this.onRmsForWorker(rmsToReport);
-            this.lastMeasuredLocalRMS = onRms;
+        const meter = new LocalAudioLevelMeter(track, (rmsDb) => {
+            // Always send the actual RMS to the worker so the encrypted frame trailer reflects
+            // real mic activity. When the track is muted the worker receives silence instead,
+            // but lastMeasuredLocalRMS stores the real value so the local speaker entry in the
+            // detector still shows the user their own microphone level while muted.
+            const rmsForWorker = track.enabled ? rmsDb : LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
+            this.sendRmsToWorker(rmsForWorker);
+            this.lastMeasuredLocalRMS = rmsDb;
         });
         this.localAudioLevelMeters.set(track.id, meter);
         try {
             await meter.init(this.assetsDir + "/rms-processor.js");
-        } catch (e) {
+        }
+        catch (e) {
             this.localAudioLevelMeters.delete(track.id);
             meter.stop();
             throw e;

@@ -1,24 +1,26 @@
 export class LocalAudioLevelMeter {
     public static readonly RMS_VALUE_OF_SILENCE = -99;
-    private ctx!: AudioContext;
-    private node!: AudioWorkletNode;
-    private source!: MediaStreamAudioSourceNode;
-    private keepAliveGain!: GainNode;
+
+    private ctx: AudioContext | undefined;
+    private node: AudioWorkletNode | undefined;
+    private source: MediaStreamAudioSourceNode | undefined;
+    private keepAliveGain: GainNode | undefined;
     private stopped = false;
 
     constructor(
         private track: MediaStreamTrack,
-        protected onLevel: (rmsDb: number) => void,
+        private onLevel: (rmsDb: number) => void,
     ) {}
 
-    async init(workletUrl: string) {
+    async init(workletUrl: string): Promise<void> {
         const candidateSampleRates: Array<number | undefined> = [];
         try {
-            const settings = this.track.getSettings?.();
-            if (typeof (settings as any)?.sampleRate === "number") {
-                candidateSampleRates.push((settings as any).sampleRate);
+            const settings = this.track.getSettings?.() as MediaTrackSettings | undefined;
+            if (typeof settings?.sampleRate === "number") {
+                candidateSampleRates.push(settings.sampleRate);
             }
-        } catch {
+        }
+        catch {
             // ignore
         }
         candidateSampleRates.push(undefined);
@@ -34,14 +36,15 @@ export class LocalAudioLevelMeter {
                 await this.ctx.audioWorklet.addModule(workletUrl);
                 try {
                     await this.ctx.resume();
-                } catch {
+                }
+                catch {
                     // ignore (can be blocked until user gesture)
                 }
 
                 this.source = this.ctx.createMediaStreamSource(new MediaStream([this.track]));
 
                 this.node = new AudioWorkletNode(this.ctx, "rms-processor");
-                this.node.port.onmessage = (e) => this.onLevel(e.data.rmsDb);
+                this.node.port.onmessage = (e) => this.onLevel((e.data as { rmsDb: number }).rmsDb);
 
                 this.keepAliveGain = this.ctx.createGain();
                 this.keepAliveGain.gain.value = 0;
@@ -52,11 +55,13 @@ export class LocalAudioLevelMeter {
 
                 lastErr = undefined;
                 break;
-            } catch (e) {
+            }
+            catch (e) {
                 lastErr = e;
                 try {
                     this.ctx?.close();
-                } catch {
+                }
+                catch {
                     // ignore
                 }
             }
@@ -67,31 +72,38 @@ export class LocalAudioLevelMeter {
         }
     }
 
-    stop() {
+    // Each disconnect/close call is wrapped individually because some browsers throw
+    // when a node is already disconnected or the context is already closed.
+    stop(): void {
         this.stopped = true;
         try {
             this.node?.port?.close();
-        } catch {
+        }
+        catch {
             // ignore
         }
         try {
             this.source?.disconnect();
-        } catch {
+        }
+        catch {
             // ignore
         }
         try {
             this.node?.disconnect();
-        } catch {
+        }
+        catch {
             // ignore
         }
         try {
             this.keepAliveGain?.disconnect();
-        } catch {
+        }
+        catch {
             // ignore
         }
         try {
             this.ctx?.close();
-        } catch {
+        }
+        catch {
             // ignore
         }
     }
