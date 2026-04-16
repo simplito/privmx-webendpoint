@@ -85,7 +85,9 @@ export class ExtKey extends BaseApi {
         const extKey = new ExtKey(this.native, ptr);
         FinalizationHelper.getInstance().register(extKey, {
             ptr,
-            onFree: async () => { await this.native.deleteExtKey(ptr); },
+            onFree: async () => {
+                await this.native.deleteExtKey(ptr);
+            },
         });
         return extKey;
     }

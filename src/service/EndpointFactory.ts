@@ -70,7 +70,7 @@ export class EndpointFactory {
         // constructor reads this global during WASM module initialization (on the
         // worker thread), before the main thread gets control back.
         if (workerCount !== undefined) {
-            (window as unknown as Record<string, unknown>)["__privmxWorkerCount"] = Math.max(
+            (window as unknown as Record<string, unknown>).__privmxWorkerCount = Math.max(
                 2,
                 Math.floor(workerCount),
             );

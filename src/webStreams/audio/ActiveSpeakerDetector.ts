@@ -7,9 +7,9 @@
 export type PublisherId = number;
 
 export const DEFAULTS = {
-    rmsEmaAlpha: 0.2,    // fast reaction to speech
+    rmsEmaAlpha: 0.2, // fast reaction to speech
     noiseEmaAlpha: 0.02, // slow background adaptation
-    thresholdOffset: 6,  // dB above noise floor to consider speech
+    thresholdOffset: 6, // dB above noise floor to consider speech
     activityWindowMs: 400,
     holdMs: 200,
 };
@@ -80,8 +80,7 @@ export class ActiveSpeakerDetector {
                 // Record the start of this continuous active window
                 state.activeSince = timestamp;
             }
-        }
-        else {
+        } else {
             state.activeSince = -Infinity;
         }
 
@@ -95,7 +94,8 @@ export class ActiveSpeakerDetector {
     private selectActiveSpeakers(now: number): SpeakerState[] {
         for (const [id, state] of this.speakers.entries()) {
             const withinWindow = now - state.lastAboveThresholdTs <= this.opts.activityWindowMs;
-            const withinHold = isFinite(state.activeSince) && now - state.activeSince < this.opts.holdMs;
+            const withinHold =
+                isFinite(state.activeSince) && now - state.activeSince < this.opts.holdMs;
             state.active = withinWindow && withinHold;
 
             // Only prune entries that have had at least one real above-threshold frame.

@@ -77,7 +77,7 @@ export class EncryptTransform {
 
         const iv = genIvAsBuffer();
         const internalKeyId = this.keyStore.getEncryptionKeyId();
-        const wireKeyId     = this.keyStore.getEncryptionExternalKeyId();
+        const wireKeyId = this.keyStore.getEncryptionExternalKeyId();
         const encrypted = await this.encryptAes(internalKeyId, iv, frameBody, frameHeader);
         const keyIdBytes = new TextEncoder().encode(wireKeyId);
 
@@ -143,7 +143,12 @@ export class EncryptTransform {
             return null;
         }
 
-        const plain = await this.decryptAes(this.keyStore.resolveKeyId(keyId), iv, payload, frameHeader);
+        const plain = await this.decryptAes(
+            this.keyStore.resolveKeyId(keyId),
+            iv,
+            payload,
+            frameHeader,
+        );
         if (!plain) {
             controller.enqueue(encodedFrame);
             return null;

@@ -26,7 +26,6 @@ import { WindowWithWasmHandler } from "../webStreams/types/WebRtcExtensions";
 import { Api } from "./Api";
 import { BaseNative } from "./BaseNative";
 import * as Types from "../Types";
-import { StreamId } from "../webStreams/types/ApiTypes";
 
 export class StreamApiNative extends BaseNative {
     protected static bindingId: number = -1;

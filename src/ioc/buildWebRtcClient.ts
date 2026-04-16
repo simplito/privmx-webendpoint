@@ -27,14 +27,13 @@ import { T } from "./Tokens";
  *   - E2eeWorker RMS callback              → resolves AudioManager lazily
  */
 export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
-    const assetsDir    = await c.resolve<string>(T.AssetsBasePath);
-    const keyStore     = await c.resolve<KeyStore>(T.KeyStore);
-    const dataChannel  = await c.resolve<DataChannelSession>(T.DataChannelSession);
-    const dispatcher   = await c.resolve<StateChangeDispatcher>(T.StateChangeDispatcher);
-    const registry     = await c.resolve<RemoteStreamListenerRegistry>(T.ListenerRegistry);
+    const keyStore = await c.resolve<KeyStore>(T.KeyStore);
+    const dataChannel = await c.resolve<DataChannelSession>(T.DataChannelSession);
+    const dispatcher = await c.resolve<StateChangeDispatcher>(T.StateChangeDispatcher);
+    const registry = await c.resolve<RemoteStreamListenerRegistry>(T.ListenerRegistry);
     const e2eeTransform = await c.resolve<E2eeTransformManager>(T.E2eeTransformManager);
     const audioManager = await c.resolve<AudioManager>(T.AudioManager);
-    const e2eeWorker   = await c.resolve<E2eeWorker>(T.E2eeWorker);
+    const e2eeWorker = await c.resolve<E2eeWorker>(T.E2eeWorker);
 
     // --- PeerConnectionFactory ---
     // onRemoteTrack fires during a live call; SubscriberManager is resolved lazily.
@@ -54,28 +53,35 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
     const pcm = new PeerConnectionManager(
         (room, streamHandle) => pcFactory.create(room, streamHandle),
         (sessionId, candidate) =>
-            c.resolve<WebRtcClient>(T.WebRtcClient).then((client) =>
-                client.trickle(sessionId, candidate),
-            ),
+            c
+                .resolve<WebRtcClient>(T.WebRtcClient)
+                .then((client) => client.trickle(sessionId, candidate)),
     );
 
-    const publisher  = new PublisherManager(pcm, audioManager, e2eeTransform);
+    const publisher = new PublisherManager(pcm, audioManager, e2eeTransform);
     const subscriber = new SubscriberManager(pcm, e2eeTransform, registry);
-    const keys       = new KeySyncManager(keyStore, e2eeWorker);
+    const keys = new KeySyncManager(keyStore, e2eeWorker);
 
     const client = new WebRtcClient(
-        publisher, subscriber, dataChannel, keys,
-        dispatcher, registry, pcFactory, audioManager, e2eeWorker,
+        publisher,
+        subscriber,
+        dataChannel,
+        keys,
+        dispatcher,
+        registry,
+        pcFactory,
+        audioManager,
+        e2eeWorker,
     );
 
     // Register all internally-constructed objects so the lazy callbacks above
     // and any future resolver can reach them.
     c.registerValue(T.PeerConnectionFactory, pcFactory);
     c.registerValue(T.PeerConnectionManager, pcm);
-    c.registerValue(T.PublisherManager,      publisher);
-    c.registerValue(T.SubscriberManager,     subscriber);
-    c.registerValue(T.KeySyncManager,        keys);
-    c.registerValue(T.WebRtcClient,          client);
+    c.registerValue(T.PublisherManager, publisher);
+    c.registerValue(T.SubscriberManager, subscriber);
+    c.registerValue(T.KeySyncManager, keys);
+    c.registerValue(T.WebRtcClient, client);
 
     return client;
 }
@@ -85,15 +91,20 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
  * Call this once per createStreamApi() invocation before resolving T.WebRtcClient.
  */
 export function registerWebRtcServices(c: WebRtcContainer): void {
-    c.registerSingleton(T.KeyStore,    async () => new KeyStore());
+    c.registerSingleton(T.KeyStore, async () => new KeyStore());
     c.registerSingleton(T.StateChangeDispatcher, async () => new StateChangeDispatcher());
-    c.registerSingleton(T.ListenerRegistry,      async () => new RemoteStreamListenerRegistry());
+    c.registerSingleton(T.ListenerRegistry, async () => new RemoteStreamListenerRegistry());
 
-    c.registerSingleton(T.DataChannelCryptor, async (c) =>
-        new DataChannelCryptor(await c.resolve<KeyStore>(T.KeyStore)));
+    c.registerSingleton(
+        T.DataChannelCryptor,
+        async (c) => new DataChannelCryptor(await c.resolve<KeyStore>(T.KeyStore)),
+    );
 
-    c.registerSingleton(T.DataChannelSession, async (c) =>
-        new DataChannelSession(await c.resolve<DataChannelCryptor>(T.DataChannelCryptor)));
+    c.registerSingleton(
+        T.DataChannelSession,
+        async (c) =>
+            new DataChannelSession(await c.resolve<DataChannelCryptor>(T.DataChannelCryptor)),
+    );
 
     // E2eeWorker — the RMS callback resolves AudioManager lazily (built after E2eeWorker).
     c.registerSingleton(T.E2eeWorker, async (c) => {
@@ -105,11 +116,13 @@ export function registerWebRtcServices(c: WebRtcContainer): void {
         });
     });
 
-    c.registerSingleton(T.E2eeTransformManager, async (c) =>
-        new E2eeTransformManager(await c.resolve<E2eeWorker>(T.E2eeWorker)));
+    c.registerSingleton(
+        T.E2eeTransformManager,
+        async (c) => new E2eeTransformManager(await c.resolve<E2eeWorker>(T.E2eeWorker)),
+    );
 
     c.registerSingleton(T.AudioManager, async (c) => {
-        const assetsDir  = await c.resolve<string>(T.AssetsBasePath);
+        const assetsDir = await c.resolve<string>(T.AssetsBasePath);
         const e2eeWorker = await c.resolve<E2eeWorker>(T.E2eeWorker);
         return new AudioManager(assetsDir, (rms) => e2eeWorker.sendRms(rms));
     });

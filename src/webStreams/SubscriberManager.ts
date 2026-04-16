@@ -108,7 +108,11 @@ export class SubscriberManager {
         const channels = this.bootstrapChannels.get(roomId);
         if (channels) {
             for (const dc of channels) {
-                try { dc.close(); } catch { /* ignore */ }
+                try {
+                    dc.close();
+                } catch {
+                    /* ignore */
+                }
             }
             this.bootstrapChannels.delete(roomId);
         }

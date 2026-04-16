@@ -1,4 +1,9 @@
-import { ActiveSpeakerDetector, DEFAULTS, LOCAL_PUBLISHER_ID, SpeakerState } from "./audio/ActiveSpeakerDetector";
+import {
+    ActiveSpeakerDetector,
+    DEFAULTS,
+    LOCAL_PUBLISHER_ID,
+    SpeakerState,
+} from "./audio/ActiveSpeakerDetector";
 import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
 
 export interface AudioLevelsStats {
@@ -61,8 +66,7 @@ export class AudioManager {
         this.localAudioLevelMeters.set(track.id, meter);
         try {
             await meter.init(this.assetsDir + "/rms-processor.js");
-        }
-        catch (e) {
+        } catch (e) {
             this.localAudioLevelMeters.delete(track.id);
             meter.stop();
             throw e;

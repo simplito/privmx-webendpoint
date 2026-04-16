@@ -92,7 +92,7 @@ export class PeerConnectionManager {
         if (!this.hasConnection(room, connectionType)) {
             this.initialize(room, connectionType);
         }
-        const conn = this.connections[room][connectionType]!;
+        const conn = this.connections[room][connectionType];
         conn.sessionId = session;
 
         for (const candidate of conn.candidateQueue) {
@@ -121,7 +121,7 @@ export class PeerConnectionManager {
         if (!this.hasConnection(room, connectionType)) {
             this.initialize(room, connectionType);
         }
-        return this.connections[room][connectionType]!;
+        return this.connections[room][connectionType];
     }
 
     /**

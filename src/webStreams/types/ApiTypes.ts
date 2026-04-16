@@ -37,7 +37,7 @@ export interface StreamTrack {
     streamHandle: StreamHandle;
     track?: MediaStreamTrack;
     dataChannelMeta: DataChannelMeta;
-    published: Boolean;
+    published: boolean;
     markedToRemove?: boolean;
 }
 

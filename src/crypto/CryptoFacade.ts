@@ -173,7 +173,7 @@ export class CryptoFacade {
         if (key instanceof Uint8Array || key instanceof ArrayBuffer) {
             throw new TypeError(
                 `CryptoFacade.${method}: Raw key bytes are not allowed. ` +
-                    `Use CryptoFacade.importKey() first to obtain a keyId.`,
+                    "Use CryptoFacade.importKey() first to obtain a keyId.",
             );
         }
     }

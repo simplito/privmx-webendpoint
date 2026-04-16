@@ -23,7 +23,11 @@ export class Container {
      * once; all subsequent `resolve` calls return the same cached `Promise`.
      */
     registerSingleton<T>(token: string | symbol, factory: Factory<T>): void {
-        this.reg.set(token, { factory: factory as Factory<unknown>, singleton: true, cached: undefined });
+        this.reg.set(token, {
+            factory: factory as Factory<unknown>,
+            singleton: true,
+            cached: undefined,
+        });
     }
 
     /**

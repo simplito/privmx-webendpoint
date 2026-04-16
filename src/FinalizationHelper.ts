@@ -1,4 +1,3 @@
-
 interface NativeObjInfo {
     ptr: number;
     onFree: () => Promise<void>;

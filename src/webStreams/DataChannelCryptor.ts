@@ -3,9 +3,8 @@ import { DataChannelCryptorDecryptStatus } from "../Types";
 import { KeyStore } from "./KeyStore";
 import { Logger } from "./Logger";
 
-const AES_GCM_KEY_LENGTH_BYTES = 32;
 const GCM_NONCE_LENGTH_BYTES = 12;
-const GCM_TAG_LENGTH_BITS = 128;
+const GCM_TAG_LENGTH_BYTES = 16;
 const VERSION_LENGTH_BYTES = 1;
 const KEY_ID_LENGTH_BYTES = 1;
 const SEQUENCE_NUMBER_LENGTH_BYTES = 4;
@@ -61,8 +60,8 @@ export class DataChannelCryptor {
      */
     async encryptToWireFormat(params: EncryptToWireFormatParams): Promise<Uint8Array> {
         const { plaintext, sequenceNumber } = params;
-        const internalKeyId  = this.keyStore.getEncryptionKeyId();
-        const keyId          = this.keyStore.getEncryptionExternalKeyId();
+        const internalKeyId = this.keyStore.getEncryptionKeyId();
+        const keyId = this.keyStore.getEncryptionExternalKeyId();
 
         this.assertKeyId(keyId);
 
@@ -117,11 +116,11 @@ export class DataChannelCryptor {
 
         try {
             const fullBuffer = parsed.ciphertext;
-            if (fullBuffer.length < 16) {
+            if (fullBuffer.length < GCM_TAG_LENGTH_BYTES) {
                 throw new Error("Ciphertext too short for tag");
             }
-            const data = fullBuffer.slice(0, fullBuffer.length - 16);
-            const tag = fullBuffer.slice(fullBuffer.length - 16);
+            const data = fullBuffer.slice(0, fullBuffer.length - GCM_TAG_LENGTH_BYTES);
+            const tag = fullBuffer.slice(fullBuffer.length - GCM_TAG_LENGTH_BYTES);
 
             const decrypted = await CryptoFacade.aeadDecrypt(
                 this.keyStore.resolveKeyId(parsed.keyId),
@@ -135,7 +134,7 @@ export class DataChannelCryptor {
         } catch {
             throw new DataChannelCryptorError(
                 DataChannelCryptorDecryptStatus.DECRYPT_AUTH_FAILED,
-                `Decryption failed (auth error)`,
+                "Decryption failed (auth error)",
             );
         }
     }
@@ -175,7 +174,7 @@ export class DataChannelCryptor {
         if (frame.length < headerLength) {
             throw new DataChannelCryptorError(
                 DataChannelCryptorDecryptStatus.FRAME_TRUNCATED,
-                `Frame truncated`,
+                "Frame truncated",
             );
         }
 

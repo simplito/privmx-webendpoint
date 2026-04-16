@@ -235,14 +235,19 @@ export class StreamApi extends BaseApi {
 
         // If this browser track was previously staged and then marked for removal, un-remove it.
         for (const streamTrack of this.streamTracks.values()) {
-            if (streamTrack.streamHandle !== streamHandle || streamTrack.track?.id !== meta.track?.id) {
+            if (
+                streamTrack.streamHandle !== streamHandle ||
+                streamTrack.track?.id !== meta.track?.id
+            ) {
                 continue;
             }
             if (streamTrack.markedToRemove) {
                 streamTrack.markedToRemove = undefined;
                 return streamTrack.id;
             }
-            throw new Error("[addStreamTrack] StreamTrack with given browser's track already added.");
+            throw new Error(
+                "[addStreamTrack] StreamTrack with given browser's track already added.",
+            );
         }
 
         const streamTrackId = crypto.randomUUID() as StreamTrackId;
@@ -275,7 +280,10 @@ export class StreamApi extends BaseApi {
             );
         }
         for (const streamTrack of this.streamTracks.values()) {
-            if (streamTrack.track?.id === meta.track?.id && streamTrack.streamHandle === streamHandle) {
+            if (
+                streamTrack.track?.id === meta.track?.id &&
+                streamTrack.streamHandle === streamHandle
+            ) {
                 streamTrack.markedToRemove = true;
             }
         }
@@ -380,7 +388,10 @@ export class StreamApi extends BaseApi {
         }
 
         await this.native.unpublishStream(this.servicePtr, [streamHandle]);
-        this.client.removeSenderPeerConnectionOnUnpublish(stream.streamRoomId, stream.localMediaStream);
+        this.client.removeSenderPeerConnectionOnUnpublish(
+            stream.streamRoomId,
+            stream.localMediaStream,
+        );
         this.streams.delete(streamHandle);
         this.client.getStreamStateChangeDispatcher().removeOnStateChangeListener({ streamHandle });
     }

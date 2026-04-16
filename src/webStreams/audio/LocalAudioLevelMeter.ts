@@ -13,14 +13,13 @@ export class LocalAudioLevelMeter {
     ) {}
 
     async init(workletUrl: string): Promise<void> {
-        const candidateSampleRates: Array<number | undefined> = [];
+        const candidateSampleRates: (number | undefined)[] = [];
         try {
-            const settings = this.track.getSettings?.() as MediaTrackSettings | undefined;
+            const settings = this.track.getSettings?.();
             if (typeof settings?.sampleRate === "number") {
                 candidateSampleRates.push(settings.sampleRate);
             }
-        }
-        catch {
+        } catch {
             // ignore
         }
         candidateSampleRates.push(undefined);
@@ -36,8 +35,7 @@ export class LocalAudioLevelMeter {
                 await this.ctx.audioWorklet.addModule(workletUrl);
                 try {
                     await this.ctx.resume();
-                }
-                catch {
+                } catch {
                     // ignore (can be blocked until user gesture)
                 }
 
@@ -55,13 +53,11 @@ export class LocalAudioLevelMeter {
 
                 lastErr = undefined;
                 break;
-            }
-            catch (e) {
+            } catch (e) {
                 lastErr = e;
                 try {
                     this.ctx?.close();
-                }
-                catch {
+                } catch {
                     // ignore
                 }
             }
@@ -78,32 +74,27 @@ export class LocalAudioLevelMeter {
         this.stopped = true;
         try {
             this.node?.port?.close();
-        }
-        catch {
+        } catch {
             // ignore
         }
         try {
             this.source?.disconnect();
-        }
-        catch {
+        } catch {
             // ignore
         }
         try {
             this.node?.disconnect();
-        }
-        catch {
+        } catch {
             // ignore
         }
         try {
             this.keepAliveGain?.disconnect();
-        }
-        catch {
+        } catch {
             // ignore
         }
         try {
             this.ctx?.close();
-        }
-        catch {
+        } catch {
             // ignore
         }
     }

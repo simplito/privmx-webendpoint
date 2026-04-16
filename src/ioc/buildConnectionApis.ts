@@ -72,7 +72,7 @@ export function registerConnectionServices(
             throw new Error("ThreadApi already registered for given connection.");
         }
         const native = new ThreadApiNative(api);
-        const ptr    = await native.newApi(conn.servicePtr);
+        const ptr = await native.newApi(conn.servicePtr);
         await native.create(ptr, []);
         conn.registerApi("threads", ptr, native);
         return new ThreadApi(native, ptr);
@@ -84,7 +84,7 @@ export function registerConnectionServices(
             throw new Error("StoreApi already registered for given connection.");
         }
         const native = new StoreApiNative(api);
-        const ptr    = await native.newApi(conn.servicePtr);
+        const ptr = await native.newApi(conn.servicePtr);
         conn.registerApi("stores", ptr, native);
         await native.create(ptr, []);
         return new StoreApi(native, ptr);
@@ -96,7 +96,7 @@ export function registerConnectionServices(
             throw new Error("KvdbApi already registered for given connection.");
         }
         const native = new KvdbApiNative(api);
-        const ptr    = await native.newApi(conn.servicePtr);
+        const ptr = await native.newApi(conn.servicePtr);
         await native.create(ptr, []);
         conn.registerApi("kvdbs", ptr, native);
         return new KvdbApi(native, ptr);
@@ -108,7 +108,7 @@ export function registerConnectionServices(
             throw new Error("EventApi already registered for given connection.");
         }
         const native = new EventApiNative(api);
-        const ptr    = await native.newApi(conn.servicePtr);
+        const ptr = await native.newApi(conn.servicePtr);
         await native.create(ptr, []);
         conn.registerApi("events", ptr, native);
         return new EventApi(native, ptr);
@@ -121,13 +121,9 @@ export function registerConnectionServices(
             throw new Error("InboxApi already registered for given connection.");
         }
         const threadApi = await c.resolve<ThreadApi>(T.ThreadApi);
-        const storeApi  = await c.resolve<StoreApi>(T.StoreApi);
-        const native    = new InboxApiNative(api);
-        const ptr       = await native.newApi(
-            conn.servicePtr,
-            threadApi.servicePtr,
-            storeApi.servicePtr,
-        );
+        const storeApi = await c.resolve<StoreApi>(T.StoreApi);
+        const native = new InboxApiNative(api);
+        const ptr = await native.newApi(conn.servicePtr, threadApi.servicePtr, storeApi.servicePtr);
         await native.create(ptr, []);
         conn.registerApi("inboxes", ptr, native);
         return new InboxApi(native, ptr);
@@ -146,14 +142,14 @@ export function registerConnectionServices(
         rtc.registerValue(T.AssetsBasePath, assetsBasePath);
         registerWebRtcServices(rtc);
 
-        const webRtcClient        = await rtc.resolve<WebRtcClient>(T.WebRtcClient);
+        const webRtcClient = await rtc.resolve<WebRtcClient>(T.WebRtcClient);
         const webRtcInterfaceImpl = new WebRtcInterfaceImpl(webRtcClient);
-        const native              = new StreamApiNative(api, webRtcInterfaceImpl);
-        const ptr                 = await native.newApi(conn.servicePtr, eventApi.servicePtr);
+        const native = new StreamApiNative(api, webRtcInterfaceImpl);
+        const ptr = await native.newApi(conn.servicePtr, eventApi.servicePtr);
 
         webRtcClient.bindApiInterface({
-            trickle:     (sessionId, candidate) => native.trickle(ptr, [sessionId, candidate]),
-            acceptOffer: (sessionId, sdp)       => native.acceptOfferOnReconfigure(ptr, [sessionId, sdp]),
+            trickle: (sessionId, candidate) => native.trickle(ptr, [sessionId, candidate]),
+            acceptOffer: (sessionId, sdp) => native.acceptOfferOnReconfigure(ptr, [sessionId, sdp]),
         });
 
         await native.create(ptr, []);
