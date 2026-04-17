@@ -1,0 +1,44 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "plugins": ["typescript", "unicorn", "oxc"],
+    "categories": {
+        "correctness": "error",
+        "suspicious": "warn"
+    },
+    "env": {
+        "builtin": true,
+        "browser": true
+    },
+    "ignorePatterns": [
+        "dist/**",
+        "assets/**",
+        "node_modules/**",
+        "dependency_sources/**",
+        "drivers/**",
+        "async-engine/**",
+        "webendpoint-cpp/**",
+        "emsdk/**"
+    ],
+    "overrides": [
+        {
+            "files": ["**/*.test.ts", "**/__tests__/**", "**/__mocks__/**"],
+            "plugins": ["jest"],
+            "rules": {
+                "jest/expect-expect": "off",
+                "jest/require-to-throw-message": "off"
+            }
+        }
+    ],
+    "rules": {
+        "no-console": "off",
+        "no-shadow": "off",
+        "no-useless-constructor": "off",
+        "preserve-caught-error": "off",
+        "typescript/no-extraneous-class": "off",
+        "unicorn/prefer-query-selector": "off",
+        "unicorn/no-array-for-each": "off",
+        "unicorn/no-array-reduce": "off",
+        "unicorn/prefer-add-event-listener": "off",
+        "unicorn/require-post-message-target-origin": "off"
+    }
+}

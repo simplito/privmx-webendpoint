@@ -15,60 +15,34 @@ source "$EMSDK_DIR/emsdk_env.sh"
 
 POCO_DIR="$SOURCE_DIR/poco-$VERSION-all"
 
-if [ -d "$POCO_DIR" ];
-then
+if [ -d "$POCO_DIR" ]; then
     echo "$POCO_DIR directory exists. Skip download of sources."
 else
-	echo "$POCO_DIR directory does not exist. Get sources..."
+    echo "$POCO_DIR directory does not exist. Get sources..."
     cd "$SOURCE_DIR"
     curl "https://pocoproject.org/releases/poco-$VERSION/poco-$VERSION-all.zip" --output poco.zip
     unzip -o poco.zip
 fi
 
-echo "+++++++++++++++++++++"
-echo $POCO_DIR
-echo "+++++++++++++++++++++"
+cd "$POCO_DIR"
+# apply config patches for emscripten
+patch --forward -d "$POCO_DIR" -p1 -i "$BASE_DIR/patches/poco-$VERSION-all.patch" || echo "OK"
 
-echo "Checking checksum: $POCO_DIR ..."
-set +e
-$SCRIPT_PATH/check_dir_checksum "$POCO_DIR"
-RESULT=$?
-set -e
-case "$RESULT" in
-    0)
-        echo "No changes - skipping build"
-        ;;
-    1)
-        echo "changes - rebuild..."
-        cd "$POCO_DIR"
-        # apply config patches for emscripten
-        patch --forward -d "$POCO_DIR" -p1 -i "$BASE_DIR/patches/poco-$VERSION-all.patch" || echo "OK"
+mkdir -p build-emscripten && cd build-emscripten
 
-        if [ ! -d "./build-emscripten" ]; then
-            mkdir -p build-emscripten && cd build-emscripten
-            emcmake cmake .. -DENABLE_JWT=OFF -DENABLE_DATA=OFF -DENABLE_DATA_SQLITE=OFF -DENABLE_DATA_MYSQL=OFF -DENABLE_DATA_POSTGRESQL=OFF -DENABLE_DATA_ODBC=OFF \
-                -DENABLE_MONGODB=OFF -DENABLE_REDIS=OFF -DENABLE_PDF=OFF -DENABLE_UTIL=OFF -DENABLE_ZIP=OFF -DENABLE_SEVENZIP=OFF \
-                -DENABLE_APACHECONNECTOR=OFF -DENABLE_CPPPARSER=OFF -DENABLE_ENCODINGS=OFF -DENABLE_ENCODINGS_COMPILER=OFF \
-                -DENABLE_PAGECOMPILER=OFF -DENABLE_PAGECOMPILER_FILE2PAGE=OFF -DENABLE_POCODOC=OFF -DENABLE_TESTS=OFF -DENABLE_LONG_RUNNING_TESTS=OFF \
-                -DENABLE_NET=OFF -DENABLE_CRYPTO=OFF -DENABLE_NETSSL=OFF -DCMAKE_BUILD_TYPE=MinSizeRel
-        else
-            cd build-emscripten
-        fi
+if [ ! -f CMakeCache.txt ]; then
+    emcmake cmake .. \
+        -DENABLE_JWT=OFF -DENABLE_DATA=OFF -DENABLE_DATA_SQLITE=OFF -DENABLE_DATA_MYSQL=OFF \
+        -DENABLE_DATA_POSTGRESQL=OFF -DENABLE_DATA_ODBC=OFF -DENABLE_MONGODB=OFF -DENABLE_REDIS=OFF \
+        -DENABLE_PDF=OFF -DENABLE_UTIL=OFF -DENABLE_ZIP=OFF -DENABLE_SEVENZIP=OFF \
+        -DENABLE_APACHECONNECTOR=OFF -DENABLE_CPPPARSER=OFF -DENABLE_ENCODINGS=OFF \
+        -DENABLE_ENCODINGS_COMPILER=OFF -DENABLE_PAGECOMPILER=OFF -DENABLE_PAGECOMPILER_FILE2PAGE=OFF \
+        -DENABLE_POCODOC=OFF -DENABLE_TESTS=OFF -DENABLE_LONG_RUNNING_TESTS=OFF \
+        -DENABLE_NET=OFF -DENABLE_CRYPTO=OFF -DENABLE_NETSSL=OFF \
+        -DCMAKE_BUILD_TYPE=MinSizeRel
+else
+    echo "CMakeCache.txt exists — skipping cmake configure."
+fi
 
-        emmake make -j20
-        emmake make install
-
-        set +e
-        $SCRIPT_PATH/check_dir_checksum "$POCO_DIR"
-        set -e
-        ;;
-    2)
-        echo "\n\n\nBłąd wejścia" >&2
-        exit 2
-        ;;
-    *)
-        echo "\n\n\nNieznany kod wyjścia: $RESULT" >&2
-        exit 3
-        ;;
-esac
-
+emmake make -j20
+emmake make install

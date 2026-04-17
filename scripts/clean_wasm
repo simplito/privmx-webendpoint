@@ -1,0 +1,29 @@
+#!/bin/bash
+# Removes all CMake/autoconf build directories for every WASM component.
+# After running this, the next build will fully reconfigure and recompile.
+
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+source "$SCRIPT_PATH/config.sh"
+
+remove() {
+    if [ -d "$1" ]; then
+        echo "Removing $1"
+        rm -rf "$1"
+    fi
+}
+
+# First-party C++ components
+remove "$PRIVMX_WEB_ASYNC_ENGINE/build-emscripten"
+remove "$PRIVMX_WEBENDPOINT_API_SRC/build-emscripten"
+remove "$PRIVMX_WEBENDPOINT_DRV_CRYPTO_SRC/build-emscripten"
+remove "$PRIVMX_WEBENDPOINT_DRV_ECC_SRC/build-emscripten"
+remove "$PRIVMX_WEBENDPOINT_DRV_NET_SRC/build-emscripten"
+
+# Third-party dependencies — each lives in dependency_sources/<name>/build-emscripten/
+for dep_dir in "$SOURCE_DIR"/*/; do
+    remove "${dep_dir}build-emscripten"
+done
+
+echo "WASM build directories cleaned."

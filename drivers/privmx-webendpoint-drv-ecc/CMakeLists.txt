@@ -12,11 +12,20 @@ target_include_directories(privmxdrvecc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/incl
 set_target_properties(privmxdrvecc PROPERTIES PUBLIC_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/include/privmx/drv/ecc.h)
 target_link_libraries(privmxdrvecc)
 target_link_libraries(privmxdrvecc embind)
-target_compile_options(privmxdrvecc PUBLIC 
-    -O3
-    -pthread
-)
-set(CMAKE_CXX_FLAGS "-std=c++17 -fexceptions -pthread")
+# ---------------------------------------------------------------------------
+# Build variant: release (default) or debug
+# ---------------------------------------------------------------------------
+set(PRIVMX_BUILD_TYPE "release" CACHE STRING "Build variant: release or debug")
+
+if(PRIVMX_BUILD_TYPE STREQUAL "debug")
+    message(STATUS "Building privmxdrvecc: DEBUG")
+    set(CMAKE_CXX_FLAGS "-std=c++17 -fexceptions -pthread")
+    target_compile_options(privmxdrvecc PUBLIC -O0 -g -pthread -DDEBUG)
+else()
+    message(STATUS "Building privmxdrvecc: RELEASE")
+    set(CMAKE_CXX_FLAGS "-std=c++17 -fexceptions -pthread")
+    target_compile_options(privmxdrvecc PUBLIC -O3 -pthread)
+endif()
 target_link_options(privmxdrvecc PUBLIC
     -L $ENV{SDK_DIR}/upstream/emscripten/cache/sysroot/lib
     -sUSE_PTHREADS
