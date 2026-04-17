@@ -82,7 +82,7 @@ export type EventsCallbackPayload = Types.ContextCustomEventData;
 
 export type EventCallback = {
     callback: (e: Types.Event | GenericEvent<unknown>) => void;
-    symbol: Symbol;
+    symbol: symbol;
 };
 
 export interface Subscription<T, S> {
