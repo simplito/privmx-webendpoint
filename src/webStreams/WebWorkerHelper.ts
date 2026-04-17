@@ -1,5 +1,5 @@
 import { Key } from "../Types";
-import { InitializeEvent, SetKeysEvent } from "./worker/WorkerEvents";
+import { SetKeysEvent } from "./worker/WorkerEvents";
 
 interface WorkerLogEvent {
     data:
@@ -49,9 +49,6 @@ export class WebWorker {
         };
         this.worker.onerror = (e) => console.error(e);
 
-        this.worker.postMessage(<InitializeEvent>{
-            operation: "initialize",
-        });
     }
 
     getWorker() {

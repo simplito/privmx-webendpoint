@@ -10,30 +10,35 @@ limitations under the License.
 */
 
 import {
-    CurrentPublishersData,
-    Jsep,
     RoomModel,
     SdpWithRoomModel,
     SetAnswerAndSetRemoteDescriptionModel,
-    StreamsUpdatedData,
     UpdateKeysModel,
     WebRtcInterface,
-} from "../service/WebRtcInterface";
+    WebRtcMethodCall,
+} from "./WebRtcInterface";
 import { ConnectionType } from "./PeerConnectionsManager";
-import { StreamRoomId } from "./types/ApiTypes";
+import { Jsep, StreamRoomId } from "./types/ApiTypes";
 import { WebRtcClient } from "./WebRtcClient";
 import { SessionId } from "./WebRtcClientTypes";
+
+type MethodMap = {
+    [K in WebRtcMethodCall["name"]]: (
+        params: Extract<WebRtcMethodCall, { name: K }>["params"],
+    ) => Promise<unknown>;
+};
 
 export class WebRtcInterfaceImpl implements WebRtcInterface {
     constructor(private webRtcClient: WebRtcClient) {}
 
-    private methodsMap: { [K: string]: Function } = {
-        createOfferAndSetLocalDescription: this.createOfferAndSetLocalDescription,
-        createAnswerAndSetDescriptions: this.createAnswerAndSetDescriptions,
-        setAnswerAndSetRemoteDescription: this.setAnswerAndSetRemoteDescription,
-        updateSessionId: this.updateSessionId,
-        close: this.close,
-        updateKeys: this.updateKeys,
+    private methodsMap: MethodMap = {
+        createOfferAndSetLocalDescription: this.createOfferAndSetLocalDescription.bind(this),
+        createAnswerAndSetDescriptions: this.createAnswerAndSetDescriptions.bind(this),
+        setAnswerAndSetRemoteDescription: this.setAnswerAndSetRemoteDescription.bind(this),
+        updateSessionId: (params) =>
+            this.updateSessionId(params.streamRoomId, params.sessionId, params.connectionType),
+        close: this.close.bind(this),
+        updateKeys: this.updateKeys.bind(this),
     };
 
     isMainThread() {
@@ -47,12 +52,10 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         return this.webRtcClient;
     }
 
-    async methodCall(name: string, params: any): Promise<any> {
-        if (this.methodsMap[name]) {
-            const method = this.methodsMap[name];
-            if (typeof method === "function") {
-                return this.methodsMap[name].call(this, params);
-            }
+    async methodCall(name: string, params: unknown): Promise<unknown> {
+        const method = this.methodsMap[name as WebRtcMethodCall["name"]];
+        if (typeof method === "function") {
+            return method(params as never);
         }
         throw new Error(`Method '${name}' is not implemented.`);
     }

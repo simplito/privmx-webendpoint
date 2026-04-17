@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Jsep, SdpWithRoomModel } from "../service/WebRtcInterface";
+import { Jsep } from "../webStreams/types/ApiTypes";
 import {
     ContainerPolicy,
     PagingList,
