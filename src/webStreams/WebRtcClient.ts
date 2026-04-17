@@ -18,12 +18,11 @@ import { KeyStore } from "./KeyStore";
 import { Utils } from "./Utils";
 import { PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
-import { StreamId, StreamRoomId } from "./types/ApiTypes";
+import { Jsep, StreamId, StreamRoomId } from "./types/ApiTypes";
 import { Queue } from "./Queue";
-import { Jsep } from "../service/WebRtcInterface";
 import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
 import { ActiveSpeakerDetector, DEFAULTS, SpeakerState } from "./audio/ActiveSpeakerDetector";
-import { StateChangeDispatcher } from "../service/EventDispatcher";
+import { StateChangeDispatcher } from "./EventDispatcher";
 import { StreamTrack } from "../service/StreamApi";
 import { DataChannelCryptor, DataChannelCryptorError } from "./DataChannelCryptor";
 
@@ -493,7 +492,7 @@ export class WebRtcClient {
 
     async updateKeys(_streamRoomId: StreamRoomId, keys: Key[]) {
         this.logger.debug("=======> UPDATE KEYS", _streamRoomId, keys.length);
-        this.keyStore.setKeys(keys);
+        await this.keyStore.setKeys(keys);
         await (await this.getWorkerApi()).setKeys(keys);
     }
 
@@ -661,7 +660,7 @@ export class WebRtcClient {
         }
     }
 
-    public async onSubscriptionUpdated(_room: StreamRoomId, offer: { sdp: string; type: string }) {
+    public async onSubscriptionUpdated(_room: StreamRoomId, offer: Jsep) {
         if (!this.peerConnectionReconfigureQueue) {
             throw new Error("ReconfigureQueue does not exist.");
         }

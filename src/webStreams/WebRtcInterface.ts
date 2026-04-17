@@ -1,16 +1,12 @@
 import { Key } from "../Types";
-import { ConnectionType } from "../webStreams/PeerConnectionsManager";
-import { StreamRoomId } from "../webStreams/types/ApiTypes";
+import { ConnectionType } from "./PeerConnectionsManager";
+import { Jsep, StreamRoomId } from "./types/ApiTypes";
 
 export class UpdateKeysModel {
     streamRoomId: StreamRoomId;
     keys: Key[];
 }
 
-export interface Jsep {
-    sdp: string;
-    type: string;
-}
 export interface SdpWithRoomModel extends Jsep {
     roomId: StreamRoomId;
 }
@@ -21,41 +17,6 @@ export interface RoomModel {
 
 export type CreateAnswerAndSetDescriptionsModel = SdpWithRoomModel;
 export type SetAnswerAndSetRemoteDescriptionModel = SdpWithRoomModel;
-
-export interface StreamsUpdatedData {
-    videoroom: "updated";
-    room: StreamRoomId;
-    streams: UpdatedStreamData[];
-    jsep?: Jsep;
-}
-
-export interface UpdatedStreamData {
-    type: "audio" | "video" | "data";
-    streamId: number;
-    streamMid: number;
-    stream_display: string;
-    mindex: number;
-    mid: string;
-    send: boolean;
-    ready: boolean;
-}
-export interface CurrentPublishersData {
-    room: StreamRoomId;
-    publishers: NewPublisherEvent[];
-}
-
-export interface NewPublisherEvent {
-    id: number;
-    video_codec: string;
-    streams: VideoRoomStreamTrack[];
-}
-
-export interface VideoRoomStreamTrack {
-    type: string;
-    codec: string;
-    mid: string;
-    mindex: number;
-}
 
 export interface WebRtcInterface {
     createOfferAndSetLocalDescription(model: RoomModel): Promise<string>;
@@ -69,3 +30,15 @@ export interface WebRtcInterface {
     close(roomId: StreamRoomId): Promise<void>;
     updateKeys(model: UpdateKeysModel): Promise<void>;
 }
+
+// Discriminated union covering every method the C++ WASM layer can invoke.
+export type WebRtcMethodCall =
+    | { name: "createOfferAndSetLocalDescription"; params: RoomModel }
+    | { name: "createAnswerAndSetDescriptions"; params: SdpWithRoomModel }
+    | { name: "setAnswerAndSetRemoteDescription"; params: SetAnswerAndSetRemoteDescriptionModel }
+    | {
+          name: "updateSessionId";
+          params: { streamRoomId: StreamRoomId; sessionId: number; connectionType: ConnectionType };
+      }
+    | { name: "close"; params: StreamRoomId }
+    | { name: "updateKeys"; params: UpdateKeysModel };
