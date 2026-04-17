@@ -1,45 +1,41 @@
-export enum LogLevel {
-    ERROR = 0,
-    WARN = 1,
-    INFO = 2,
-    DEBUG = 3,
-}
-
+/**
+ * Minimal timestamp-prefixed logger used internally by the webStreams layer.
+ *
+ * Log levels (lower number = higher severity):
+ * - 0 ERROR
+ * - 1 WARN  (default threshold)
+ * - 2 INFO
+ * - 3 DEBUG
+ *
+ * Only messages whose level is ≤ the configured threshold are emitted.
+ */
 export class Logger {
-    private level: LogLevel;
+    private level: number;
 
-    constructor(level: LogLevel = LogLevel.WARN) {
+    constructor(level: number = 1) {
         this.level = level;
     }
 
-    setLevel(level: LogLevel) {
-        this.level = level;
+    debug(...args: unknown[]): void {
+        this.log(3, "DEBUG", args);
     }
 
-    getLevel(): LogLevel {
-        return this.level;
+    info(...args: unknown[]): void {
+        this.log(2, "INFO", args);
     }
 
-    private log(level: LogLevel, prefix: string, args: any[]) {
+    warn(...args: unknown[]): void {
+        this.log(1, "WARN", args);
+    }
+
+    error(...args: unknown[]): void {
+        this.log(0, "ERROR", args);
+    }
+
+    private log(level: number, prefix: string, args: unknown[]): void {
         if (level <= this.level) {
             const timestamp = new Date().toISOString();
             console.log(`[${timestamp}] [${prefix}]`, ...args);
         }
-    }
-
-    debug(...args: any[]) {
-        this.log(LogLevel.DEBUG, "DEBUG", args);
-    }
-
-    info(...args: any[]) {
-        this.log(LogLevel.INFO, "INFO", args);
-    }
-
-    warn(...args: any[]) {
-        this.log(LogLevel.WARN, "WARN", args);
-    }
-
-    error(...args: any[]) {
-        this.log(LogLevel.ERROR, "ERROR", args);
     }
 }
