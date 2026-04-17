@@ -110,6 +110,9 @@ export class StreamApiNative extends BaseNative {
         );
     }
     async createStream(ptr: number, args: [string]): Promise<Types.StreamHandle> {
+        // params from api: streamRoomId, streamId
+        // params to lib: streamRoomId, streamId, webrtcInterfacePtr
+        // const libArgs: [string, number, number] = [...args, this.webRtcInterfacePtr];
         return this.runAsync<Types.StreamHandle>((taskId) =>
             this.api.lib.StreamApi_createStream(taskId, ptr, args),
         );
