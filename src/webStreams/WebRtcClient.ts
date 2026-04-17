@@ -325,6 +325,7 @@ export class WebRtcClient {
                 if ((window as any).RTCRtpScriptTransform) {
                     const options = {
                         operation: "encode",
+                        kind: track.kind,
                     };
                     (videoSender as any).transform = new RTCRtpScriptTransform(
                         this.e2eeWorker,
@@ -335,6 +336,7 @@ export class WebRtcClient {
                     this.e2eeWorker.postMessage(
                         {
                             operation: "encode",
+                            kind: track.kind,
                             readableStream: senderStreams.readable,
                             writableStream: senderStreams.writable,
                         },
@@ -500,6 +502,7 @@ export class WebRtcClient {
         if ((window as any).RTCRtpScriptTransform) {
             const options = {
                 operation: "encode",
+                kind: videoSender.track?.kind,
             };
             (videoSender as any).transform = new RTCRtpScriptTransform(this.e2eeWorker, options);
         } else {
@@ -508,6 +511,7 @@ export class WebRtcClient {
             this.e2eeWorker.postMessage(
                 {
                     operation: "encode",
+                    kind: videoSender.track?.kind,
                     readableStream: senderStreams.readable,
                     writableStream: senderStreams.writable,
                 },
@@ -528,6 +532,7 @@ export class WebRtcClient {
                 operation: "decode",
                 id,
                 publisherId,
+                kind: receiver.track.kind,
             });
             return;
         }
@@ -559,6 +564,7 @@ export class WebRtcClient {
                     operation: "decode",
                     id: enc.id,
                     publisherId: enc.publisherId,
+                    kind: receiver.track.kind,
                     readableStream: enc.readable,
                     writableStream: enc.writable,
                 },
