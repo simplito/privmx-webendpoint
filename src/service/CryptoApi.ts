@@ -50,7 +50,7 @@ export class CryptoApi extends BaseApi {
      * @param {string} [randomSeed] optional string used as the base to generate the new key
      * @returns {string} generated ECC key in WIF format
      */
-    async generatePrivateKey(randomSeed?: string | undefined): Promise<string> {
+    async generatePrivateKey(randomSeed?: string): Promise<string> {
         return this.native.generatePrivateKey(this.servicePtr, [randomSeed]);
     }
 
@@ -59,7 +59,7 @@ export class CryptoApi extends BaseApi {
      *
      * @param {string} password the password used to generate the new key
      * @param {string} salt random string (additional input for the hashing function)
-  
+     
      * @returns {string} generated ECC key in WIF format
      */
     async derivePrivateKey(password: string, salt: string): Promise<string> {
@@ -71,7 +71,7 @@ export class CryptoApi extends BaseApi {
      *
      * @param {string} password the password used to generate the new key
      * @param {string} salt random string (additional input for the hashing function)
-  
+     
      * @returns {string} generated ECC key in WIF format
      */
     async derivePrivateKey2(password: string, salt: string): Promise<string> {

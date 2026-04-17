@@ -25,7 +25,7 @@ import {
 
 export class KvdbApi extends BaseApi {
     constructor(
-        protected native: KvdbApiNative,
+        private native: KvdbApiNative,
         ptr: number,
     ) {
         super(ptr);
