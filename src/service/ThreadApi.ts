@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi";
-import { ThreadApiNative } from "../api/ThreadApiNative";
+import { ThreadApiNative } from "../native/ThreadApiNative";
 import {
     PagingQuery,
     PagingList,

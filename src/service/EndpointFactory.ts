@@ -9,35 +9,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Api } from "../api/Api";
-import { ApiStatic } from "../api/ApiStatic";
-import { ConnectionNative } from "../api/ConnectionNative";
-import { CryptoApiNative } from "../api/CryptoApiNative";
-import { EventApiNative } from "../api/EventApiNative";
-import { EventQueueNative } from "../api/EventQueueNative";
-import { InboxApiNative } from "../api/InboxApiNative";
-import { KvdbApiNative } from "../api/KvdbApiNative";
-import { StoreApiNative } from "../api/StoreApiNative";
-import { StreamApiNative } from "../api/StreamApiNative";
-import { ThreadApiNative } from "../api/ThreadApiNative";
+import { Api } from "../native/Api";
+import { ConnectionNative } from "../native/ConnectionNative";
 import { FinalizationHelper } from "../FinalizationHelper";
 import { PKIVerificationOptions } from "../Types";
-import { AudioManager } from "../webStreams/AudioManager";
-import { DataChannelCryptor } from "../webStreams/DataChannelCryptor";
-import { DataChannelSession } from "../webStreams/DataChannelSession";
-import { E2eeTransformManager } from "../webStreams/E2eeTransformManager";
-import { E2eeWorker } from "../webStreams/E2eeWorker";
-import { StateChangeDispatcher } from "../webStreams/EventDispatcher";
-import { KeyStore } from "../webStreams/KeyStore";
-import { KeySyncManager } from "../webStreams/KeySyncManager";
-import { PeerConnectionFactory } from "../webStreams/PeerConnectionFactory";
-import { PeerConnectionManager } from "../webStreams/PeerConnectionManager";
-import { PublisherManager } from "../webStreams/PublisherManager";
-import { RemoteStreamListenerRegistry } from "../webStreams/RemoteStreamListenerRegistry";
-import { SubscriberManager } from "../webStreams/SubscriberManager";
-import { WebRtcClient } from "../webStreams/WebRtcClient";
-import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
-import { SessionId } from "../webStreams/PeerConnectionManager";
 import { Connection } from "./Connection";
 import { CryptoApi } from "./CryptoApi";
 import { EventApi } from "./EventApi";
@@ -47,6 +22,9 @@ import { KvdbApi } from "./KvdbApi";
 import { StoreApi } from "./StoreApi";
 import { StreamApi } from "./StreamApi";
 import { ThreadApi } from "./ThreadApi";
+import { GlobalContainer, ConnectionContainer } from "../ioc/Container";
+import { T } from "../ioc/Tokens";
+import { registerGlobalServices, registerConnectionServices } from "../ioc/buildConnectionApis";
 import { setGlobalEmCrypto } from "../crypto/index";
 
 /**
@@ -54,22 +32,49 @@ import { setGlobalEmCrypto } from "../crypto/index";
  */
 declare function endpointWasmModule(): Promise<any>; // Provided by emscripten js glue code
 
+export interface EndpointSetupOptions {
+    assetsBasePath?: string;
+    workerCount?: number;
+}
+
 /**
  * Contains static factory methods - generators for Connection and APIs.
  */
 export class EndpointFactory {
-    private static api: Api;
-    private static eventQueueInstance: EventQueue;
+    private static globalContainer: GlobalContainer;
     private static assetsBasePath: string;
+    private static api: Api;
+
+    // Per-Connection containers, keyed by the Connection instance.
+    // WeakMap ensures no memory leak when a Connection is garbage-collected.
+    private static readonly connectionContainers = new WeakMap<Connection, ConnectionContainer>();
 
     /**
      * Load the Endpoint's WASM assets and initialize the Endpoint library.
      *
-     * @param {string} [assetsBasePath] base path/url to the Endpoint's WebAssembly assets (like: endpoint-wasm-module.js, driver-web-context.js and others)
+     * @param {string | EndpointSetupOptions} [options] either a base path string (legacy) or an options object
+     * @param {string} [options.assetsBasePath] base path/url to the Endpoint's WebAssembly assets
+     * @param {number} [options.workerCount] number of async-engine worker threads (default: 4, minimum: 2)
      */
-    public static async setup(assetsBasePath?: string): Promise<void> {
+    public static async setup(options?: string | EndpointSetupOptions): Promise<void> {
+        const resolved: EndpointSetupOptions =
+            typeof options === "object" && options !== null
+                ? options
+                : { assetsBasePath: options as string | undefined };
+        const { assetsBasePath, workerCount } = resolved;
+
         const basePath = this.resolveAssetsBasePath(assetsBasePath);
         this.assetsBasePath = basePath;
+
+        // Must be set before endpointWasmModule() is called — the C++ AsyncEngine
+        // constructor reads this global during WASM module initialization (on the
+        // worker thread), before the main thread gets control back.
+        if (workerCount !== undefined) {
+            (window as unknown as Record<string, unknown>).__privmxWorkerCount = Math.max(
+                2,
+                Math.floor(workerCount),
+            );
+        }
 
         setGlobalEmCrypto();
         const assets = ["endpoint-wasm-module.js"];
@@ -128,8 +133,10 @@ export class EndpointFactory {
      */
     private static init(lib: any) {
         this.api = new Api(lib);
-        ApiStatic.init(this.api);
         FinalizationHelper.init(lib);
+
+        this.globalContainer = new GlobalContainer();
+        registerGlobalServices(this.globalContainer, this.api, this.assetsBasePath);
     }
 
     /**
@@ -138,12 +145,19 @@ export class EndpointFactory {
      * @returns {EventQueue} instance of EventQueue
      */
     static async getEventQueue(): Promise<EventQueue> {
-        if (!this.eventQueueInstance) {
-            const nativeApi = new EventQueueNative(this.api);
-            const ptr = await nativeApi.newEventQueue();
-            this.eventQueueInstance = new EventQueue(nativeApi, ptr);
-        }
-        return this.eventQueueInstance;
+        return this.globalContainer.resolve<EventQueue>(T.EventQueue);
+    }
+
+    /**
+     * Creates a standalone instance of the Crypto API.
+     *
+     * CryptoApi is stateless and connection-independent; the same instance is
+     * returned on every call (singleton within the global container).
+     *
+     * @returns {CryptoApi} instance of CryptoApi
+     */
+    static async createCryptoApi(): Promise<CryptoApi> {
+        return this.globalContainer.resolve<CryptoApi>(T.CryptoApi);
     }
 
     private static generateDefaultPKIVerificationOptions(): PKIVerificationOptions {
@@ -151,6 +165,21 @@ export class EndpointFactory {
             bridgeInstanceId: undefined,
             bridgePubKey: undefined,
         };
+    }
+
+    /**
+     * Returns (creating if necessary) the connection-scoped container for the
+     * given `Connection` instance.  All per-connection API singletons live here.
+     */
+    private static getConnectionContainer(connection: Connection): ConnectionContainer {
+        let c = this.connectionContainers.get(connection);
+        if (!c) {
+            c = new ConnectionContainer();
+            c.registerValue(T.ConnectionPtr, connection);
+            registerConnectionServices(c, this.api, this.assetsBasePath);
+            this.connectionContainers.set(connection, c);
+        }
+        return c;
     }
 
     /**
@@ -207,201 +236,70 @@ export class EndpointFactory {
      * Creates an instance of the Thread API.
      *
      * @param {Connection} connection instance of Connection
-     *
      * @returns {ThreadApi} instance of ThreadApi
      */
     static async createThreadApi(connection: Connection): Promise<ThreadApi> {
-        if ("threads" in connection.apisRefs) {
-            throw new Error("ThreadApi already registered for given connection.");
-        }
-        const nativeApi = new ThreadApiNative(this.api);
-        const ptr = await nativeApi.newApi(connection.servicePtr);
-        await nativeApi.create(ptr, []);
-        connection.apisRefs["threads"] = { _apiServicePtr: ptr };
-        connection.nativeApisDeps["threads"] = nativeApi;
-        return new ThreadApi(nativeApi, ptr);
+        return this.getConnectionContainer(connection).resolve<ThreadApi>(T.ThreadApi);
     }
 
     /**
      * Creates an instance of the Store API.
      *
      * @param {Connection} connection instance of Connection
-     *
      * @returns {StoreApi} instance of StoreApi
      */
     static async createStoreApi(connection: Connection): Promise<StoreApi> {
-        if ("stores" in connection.apisRefs) {
-            throw new Error("StoreApi already registered for given connection.");
-        }
-        const nativeApi = new StoreApiNative(this.api);
-        const ptr = await nativeApi.newApi(connection.servicePtr);
-        connection.apisRefs["stores"] = { _apiServicePtr: ptr };
-        connection.nativeApisDeps["stores"] = nativeApi;
-        await nativeApi.create(ptr, []);
-        return new StoreApi(nativeApi, ptr);
+        return this.getConnectionContainer(connection).resolve<StoreApi>(T.StoreApi);
     }
 
     /**
      * Creates an instance of the Inbox API.
      *
+     * ThreadApi and StoreApi are resolved automatically from the connection container.
+     *
      * @param {Connection} connection instance of Connection
-     * @param {ThreadApi} threadApi instance of ThreadApi
-     * @param {StoreApi} storeApi instance of StoreApi
+     * @param {ThreadApi} [_threadApi] ignored — kept for backwards-compatible signature
+     * @param {StoreApi} [_storeApi] ignored — kept for backwards-compatible signature
      * @returns {InboxApi} instance of InboxApi
      */
     static async createInboxApi(
         connection: Connection,
-        threadApi: ThreadApi,
-        storeApi: StoreApi,
+        _threadApi?: ThreadApi,
+        _storeApi?: StoreApi,
     ): Promise<InboxApi> {
-        if ("inboxes" in connection.apisRefs) {
-            throw new Error("InboxApi already registered for given connection.");
-        }
-        const nativeApi = new InboxApiNative(this.api);
-        const ptr = await nativeApi.newApi(
-            connection.servicePtr,
-            threadApi.servicePtr,
-            storeApi.servicePtr,
-        );
-        await nativeApi.create(ptr, []);
-        connection.apisRefs["inboxes"] = { _apiServicePtr: ptr };
-        connection.nativeApisDeps["inboxes"] = nativeApi;
-
-        return new InboxApi(nativeApi, ptr);
+        return this.getConnectionContainer(connection).resolve<InboxApi>(T.InboxApi);
     }
 
     /**
      * Creates an instance of the Kvdb API.
      *
      * @param {Connection} connection instance of Connection
-     *
      * @returns {KvdbApi} instance of KvdbApi
      */
     static async createKvdbApi(connection: Connection): Promise<KvdbApi> {
-        if ("kvdbs" in connection.apisRefs) {
-            throw new Error("KvdbApi already registered for given connection.");
-        }
-        const nativeApi = new KvdbApiNative(this.api);
-        const ptr = await nativeApi.newApi(connection.servicePtr);
-        await nativeApi.create(ptr, []);
-        connection.apisRefs["kvdbs"] = { _apiServicePtr: ptr };
-        connection.nativeApisDeps["kvdbs"] = nativeApi;
-        return new KvdbApi(nativeApi, ptr);
-    }
-
-    /**
-     * Creates an instance of the Crypto API.
-     *
-     * @returns {CryptoApi} instance of CryptoApi
-     */
-    static async createCryptoApi(): Promise<CryptoApi> {
-        const nativeApi = new CryptoApiNative(this.api);
-        const ptr = await nativeApi.newApi();
-        await nativeApi.create(ptr, []);
-        return new CryptoApi(nativeApi, ptr);
+        return this.getConnectionContainer(connection).resolve<KvdbApi>(T.KvdbApi);
     }
 
     /**
      * Creates an instance of 'EventApi'.
      *
      * @param connection instance of 'Connection'
-     *
      * @returns {EventApi} instance of EventApi
      */
     static async createEventApi(connection: Connection): Promise<EventApi> {
-        if ("events" in connection.apisRefs) {
-            throw new Error("EventApi already registered for given connection.");
-        }
-        const nativeApi = new EventApiNative(this.api);
-        const ptr = await nativeApi.newApi(connection.servicePtr);
-        await nativeApi.create(ptr, []);
-        connection.apisRefs["events"] = { _apiServicePtr: ptr };
-        connection.nativeApisDeps["events"] = nativeApi;
-        return new EventApi(nativeApi, ptr);
+        return this.getConnectionContainer(connection).resolve<EventApi>(T.EventApi);
     }
 
     /**
      * Creates an instance of the Stream API.
      *
+     * EventApi is resolved automatically from the connection container.
+     *
      * @param {Connection} connection instance of Connection
-     * @param {EventApi} eventApi instance of EventApi
-     * @param {StoreApi} storeApi instance of StoreApi
+     * @param {EventApi} [_eventApi] ignored — kept for backwards-compatible signature
      * @returns {StreamApi} instance of StreamApi
      */
-    static async createStreamApi(connection: Connection, eventApi: EventApi): Promise<StreamApi> {
-        if ("streams" in connection.apisRefs) {
-            throw new Error("StreamApi already registered for given connection.");
-        }
-
-        const assetsDir = this.assetsBasePath;
-
-        // Build isolated WebRTC sub-graph for this streaming session.
-        const keyStore = new KeyStore();
-        const dispatcher = new StateChangeDispatcher();
-        const registry = new RemoteStreamListenerRegistry();
-        const cryptor = new DataChannelCryptor(keyStore);
-        const dataChannelSession = new DataChannelSession(cryptor);
-
-        // E2eeWorker RMS callback resolves AudioManager lazily (built below).
-        let audioManager: AudioManager | undefined;
-        const e2eeWorker = new E2eeWorker(assetsDir, (publisherId, rms) => {
-            audioManager?.onRemoteFrameRms(publisherId, rms);
-        });
-        const e2eeTransform = new E2eeTransformManager(e2eeWorker);
-        audioManager = new AudioManager(assetsDir, (rms) => e2eeWorker.sendRms(rms));
-
-        // PeerConnectionFactory.onRemoteTrack resolves SubscriberManager lazily.
-        let subscriber: SubscriberManager | undefined;
-        const pcFactory = new PeerConnectionFactory(
-            dispatcher,
-            dataChannelSession,
-            e2eeTransform,
-            registry,
-            async (roomId, event) => {
-                if (!subscriber) throw new Error("SubscriberManager not yet constructed");
-                return subscriber.onRemoteTrack(roomId, event);
-            },
-        );
-
-        // PeerConnectionManager.onTrickle resolves WebRtcClient lazily.
-        let webRtcClient: WebRtcClient | undefined;
-        const pcm = new PeerConnectionManager(
-            (room, streamHandle) => pcFactory.create(room, streamHandle),
-            (sessionId, candidate) => {
-                if (!webRtcClient) throw new Error("WebRtcClient not yet constructed");
-                return webRtcClient.trickle(sessionId as SessionId, candidate);
-            },
-        );
-
-        const publisher = new PublisherManager(pcm, audioManager, e2eeTransform);
-        subscriber = new SubscriberManager(pcm, e2eeTransform, registry);
-        const keys = new KeySyncManager(keyStore, e2eeWorker);
-
-        webRtcClient = new WebRtcClient(
-            publisher,
-            subscriber,
-            dataChannelSession,
-            keys,
-            dispatcher,
-            registry,
-            pcFactory,
-            audioManager,
-            e2eeWorker,
-        );
-
-        const webRtcInterfaceImpl = new WebRtcInterfaceImpl(webRtcClient);
-        const nativeApi = new StreamApiNative(this.api, webRtcInterfaceImpl);
-        const ptr = await nativeApi.newApi(connection.servicePtr, eventApi.servicePtr);
-
-        webRtcClient.bindApiInterface({
-            trickle: (sessionId, candidate) => nativeApi.trickle(ptr, [sessionId, candidate]),
-            acceptOffer: (sessionId, sdp) =>
-                nativeApi.acceptOfferOnReconfigure(ptr, [sessionId, sdp]),
-        });
-
-        await nativeApi.create(ptr, []);
-        connection.apisRefs["streams"] = { _apiServicePtr: ptr };
-        connection.nativeApisDeps["streams"] = nativeApi;
-        return new StreamApi(nativeApi, ptr, webRtcClient);
+    static async createStreamApi(connection: Connection, _eventApi?: EventApi): Promise<StreamApi> {
+        return this.getConnectionContainer(connection).resolve<StreamApi>(T.StreamApi);
     }
 }

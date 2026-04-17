@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi";
-import { EventQueueNative } from "../api/EventQueueNative";
+import { EventQueueNative } from "../native/EventQueueNative";
 import { Event } from "../Types";
 
 export class EventQueue extends BaseApi {
