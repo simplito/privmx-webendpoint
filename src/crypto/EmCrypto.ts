@@ -23,7 +23,7 @@ import RIPEMD160 = require("ripemd160");
 const subtle =
     typeof crypto !== "undefined"
         ? crypto.subtle
-        : (globalThis as unknown as { crypto?: { subtle?: SubtleCrypto } }).crypto?.subtle!;
+        : (globalThis as unknown as { crypto?: { subtle?: SubtleCrypto } }).crypto?.subtle;
 
 interface KeyRegistryEntry {
     key: CryptoKey;
@@ -491,7 +491,7 @@ export class EmCrypto {
         if (params.password instanceof CryptoKey) {
             key = params.password;
         } else {
-            const passwordStr = params.password as string;
+            const passwordStr = params.password;
             key = await subtle.importKey(
                 "raw",
                 new Uint8Array(Buffer.from(passwordStr, "utf-8")) as unknown as BufferSource,
@@ -569,9 +569,7 @@ export class EmCrypto {
             ["sign"],
         );
         const keyPair = EC.keyFromPrivate(Buffer.from(privateKey as unknown as Uint8Array));
-        const s = <elliptic.ec.Signature & { recoveryParam: number }>(
-            keyPair.sign(Buffer.from(params.data))
-        );
+        const s = keyPair.sign(Buffer.from(params.data));
         const compact = 27 + s.recoveryParam;
         const buffer = Buffer.alloc(65);
         buffer.writeUInt8(compact, 0);
