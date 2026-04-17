@@ -10,29 +10,38 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi";
-import { ConnectionNative } from "../api/ConnectionNative";
+import { ConnectionNative } from "../native/ConnectionNative";
 import {
     PagingQuery,
     PagingList,
     Context,
     UserInfo,
-    PKIVerificationOptions,
     ConnectionEventType,
     ConnectionEventSelectorType,
 } from "../Types";
-import { BaseNative } from "../api/BaseNative";
+import { BaseNative } from "../native/BaseNative";
 import { UserVerifierInterface } from "./UserVerifierInterface";
 
 export class Connection extends BaseApi {
-    /**
-     * //doc-gen:ignore
-     */
-    apisRefs: { [apiId: string]: { _apiServicePtr: number } } = {};
+    private apisRefs: { [apiId: string]: { _apiServicePtr: number } } = {};
+    private nativeApisDeps: { [apiId: string]: BaseNative } = {};
+    private jsApiInstances: { [apiId: string]: BaseApi } = {};
 
     /**
      * //doc-gen:ignore
      */
-    nativeApisDeps: { [apiId: string]: BaseNative } = {};
+    registerApi(id: string, ptr: number, native: BaseNative, jsApi?: BaseApi): void {
+        this.apisRefs[id] = { _apiServicePtr: ptr };
+        this.nativeApisDeps[id] = native;
+        if (jsApi) this.jsApiInstances[id] = jsApi;
+    }
+
+    /**
+     * //doc-gen:ignore
+     */
+    hasApi(id: string): boolean {
+        return id in this.apisRefs;
+    }
 
     constructor(
         private native: ConnectionNative,
@@ -135,15 +144,11 @@ export class Connection extends BaseApi {
     }
 
     private async freeApis() {
-        console.warn("freeApis disabled for debugging purposes. Please re-enable");
-
-        // for (const apiId in this.apisRefs) {
-        //   if (this.nativeApisDeps[apiId]) {
-
-        //     await this.nativeApisDeps[apiId].deleteApi(
-        //       this.apisRefs[apiId]._apiServicePtr
-        //     );
-        //   }
-        // }
+        for (const apiId in this.apisRefs) {
+            this.jsApiInstances[apiId]?.destroyRefs();
+            if (this.nativeApisDeps[apiId]) {
+                await this.nativeApisDeps[apiId].deleteApi(this.apisRefs[apiId]._apiServicePtr);
+            }
+        }
     }
 }

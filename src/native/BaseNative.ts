@@ -26,8 +26,6 @@ export abstract class BaseNative {
         return this._api;
     }
 
-    protected abstract newApi(connectionPtr: number, ...apisPtrs: number[]): Promise<number>;
-
     abstract deleteApi(ptr: number): Promise<void>;
 
     protected deleteApiRef() {

@@ -23,7 +23,7 @@ import {
     StreamPublishResult,
     RemoteStreamListener,
 } from "../Types";
-import { StreamApiNative } from "../api/StreamApiNative";
+import { StreamApiNative } from "../native/StreamApiNative";
 
 /**
  * `StreamApi` is a class representing Endpoint's API for Stream Rooms.

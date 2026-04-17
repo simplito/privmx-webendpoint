@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi";
-import { CryptoApiNative } from "../api/CryptoApiNative";
+import { CryptoApiNative } from "../native/CryptoApiNative";
 import { BIP39 } from "../Types";
 
 export class CryptoApi extends BaseApi {

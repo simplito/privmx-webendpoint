@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi";
-import { EventApiNative } from "../api/EventApiNative";
+import { EventApiNative } from "../native/EventApiNative";
 import { EventsEventSelectorType, UserWithPubKey } from "../Types";
 
 export class EventApi extends BaseApi {
