@@ -30,7 +30,7 @@ export interface DecryptFromWireFormatParams {
 export interface ParsedEncryptedFrame {
     version: number;
     sequenceNumber: number;
-    keyId: string;
+    externalKeyId: string;
     iv: Uint8Array;
     ciphertext: Uint8Array;
     header: Uint8Array; // AAD
@@ -61,9 +61,9 @@ export class DataChannelCryptor {
     async encryptToWireFormat(params: EncryptToWireFormatParams): Promise<Uint8Array> {
         const { plaintext, sequenceNumber } = params;
         const internalKeyId = this.keyStore.getEncryptionKeyId();
-        const keyId = this.keyStore.getEncryptionExternalKeyId();
+        const externalKeyId = this.keyStore.getEncryptionExternalKeyId();
 
-        this.assertKeyId(keyId);
+        this.assertKeyId(externalKeyId);
 
         this.assertSequenceNumberValue(sequenceNumber);
 
@@ -71,7 +71,7 @@ export class DataChannelCryptor {
             throw new Error("sequenceNumber must be non-negative");
         }
 
-        const keyIdBytes = this.textEncoder.encode(keyId);
+        const keyIdBytes = this.textEncoder.encode(externalKeyId);
 
         if (keyIdBytes.length > 0xffff) {
             throw new Error(`keyId too long: ${keyIdBytes.length}`);
@@ -107,10 +107,10 @@ export class DataChannelCryptor {
         const parsed = this.parseEncryptedFrame(params.frame, params.lastSequenceNumber);
         this.logger.debug("decryptFromWireFormat", params, parsed);
 
-        if (!this.keyStore.hasKey(parsed.keyId)) {
+        if (!this.keyStore.hasKey(parsed.externalKeyId)) {
             throw new DataChannelCryptorError(
                 DataChannelCryptorDecryptStatus.KEY_NOT_FOUND,
-                `Key not found: ${parsed.keyId}`,
+                `Key not found: ${parsed.externalKeyId}`,
             );
         }
 
@@ -123,7 +123,7 @@ export class DataChannelCryptor {
             const tag = fullBuffer.slice(fullBuffer.length - GCM_TAG_LENGTH_BYTES);
 
             const decrypted = await CryptoFacade.aeadDecrypt(
-                this.keyStore.resolveKeyId(parsed.keyId),
+                this.keyStore.resolveKeyId(parsed.externalKeyId),
                 parsed.iv,
                 parsed.header,
                 data,
@@ -181,8 +181,8 @@ export class DataChannelCryptor {
         const keyIdBytes = frame.slice(offset, offset + keyIdLength);
         offset += keyIdLength;
 
-        const keyId = this.textDecoder.decode(keyIdBytes);
-        this.assertKeyId(keyId);
+        const externalKeyId = this.textDecoder.decode(keyIdBytes);
+        this.assertKeyId(externalKeyId);
 
         const ciphertext = frame.slice(offset);
 
@@ -191,7 +191,7 @@ export class DataChannelCryptor {
         return {
             version,
             sequenceNumber,
-            keyId,
+            externalKeyId,
             iv,
             ciphertext,
             header,

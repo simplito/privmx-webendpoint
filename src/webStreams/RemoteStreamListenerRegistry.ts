@@ -1,4 +1,5 @@
 import { RemoteStreamListener } from "../Types";
+import { Logger } from "./Logger";
 import { StreamRoomId } from "./types/ApiTypes";
 
 /**
@@ -11,6 +12,7 @@ import { StreamRoomId } from "./types/ApiTypes";
  */
 export class RemoteStreamListenerRegistry {
     private readonly listeners: Map<StreamRoomId, RemoteStreamListener[]> = new Map();
+    private readonly logger = new Logger();
 
     /**
      * Registers `listener` for the room and optional stream ID specified on the
@@ -40,7 +42,11 @@ export class RemoteStreamListenerRegistry {
         );
         for (const listener of filtered) {
             if (listener.onRemoteStreamTrack) {
-                listener.onRemoteStreamTrack(event);
+                try {
+                    listener.onRemoteStreamTrack(event);
+                } catch (e) {
+                    this.logger.error("onRemoteStreamTrack listener threw:", e);
+                }
             }
         }
     }
@@ -66,7 +72,11 @@ export class RemoteStreamListenerRegistry {
         );
         for (const listener of filtered) {
             if (listener.onRemoteData) {
-                listener.onRemoteData(data, statusCode);
+                try {
+                    listener.onRemoteData(data, statusCode);
+                } catch (e) {
+                    this.logger.error("onRemoteData listener threw:", e);
+                }
             }
         }
     }

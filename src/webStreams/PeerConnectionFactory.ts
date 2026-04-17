@@ -87,8 +87,10 @@ export class PeerConnectionFactory {
             this.logger.debug("RECV datachannel:", event.channel.id, event.channel.label);
             this.wireDataChannel(roomId, event.channel);
         });
-        pc.addEventListener("track", async (event) => {
-            await this.onRemoteTrack(roomId, event);
+        pc.addEventListener("track", (event) => {
+            this.onRemoteTrack(roomId, event).catch((e) => {
+                this.logger.error("onRemoteTrack failed:", e);
+            });
         });
 
         return pc;
@@ -107,26 +109,19 @@ export class PeerConnectionFactory {
                       ? new Uint8Array(raw)
                       : new Uint8Array(raw.buffer);
 
+            let decryptResult: { data: Uint8Array; statusCode: number };
             try {
                 const decrypted = await this.dataChannelSession.decrypt(remoteStreamId, frame);
-                this.listenerRegistry.dispatchData(
-                    roomId,
-                    remoteStreamId,
-                    decrypted.data,
-                    DataChannelCryptorDecryptStatus.OK,
-                );
+                decryptResult = { data: decrypted.data, statusCode: DataChannelCryptorDecryptStatus.OK };
             } catch (e) {
                 if (e instanceof DataChannelCryptorError) {
-                    this.listenerRegistry.dispatchData(
-                        roomId,
-                        remoteStreamId,
-                        new Uint8Array(),
-                        e.code,
-                    );
+                    decryptResult = { data: new Uint8Array(), statusCode: e.code };
                 } else {
-                    throw e;
+                    this.logger.error("Unexpected error decrypting data channel frame:", e);
+                    return;
                 }
             }
+            this.listenerRegistry.dispatchData(roomId, remoteStreamId, decryptResult.data, decryptResult.statusCode);
         };
     }
 }

@@ -45,11 +45,7 @@ export class SubscriberManager {
      */
     async onSubscriptionUpdated(room: StreamRoomId, offer: Jsep): Promise<void> {
         this.reconfigureQueue.enqueue({ room, jsep: offer });
-        try {
-            await this.reconfigureQueue.processAll();
-        } catch (e) {
-            console.error("Error processing subscriber reconfigure queue", e);
-        }
+        await this.reconfigureQueue.processAll();
     }
 
     /**
@@ -72,15 +68,17 @@ export class SubscriberManager {
     async onRemoteTrack(roomId: StreamRoomId, event: RTCTrackEvent): Promise<void> {
         const receiver = event.receiver;
         const publisherId = Number(event.streams[0].id);
-        const pc = this.pcm.getConnectionWithSession(roomId, "subscriber").pc;
+        const pc = this.pcm.getOrCreateConnection(roomId, "subscriber").pc;
 
         this.logger.debug("waitUntilConnected...");
         await this.waitUntilConnected(pc);
 
         this.logger.debug("setupReceiverTransform...");
         await this.e2eeTransformManager.setupReceiverTransform(receiver, publisherId);
-        event.track.addEventListener("ended", async () => {
-            await this.e2eeTransformManager.teardownReceiver(receiver);
+        event.track.addEventListener("ended", () => {
+            this.e2eeTransformManager.teardownReceiver(receiver).catch((e) => {
+                this.logger.error("teardownReceiver failed:", e);
+            });
         });
 
         this.listenerRegistry.dispatchTrack(roomId, event);
@@ -122,29 +120,41 @@ export class SubscriberManager {
         if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
             return Promise.resolve();
         }
+        if (
+            pc.iceConnectionState === "failed" ||
+            pc.connectionState === "failed" ||
+            pc.connectionState === "closed"
+        ) {
+            return Promise.reject(new Error("ICE/DTLS not connected"));
+        }
         return new Promise<void>((resolve, reject) => {
+            const cleanup = () => {
+                pc.removeEventListener("iceconnectionstatechange", onChange);
+                pc.removeEventListener("connectionstatechange", onChange);
+            };
             const onChange = () => {
                 if (
                     pc.iceConnectionState === "connected" ||
                     pc.iceConnectionState === "completed"
                 ) {
-                    pc.removeEventListener("iceconnectionstatechange", onChange);
+                    cleanup();
                     resolve();
                 } else if (
                     pc.iceConnectionState === "failed" ||
                     pc.connectionState === "failed" ||
                     pc.connectionState === "closed"
                 ) {
-                    pc.removeEventListener("iceconnectionstatechange", onChange);
+                    cleanup();
                     reject(new Error("ICE/DTLS not connected"));
                 }
             };
             pc.addEventListener("iceconnectionstatechange", onChange);
+            pc.addEventListener("connectionstatechange", onChange);
         });
     }
 
     private async reconfigureSingle(room: StreamRoomId, offer: Jsep): Promise<void> {
-        const pc = this.pcm.getConnectionWithSession(room, "subscriber").pc;
+        const pc = this.pcm.getOrCreateConnection(room, "subscriber").pc;
 
         // Create a bootstrap data channel on every reconfigure so that Janus
         // sees the data-channel m= line in each offer/answer exchange.

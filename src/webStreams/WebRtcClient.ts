@@ -151,7 +151,7 @@ export class WebRtcClient {
      * publisher peer connection for `streamRoomId`.
      */
     removeSenderPeerConnectionOnUnpublish(streamRoomId: StreamRoomId, stream: MediaStream): void {
-        this.publisher.removeAndCleanup(streamRoomId, stream);
+        this.publisher.stopAndClose(streamRoomId, stream);
     }
 
     /**

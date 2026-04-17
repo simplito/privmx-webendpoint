@@ -30,7 +30,7 @@ export class PublisherManager {
         dataTracks?: StreamTrack[],
     ): Promise<RTCPeerConnection> {
         this.pcm.initialize(streamRoomId, "publisher", -1 as SessionId, streamHandle);
-        const pc = this.pcm.getConnectionWithSession(streamRoomId, "publisher").pc;
+        const pc = this.pcm.getOrCreateConnection(streamRoomId, "publisher").pc;
 
         if (stream && stream.getTracks().length > 0) {
             for (const track of stream.getTracks()) {
@@ -70,7 +70,7 @@ export class PublisherManager {
         tracksToRemove: MediaStreamTrack[],
     ): Promise<RTCPeerConnection> {
         this.pcm.initialize(streamRoomId, "publisher");
-        const pc = this.pcm.getConnectionWithSession(streamRoomId, "publisher").pc;
+        const pc = this.pcm.getOrCreateConnection(streamRoomId, "publisher").pc;
 
         for (const track of tracksToAdd) {
             if (track.kind === "audio") {
@@ -97,7 +97,7 @@ export class PublisherManager {
      * @throws if `createOffer` returns no SDP.
      */
     async createOffer(roomId: StreamRoomId): Promise<string> {
-        const pc = this.pcm.getConnectionWithSession(roomId, "publisher").pc;
+        const pc = this.pcm.getOrCreateConnection(roomId, "publisher").pc;
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
         if (!offer.sdp) throw new Error("createOffer returned no SDP");
@@ -108,7 +108,7 @@ export class PublisherManager {
      * Sets the remote SDP answer on the publisher connection for `roomId`.
      */
     async setRemoteDescription(roomId: StreamRoomId, sdp: string, type: RTCSdpType): Promise<void> {
-        const pc = this.pcm.getConnectionWithSession(roomId, "publisher").pc;
+        const pc = this.pcm.getOrCreateConnection(roomId, "publisher").pc;
         await pc.setRemoteDescription(new RTCSessionDescription({ sdp, type }));
     }
 
@@ -116,7 +116,7 @@ export class PublisherManager {
      * Stops audio level metering for all audio tracks in `stream` and closes
      * the publisher peer connection for `streamRoomId`.
      */
-    removeAndCleanup(streamRoomId: StreamRoomId, stream: MediaStream): void {
+    stopAndClose(streamRoomId: StreamRoomId, stream: MediaStream): void {
         for (const track of stream.getAudioTracks()) {
             this.audioManager.stopLocalAudioLevelMeter(track);
         }

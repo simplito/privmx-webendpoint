@@ -55,6 +55,7 @@ export class Queue<T> {
                 await func(item);
             } catch (err) {
                 console.error("Error while processing queue item", itemId, err);
+                throw err;
             }
         }
     }

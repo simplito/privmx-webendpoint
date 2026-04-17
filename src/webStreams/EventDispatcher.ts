@@ -36,7 +36,7 @@ export class StateChangeDispatcher {
      * Removes all listeners whose `streamHandle` equals `filter.streamHandle`.
      */
     removeOnStateChangeListener(filter: StateChangeFilter): void {
-        for (const value of this.listeners.values()) {
+        for (const value of [...this.listeners]) {
             if (value.filter.streamHandle === filter.streamHandle) {
                 this.listeners.delete(value);
             }
@@ -49,7 +49,11 @@ export class StateChangeDispatcher {
     emit(event: StateChangeEvent): void {
         for (const { filter, listener } of this.listeners) {
             if (filter.streamHandle === event.streamHandle) {
-                listener(event);
+                try {
+                    listener(event);
+                } catch (e) {
+                    console.error("StateChangeListener threw:", e);
+                }
             }
         }
     }

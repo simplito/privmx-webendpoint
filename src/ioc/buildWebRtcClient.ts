@@ -28,7 +28,7 @@ import { T } from "./Tokens";
  */
 export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
     const keyStore = await c.resolve<KeyStore>(T.KeyStore);
-    const dataChannel = await c.resolve<DataChannelSession>(T.DataChannelSession);
+    const dataChannelSession = await c.resolve<DataChannelSession>(T.DataChannelSession);
     const dispatcher = await c.resolve<StateChangeDispatcher>(T.StateChangeDispatcher);
     const registry = await c.resolve<RemoteStreamListenerRegistry>(T.ListenerRegistry);
     const e2eeTransform = await c.resolve<E2eeTransformManager>(T.E2eeTransformManager);
@@ -39,7 +39,7 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
     // onRemoteTrack fires during a live call; SubscriberManager is resolved lazily.
     const pcFactory = new PeerConnectionFactory(
         dispatcher,
-        dataChannel,
+        dataChannelSession,
         e2eeTransform,
         registry,
         async (roomId, event) => {
@@ -65,7 +65,7 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
     const client = new WebRtcClient(
         publisher,
         subscriber,
-        dataChannel,
+        dataChannelSession,
         keys,
         dispatcher,
         registry,
@@ -110,9 +110,9 @@ export function registerWebRtcServices(c: WebRtcContainer): void {
     c.registerSingleton(T.E2eeWorker, async (c) => {
         const assetsDir = await c.resolve<string>(T.AssetsBasePath);
         return new E2eeWorker(assetsDir, (publisherId, rms) => {
-            c.resolve<AudioManager>(T.AudioManager).then((am) =>
-                am.onRemoteFrameRms(publisherId, rms),
-            );
+            c.resolve<AudioManager>(T.AudioManager)
+                .then((am) => am.onRemoteFrameRms(publisherId, rms))
+                .catch((e) => console.error("onRemoteFrameRms failed:", e));
         });
     });
 

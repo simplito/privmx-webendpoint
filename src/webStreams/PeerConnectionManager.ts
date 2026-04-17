@@ -117,7 +117,7 @@ export class PeerConnectionManager {
      * Returns the `JanusConnection` for `room` / `connectionType`, creating it
      * first (with session ID `-1`) if it does not exist yet.
      */
-    getConnectionWithSession(room: StreamRoomId, connectionType: ConnectionType): JanusConnection {
+    getOrCreateConnection(room: StreamRoomId, connectionType: ConnectionType): JanusConnection {
         if (!this.hasConnection(room, connectionType)) {
             this.initialize(room, connectionType);
         }

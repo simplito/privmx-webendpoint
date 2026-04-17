@@ -614,3 +614,71 @@ A review of every JSDoc comment against its implementation found the following d
 
 **`PeerConnectionManager.hasConnection` — "live" was imprecise**
 - Doc said "a live peer connection exists". The implementation checks for a registered object reference — a `closed` `RTCPeerConnection` is still truthy. Changed to "a peer connection is registered" with a note that it may be in any state including `"closed"`.
+
+---
+
+## TypeScript config — IDE / build split
+
+**`tsconfig.json`** — repurposed as the VS Code IDE config
+- Removed `exclude` entries for `**/__tests__` and `**/__mocks__`; now covers all files under `src/` so the TypeScript language service picks up `@types/jest` and resolves test-file symbols without errors.
+- `references` array removed (project references approach abandoned — circular `extends` + `references` produced TS6305 / TS6310 errors).
+
+**`tsconfig.build.json`** — new file
+- Extends `tsconfig.json`; re-adds `**/__tests__` and `**/__mocks__` exclusions so the production compile (`tsc`) does not emit test files.
+
+**`tsconfig.test.json`**
+- Simplified to only extend `tsconfig.json` and add `"types": ["jest", "node"]`; used by ts-jest via `jest.config.js`.
+
+**`package.json`**
+- `"compile"` and `"watch:types"` scripts changed to use `--project tsconfig.build.json`, keeping the production build free of test files.
+
+---
+
+## Fix — async error handling and race conditions in `webStreams/`
+
+### `Queue.ts` — propagate processor errors to callers
+
+- `drain()` now re-throws after logging so `processAll()` propagates the failure to its awaiter instead of silently swallowing it. Previously a processor error left the queue in a half-drained state with no signal to the caller.
+
+### `EventDispatcher.ts` — Set mutation safety and listener isolation
+
+- `removeOnStateChangeListener`: iteration changed to `for (const value of [...this.listeners])` — snapshots the Set before the loop so in-loop `delete` calls cannot corrupt the iterator.
+- `emit`: each listener call wrapped in `try/catch`; a throwing listener no longer aborts delivery to subsequent listeners.
+
+### `RemoteStreamListenerRegistry.ts` — user callback isolation
+
+- `dispatchTrack` and `dispatchData`: each `listener.onRemoteStreamTrack` / `listener.onRemoteData` call wrapped in `try/catch` with `this.logger.error(...)`. A user callback throwing an unhandled error no longer propagates into the WebRTC event pipeline and silently drops events for all subsequent listeners.
+
+### `PeerConnectionFactory.ts` — unhandled rejections in event handlers
+
+- `track` event handler: changed from `async (event) => { await this.onRemoteTrack(...) }` to a synchronous handler that calls `.catch()` on the returned promise. The previous form left the promise unhandled when `onRemoteTrack` rejected, producing unhandled rejection warnings and silently swallowing errors.
+- `dc.onmessage`: restructured the decrypt-then-dispatch flow so that `dispatchData` is only reachable after decrypt succeeds or produces a typed `DataChannelCryptorError`. Unknown errors now `return` early (logged) instead of falling through to dispatch with an undefined result.
+
+### `SubscriberManager.ts` — async event handler and ICE wait race
+
+- `track` `"ended"` handler: changed from `async () => { await this.e2eeTransformManager.teardownReceiver(...) }` to a synchronous handler that calls `.catch()` — same unhandled-rejection pattern as `PeerConnectionFactory`.
+- `waitUntilConnected`: fixed a race condition where only `iceconnectionstatechange` was listened to. `connectionState === "failed"` and `connectionState === "closed"` are driven by the separate `connectionstatechange` event; the old implementation could wait forever when the connection closed without going through the ICE failed state. Fix: both `iceconnectionstatechange` and `connectionstatechange` events are now listened to; the shared `cleanup()` helper removes both on resolution or rejection; an early synchronous check on `connectionState` rejects immediately if the PC is already failed/closed before the promise is constructed.
+
+### `buildWebRtcClient.ts` — fire-and-forget RMS callback
+
+- The `E2eeWorker` RMS callback resolved `AudioManager` and called `onRemoteFrameRms` but had no `.catch()`. Any resolution or downstream error produced an unhandled rejection. Added `.catch((e) => console.error("onRemoteFrameRms failed:", e))`.
+
+---
+
+## Rename — disambiguate names in `webStreams/` and IoC layer
+
+**`PeerConnectionManager.ts`, `PublisherManager.ts`, `SubscriberManager.ts`**
+- `getConnectionWithSession` → `getOrCreateConnection`. The old name implied a pure getter; the method creates a new `JanusConnection` (with session ID `-1`) when none exists — it is a get-or-create operation.
+
+**`PublisherManager.ts`, `WebRtcClient.ts`**
+- `removeAndCleanup` → `stopAndClose`. The old name was a vague pair of verbs. `stopAndClose` is concrete: it stops audio level metering and closes the peer connection.
+
+**`DataChannelCryptor.ts`**
+- `ParsedEncryptedFrame.keyId` → `ParsedEncryptedFrame.externalKeyId`. The field holds the wire-format key ID decoded from a received frame; `keyId` was ambiguous against the internal `CryptoFacade` registry key. Consistent with the `getEncryptionExternalKeyId()` / `resolveKeyId()` naming already established in `KeyStore`.
+- Local `keyId` in `encryptToWireFormat` and `parseEncryptedFrame` renamed to `externalKeyId` for the same reason.
+
+**`buildWebRtcClient.ts`**
+- Local `dataChannel` → `dataChannelSession`. The variable holds a `DataChannelSession` instance; the old name looked like a native `RTCDataChannel` reference.
+
+**`PeerConnectionFactory.ts`**
+- Local `result` in `dc.onmessage` → `decryptResult`. `result` was too generic in a function that decrypts then dispatches; the rename makes the variable's role — holding the decrypt outcome — explicit.
