@@ -19,7 +19,7 @@ import { secp256k1 as secp } from "@noble/curves/secp256k1.js";
 const subtle =
     typeof crypto !== "undefined"
         ? crypto.subtle
-        : (globalThis as unknown as { crypto?: { subtle?: SubtleCrypto } }).crypto?.subtle!;
+        : (globalThis as unknown as { crypto?: { subtle?: SubtleCrypto } }).crypto?.subtle;
 
 const textEncoder = new TextEncoder();
 
@@ -553,7 +553,7 @@ export class EmCrypto {
         if (params.password instanceof CryptoKey) {
             key = params.password;
         } else {
-            const passwordStr = params.password as string;
+            const passwordStr = params.password;
             key = await subtle.importKey(
                 "raw",
                 textEncoder.encode(passwordStr) as unknown as BufferSource,

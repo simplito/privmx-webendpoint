@@ -13,10 +13,7 @@ export function toArrayBuffer(buffer: Uint8Array | ArrayBuffer): ArrayBuffer {
     if (buffer instanceof ArrayBuffer) {
         return buffer;
     }
-    return buffer.buffer.slice(
-        buffer.byteOffset,
-        buffer.byteOffset + buffer.byteLength,
-    ) as ArrayBuffer;
+    return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
 }
 
 export function toBuffer(byteArray: ArrayBuffer | Uint8Array): Uint8Array {
