@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi";
-import { InboxApiNative } from "../api/InboxApiNative";
+import { InboxApiNative } from "../native/InboxApiNative";
 import {
     PagingQuery,
     PagingList,

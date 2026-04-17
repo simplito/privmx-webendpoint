@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { BaseNative } from "../api/BaseNative";
+import { BaseNative } from "../native/BaseNative";
 
 export class BaseApi {
     private _servicePtr: number;
