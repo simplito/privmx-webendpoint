@@ -41,10 +41,14 @@ if ((self as unknown as { RTCTransformEvent: unknown }).RTCTransformEvent) {
             postError("onrtctransform: options is undefined");
             return;
         }
-
         const { operation, kind, id, publisherId } = options;
-        const context: TransformContext = { id, publisherId };
-        handleTransform(context, operation, kind, event.transformer.readable, event.transformer.writable);
+        handleTransform(
+            { id, publisherId },
+            operation,
+            kind ?? "video",
+            event.transformer.readable,
+            event.transformer.writable,
+        );
     };
 }
 

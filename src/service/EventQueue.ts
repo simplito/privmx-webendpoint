@@ -14,7 +14,7 @@ import { EventQueueNative } from "../native/EventQueueNative";
 import { Event } from "../Types";
 
 export class EventQueue extends BaseApi {
-    private deferedPromise: Promise<Event>;
+    private deferedPromise: Promise<Event> | null = null;
     constructor(
         private native: EventQueueNative,
         ptr: number,

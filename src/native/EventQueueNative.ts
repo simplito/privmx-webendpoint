@@ -13,9 +13,6 @@ import { Event } from "../Types";
 import { BaseNative } from "./BaseNative";
 
 export class EventQueueNative extends BaseNative {
-    protected async newApi(_connectionPtr: number): Promise<number> {
-        throw new Error("Use the newEventQueue() - specialized version of method instead.");
-    }
     async deleteApi(ptr: number): Promise<void> {
         await this.runAsync<void>((taskId) =>
             this.api.lib.EventQueue_deleteEventQueue(taskId, ptr),
