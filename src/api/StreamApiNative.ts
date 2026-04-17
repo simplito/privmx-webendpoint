@@ -241,10 +241,37 @@ export class StreamApiNative extends BaseNative {
 
     async trickle(ptr: number, args: [number, RTCIceCandidate]): Promise<void> {
         const [sessionId, candidate] = args;
-        const convertedArgs: [number, string] = [sessionId, JSON.stringify(candidate)];
+        const convertedArgs: [number, string] = [
+            sessionId,
+            StreamApiNative.serializeCandidate(candidate),
+        ];
         return this.runAsync<void>((taskId) =>
             this.api.lib.StreamApi_trickle(taskId, ptr, convertedArgs),
         );
+    }
+
+    /**
+     * Serializes an RTCIceCandidate to the JSON object expected by PrivMX Bridge.
+     * RTCIceCandidate.toJSON() only emits 4 fields; all properties are read directly
+     * from the object (the browser already parses the SDP string into typed fields).
+     */
+    private static serializeCandidate(c: RTCIceCandidate): string {
+        return JSON.stringify({
+            address: c.address,
+            candidate: c.candidate,
+            component: c.component,
+            foundation: c.foundation,
+            port: c.port,
+            priority: c.priority,
+            protocol: c.protocol,
+            relatedAddress: c.relatedAddress,
+            relatedPort: c.relatedPort,
+            sdpMLineIndex: c.sdpMLineIndex,
+            sdpMid: c.sdpMid,
+            tcpType: c.tcpType,
+            type: c.type,
+            usernameFragment: c.usernameFragment,
+        });
     }
 
     async acceptOfferOnReconfigure(ptr: number, args: [number, Jsep]): Promise<void> {

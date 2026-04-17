@@ -3,9 +3,8 @@ import { DataChannelCryptorDecryptStatus } from "../Types";
 import { KeyStore } from "./KeyStore";
 import { Logger } from "./Logger";
 
-const AES_GCM_KEY_LENGTH_BYTES = 32;
 const GCM_NONCE_LENGTH_BYTES = 12;
-const GCM_TAG_LENGTH_BITS = 128;
+const GCM_TAG_LENGTH_BYTES = 16;
 const VERSION_LENGTH_BYTES = 1;
 const KEY_ID_LENGTH_BYTES = 1;
 const SEQUENCE_NUMBER_LENGTH_BYTES = 4;
@@ -31,23 +30,40 @@ export interface DecryptFromWireFormatParams {
 export interface ParsedEncryptedFrame {
     version: number;
     sequenceNumber: number;
-    keyId: string;
+    externalKeyId: string;
     iv: Uint8Array;
     ciphertext: Uint8Array;
     header: Uint8Array; // AAD
 }
 
+/**
+ * Serialises and deserialises encrypted data channel frames.
+ *
+ * Wire format:
+ * ```
+ * [Version:1B][SeqNum:4B big-endian][IV:12B][KeyIdLen:1B][KeyId:Var][Ciphertext+Tag:Var]
+ * ```
+ * Everything before the ciphertext is used as AAD for AES-256-GCM.
+ * Sequence numbers are strictly increasing per remote stream for replay protection.
+ */
 export class DataChannelCryptor {
     private readonly textEncoder = new TextEncoder();
     private readonly textDecoder = new TextDecoder();
+    private readonly logger = new Logger();
 
     constructor(private keyStore: KeyStore) {}
 
+    /**
+     * Encrypts `params.plaintext` using the active session key and returns the
+     * complete wire-format frame including version, sequence number, IV, key ID,
+     * and AES-GCM ciphertext+tag.
+     */
     async encryptToWireFormat(params: EncryptToWireFormatParams): Promise<Uint8Array> {
         const { plaintext, sequenceNumber } = params;
-        const keyId = this.keyStore.getEncryptionKeyId();
+        const internalKeyId = this.keyStore.getEncryptionKeyId();
+        const externalKeyId = this.keyStore.getEncryptionExternalKeyId();
 
-        this.assertKeyId(keyId);
+        this.assertKeyId(externalKeyId);
 
         this.assertSequenceNumberValue(sequenceNumber);
 
@@ -55,7 +71,7 @@ export class DataChannelCryptor {
             throw new Error("sequenceNumber must be non-negative");
         }
 
-        const keyIdBytes = this.textEncoder.encode(keyId);
+        const keyIdBytes = this.textEncoder.encode(externalKeyId);
 
         if (keyIdBytes.length > 0xffff) {
             throw new Error(`keyId too long: ${keyIdBytes.length}`);
@@ -70,37 +86,44 @@ export class DataChannelCryptor {
             keyIdBytes,
         });
 
-        const encrypted = await CryptoFacade.aeadEncrypt(keyId, iv, header, plaintext);
+        const encrypted = await CryptoFacade.aeadEncrypt(internalKeyId, iv, header, plaintext);
 
         const ciphertext = new Uint8Array(encrypted);
 
         return this.concat(header, ciphertext);
     }
 
+    /**
+     * Parses and decrypts a wire-format frame, verifying the sequence number
+     * is strictly greater than `params.lastSequenceNumber` (replay protection).
+     *
+     * @returns the decrypted payload and the accepted sequence number.
+     * @throws `DataChannelCryptorError` on authentication failure, replay,
+     *         unrecognised key ID, or a malformed frame.
+     */
     async decryptFromWireFormat(
         params: DecryptFromWireFormatParams,
     ): Promise<{ data: Uint8Array; seq: number }> {
         const parsed = this.parseEncryptedFrame(params.frame, params.lastSequenceNumber);
-        const logger = new Logger();
-        logger.debug("decryptFromWireFormat", params, parsed);
+        this.logger.debug("decryptFromWireFormat", params, parsed);
 
-        if (!this.keyStore.hasKey(parsed.keyId)) {
+        if (!this.keyStore.hasKey(parsed.externalKeyId)) {
             throw new DataChannelCryptorError(
                 DataChannelCryptorDecryptStatus.KEY_NOT_FOUND,
-                `Key not found: ${parsed.keyId}`,
+                `Key not found: ${parsed.externalKeyId}`,
             );
         }
 
         try {
             const fullBuffer = parsed.ciphertext;
-            if (fullBuffer.length < 16) {
+            if (fullBuffer.length < GCM_TAG_LENGTH_BYTES) {
                 throw new Error("Ciphertext too short for tag");
             }
-            const data = fullBuffer.slice(0, fullBuffer.length - 16);
-            const tag = fullBuffer.slice(fullBuffer.length - 16);
+            const data = fullBuffer.slice(0, fullBuffer.length - GCM_TAG_LENGTH_BYTES);
+            const tag = fullBuffer.slice(fullBuffer.length - GCM_TAG_LENGTH_BYTES);
 
             const decrypted = await CryptoFacade.aeadDecrypt(
-                parsed.keyId,
+                this.keyStore.resolveKeyId(parsed.externalKeyId),
                 parsed.iv,
                 parsed.header,
                 data,
@@ -111,7 +134,7 @@ export class DataChannelCryptor {
         } catch {
             throw new DataChannelCryptorError(
                 DataChannelCryptorDecryptStatus.DECRYPT_AUTH_FAILED,
-                `Decryption failed (auth error)`,
+                "Decryption failed (auth error)",
             );
         }
     }
@@ -151,15 +174,15 @@ export class DataChannelCryptor {
         if (frame.length < headerLength) {
             throw new DataChannelCryptorError(
                 DataChannelCryptorDecryptStatus.FRAME_TRUNCATED,
-                `Frame truncated`,
+                "Frame truncated",
             );
         }
 
         const keyIdBytes = frame.slice(offset, offset + keyIdLength);
         offset += keyIdLength;
 
-        const keyId = this.textDecoder.decode(keyIdBytes);
-        this.assertKeyId(keyId);
+        const externalKeyId = this.textDecoder.decode(keyIdBytes);
+        this.assertKeyId(externalKeyId);
 
         const ciphertext = frame.slice(offset);
 
@@ -168,7 +191,7 @@ export class DataChannelCryptor {
         return {
             version,
             sequenceNumber,
-            keyId,
+            externalKeyId,
             iv,
             ciphertext,
             header,
