@@ -38,7 +38,7 @@ export class MockEventQueue {
 
     async emitBreakEvent() {
         return new Promise<void>((resolve) => {
-            resolve;
+            resolve();
         });
     }
 }

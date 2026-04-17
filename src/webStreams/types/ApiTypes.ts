@@ -5,12 +5,6 @@ export interface UserWithPubKey {
     key: string;
 }
 
-export interface ListQuery {
-    skip?: number;
-    limit?: number;
-    order?: string;
-}
-
 export interface StreamCreateMeta {
     mid?: string;
     description?: string;
@@ -21,12 +15,6 @@ export interface StreamCreateMeta {
 export interface StreamTrackCreateMeta {
     mid?: string;
     description?: string;
-}
-
-export interface StreamAndTracksSelector {
-    streamRoomId: StreamRoomId;
-    streamId: StreamId;
-    tracks?: StreamTrackId[];
 }
 
 export interface Stream {

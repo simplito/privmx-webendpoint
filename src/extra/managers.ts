@@ -67,7 +67,7 @@ export interface GenericEvent<K> extends Types.Event {
 }
 
 export abstract class BaseEventDispatcherManager {
-    private _listenersSymbols = new Map<Symbol, string>();
+    private _listenersSymbols = new Map<symbol, string>();
     private _listeners = new Map<string, EventCallback[]>();
 
     get listeners() {
@@ -87,7 +87,7 @@ export abstract class BaseEventDispatcherManager {
         }
     }
 
-    unregisterCallback(symbol: Symbol) {
+    unregisterCallback(symbol: symbol) {
         this._listenersSymbols.delete(symbol);
         for (const keys of this._listeners.keys()) {
             const listeners = this._listeners.get(keys);
