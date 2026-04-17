@@ -21,41 +21,29 @@ import {
     TurnCredentials,
     UserWithPubKey,
 } from "../Types";
-import { WebRtcClient } from "../webStreams/WebRtcClient";
-import { SessionId } from "../webStreams/WebRtcClientTypes";
 import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
+import { WindowWithWasmHandler } from "../webStreams/types/WebRtcExtensions";
 import { Api } from "./Api";
 import { BaseNative } from "./BaseNative";
 import * as Types from "../Types";
-import { StreamId } from "../webStreams/types/ApiTypes";
 
 export class StreamApiNative extends BaseNative {
     protected static bindingId: number = -1;
     public static getBindingId() {
         return ++this.bindingId;
     }
-    protected webRtcInterfacePtr: number = -1;
-    protected selfPtr: number = -1;
-    protected webRtcInterfaceImpl: WebRtcInterfaceImpl | null;
+    public selfPtr: number = -1;
 
     constructor(
         api: Api,
-        protected webRtcClient: WebRtcClient,
+        private readonly webRtcInterfaceImpl: WebRtcInterfaceImpl,
     ) {
         super(api);
-        webRtcClient.bindApiInterface({
-            trickle: (sessionId: SessionId, candidate: RTCIceCandidate) => {
-                return this.trickle(this.selfPtr, [sessionId, candidate]);
-            },
-            acceptOffer: (sessionId: SessionId, sdp: Jsep) => {
-                return this.acceptOfferOnReconfigure(this.selfPtr, [sessionId, sdp]);
-            },
-        });
     }
 
     async newApi(connectionPtr: number, eventApiPtr: number): Promise<number> {
         const bindingId = StreamApiNative.getBindingId();
-        this.bindWebRtcInterfaceAsHandler(bindingId);
+        this.registerWebRtcInterfaceHandler(bindingId);
         this.selfPtr = await this.runAsync<number>((taskId) =>
             this.api.lib.StreamApi_newStreamApi(taskId, connectionPtr, eventApiPtr, bindingId),
         );
@@ -122,9 +110,6 @@ export class StreamApiNative extends BaseNative {
         );
     }
     async createStream(ptr: number, args: [string]): Promise<Types.StreamHandle> {
-        // params from api: streamRoomId, streamId
-        // params to lib: streamRoomId, streamId, webrtcInterfacePtr
-        // const libArgs: [string, number, number] = [...args, this.webRtcInterfacePtr];
         return this.runAsync<Types.StreamHandle>((taskId) =>
             this.api.lib.StreamApi_createStream(taskId, ptr, args),
         );
@@ -286,13 +271,11 @@ export class StreamApiNative extends BaseNative {
         );
     }
 
-    protected bindWebRtcInterfaceAsHandler(bindingId: number): void {
-        this.webRtcInterfaceImpl = new WebRtcInterfaceImpl(this.webRtcClient);
-        let windowBinder = (window as any).webRtcInterfaceToNativeHandler;
-        if (!windowBinder) {
-            windowBinder = {};
+    private registerWebRtcInterfaceHandler(bindingId: number): void {
+        const win = window as unknown as WindowWithWasmHandler;
+        if (!win.webRtcInterfaceToNativeHandler) {
+            win.webRtcInterfaceToNativeHandler = {};
         }
-        windowBinder[bindingId] = this.webRtcInterfaceImpl;
-        (window as any).webRtcInterfaceToNativeHandler = windowBinder;
+        win.webRtcInterfaceToNativeHandler[bindingId] = this.webRtcInterfaceImpl;
     }
 }
