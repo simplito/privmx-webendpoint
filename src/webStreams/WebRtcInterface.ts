@@ -1,5 +1,5 @@
 import { Key } from "../Types";
-import { ConnectionType } from "./PeerConnectionsManager";
+import { ConnectionType } from "./PeerConnectionManager";
 import { Jsep, StreamRoomId } from "./types/ApiTypes";
 
 export class UpdateKeysModel {

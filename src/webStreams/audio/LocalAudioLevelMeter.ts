@@ -1,9 +1,10 @@
 export class LocalAudioLevelMeter {
     public static readonly RMS_VALUE_OF_SILENCE = -99;
-    private ctx!: AudioContext;
-    private node!: AudioWorkletNode;
-    private source!: MediaStreamAudioSourceNode;
-    private keepAliveGain!: GainNode;
+
+    private ctx: AudioContext | undefined;
+    private node: AudioWorkletNode | undefined;
+    private source: MediaStreamAudioSourceNode | undefined;
+    private keepAliveGain: GainNode | undefined;
     private stopped = false;
 
     constructor(
@@ -11,12 +12,12 @@ export class LocalAudioLevelMeter {
         private onLevel: (rmsDb: number) => void,
     ) {}
 
-    async init(workletUrl: string) {
-        const candidateSampleRates: Array<number | undefined> = [];
+    async init(workletUrl: string): Promise<void> {
+        const candidateSampleRates: (number | undefined)[] = [];
         try {
             const settings = this.track.getSettings?.();
-            if (typeof (settings as any)?.sampleRate === "number") {
-                candidateSampleRates.push((settings as any).sampleRate);
+            if (typeof settings?.sampleRate === "number") {
+                candidateSampleRates.push(settings.sampleRate);
             }
         } catch {
             // ignore
@@ -41,7 +42,7 @@ export class LocalAudioLevelMeter {
                 this.source = this.ctx.createMediaStreamSource(new MediaStream([this.track]));
 
                 this.node = new AudioWorkletNode(this.ctx, "rms-processor");
-                this.node.port.onmessage = (e) => this.onLevel(e.data.rmsDb);
+                this.node.port.onmessage = (e) => this.onLevel((e.data as { rmsDb: number }).rmsDb);
 
                 this.keepAliveGain = this.ctx.createGain();
                 this.keepAliveGain.gain.value = 0;
@@ -67,7 +68,9 @@ export class LocalAudioLevelMeter {
         }
     }
 
-    stop() {
+    // Each disconnect/close call is wrapped individually because some browsers throw
+    // when a node is already disconnected or the context is already closed.
+    stop(): void {
         this.stopped = true;
         try {
             this.node?.port?.close();
