@@ -24,7 +24,7 @@ import {
 
 export class ThreadApi extends BaseApi {
     constructor(
-        protected native: ThreadApiNative,
+        private native: ThreadApiNative,
         ptr: number,
     ) {
         super(ptr);
