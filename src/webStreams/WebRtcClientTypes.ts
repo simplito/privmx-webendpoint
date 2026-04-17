@@ -1,5 +1,5 @@
 import { MediaServerApiTypes } from "../ServerTypes";
-import { NewPublisherEvent } from "../service/WebRtcInterface";
+import { NewPublisherEvent } from "./types/MediaServerWebSocketApiTypes";
 import { StreamRoomId } from "./types/ApiTypes";
 export declare class RTCRtpScriptTransform {
     constructor(worker: any, options: any);
@@ -65,5 +65,5 @@ export interface RTCEncodedStream {
 export interface QueueItem {
     taskId: number;
     _room: StreamRoomId;
-    jsep?: { sdp: string; type: string };
+    jsep?: { sdp: string; type: RTCSdpType };
 }
