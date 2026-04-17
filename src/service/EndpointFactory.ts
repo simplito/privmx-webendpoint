@@ -22,7 +22,22 @@ import { StreamApiNative } from "../api/StreamApiNative";
 import { ThreadApiNative } from "../api/ThreadApiNative";
 import { FinalizationHelper } from "../FinalizationHelper";
 import { PKIVerificationOptions } from "../Types";
+import { AudioManager } from "../webStreams/AudioManager";
+import { DataChannelCryptor } from "../webStreams/DataChannelCryptor";
+import { DataChannelSession } from "../webStreams/DataChannelSession";
+import { E2eeTransformManager } from "../webStreams/E2eeTransformManager";
+import { E2eeWorker } from "../webStreams/E2eeWorker";
+import { StateChangeDispatcher } from "../webStreams/EventDispatcher";
+import { KeyStore } from "../webStreams/KeyStore";
+import { KeySyncManager } from "../webStreams/KeySyncManager";
+import { PeerConnectionFactory } from "../webStreams/PeerConnectionFactory";
+import { PeerConnectionManager } from "../webStreams/PeerConnectionManager";
+import { PublisherManager } from "../webStreams/PublisherManager";
+import { RemoteStreamListenerRegistry } from "../webStreams/RemoteStreamListenerRegistry";
+import { SubscriberManager } from "../webStreams/SubscriberManager";
 import { WebRtcClient } from "../webStreams/WebRtcClient";
+import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
+import { SessionId } from "../webStreams/PeerConnectionManager";
 import { Connection } from "./Connection";
 import { CryptoApi } from "./CryptoApi";
 import { EventApi } from "./EventApi";
@@ -317,10 +332,73 @@ export class EndpointFactory {
         if ("streams" in connection.apisRefs) {
             throw new Error("StreamApi already registered for given connection.");
         }
-        const webRtcClient = new WebRtcClient(this.assetsBasePath);
-        const nativeApi = new StreamApiNative(this.api, webRtcClient);
 
+        const assetsDir = this.assetsBasePath;
+
+        // Build isolated WebRTC sub-graph for this streaming session.
+        const keyStore = new KeyStore();
+        const dispatcher = new StateChangeDispatcher();
+        const registry = new RemoteStreamListenerRegistry();
+        const cryptor = new DataChannelCryptor(keyStore);
+        const dataChannelSession = new DataChannelSession(cryptor);
+
+        // E2eeWorker RMS callback resolves AudioManager lazily (built below).
+        let audioManager: AudioManager | undefined;
+        const e2eeWorker = new E2eeWorker(assetsDir, (publisherId, rms) => {
+            audioManager?.onRemoteFrameRms(publisherId, rms);
+        });
+        const e2eeTransform = new E2eeTransformManager(e2eeWorker);
+        audioManager = new AudioManager(assetsDir, (rms) => e2eeWorker.sendRms(rms));
+
+        // PeerConnectionFactory.onRemoteTrack resolves SubscriberManager lazily.
+        let subscriber: SubscriberManager | undefined;
+        const pcFactory = new PeerConnectionFactory(
+            dispatcher,
+            dataChannelSession,
+            e2eeTransform,
+            registry,
+            async (roomId, event) => {
+                if (!subscriber) throw new Error("SubscriberManager not yet constructed");
+                return subscriber.onRemoteTrack(roomId, event);
+            },
+        );
+
+        // PeerConnectionManager.onTrickle resolves WebRtcClient lazily.
+        let webRtcClient: WebRtcClient | undefined;
+        const pcm = new PeerConnectionManager(
+            (room, streamHandle) => pcFactory.create(room, streamHandle),
+            (sessionId, candidate) => {
+                if (!webRtcClient) throw new Error("WebRtcClient not yet constructed");
+                return webRtcClient.trickle(sessionId as SessionId, candidate);
+            },
+        );
+
+        const publisher = new PublisherManager(pcm, audioManager, e2eeTransform);
+        subscriber = new SubscriberManager(pcm, e2eeTransform, registry);
+        const keys = new KeySyncManager(keyStore, e2eeWorker);
+
+        webRtcClient = new WebRtcClient(
+            publisher,
+            subscriber,
+            dataChannelSession,
+            keys,
+            dispatcher,
+            registry,
+            pcFactory,
+            audioManager,
+            e2eeWorker,
+        );
+
+        const webRtcInterfaceImpl = new WebRtcInterfaceImpl(webRtcClient);
+        const nativeApi = new StreamApiNative(this.api, webRtcInterfaceImpl);
         const ptr = await nativeApi.newApi(connection.servicePtr, eventApi.servicePtr);
+
+        webRtcClient.bindApiInterface({
+            trickle: (sessionId, candidate) => nativeApi.trickle(ptr, [sessionId, candidate]),
+            acceptOffer: (sessionId, sdp) =>
+                nativeApi.acceptOfferOnReconfigure(ptr, [sessionId, sdp]),
+        });
+
         await nativeApi.create(ptr, []);
         connection.apisRefs["streams"] = { _apiServicePtr: ptr };
         connection.nativeApisDeps["streams"] = nativeApi;

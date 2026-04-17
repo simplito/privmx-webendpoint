@@ -1,0 +1,177 @@
+import { Jsep, StreamRoomId } from "./types/ApiTypes";
+import { PeerConnectionManager, SessionId } from "./PeerConnectionManager";
+
+interface QueueItem {
+    room: StreamRoomId;
+    jsep: { sdp: string; type: RTCSdpType };
+}
+import { E2eeTransformManager } from "./E2eeTransformManager";
+import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry";
+import { Queue } from "./Queue";
+import { Logger } from "./Logger";
+
+/**
+ * Manages the subscriber-side peer connection for a stream room:
+ * SDP offer/answer negotiation, the reconfigure queue, and remote track wiring.
+ */
+export class SubscriberManager {
+    private readonly reconfigureQueue: Queue<QueueItem>;
+    private readonly lastProcessedAnswer: { [roomId: string]: Jsep } = {};
+    private readonly bootstrapChannels: Map<StreamRoomId, RTCDataChannel[]> = new Map();
+    private readonly logger = new Logger();
+
+    constructor(
+        private readonly pcm: PeerConnectionManager,
+        private readonly e2eeTransformManager: E2eeTransformManager,
+        private readonly listenerRegistry: RemoteStreamListenerRegistry,
+    ) {
+        this.reconfigureQueue = new Queue<QueueItem>();
+        this.reconfigureQueue.assignProcessorFunc(async (item) => {
+            await this.reconfigureSingle(item.room, item.jsep);
+        });
+    }
+
+    /**
+     * Initialises the subscriber `RTCPeerConnection` for `roomId` so it is
+     * ready to receive incoming SDP offers from the server.
+     */
+    initialize(roomId: StreamRoomId): void {
+        this.pcm.initialize(roomId, "subscriber");
+    }
+
+    /**
+     * Enqueues a new SDP offer from the server and serially processes the
+     * queue, ensuring reconfigures are never interleaved.
+     */
+    async onSubscriptionUpdated(room: StreamRoomId, offer: Jsep): Promise<void> {
+        this.reconfigureQueue.enqueue({ room, jsep: offer });
+        await this.reconfigureQueue.processAll();
+    }
+
+    /**
+     * Returns the last SDP answer produced for `room` during reconfiguration.
+     * Used by `WebRtcInterfaceImpl` to reply to the server's accept-offer call.
+     * @throws if no answer has been produced for the given room yet.
+     */
+    getLastProcessedAnswer(room: StreamRoomId): Jsep {
+        const answer = this.lastProcessedAnswer[room];
+        if (!answer) throw new Error(`No processed answer for room: ${room}`);
+        return answer;
+    }
+
+    /**
+     * Wires a newly arrived remote track into the E2EE receiver pipeline and
+     * notifies registered `RemoteStreamListener` callbacks. Waits for ICE to
+     * reach connected/completed state before installing the transform to avoid
+     * a race between the transform pipeline and DTLS negotiation.
+     */
+    async onRemoteTrack(roomId: StreamRoomId, event: RTCTrackEvent): Promise<void> {
+        const receiver = event.receiver;
+        const publisherId = Number(event.streams[0].id);
+        const pc = this.pcm.getOrCreateConnection(roomId, "subscriber").pc;
+
+        this.logger.debug("waitUntilConnected...");
+        await this.waitUntilConnected(pc);
+
+        this.logger.debug("setupReceiverTransform...");
+        await this.e2eeTransformManager.setupReceiverTransform(receiver, publisherId);
+        event.track.addEventListener("ended", () => {
+            this.e2eeTransformManager.teardownReceiver(receiver).catch((e) => {
+                this.logger.error("teardownReceiver failed:", e);
+            });
+        });
+
+        this.listenerRegistry.dispatchTrack(roomId, event);
+    }
+
+    /**
+     * Updates the Janus session ID for the subscriber connection in `roomId`
+     * and flushes any ICE candidates that were queued before the session was assigned.
+     */
+    updateSessionId(roomId: StreamRoomId, sessionId: SessionId): void {
+        this.pcm.updateSessionForConnection(roomId, "subscriber", sessionId);
+    }
+
+    /**
+     * Closes the subscriber peer connection for `roomId`, removes the cached
+     * SDP answer, and closes all bootstrap data channels for that room.
+     */
+    close(roomId: StreamRoomId): void {
+        this.pcm.closePeerConnectionBySessionIfExists(roomId, "subscriber");
+        delete this.lastProcessedAnswer[roomId];
+        this.closeBootstrapChannels(roomId);
+    }
+
+    private closeBootstrapChannels(roomId: StreamRoomId): void {
+        const channels = this.bootstrapChannels.get(roomId);
+        if (channels) {
+            for (const dc of channels) {
+                try {
+                    dc.close();
+                } catch {
+                    /* ignore */
+                }
+            }
+            this.bootstrapChannels.delete(roomId);
+        }
+    }
+
+    private waitUntilConnected(pc: RTCPeerConnection): Promise<void> {
+        if (pc.iceConnectionState === "connected" || pc.iceConnectionState === "completed") {
+            return Promise.resolve();
+        }
+        if (
+            pc.iceConnectionState === "failed" ||
+            pc.connectionState === "failed" ||
+            pc.connectionState === "closed"
+        ) {
+            return Promise.reject(new Error("ICE/DTLS not connected"));
+        }
+        return new Promise<void>((resolve, reject) => {
+            const cleanup = () => {
+                pc.removeEventListener("iceconnectionstatechange", onChange);
+                pc.removeEventListener("connectionstatechange", onChange);
+            };
+            const onChange = () => {
+                if (
+                    pc.iceConnectionState === "connected" ||
+                    pc.iceConnectionState === "completed"
+                ) {
+                    cleanup();
+                    resolve();
+                } else if (
+                    pc.iceConnectionState === "failed" ||
+                    pc.connectionState === "failed" ||
+                    pc.connectionState === "closed"
+                ) {
+                    cleanup();
+                    reject(new Error("ICE/DTLS not connected"));
+                }
+            };
+            pc.addEventListener("iceconnectionstatechange", onChange);
+            pc.addEventListener("connectionstatechange", onChange);
+        });
+    }
+
+    private async reconfigureSingle(room: StreamRoomId, offer: Jsep): Promise<void> {
+        const pc = this.pcm.getOrCreateConnection(room, "subscriber").pc;
+
+        // Create a bootstrap data channel on every reconfigure so that Janus
+        // sees the data-channel m= line in each offer/answer exchange.
+        const dc = pc.createDataChannel("JanusDataChannel");
+        const existing = this.bootstrapChannels.get(room) ?? [];
+        existing.push(dc);
+        this.bootstrapChannels.set(room, existing);
+
+        await pc.setRemoteDescription(
+            new RTCSessionDescription({ type: offer.type, sdp: offer.sdp }),
+        );
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(new RTCSessionDescription(answer));
+
+        if (!answer.type || !answer.sdp) {
+            throw new Error("createAnswer returned incomplete description");
+        }
+        this.lastProcessedAnswer[room] = { sdp: answer.sdp, type: answer.type };
+    }
+}
