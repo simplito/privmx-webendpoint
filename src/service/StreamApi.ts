@@ -25,7 +25,6 @@ import {
     RemoteStreamListener,
 } from "../Types";
 import { StreamApiNative } from "../api/StreamApiNative";
-import { Buffer } from "buffer";
 import { DataChannelCryptor } from "../webStreams/DataChannelCryptor";
 import { Logger } from "../webStreams/Logger";
 

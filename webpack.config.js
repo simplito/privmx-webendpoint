@@ -1,5 +1,4 @@
 const path = require("path");
-const webpack = require("webpack");
 const CopyPlugin = require("copy-webpack-plugin");
 
 module.exports = {
@@ -8,10 +7,6 @@ module.exports = {
   },
   mode: "production",
   plugins: [
-    new webpack.ProvidePlugin({
-        Buffer: ["buffer", "Buffer"],
-        process: "process/browser",
-    }),
     new CopyPlugin({
       patterns: [
         {
@@ -32,11 +27,7 @@ module.exports = {
   },
   resolve: {
     extensions: [".tsx", ".ts", ".js"],
-    fallback: {
-      "buffer": require.resolve("buffer"),
-      "assert": require.resolve("assert/"),
-      "process/browser": require.resolve("process/browser"),
-    }, 
+    fallback: {},
   },
   output: {
     filename: (pathData) => {

@@ -115,7 +115,7 @@ export interface StreamTrackSendDataRequest extends AppRequest {
     kind: "streams.streamTrackSendData";
     data: {
         streamTrackId: Types.StreamTrackId;
-        data: Buffer;
+        data: Uint8Array;
     };
 }
 

@@ -392,4 +392,199 @@ test.describe("CryptoTest", () => {
         expect(result.count).toBe(1000);
         expect(result.allMatch).toBe(true);
     });
+
+    // =========================================================================
+    // CryptoFacade (em_crypto) vs CryptoApi (WASM) sign/verify compatibility
+    //
+    // The WASM C++ layer delegates its crypto primitives to em_crypto, so both
+    // layers share the same secp256k1 implementation. They differ in key encoding
+    // (WIF / BASE58DER vs raw bytes) and hashing (CryptoApi hashes internally;
+    // em_crypto.eccSign/eccVerify operate on pre-hashed 32-byte input).
+    // =========================================================================
+
+    test.describe("ECC sign/verify: round-trip", () => {
+        test("EmCrypto (CryptoFacade): sign and verify succeed", async ({ page }) => {
+            const result = await page.evaluate(async () => {
+                const em = (window as any).em_crypto;
+                const { privateKey, publicKey } = await em.eccGenPair();
+                const data = new TextEncoder().encode("emcrypto round-trip");
+                // eccSign / eccVerify require exactly 32-byte pre-hashed input
+                const hash = new Uint8Array(await em.sha256({ data }));
+                const sig = new Uint8Array(await em.eccSign({ privateKey, data: hash }));
+                const verified: boolean = await em.eccVerify({ publicKey, data: hash, signature: sig });
+                return { verified };
+            });
+            expect(result.verified).toBe(true);
+        });
+
+        test("CryptoApi (WASM): sign and verify succeed", async ({ page }) => {
+            const result = await page.evaluate(async () => {
+                const cryptoApi = await window.Endpoint.createCryptoApi();
+                const wif = await cryptoApi.generatePrivateKey();
+                const pub = await cryptoApi.derivePublicKey(wif);
+                const data = new TextEncoder().encode("cryptoapi round-trip");
+                const sig = await cryptoApi.signData(data, wif);
+                const verified: boolean = await cryptoApi.verifySignature(data, sig, pub);
+                return { verified };
+            });
+            expect(result.verified).toBe(true);
+        });
+    });
+
+    test.describe("ECC sign/verify: cross-layer compatibility", () => {
+        // CryptoApi.signData hashes internally (SHA-256) then calls em_crypto.ecc_sign.
+        // The signature is over SHA-256(data) in [recovery|r|s] format — identical to
+        // what em_crypto.eccVerify expects when given the same pre-hashed data.
+        test("CryptoApi (WASM) sign → EmCrypto (CryptoFacade) verify", async ({ page }) => {
+            const result = await page.evaluate(async () => {
+                const cryptoApi = await window.Endpoint.createCryptoApi();
+                const em = (window as any).em_crypto;
+                const wif = await cryptoApi.generatePrivateKey();
+
+                // WIF = base58check( 0x80 | privkey32 | 0x01 ).
+                // Slice [1, 33) strips the version prefix; the 4-byte checksum at the
+                // end does not interfere with this slice.
+                const base58Decode = (s: string): Uint8Array => {
+                    const alpha = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+                    let n = 0n;
+                    for (const c of s) n = n * 58n + BigInt(alpha.indexOf(c));
+                    let hex = n.toString(16);
+                    if (hex.length % 2) hex = "0" + hex;
+                    const bytes = Uint8Array.from(
+                        (hex.match(/.{2}/g) as string[]).map((b) => parseInt(b, 16)),
+                    );
+                    let lead = 0;
+                    for (const c of s) {
+                        if (c !== "1") break;
+                        lead++;
+                    }
+                    const out = new Uint8Array(lead + bytes.length);
+                    out.set(bytes, lead);
+                    return out;
+                };
+
+                const rawPrivKey = base58Decode(wif).slice(1, 33);
+                const { publicKey: rawPubKey } = await em.eccFromPrivateKey({ key: rawPrivKey });
+                const rawData = new TextEncoder().encode("wasm-sign / js-verify");
+                const sig = new Uint8Array(await cryptoApi.signData(rawData, wif));
+                const hash = new Uint8Array(await em.sha256({ data: rawData }));
+                const verified: boolean = await em.eccVerify({
+                    publicKey: rawPubKey,
+                    data: hash,
+                    signature: sig,
+                });
+                return { verified };
+            });
+            expect(result.verified).toBe(true);
+        });
+
+        // em_crypto.eccSign signs SHA-256(data) in [recovery|r|s] format.
+        // CryptoApi.verifySignature re-hashes rawData internally before verifying.
+        test("EmCrypto (CryptoFacade) sign → CryptoApi (WASM) verify", async ({ page }) => {
+            const result = await page.evaluate(async () => {
+                const cryptoApi = await window.Endpoint.createCryptoApi();
+                const em = (window as any).em_crypto;
+                const { privateKey: rawPrivKey } = await em.eccGenPair();
+
+                // Encode raw key as compressed WIF so CryptoApi can derive the
+                // BASE58DER public key. WIF = base58check( 0x80 | rawKey32 | 0x01 ).
+                const rawToWIF = async (raw: Uint8Array): Promise<string> => {
+                    const alpha = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+                    const payload = new Uint8Array([0x80, ...raw, 0x01]);
+                    const h1 = new Uint8Array(await crypto.subtle.digest("SHA-256", payload));
+                    const h2 = new Uint8Array(await crypto.subtle.digest("SHA-256", h1));
+                    const full = new Uint8Array([...payload, ...h2.slice(0, 4)]);
+                    let n = BigInt(
+                        "0x" + Array.from(full).map((b) => b.toString(16).padStart(2, "0")).join(""),
+                    );
+                    let r = "";
+                    while (n > 0n) {
+                        const rem = n % 58n;
+                        n /= 58n;
+                        r = alpha[Number(rem)] + r;
+                    }
+                    for (const b of full) {
+                        if (b !== 0) break;
+                        r = "1" + r;
+                    }
+                    return r;
+                };
+
+                const wif = await rawToWIF(rawPrivKey);
+                const base58DerPubKey = await cryptoApi.derivePublicKey(wif);
+                const rawData = new TextEncoder().encode("js-sign / wasm-verify");
+                const hash = new Uint8Array(await em.sha256({ data: rawData }));
+                const sig = new Uint8Array(await em.eccSign({ privateKey: rawPrivKey, data: hash }));
+                const verified: boolean = await cryptoApi.verifySignature(rawData, sig, base58DerPubKey);
+                return { verified };
+            });
+            expect(result.verified).toBe(true);
+        });
+    });
+
+    test.describe("ECC sign/verify: rejection", () => {
+        test("EmCrypto rejects a signature with a flipped byte", async ({ page }) => {
+            const result = await page.evaluate(async () => {
+                const em = (window as any).em_crypto;
+                const { privateKey, publicKey } = await em.eccGenPair();
+                const hash = new Uint8Array(
+                    await em.sha256({ data: new TextEncoder().encode("tamper-js") }),
+                );
+                const sig = new Uint8Array(await em.eccSign({ privateKey, data: hash }));
+                sig[32] ^= 0xff;
+                const verified: boolean = await em.eccVerify({ publicKey, data: hash, signature: sig });
+                return { verified };
+            });
+            expect(result.verified).toBe(false);
+        });
+
+        test("CryptoApi (WASM) rejects a tampered signature", async ({ page }) => {
+            const result = await page.evaluate(async () => {
+                const cryptoApi = await window.Endpoint.createCryptoApi();
+                const wif = await cryptoApi.generatePrivateKey();
+                const pub = await cryptoApi.derivePublicKey(wif);
+                const data = new TextEncoder().encode("tamper-wasm");
+                const sig = new Uint8Array(await cryptoApi.signData(data, wif));
+                sig[32] ^= 0xff;
+                const verified: boolean = await cryptoApi.verifySignature(data, sig, pub);
+                return { verified };
+            });
+            expect(result.verified).toBe(false);
+        });
+
+        test("EmCrypto rejects a valid signature verified against the wrong public key", async ({
+            page,
+        }) => {
+            const result = await page.evaluate(async () => {
+                const em = (window as any).em_crypto;
+                const { privateKey } = await em.eccGenPair();
+                const { publicKey: wrongPub } = await em.eccGenPair();
+                const hash = new Uint8Array(
+                    await em.sha256({ data: new TextEncoder().encode("wrong-key-js") }),
+                );
+                const sig = new Uint8Array(await em.eccSign({ privateKey, data: hash }));
+                const verified: boolean = await em.eccVerify({
+                    publicKey: wrongPub,
+                    data: hash,
+                    signature: sig,
+                });
+                return { verified };
+            });
+            expect(result.verified).toBe(false);
+        });
+
+        test("CryptoApi (WASM) rejects a signature from a different key pair", async ({ page }) => {
+            const result = await page.evaluate(async () => {
+                const cryptoApi = await window.Endpoint.createCryptoApi();
+                const signerWIF = await cryptoApi.generatePrivateKey();
+                const verifierWIF = await cryptoApi.generatePrivateKey();
+                const verifierPub = await cryptoApi.derivePublicKey(verifierWIF);
+                const data = new TextEncoder().encode("wrong-key-wasm");
+                const sig = await cryptoApi.signData(data, signerWIF);
+                const verified: boolean = await cryptoApi.verifySignature(data, sig, verifierPub);
+                return { verified };
+            });
+            expect(result.verified).toBe(false);
+        });
+    });
 });

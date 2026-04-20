@@ -9,21 +9,87 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// @ts-ignore
-import * as elliptic from "elliptic";
 import { assertIsNumber, assertIsUint8Array, assertArgsValid, assertIsString } from "./assert";
 import * as Types from "./Types";
 import * as Utils from "./Utils";
-// @ts-ignore
-import BN = require("bn.js");
-const EC = new elliptic.ec("secp256k1");
 import * as aesjs from "aes-js";
-import RIPEMD160 = require("ripemd160");
+import { ripemd160 as nobleRipemd160 } from "@noble/hashes/legacy.js";
+import { secp256k1 as secp } from "@noble/curves/secp256k1.js";
 
 const subtle =
     typeof crypto !== "undefined"
         ? crypto.subtle
         : (globalThis as unknown as { crypto?: { subtle?: SubtleCrypto } }).crypto?.subtle!;
+
+const textEncoder = new TextEncoder();
+
+// ---------------------------------------------------------------------------
+// Byte helpers — replace every Buffer.* call with native Uint8Array ops
+// ---------------------------------------------------------------------------
+
+function concatBytes(...arrays: Uint8Array[]): Uint8Array {
+    let total = 0;
+    for (const a of arrays) total += a.length;
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const a of arrays) {
+        out.set(a, offset);
+        offset += a.length;
+    }
+    return out;
+}
+
+function writeUInt32BE(buf: Uint8Array, value: number, offset: number): void {
+    buf[offset] = (value >>> 24) & 0xff;
+    buf[offset + 1] = (value >>> 16) & 0xff;
+    buf[offset + 2] = (value >>> 8) & 0xff;
+    buf[offset + 3] = value & 0xff;
+}
+
+function hexToBytes(hex: string): Uint8Array {
+    const len = hex.length >> 1;
+    const out = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+        out[i] = parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+    }
+    return out;
+}
+
+function uint8ArrayEqual(a: Uint8Array, b: Uint8Array): boolean {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return false;
+    }
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// BigInt helpers — replace BN.js with native bigint
+// ---------------------------------------------------------------------------
+
+function bytesToBigInt(bytes: Uint8Array): bigint {
+    let n = 0n;
+    for (const byte of bytes) {
+        n = (n << 8n) | BigInt(byte);
+    }
+    return n;
+}
+
+function bigIntToBytes(n: bigint, padToLength?: number): Uint8Array {
+    if (n < 0n) throw new Error("Negative BigInt not supported");
+    if (n === 0n) return new Uint8Array(padToLength ?? 1);
+    let hex = n.toString(16);
+    if (hex.length % 2) hex = "0" + hex;
+    const bytes = hexToBytes(hex);
+    if (padToLength !== undefined && bytes.length < padToLength) {
+        const padded = new Uint8Array(padToLength);
+        padded.set(bytes, padToLength - bytes.length);
+        return padded;
+    }
+    return bytes;
+}
+
+// ---------------------------------------------------------------------------
 
 interface KeyRegistryEntry {
     key: CryptoKey;
@@ -50,7 +116,7 @@ export class EmCrypto {
         sha1: this.sha1,
         sha256: this.sha256,
         sha512: this.sha512,
-        ripemd160: this.ripemd160,
+        ripemd160: this.ripemd160Impl,
         hash160: this.hash160,
         aes256EcbEncrypt: this.aes256EcbEncrypt,
         aes256EcbDecrypt: this.aes256EcbDecrypt,
@@ -122,7 +188,7 @@ export class EmCrypto {
     }
 
     /**
-     * Copies a Uint8Array into a fresh plain
+     * Copies a Uint8Array into a fresh plain ArrayBuffer-backed view.
      */
     private copyUint8Array(src: Uint8Array): Uint8Array {
         const dst = new Uint8Array(src.byteLength);
@@ -261,10 +327,10 @@ export class EmCrypto {
         return subtle.digest("SHA-512", new Uint8Array(params.data));
     }
 
-    public async ripemd160(params: Types.RIPEMD160_PARAMS): Promise<ArrayBuffer> {
+    public async ripemd160Impl(params: Types.RIPEMD160_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.RIPEMD160_PARAMS);
         assertIsUint8Array(params.data);
-        return Utils.toArrayBuffer(new RIPEMD160().update(Buffer.from(params.data)).digest());
+        return Utils.toArrayBuffer(nobleRipemd160(new Uint8Array(params.data)));
     }
 
     public async aes256EcbEncrypt(params: Types.AES256ECB_PARAMS): Promise<ArrayBuffer> {
@@ -275,7 +341,7 @@ export class EmCrypto {
         const aesEcb = new aesjs.ModeOfOperation.ecb(keyCopy);
         const encryptedBytes = aesEcb.encrypt(new Uint8Array(params.data));
         keyCopy.fill(0);
-        return Utils.toArrayBuffer(Buffer.from(encryptedBytes));
+        return Utils.toArrayBuffer(encryptedBytes);
     }
 
     public async aes256EcbDecrypt(params: Types.AES256ECB_PARAMS): Promise<ArrayBuffer> {
@@ -286,7 +352,7 @@ export class EmCrypto {
         const aesEcb = new aesjs.ModeOfOperation.ecb(keyCopy);
         const decryptedBytes = aesEcb.decrypt(new Uint8Array(params.data));
         keyCopy.fill(0);
-        return Utils.toArrayBuffer(Buffer.from(decryptedBytes));
+        return Utils.toArrayBuffer(decryptedBytes);
     }
 
     public async aes256CbcPkcs7Encrypt(params: Types.Aes256CbcPkcs7_PARAMS): Promise<ArrayBuffer> {
@@ -322,7 +388,7 @@ export class EmCrypto {
         const aesCbc = new aesjs.ModeOfOperation.cbc(keyCopy, new Uint8Array(params.iv));
         const encryptedBytes = aesCbc.encrypt(new Uint8Array(params.data));
         keyCopy.fill(0);
-        return Utils.toArrayBuffer(Buffer.from(encryptedBytes));
+        return Utils.toArrayBuffer(encryptedBytes);
     }
 
     public async aes256CbcNoPadDecrypt(params: Types.Aes256CbcPkcs7_PARAMS): Promise<ArrayBuffer> {
@@ -334,7 +400,7 @@ export class EmCrypto {
         const aesCbc = new aesjs.ModeOfOperation.cbc(keyCopy, new Uint8Array(params.iv));
         const decryptedBytes = aesCbc.decrypt(new Uint8Array(params.data));
         keyCopy.fill(0);
-        return Utils.toArrayBuffer(Buffer.from(decryptedBytes));
+        return Utils.toArrayBuffer(decryptedBytes);
     }
 
     public async prf_tls12(params: Types.Prf_tls12_PARAMS): Promise<ArrayBuffer> {
@@ -342,49 +408,47 @@ export class EmCrypto {
         assertIsUint8Array(params.key);
         assertIsUint8Array(params.seed);
         assertIsNumber(params.length);
-        let result = Buffer.alloc(0);
+        let result = new Uint8Array(0);
         let a = new Uint8Array(params.seed);
         while (result.length < params.length) {
             a = new Uint8Array(await this.hmacSha256({ key: new Uint8Array(params.key), data: a }));
-            result = Buffer.concat([
-                result,
-                Buffer.from(
-                    await this.hmacSha256({
-                        key: new Uint8Array(params.key),
-                        data: Buffer.concat([a, new Uint8Array(params.seed)]),
-                    }),
-                ),
-            ]);
+            const block = new Uint8Array(
+                await this.hmacSha256({
+                    key: new Uint8Array(params.key),
+                    data: concatBytes(a, new Uint8Array(params.seed)),
+                }),
+            );
+            result = concatBytes(result, block);
         }
-        return Utils.toArrayBuffer(result.slice(0, params.length));
+        return Utils.toArrayBuffer(result.subarray(0, params.length));
     }
 
-    public async kdf(algo: string, length: number, key: Buffer, labelStr: string): Promise<Buffer> {
-        const label = Buffer.from(labelStr);
-        const context = Buffer.alloc(0);
-        let seed = Buffer.alloc(label.length + context.length + 5);
-        label.copy(seed);
-        seed.writeUInt8(0, label.length);
-        context.copy(seed, label.length + 1);
-        seed.writeUInt32BE(length, label.length + context.length + 1);
-        let k = Buffer.alloc(0);
-        let result = Buffer.alloc(0);
+    public async kdf(
+        algo: string,
+        length: number,
+        key: Uint8Array,
+        labelStr: string,
+    ): Promise<Uint8Array> {
+        const label = textEncoder.encode(labelStr);
+        const seed = new Uint8Array(label.length + 5);
+        seed.set(label, 0);
+        seed[label.length] = 0;
+        writeUInt32BE(seed, length, label.length + 1);
+        let k = new Uint8Array(0);
+        let result = new Uint8Array(0);
         let i = 1;
         while (result.length < length) {
-            let input = Buffer.alloc(0);
-            input = k;
-            const count = Buffer.alloc(4);
-            count.writeUInt32BE(i++, 0);
-            input = Buffer.concat([input, count]);
-            input = Buffer.concat([input, seed]);
+            const count = new Uint8Array(4);
+            writeUInt32BE(count, i++, 0);
+            const input = concatBytes(k, count, seed);
             const hmac = await this.hmac({ engine: algo, key, data: input });
-            k = Buffer.from(hmac);
-            result = Buffer.concat([result, k]);
+            k = new Uint8Array(hmac);
+            result = concatBytes(result, k);
         }
         return result;
     }
 
-    public async getKEM(algo: string, key: Buffer, keLen?: number, kmLen?: number) {
+    public async getKEM(algo: string, key: Uint8Array, keLen?: number, kmLen?: number) {
         if (!keLen && keLen !== 0) {
             keLen = 32;
         }
@@ -393,8 +457,8 @@ export class EmCrypto {
         }
         const kEM = await this.kdf(algo, keLen + kmLen, key, "key expansion");
         return {
-            kE: kEM.slice(0, keLen),
-            kM: kEM.slice(keLen),
+            kE: kEM.subarray(0, keLen),
+            kM: kEM.subarray(keLen),
         };
     }
 
@@ -406,15 +470,14 @@ export class EmCrypto {
         assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
         assertIsNumber(params.taglen);
-        const kem = await this.getKEM("sha256", Buffer.from(params.key));
-        const iv = Buffer.from(params.iv).slice(0, 16);
-        const prefix = Buffer.alloc(16);
-        prefix.fill(0);
-        const data = Buffer.concat([prefix, Buffer.from(params.data)]);
+        const kem = await this.getKEM("sha256", new Uint8Array(params.key));
+        const iv = new Uint8Array(params.iv).subarray(0, 16);
+        const prefix = new Uint8Array(16);
+        const data = concatBytes(prefix, new Uint8Array(params.data));
         const cipher = await this.aes256CbcPkcs7Encrypt({ data, key: kem.kE, iv });
         const tag = await this.hmacSha256({ key: kem.kM, data: cipher });
         return Utils.toArrayBuffer(
-            Buffer.concat([Buffer.from(cipher), Buffer.from(tag).slice(0, params.taglen)]),
+            concatBytes(new Uint8Array(cipher), new Uint8Array(tag).subarray(0, params.taglen)),
         );
     }
 
@@ -424,21 +487,20 @@ export class EmCrypto {
         assertArgsValid(params, Types.Aes256CbcPkcs7Decrypt_PARAMS);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
-
         assertIsNumber(params.taglen);
-        const kem = await this.getKEM("sha256", Buffer.from(params.key));
-        let data = Buffer.from(params.data);
-        const tag = data.slice(data.length - params.taglen);
-        data = data.slice(0, data.length - params.taglen);
-        const rTag = Buffer.from(await this.hmacSha256({ key: kem.kM, data })).slice(
+        const kem = await this.getKEM("sha256", new Uint8Array(params.key));
+        let data = new Uint8Array(params.data);
+        const tag = data.subarray(data.length - params.taglen);
+        data = data.subarray(0, data.length - params.taglen);
+        const rTag = new Uint8Array(await this.hmacSha256({ key: kem.kM, data })).subarray(
             0,
             params.taglen,
         );
-        if (!tag.equals(rTag)) {
+        if (!uint8ArrayEqual(tag, rTag)) {
             throw new Error("Wrong message security tag");
         }
-        const iv = data.slice(0, 16);
-        data = data.slice(16);
+        const iv = data.subarray(0, 16);
+        data = data.subarray(16);
         return this.aes256CbcPkcs7Decrypt({ data, key: kem.kE, iv });
     }
 
@@ -467,7 +529,7 @@ export class EmCrypto {
         assertIsUint8Array(params.aad);
         assertIsUint8Array(params.tag);
         const key = await this.getOrImportKey(params.key, "AES-GCM", ["decrypt"]);
-        const dataWithTag = Buffer.concat([Buffer.from(params.data), Buffer.from(params.tag)]);
+        const dataWithTag = concatBytes(new Uint8Array(params.data), new Uint8Array(params.tag));
         return subtle.decrypt(
             {
                 name: "AES-GCM",
@@ -494,7 +556,7 @@ export class EmCrypto {
             const passwordStr = params.password as string;
             key = await subtle.importKey(
                 "raw",
-                new Uint8Array(Buffer.from(passwordStr, "utf-8")) as unknown as BufferSource,
+                textEncoder.encode(passwordStr) as unknown as BufferSource,
                 "PBKDF2",
                 false,
                 ["deriveBits"],
@@ -504,7 +566,7 @@ export class EmCrypto {
         return subtle.deriveBits(
             {
                 name: "PBKDF2",
-                salt: Buffer.from(params.salt, "utf-8") as unknown as BufferSource,
+                salt: textEncoder.encode(params.salt) as unknown as BufferSource,
                 iterations: params.rounds,
                 hash: { name: EmCrypto.HASH_ALGORITHM_MAP[params.hash] },
             },
@@ -517,46 +579,37 @@ export class EmCrypto {
         assertArgsValid(params, Types.HASH160_PARAMS);
         assertIsUint8Array(params.data);
         const sha256 = await subtle.digest("SHA-256", new Uint8Array(params.data));
-        return Utils.toArrayBuffer(new RIPEMD160().update(Buffer.from(sha256)).digest());
+        return Utils.toArrayBuffer(nobleRipemd160(new Uint8Array(sha256)));
     }
 
-    private fillWithZeroesTo32(buffer: Buffer) {
-        return buffer.length < 32
-            ? Buffer.concat([Buffer.alloc(32 - buffer.length).fill(0), buffer])
-            : buffer;
+    private fillWithZeroesTo32(buffer: Uint8Array): Uint8Array {
+        if (buffer.length >= 32) return buffer;
+        const result = new Uint8Array(32);
+        result.set(buffer, 32 - buffer.length);
+        return result;
     }
 
     public async eccGenPair() {
-        const keyPair = EC.genKeyPair();
-        const privateKey = this.fillWithZeroesTo32(Buffer.from(keyPair.getPrivate("hex"), "hex"));
-        const publicKey = Buffer.from(keyPair.getPublic().encodeCompressed());
-        return {
-            privateKey: privateKey,
-            publicKey: publicKey,
-        };
+        const privateKey = secp.utils.randomSecretKey(); // 32 bytes
+        const publicKey = secp.getPublicKey(privateKey, true); // 33 bytes, compressed
+        return { privateKey, publicKey };
     }
 
     public async eccFromPublicKey(params: Types.FromPublicOrPrivateKey_PARAMS) {
         assertArgsValid(params, Types.FromPublicOrPrivateKey_PARAMS);
         assertIsUint8Array(params.key);
-        const keyPairPub = EC.keyFromPublic(Buffer.from(params.key));
-        const serializedPub = Buffer.from(keyPairPub.getPublic().encodeCompressed());
-        return {
-            publicKey: Utils.toArrayBuffer(serializedPub),
-        };
+        const point = secp.Point.fromBytes(new Uint8Array(params.key));
+        return { publicKey: Utils.toArrayBuffer(point.toBytes(true)) };
     }
 
     public async eccFromPrivateKey(params: Types.FromPublicOrPrivateKey_PARAMS) {
         assertArgsValid(params, Types.FromPublicOrPrivateKey_PARAMS);
         assertIsUint8Array(params.key);
-        const keyPair = EC.keyFromPrivate(Buffer.from(params.key));
-        const privateKey = Utils.toArrayBuffer(
-            this.fillWithZeroesTo32(Buffer.from(keyPair.getPrivate("hex"), "hex")),
-        );
-        const publicKey = Utils.toArrayBuffer(Buffer.from(keyPair.getPublic().encodeCompressed()));
+        const privateKey = this.fillWithZeroesTo32(new Uint8Array(params.key));
+        const publicKey = secp.getPublicKey(privateKey, true);
         return {
-            privateKey: new Uint8Array(privateKey),
-            publicKey: new Uint8Array(publicKey),
+            privateKey: new Uint8Array(Utils.toArrayBuffer(privateKey)),
+            publicKey: new Uint8Array(Utils.toArrayBuffer(publicKey)),
         };
     }
 
@@ -568,16 +621,14 @@ export class EmCrypto {
             "secp256k1-private" as unknown as AlgorithmIdentifier,
             ["sign"],
         );
-        const keyPair = EC.keyFromPrivate(Buffer.from(privateKey as unknown as Uint8Array));
-        const s = <elliptic.ec.Signature & { recoveryParam: number }>(
-            keyPair.sign(Buffer.from(params.data))
-        );
-        const compact = 27 + s.recoveryParam;
-        const buffer = Buffer.alloc(65);
-        buffer.writeUInt8(compact, 0);
-        Buffer.from(s.r.toArray("be", 32)).copy(buffer, 1);
-        Buffer.from(s.s.toArray("be", 32)).copy(buffer, 33);
-        return Utils.toArrayBuffer(buffer);
+        const privBytes = new Uint8Array(privateKey as unknown as Uint8Array);
+        // v3: sign with { format: 'recovered' } returns 65-byte Uint8Array:
+        //   [0] = raw recovery id (0-3), [1..64] = r || s
+        const rawSig = secp.sign(params.data, privBytes, { format: "recovered", prehash: false });
+        const out = new Uint8Array(65);
+        out[0] = 27 + rawSig[0];
+        out.set(rawSig.subarray(1), 1); // r || s
+        return Utils.toArrayBuffer(out);
     }
 
     private getRecoveryParam(value: number) {
@@ -601,17 +652,9 @@ export class EmCrypto {
         assertIsUint8Array(params.publicKey);
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.signature);
-        const signature = Buffer.from(params.signature);
-        const keyPairPub = EC.keyFromPublic(Buffer.from(params.publicKey));
-        const recoveryParam = this.getRecoveryParam(signature.readUInt8(0));
-        const r = new BN(signature.slice(1, 33).toString("hex"), 16);
-        const s = new BN(signature.slice(33).toString("hex"), 16);
-        const sig = {
-            r: r,
-            s: s,
-            recoveryParam: recoveryParam,
-        };
-        return keyPairPub.verify(Buffer.from(params.data), sig);
+        // signature format: [recovery_byte (1B)] [r (32B)] [s (32B)]
+        const compactSig = params.signature.subarray(1, 65); // 64 bytes: r || s
+        return secp.verify(compactSig, params.data, params.publicKey, { prehash: false, lowS: false });
     }
 
     public async eccVerify2(params: Types.Verify2_PARAMS) {
@@ -619,10 +662,10 @@ export class EmCrypto {
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.r);
         assertIsUint8Array(params.s);
-        const buffer = Buffer.alloc(65);
-        buffer.writeUInt8(27, 0);
-        Buffer.from(params.r).copy(buffer, 1);
-        Buffer.from(params.s).copy(buffer, 33);
+        const buffer = new Uint8Array(65);
+        buffer[0] = 27;
+        buffer.set(params.r, 1);
+        buffer.set(params.s, 33);
         return this.eccVerify({
             publicKey: params.publicKey,
             data: buffer,
@@ -633,63 +676,57 @@ export class EmCrypto {
     public async eccDerive(params: Types.Derive_PARAMS) {
         assertArgsValid(params, Types.Derive_PARAMS);
         assertIsUint8Array(params.publicKey);
-        const keyPairPub = EC.keyFromPublic(Buffer.from(params.publicKey));
         const privateKey = await this.getOrImportKey(
             params.privateKey,
             "secp256k1-private" as unknown as AlgorithmIdentifier,
             ["deriveBits"],
         );
-        const keyPairPriv = EC.keyFromPrivate(Buffer.from(privateKey as unknown as Uint8Array));
-        const val = keyPairPriv.derive(keyPairPub.getPublic());
-        const keyPair = EC.keyFromPrivate(val.toArray());
-        return Utils.toArrayBuffer(
-            this.fillWithZeroesTo32(Buffer.from(keyPair.getPrivate("hex"), "hex")),
-        );
+        const privBytes = new Uint8Array(privateKey as unknown as Uint8Array);
+        // getSharedSecret with isCompressed=true returns [prefix(1B), x(32B)] = 33 bytes
+        const shared = secp.getSharedSecret(privBytes, new Uint8Array(params.publicKey), true);
+        return Utils.toArrayBuffer(shared.slice(1)); // 32-byte x-coordinate
     }
 
     public async eccGetOrder(_params?: undefined) {
-        const n = EC.curve.n;
-        return Uint8Array.from(n.toArray());
+        return bigIntToBytes(secp.Point.CURVE().n, 32);
     }
 
     public async eccGetGenerator(_params?: undefined): Promise<Uint8Array> {
-        const g = EC.g;
-        return Uint8Array.from(g.encodeCompressed() as unknown as number[]);
+        return secp.Point.BASE.toBytes(true); // 33-byte compressed generator G
     }
 
     public async bnGetBitsLength(params: Types.GetBitsLength_PARAMS) {
         assertArgsValid(params, Types.GetBitsLength_PARAMS);
         assertIsUint8Array(params.bn);
-        const bn = new BN(Buffer.from(params.bn));
-        return bn.bitLength();
+        const bn = bytesToBigInt(new Uint8Array(params.bn));
+        return bn === 0n ? 0 : bn.toString(2).length;
     }
 
     public async bnUmod(params: Types.BNumod_PARAMS) {
         assertArgsValid(params, Types.BNumod_PARAMS);
         assertIsUint8Array(params.bn);
         assertIsUint8Array(params.bn2);
-        const bn = new BN(Buffer.from(params.bn));
-        const bn2 = new BN(Buffer.from(params.bn2));
-        return Uint8Array.from(bn.umod(bn2).toArray());
+        const a = bytesToBigInt(new Uint8Array(params.bn));
+        const b = bytesToBigInt(new Uint8Array(params.bn2));
+        const r = a % b;
+        return bigIntToBytes(r < 0n ? r + b : r);
     }
 
     public async bnEq(params: Types.BNeq_PARAMS) {
         assertArgsValid(params, Types.BNeq_PARAMS);
         assertIsUint8Array(params.bn);
         assertIsUint8Array(params.bn2);
-        const bn = new BN(Buffer.from(params.bn));
-        const bn2 = new BN(Buffer.from(params.bn2));
-        return bn.eq(bn2);
+        return bytesToBigInt(new Uint8Array(params.bn)) === bytesToBigInt(new Uint8Array(params.bn2));
     }
 
     public async pointEncode(params: Types.PointEncode_PARAMS) {
         assertArgsValid(params, Types.PointEncode_PARAMS);
         assertIsUint8Array(params.point);
-        const point = EC.curve.decodePoint(Buffer.from(params.point));
+        const point = secp.Point.fromBytes(new Uint8Array(params.point));
         if (params.compact) {
-            return Uint8Array.from(point.encodeCompressed() as unknown as number[]);
+            return point.toBytes(true); // 33-byte compressed
         } else {
-            return Utils.toArrayBuffer(Buffer.from(point.encode()));
+            return Utils.toArrayBuffer(point.toBytes(false)); // 65-byte uncompressed
         }
     }
 
@@ -697,19 +734,17 @@ export class EmCrypto {
         assertArgsValid(params, Types.PointMul_PARAMS);
         assertIsUint8Array(params.point);
         assertIsUint8Array(params.bn);
-        const point = EC.curve.decodePoint(Buffer.from(params.point));
-        const bn = new BN(Buffer.from(params.bn));
-        const result = point.mul(bn);
-        return Uint8Array.from(result.encodeCompressed() as unknown as number[]);
+        const point = secp.Point.fromBytes(new Uint8Array(params.point));
+        const scalar = bytesToBigInt(new Uint8Array(params.bn));
+        return point.multiply(scalar).toBytes(true);
     }
 
     public async pointAdd(params: Types.PointAdd_PARAMS) {
         assertArgsValid(params, Types.PointAdd_PARAMS);
         assertIsUint8Array(params.point);
         assertIsUint8Array(params.point2);
-        const point = EC.curve.decodePoint(Buffer.from(params.point));
-        const point2 = EC.curve.decodePoint(Buffer.from(params.point2));
-        const result = point.add(point2);
-        return Uint8Array.from(result.encodeCompressed() as unknown as number[]);
+        const point1 = secp.Point.fromBytes(new Uint8Array(params.point));
+        const point2 = secp.Point.fromBytes(new Uint8Array(params.point2));
+        return point1.add(point2).toBytes(true);
     }
 }

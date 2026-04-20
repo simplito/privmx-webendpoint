@@ -1,5 +1,4 @@
 import { CryptoFacade } from "../crypto/CryptoFacade";
-import { Buffer } from "buffer";
 
 export class Utils {
     public static generateNumericId(): number {

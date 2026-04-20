@@ -1,6 +1,5 @@
 // webpack.worker.config.js
 const path = require("path");
-const webpack = require("webpack");
 
 module.exports = {
   entry: "./src/crypto/workerHelper.ts",
@@ -19,12 +18,6 @@ module.exports = {
       },
     ],
   },
-  plugins: [
-    new webpack.ProvidePlugin({
-        Buffer: ["buffer", "Buffer"],
-        process: "process/browser",
-    }),
-  ],
   performance: {
     hints: false,
     maxEntrypointSize: 1048576, // 1MB
@@ -32,10 +25,6 @@ module.exports = {
   },
   resolve: {
     extensions: [".ts", ".js"],
-    fallback: {
-      "buffer": require.resolve("buffer"),
-      "assert": require.resolve("assert/"),
-      "process/browser": require.resolve("process/browser"),
-    },
+    fallback: {},
   },
 };
