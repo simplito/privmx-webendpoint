@@ -14,8 +14,8 @@ export interface PeerCredentials {
 }
 
 export interface EncKey {
-    key: Buffer;
-    iv: Buffer;
+    key: Uint8Array;
+    iv: Uint8Array;
 }
 
 export interface InitOptions {

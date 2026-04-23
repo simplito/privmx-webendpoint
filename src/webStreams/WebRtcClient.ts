@@ -15,6 +15,7 @@ import {
     DataChannelCryptorDecryptStatus,
 } from "../Types";
 import { KeyStore } from "./KeyStore";
+import { Utils } from "./Utils";
 import { PeerConnectionManager } from "./PeerConnectionsManager";
 import { Logger } from "./Logger";
 import { StreamId, StreamRoomId } from "./types/ApiTypes";
@@ -55,9 +56,9 @@ export class WebRtcClient {
     public uniqId: string;
     private e2eeWorker: Worker | undefined;
     private webWorkerApi: WebWorker;
+    private keyStore: KeyStore = new KeyStore();
 
     private configuration: RTCConfiguration | undefined;
-    private keyStore: KeyStore = new KeyStore();
 
     private publishStreamHandle: StreamHandle;
 
@@ -87,7 +88,7 @@ export class WebRtcClient {
     private bootstrapDataChannel: RTCDataChannel | undefined;
 
     constructor(private assetsDir: string) {
-        this.uniqId = "" + Math.random() + "-" + Math.random();
+        this.uniqId = Utils.getRandomString(8) + "-" + Utils.getRandomString(8);
         this.sequenceNumberOfSender = 1;
         this.peerConnectionsManager = new PeerConnectionManager(
             (roomId: StreamRoomId) => {
@@ -110,7 +111,7 @@ export class WebRtcClient {
         });
 
         this.activeSpeakerDetector = new ActiveSpeakerDetector(DEFAULTS);
-        this.dataChannelCryptor = new DataChannelCryptor(this.getKeyStore());
+        this.dataChannelCryptor = new DataChannelCryptor(this.keyStore);
     }
 
     private async ensureLocalAudioLevelMeter(track: MediaStreamTrack) {
@@ -477,7 +478,7 @@ export class WebRtcClient {
                 throw new Error("ReconfigureQueue does not exist.");
             }
             this.peerConnectionReconfigureQueue.enqueue({
-                taskId: Math.floor(1 + Math.random() * 10000),
+                taskId: Utils.generateNumericId(),
                 _room: roomId,
             });
             try {
@@ -493,11 +494,7 @@ export class WebRtcClient {
     async updateKeys(_streamRoomId: StreamRoomId, keys: Key[]) {
         this.logger.debug("=======> UPDATE KEYS", _streamRoomId, keys.length);
         this.keyStore.setKeys(keys);
-        (await this.getWorkerApi()).setKeys(keys);
-    }
-
-    getKeyStore(): KeyStore {
-        return this.keyStore;
+        await (await this.getWorkerApi()).setKeys(keys);
     }
 
     private setupSenderTransform(videoSender: RTCRtpSender) {
@@ -651,7 +648,7 @@ export class WebRtcClient {
         statusCode: number,
     ) {
         const listeners = this.remoteStreamsListeners.get(roomId);
-        if (!listeners) {
+        if (!listeners || listeners.length === 0) {
             return;
         }
         const filteredListeners = listeners.filter(
@@ -669,7 +666,7 @@ export class WebRtcClient {
             throw new Error("ReconfigureQueue does not exist.");
         }
         this.peerConnectionReconfigureQueue.enqueue({
-            taskId: Math.floor(1 + Math.random() * 10000),
+            taskId: Utils.generateNumericId(),
             _room,
             jsep: offer,
         });

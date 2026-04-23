@@ -5,3 +5,12 @@ package-*.json
 scripts
 patches
 webendpoint-cpp
+tests
+**/__tests__
+**/__mocks__
+dist/assets
+dist/bundle
+dist/**/__tests__
+dist/**/__mocks__
+assets/*.js
+assets/privmx-endpoint-web.js

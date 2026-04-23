@@ -28,7 +28,6 @@ case "$RESULT" in
     1)
         echo "changes - rebuild..."
         cd "$PRIVMX_WEBENDPOINT_API_SRC"
-        cp "$PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC/out/loader.js" "$PRIVMX_WEBENDPOINT_API_SRC/js/"
         cp "$PRIVMX_ENDPOINT_SRC-$PRIVMX_ENDPOINT_VERSION/emscripten/jslibrary/websocket.js" "$PRIVMX_WEBENDPOINT_API_SRC/js/"
         rm -rf ./build-emscripten
         mkdir -p build-emscripten && cd build-emscripten

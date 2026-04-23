@@ -1,13 +1,10 @@
 import { Utils } from "../Utils";
-import {
-    encryptWithAES256GCM,
-    decryptWithAES256GCM,
-    isEncryptionSuccess,
-    isDecryptionSuccess,
-} from "../CryptoUtils";
 import * as events from "./WorkerEvents";
+import { CryptoFacade } from "../../crypto/CryptoFacade";
 import { KeyStore } from "../KeyStore";
 import { LocalAudioLevelMeter } from "../audio/LocalAudioLevelMeter";
+
+const keyStore = new KeyStore();
 
 const NUM_AS_UINT8_SIZE = 1;
 const DEBUG = false;
@@ -19,7 +16,6 @@ let recvRMS = LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
 let recvRMSTimestamp = Date.now();
 
 export interface TransformContext {
-    keyStore: KeyStore;
     id?: string;
     publisherId?: number;
 }
@@ -41,6 +37,35 @@ export class EncryptTransform {
         return 0;
     }
 
+    private async encryptFrame_aes(
+        keyId: string,
+        iv: Uint8Array,
+        data: Uint8Array,
+        header: Uint8Array,
+    ): Promise<Uint8Array> {
+        const encrypted = await CryptoFacade.aeadEncrypt(keyId, iv, header, data);
+        return new Uint8Array(encrypted);
+    }
+
+    private async decryptFrame_aes(
+        keyId: string,
+        iv: Uint8Array,
+        encryptedData: Uint8Array,
+        header: Uint8Array,
+    ): Promise<Uint8Array | null> {
+        if (encryptedData.length < 16) {
+            return null;
+        }
+        const data = encryptedData.slice(0, encryptedData.length - 16);
+        const tag = encryptedData.slice(encryptedData.length - 16);
+        try {
+            const decrypted = await CryptoFacade.aeadDecrypt(keyId, iv, header, data, tag);
+            return new Uint8Array(decrypted);
+        } catch {
+            return null;
+        }
+    }
+
     async encryptFrame(
         encodedFrame: RTCEncodedAudioFrame | RTCEncodedVideoFrame,
         kind: string,
@@ -53,16 +78,15 @@ export class EncryptTransform {
 
         const iv = Utils.genIvAsBuffer();
         const keyId = this.keyStore.getEncryptionKeyId();
-        const cryptoKey = await this.keyStore.getEncriptionKey();
 
-        const cryptoResult = await encryptWithAES256GCM(cryptoKey, iv, frameBody, frameHeader);
-        if (!isEncryptionSuccess(cryptoResult)) {
+        const encrypted = await this.encryptFrame_aes(keyId, iv, frameBody, frameHeader);
+        if (!encrypted) {
             throw new Error("Cannot encrypt frame");
         }
         const keyIdAsUint8 = new TextEncoder().encode(keyId);
 
         const posOfCipher = frameHeader.byteLength;
-        const posOfIv = posOfCipher + cryptoResult.data.byteLength;
+        const posOfIv = posOfCipher + encrypted.byteLength;
         const posOfIvSize = posOfIv + iv.byteLength;
         const posOfKeyId = posOfIvSize + NUM_AS_UINT8_SIZE;
         const posOfKeyIdSize = posOfKeyId + keyIdAsUint8.byteLength;
@@ -72,7 +96,7 @@ export class EncryptTransform {
         const resultUint8 = new Uint8Array(result);
 
         resultUint8.set(frameHeader);
-        resultUint8.set(new Uint8Array(cryptoResult.data), posOfCipher);
+        resultUint8.set(encrypted, posOfCipher);
         resultUint8.set(iv, posOfIv);
         resultUint8.set(Utils.numAsOneByteUint(iv.byteLength), posOfIvSize);
         resultUint8.set(keyIdAsUint8, posOfKeyId);
@@ -124,31 +148,24 @@ export class EncryptTransform {
 
         const payloadPos = headerLen;
         const payloadLen = ivPos - headerLen;
-        const payload = data.slice(payloadPos, payloadPos + payloadLen);
+        const payload = new Uint8Array(data.slice(payloadPos, payloadPos + payloadLen));
 
         try {
             if (!this.keyStore.hasKey(keyId)) {
                 controller.enqueue(encodedFrame);
                 return;
             }
-            const cryptoKey = await this.keyStore.getKey(keyId);
-            const decryptionResult = await decryptWithAES256GCM(
-                cryptoKey,
-                iv,
-                payload,
-                frameHeader,
-            );
+            const plain = await this.decryptFrame_aes(keyId, iv, payload, frameHeader);
 
-            if (!isDecryptionSuccess(decryptionResult)) {
+            if (!plain) {
                 controller.enqueue(encodedFrame);
                 return;
             }
 
-            const plain = decryptionResult.data;
             const result = new ArrayBuffer(frameHeader.byteLength + plain.byteLength);
             const writableResult = new Uint8Array(result);
             writableResult.set(frameHeader);
-            writableResult.set(new Uint8Array(plain), frameHeader.byteLength);
+            writableResult.set(plain, frameHeader.byteLength);
 
             encodedFrame.data = result;
             controller.enqueue(encodedFrame);
@@ -159,10 +176,8 @@ export class EncryptTransform {
     }
 }
 
-(self as any).keyStore = new KeyStore();
-const getKeyStore = () => (self as any).keyStore as KeyStore;
-
-self.onmessage = async (event: MessageEvent) => {
+self.addEventListener("message", async (event: MessageEvent) => {
+    if (!event || !event.data || typeof event.data !== "object" || !event.data.operation) return;
     const { operation, kind } = event.data;
 
     if (operation === "initialize") {
@@ -172,17 +187,18 @@ self.onmessage = async (event: MessageEvent) => {
         self.postMessage({ operation: "init-pipeline", id: event.data.id });
     } else if (operation === "encode" || operation === "decode") {
         const { readableStream, writableStream, id, publisherId } = event.data;
-        const context: TransformContext = { keyStore: getKeyStore(), id, publisherId };
+        const context: TransformContext = { id, publisherId };
         handleTransform(context, operation, kind, readableStream, writableStream);
     } else if (operation === "setKeys") {
         const data = event.data as events.SetKeysEvent;
-        getKeyStore().setKeys(data.keys);
+        keyStore.setKeys(data.keys);
+        self.postMessage({ operation: "setKeys-ack" });
     } else if (operation === "rms") {
         lastRMS = Math.round(event.data.rms as number);
     }
-};
+});
 
-function createSenderTransform(keyStore: KeyStore, kind: string) {
+function createSenderTransform(kind: string) {
     const encrypter = new EncryptTransform(keyStore);
     return new TransformStream({
         async transform(encodedFrame, controller) {
@@ -192,7 +208,7 @@ function createSenderTransform(keyStore: KeyStore, kind: string) {
 }
 
 function createReceiverTransform(context: TransformContext, kind: string) {
-    const encrypter = new EncryptTransform(context.keyStore);
+    const encrypter = new EncryptTransform(keyStore);
     return new TransformStream({
         async transform(encodedFrame, controller) {
             await encrypter.decryptFrame(
@@ -217,7 +233,7 @@ function handleTransform(
     logDebug("handleTransform: " + JSON.stringify({ operation, context }));
 
     if (operation === "encode") {
-        transformStream = createSenderTransform(context.keyStore, kind);
+        transformStream = createSenderTransform(kind);
         readableStream.pipeThrough(transformStream).pipeTo(writableStream);
     } else if (operation === "decode") {
         transformStream = createReceiverTransform(context, kind);
@@ -249,7 +265,6 @@ if ((self as any).RTCTransformEvent) {
         const { operation, kind, id, publisherId } = options;
 
         const context: TransformContext = {
-            keyStore: getKeyStore(),
             id,
             publisherId,
         };

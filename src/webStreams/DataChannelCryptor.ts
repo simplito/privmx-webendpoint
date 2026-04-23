@@ -1,3 +1,4 @@
+import { CryptoFacade } from "../crypto/CryptoFacade";
 import { DataChannelCryptorDecryptStatus } from "../Types";
 import { KeyStore } from "./KeyStore";
 import { Logger } from "./Logger";
@@ -69,18 +70,7 @@ export class DataChannelCryptor {
             keyIdBytes,
         });
 
-        const cryptoKey = await this.keyStore.getEncriptionKey();
-
-        const encrypted = await crypto.subtle.encrypt(
-            {
-                name: "AES-GCM",
-                iv,
-                additionalData: header,
-                tagLength: GCM_TAG_LENGTH_BITS,
-            },
-            cryptoKey,
-            plaintext,
-        );
+        const encrypted = await CryptoFacade.aeadEncrypt(keyId, iv, header, plaintext);
 
         const ciphertext = new Uint8Array(encrypted);
 
@@ -101,18 +91,20 @@ export class DataChannelCryptor {
             );
         }
 
-        const cryptoKey = await this.keyStore.getKey(parsed.keyId);
-
         try {
-            const decrypted = await crypto.subtle.decrypt(
-                {
-                    name: "AES-GCM",
-                    iv: parsed.iv,
-                    additionalData: parsed.header,
-                    tagLength: GCM_TAG_LENGTH_BITS,
-                },
-                cryptoKey,
-                parsed.ciphertext,
+            const fullBuffer = parsed.ciphertext;
+            if (fullBuffer.length < 16) {
+                throw new Error("Ciphertext too short for tag");
+            }
+            const data = fullBuffer.slice(0, fullBuffer.length - 16);
+            const tag = fullBuffer.slice(fullBuffer.length - 16);
+
+            const decrypted = await CryptoFacade.aeadDecrypt(
+                parsed.keyId,
+                parsed.iv,
+                parsed.header,
+                data,
+                tag,
             );
 
             return { data: new Uint8Array(decrypted), seq: parsed.sequenceNumber };

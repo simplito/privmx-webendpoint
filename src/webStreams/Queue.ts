@@ -53,17 +53,12 @@ export class Queue<T> implements Iterable<T> {
             const randId = Math.random();
             try {
                 await this.func(item);
-                await this.awaiter();
             } catch (err) {
                 console.error("Error while processing queue item", randId, err);
             }
         }
 
         this.processing = false;
-    }
-
-    async awaiter() {
-        return new Promise<void>((resolve) => setTimeout(() => resolve(), 5000));
     }
 
     [Symbol.iterator](): Iterator<T> {

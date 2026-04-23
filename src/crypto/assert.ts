@@ -18,33 +18,46 @@ export function assertIsArrayBuffer(value: unknown): asserts value is ArrayBuffe
 }
 
 export function assertIsUint8Array(value: unknown): asserts value is ArrayBuffer {
-    if (!(value instanceof Uint8Array) && !(value instanceof Int8Array)) throw new Error("Not Uint8Array or Int8Array");
+    if (!(value instanceof Uint8Array) && !(value instanceof Int8Array))
+        throw new Error("Not Uint8Array or Int8Array");
 }
 
 export function assertIsNumber(value: unknown): asserts value is number {
     if (typeof value !== "number") throw new Error("Not a number");
 }
 
-export function assertArgsValid<T>(obj: any, argsType: { new(...args: any[]): T }) {
+export function assertArgsValid<T>(obj: any, argsType: { new (...args: any[]): T }) {
     const objKeys = Object.keys(obj);
     const expected = Object.keys(new argsType());
-    if (!(objKeys.length === expected.length && objKeys.every(x => expected.includes(x)))) {
-        throw new Error("Invalid arguments list\nexpected: " + JSON.stringify(expected) + "\nactual: " + JSON.stringify(objKeys));
+    if (!objKeys.every((x) => expected.includes(x))) {
+        throw new Error(
+            "Invalid arguments list\nexpected: " +
+                JSON.stringify(expected) +
+                "\nactual: " +
+                JSON.stringify(objKeys),
+        );
     }
 }
 
-export function assertArgsAndValueValid<T>(actualObj: T, defaultObj: { new(...args: any[]): T}) {
+export function assertArgsAndValueValid<T>(actualObj: T, defaultObj: { new (...args: any[]): T }) {
     const objKeys = Object.keys(actualObj);
     const expected = Object.keys(new defaultObj());
-    if (!(objKeys.length === expected.length && objKeys.every(x => expected.includes(x)))) {
-        throw new Error("Invalid arguments list\nexpected: " + JSON.stringify(expected) + "\nactual: " + JSON.stringify(objKeys));
+    if (!objKeys.every((x) => expected.includes(x))) {
+        throw new Error(
+            "Invalid arguments list\nexpected: " +
+                JSON.stringify(expected) +
+                "\nactual: " +
+                JSON.stringify(objKeys),
+        );
     }
     const defaultInstance = new defaultObj();
     for (const p of objKeys) {
         const actualValue = actualObj[p as keyof typeof actualObj];
         const defaultValue = defaultInstance[p as keyof typeof actualObj];
         if (actualValue == defaultValue) {
-            throw new Error(`Invalid argument value of ${defaultObj.name}.${p}: ${(<any>defaultInstance)[p]}`);
+            throw new Error(
+                `Invalid argument value of ${defaultObj.name}.${p}: ${(<any>defaultInstance)[p]}`,
+            );
         }
     }
 }
