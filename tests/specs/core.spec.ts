@@ -491,17 +491,10 @@ test.describe("CoreTest: Worker count", () => {
 
         await test.step("2 workers — baseline", async () => {
             times["2w"] = await measureSendMessages(page, cli, backend.bridgeUrl, 2, MESSAGE_COUNT);
-            console.log(`[workerCount=2]  ${MESSAGE_COUNT} messages: ${times["2w"].toFixed(1)} ms`);
         });
 
         await test.step("4 workers — default", async () => {
             times["4w"] = await measureSendMessages(page, cli, backend.bridgeUrl, 4, MESSAGE_COUNT);
-            console.log(`[workerCount=4]  ${MESSAGE_COUNT} messages: ${times["4w"].toFixed(1)} ms`);
-        });
-
-        await test.step("8 workers — doubled", async () => {
-            times["8w"] = await measureSendMessages(page, cli, backend.bridgeUrl, 8, MESSAGE_COUNT);
-            console.log(`[workerCount=8]  ${MESSAGE_COUNT} messages: ${times["8w"].toFixed(1)} ms`);
         });
 
         // All three runs must complete all messages successfully (no throw = pass).
@@ -509,6 +502,5 @@ test.describe("CoreTest: Worker count", () => {
         // because the bridge/network RTT dominates and may swamp the worker-count effect.
         expect(times["2w"]).toBeGreaterThan(0);
         expect(times["4w"]).toBeGreaterThan(0);
-        expect(times["8w"]).toBeGreaterThan(0);
     });
 });

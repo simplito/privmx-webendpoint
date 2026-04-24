@@ -11,6 +11,9 @@ limitations under the License.
 
 #include "AsyncEngine.hpp"
 
+static constexpr size_t WORKER_COUNT_MIN     = 2;
+static constexpr size_t WORKER_COUNT_DEFAULT = 4;
+
 #include <Poco/JSON/Object.h>
 #include <Pson/pson.h>
 #include <emscripten/eventloop.h>
@@ -71,7 +74,7 @@ AsyncEngine* AsyncEngine::getInstance() {
 
 AsyncEngine::AsyncEngine() {
     int requested = readWorkerCountFromJs();
-    size_t numWorkers = (requested >= 2) ? static_cast<size_t>(requested) : 4;
+    size_t numWorkers = (static_cast<size_t>(requested) >= WORKER_COUNT_MIN) ? static_cast<size_t>(requested) : WORKER_COUNT_DEFAULT;
     _pool = std::make_unique<WorkerPool>(numWorkers);
     _taskManagerThread = std::thread([=] { emscripten_runtime_keepalive_push(); });
 }

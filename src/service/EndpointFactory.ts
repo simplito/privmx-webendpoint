@@ -34,6 +34,7 @@ import { StreamApi } from "./StreamApi";
 import { ThreadApi } from "./ThreadApi";
 import { setGlobalEmCrypto } from "../crypto/index";
 
+
 /**
  * //doc-gen:ignore
  */
@@ -48,6 +49,9 @@ export interface EndpointSetupOptions {
  * Contains static factory methods - generators for Connection and APIs.
  */
 export class EndpointFactory {
+
+    private static readonly WORKER_COUNT_MIN = 2;
+
     private static api: Api;
     private static eventQueueInstance: EventQueue;
     private static assetsBasePath: string;
@@ -74,7 +78,7 @@ export class EndpointFactory {
         // worker thread), before the main thread gets control back.
         if (workerCount !== undefined) {
             (window as unknown as Record<string, unknown>).__privmxWorkerCount = Math.max(
-                2,
+                EndpointFactory.WORKER_COUNT_MIN,
                 Math.floor(workerCount),
             );
         }
