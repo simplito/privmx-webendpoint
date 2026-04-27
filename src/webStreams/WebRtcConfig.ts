@@ -1,5 +1,4 @@
 import { TurnCredentials } from "../Types";
-import { PeerCredentials } from "./WebRtcClientTypes";
 
 export class WebRtcConfig {
     // TMP IV

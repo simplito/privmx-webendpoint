@@ -68,10 +68,7 @@ export class ActiveSpeakerDetector {
     }
 
     private selectActiveSpeakers(now: number): SpeakerState[] {
-        let bestId: SpeakerId | null = null;
-        let bestRms = -Infinity;
-
-        for (const [id, state] of this.speakers.entries()) {
+        for (const [_id, state] of this.speakers.entries()) {
             state.active =
                 now - state.lastAboveThresholdTs <= this.opts.activityWindowMs &&
                 now - state.activeSince < this.opts.holdMs;

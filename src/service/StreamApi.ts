@@ -5,7 +5,6 @@ import { AudioLevelsStats, WebRtcClient } from "../webStreams/WebRtcClient";
 import {
     DataChannelMeta,
     StreamCreateMeta,
-    StreamId,
     StreamTrackId,
 } from "../webStreams/types/ApiTypes";
 import { BaseApi } from "./BaseApi";
@@ -25,15 +24,13 @@ import {
     RemoteStreamListener,
 } from "../Types";
 import { StreamApiNative } from "../api/StreamApiNative";
-import { DataChannelCryptor } from "../webStreams/DataChannelCryptor";
-import { Logger } from "../webStreams/Logger";
 
 export interface StreamTrack {
     id: Types.StreamTrackId;
     streamHandle: StreamHandle;
     track?: MediaStreamTrack;
     dataChannelMeta: DataChannelMeta;
-    published: Boolean;
+    published: boolean;
     markedToRemove?: boolean;
 }
 
@@ -300,7 +297,7 @@ export class StreamApi extends BaseApi {
                 "[removeStreamTrack]: there is no Stream with given Id: " + streamHandle,
             );
         }
-        for (const [key, streamTrack] of this.streamTracks.entries()) {
+        for (const [_key, streamTrack] of this.streamTracks.entries()) {
             if (
                 streamTrack.track &&
                 streamTrack.track?.id === meta.track?.id &&

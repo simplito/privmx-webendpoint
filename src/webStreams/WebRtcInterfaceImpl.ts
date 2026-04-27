@@ -10,12 +10,10 @@ limitations under the License.
 */
 
 import {
-    CurrentPublishersData,
     Jsep,
     RoomModel,
     SdpWithRoomModel,
     SetAnswerAndSetRemoteDescriptionModel,
-    StreamsUpdatedData,
     UpdateKeysModel,
     WebRtcInterface,
 } from "../service/WebRtcInterface";

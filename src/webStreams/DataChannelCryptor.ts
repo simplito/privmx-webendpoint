@@ -3,9 +3,7 @@ import { DataChannelCryptorDecryptStatus } from "../Types";
 import { KeyStore } from "./KeyStore";
 import { Logger } from "./Logger";
 
-const AES_GCM_KEY_LENGTH_BYTES = 32;
 const GCM_NONCE_LENGTH_BYTES = 12;
-const GCM_TAG_LENGTH_BITS = 128;
 const VERSION_LENGTH_BYTES = 1;
 const KEY_ID_LENGTH_BYTES = 1;
 const SEQUENCE_NUMBER_LENGTH_BYTES = 4;
