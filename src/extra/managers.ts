@@ -113,7 +113,7 @@ export abstract class BaseEventDispatcherManager {
             const subscription = subscriptions[i];
             this._listeners.set(id, subscription.callbacks);
             for (const cb of subscription.callbacks) {
-                this._listenerssymbols.set(cb.symbol, id);
+                this._listenersSymbols.set(cb.symbol, id);
             }
             return subscription;
         });
@@ -123,7 +123,7 @@ export abstract class BaseEventDispatcherManager {
     async unsubscribeFrom(subscriptionsId: string[]) {
         const knownIds: string[] = [];
         for (const subscriptionId of subscriptionsId) {
-            for (const [key, callbackSubscription] of this._listenerssymbols.entries()) {
+            for (const [key, callbackSubscription] of this._listenersSymbols.entries()) {
                 if (callbackSubscription === subscriptionId) {
                     knownIds.push(subscriptionId);
                     this.unregisterCallback(key);

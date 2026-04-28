@@ -654,7 +654,10 @@ export class EmCrypto {
         assertIsUint8Array(params.signature);
         // signature format: [recovery_byte (1B)] [r (32B)] [s (32B)]
         const compactSig = params.signature.subarray(1, 65); // 64 bytes: r || s
-        return secp.verify(compactSig, params.data, params.publicKey, { prehash: false, lowS: false });
+        return secp.verify(compactSig, params.data, params.publicKey, {
+            prehash: false,
+            lowS: false,
+        });
     }
 
     public async eccVerify2(params: Types.Verify2_PARAMS) {
@@ -716,7 +719,9 @@ export class EmCrypto {
         assertArgsValid(params, Types.BNeq_PARAMS);
         assertIsUint8Array(params.bn);
         assertIsUint8Array(params.bn2);
-        return bytesToBigInt(new Uint8Array(params.bn)) === bytesToBigInt(new Uint8Array(params.bn2));
+        return (
+            bytesToBigInt(new Uint8Array(params.bn)) === bytesToBigInt(new Uint8Array(params.bn2))
+        );
     }
 
     public async pointEncode(params: Types.PointEncode_PARAMS) {

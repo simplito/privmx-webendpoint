@@ -112,7 +112,10 @@ export class PeerConnectionFactory {
             let decryptResult: { data: Uint8Array; statusCode: number };
             try {
                 const decrypted = await this.dataChannelSession.decrypt(remoteStreamId, frame);
-                decryptResult = { data: decrypted.data, statusCode: DataChannelCryptorDecryptStatus.OK };
+                decryptResult = {
+                    data: decrypted.data,
+                    statusCode: DataChannelCryptorDecryptStatus.OK,
+                };
             } catch (e) {
                 if (e instanceof DataChannelCryptorError) {
                     decryptResult = { data: new Uint8Array(), statusCode: e.code };
@@ -121,7 +124,12 @@ export class PeerConnectionFactory {
                     return;
                 }
             }
-            this.listenerRegistry.dispatchData(roomId, remoteStreamId, decryptResult.data, decryptResult.statusCode);
+            this.listenerRegistry.dispatchData(
+                roomId,
+                remoteStreamId,
+                decryptResult.data,
+                decryptResult.statusCode,
+            );
         };
     }
 }
