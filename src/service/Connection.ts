@@ -16,7 +16,6 @@ import {
     PagingList,
     Context,
     UserInfo,
-    PKIVerificationOptions,
     ConnectionEventType,
     ConnectionEventSelectorType,
 } from "../Types";

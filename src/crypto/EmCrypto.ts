@@ -19,7 +19,7 @@ import { secp256k1 as secp } from "@noble/curves/secp256k1.js";
 const subtle =
     typeof crypto !== "undefined"
         ? crypto.subtle
-        : (globalThis as unknown as { crypto?: { subtle?: SubtleCrypto } }).crypto?.subtle!;
+        : (globalThis as unknown as { crypto: { subtle: SubtleCrypto } }).crypto.subtle;
 
 const textEncoder = new TextEncoder();
 

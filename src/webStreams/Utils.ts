@@ -1,5 +1,3 @@
-import { CryptoFacade } from "../crypto/CryptoFacade";
-
 export class Utils {
     public static generateNumericId(): number {
         return new DataView(crypto.getRandomValues(new Uint8Array(6)).buffer).getUint32(0, false);

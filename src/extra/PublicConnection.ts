@@ -1,5 +1,5 @@
 import { Inboxes } from ".";
-import { Connection, EndpointFactory, InboxApi, StoreApi, ThreadApi, KvdbApi } from "../service";
+import { Connection, EndpointFactory, InboxApi, StoreApi, ThreadApi } from "../service";
 
 import { InboxEntryPayload } from "./inbox";
 

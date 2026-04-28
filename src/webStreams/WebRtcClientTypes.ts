@@ -1,4 +1,3 @@
-import { MediaServerApiTypes } from "../ServerTypes";
 import { NewPublisherEvent } from "../service/WebRtcInterface";
 import { StreamRoomId } from "./types/ApiTypes";
 export declare class RTCRtpScriptTransform {

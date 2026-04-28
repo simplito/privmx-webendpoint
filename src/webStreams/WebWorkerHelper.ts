@@ -4,7 +4,7 @@ import { InitializeEvent, SetKeysEvent } from "./worker/WorkerEvents";
 interface WorkerLogEvent {
     data:
         | {
-              data: Object | String;
+              data: object | string;
               type: "error" | "debug";
           }
         | {
@@ -43,7 +43,7 @@ export class WebWorker {
                         });
                     }
                 }
-            } catch (e) {
+            } catch {
                 console.error("[Worker]: invalid event");
             }
         };

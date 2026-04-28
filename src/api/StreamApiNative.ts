@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Jsep, SdpWithRoomModel } from "../service/WebRtcInterface";
+import { Jsep } from "../service/WebRtcInterface";
 import {
     ContainerPolicy,
     PagingList,
@@ -27,7 +27,6 @@ import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
 import { Api } from "./Api";
 import { BaseNative } from "./BaseNative";
 import * as Types from "../Types";
-import { StreamId } from "../webStreams/types/ApiTypes";
 
 export class StreamApiNative extends BaseNative {
     protected static bindingId: number = -1;

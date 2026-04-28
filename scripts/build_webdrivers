@@ -7,42 +7,47 @@ SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 source "$SCRIPT_PATH/config.sh"
 source "$EMSDK_DIR/emsdk_env.sh"
 
+# Build variant: "debug" enables debug flags. Defaults to "release".
+PRIVMX_BUILD_TYPE="${PRIVMX_BUILD_TYPE:-release}"
+
 sep() {
     echo "=========================== $1 =========================="
 }
 
+configure_if_needed() {
+    local label="$1"
+    CACHED_BUILD_TYPE=""
+    if [ -f CMakeCache.txt ]; then
+        CACHED_BUILD_TYPE=$(grep -m1 "^PRIVMX_BUILD_TYPE:STRING=" CMakeCache.txt | cut -d= -f2 || true)
+    fi
+    if [ ! -f CMakeCache.txt ] || [ "$CACHED_BUILD_TYPE" != "$PRIVMX_BUILD_TYPE" ]; then
+        echo "Configuring $label (build type: $PRIVMX_BUILD_TYPE)..."
+        emcmake cmake .. \
+            -D CMAKE_BUILD_TYPE=MinSizeRel \
+            -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -D PRIVMX_BUILD_TYPE="$PRIVMX_BUILD_TYPE"
+    else
+        echo "CMakeCache.txt exists with matching build type ($PRIVMX_BUILD_TYPE) — skipping cmake configure."
+    fi
+}
+
 sep "PRIVMX_WEBENDPOINT_DRV_CRYPTO_SRC"
 cd "$PRIVMX_WEBENDPOINT_DRV_CRYPTO_SRC"
-
-if [ ! -d "./build-emscripten" ]; then
-    mkdir -p build-emscripten && cd build-emscripten
-    emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
-else
-    cd build-emscripten
-fi
+mkdir -p build-emscripten && cd build-emscripten
+configure_if_needed "drv-crypto"
 emmake make -j20
 emmake make install
 
 sep "PRIVMX_WEBENDPOINT_DRV_ECC_SRC"
 cd "$PRIVMX_WEBENDPOINT_DRV_ECC_SRC"
-
-if [ ! -d "./build-emscripten" ]; then
-    mkdir -p build-emscripten && cd build-emscripten
-    emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
-else
-    cd build-emscripten
-fi
+mkdir -p build-emscripten && cd build-emscripten
+configure_if_needed "drv-ecc"
 emmake make -j20
 emmake make install
 
 sep "PRIVMX_WEBENDPOINT_DRV_NET_SRC"
 cd "$PRIVMX_WEBENDPOINT_DRV_NET_SRC"
-
-if [ ! -d "./build-emscripten" ]; then
-    mkdir -p build-emscripten && cd build-emscripten
-    emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
-else
-    cd build-emscripten
-fi
+mkdir -p build-emscripten && cd build-emscripten
+configure_if_needed "drv-net"
 emmake make -j20
 emmake make install
