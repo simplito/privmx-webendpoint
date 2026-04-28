@@ -36,7 +36,7 @@ export class StateChangeDispatcher {
      * Removes all listeners whose `streamHandle` equals `filter.streamHandle`.
      */
     removeOnStateChangeListener(filter: StateChangeFilter): void {
-        for (const value of [...this.listeners]) {
+        for (const value of this.listeners) {
             if (value.filter.streamHandle === filter.streamHandle) {
                 this.listeners.delete(value);
             }

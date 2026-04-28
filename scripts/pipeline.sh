@@ -5,6 +5,10 @@ set -o pipefail
 SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
 source "$SCRIPT_PATH/../build-manifest.sh"
 
+# Build variant: release (default) or debug.
+# Set via environment variable: PRIVMX_BUILD_TYPE=debug npm run build:wasm
+PRIVMX_BUILD_TYPE="${PRIVMX_BUILD_TYPE:-release}"
+
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
@@ -155,6 +159,7 @@ fi
 
 echo "${BLUE}----------------------------------------"
 echo " Starting Build Process..."
+echo " Build type: ${PRIVMX_BUILD_TYPE}"
 echo "---------------------------------------${RESET}"
 
 run_step "Download and Install Emscripten SDK" "$SCRIPT_PATH/get_emsdk"
@@ -165,7 +170,7 @@ run_step "Build secp256k1 Cryptography Library" "$SCRIPT_PATH/build_secp"
 run_step "Build Async Engine" "$SCRIPT_PATH/build_async_engine"
 run_step "Build Web Browser Drivers" "$SCRIPT_PATH/build_webdrivers"
 run_step "Build PrivMX Endpoint Module" "$SCRIPT_PATH/build_privmx_endpoint" $PRIVMX_ENDPOINT
-run_step "Build API Interface" "$SCRIPT_PATH/build_api" $PRIVMX_ENDPOINT
+run_step "Build API Interface" "$SCRIPT_PATH/build_api" $PRIVMX_ENDPOINT "$PRIVMX_BUILD_TYPE"
 run_step "Add Built Assets to package" "$SCRIPT_PATH/move_wasm_assets"
 
 echo "${BLUE}----------------------------------------"
