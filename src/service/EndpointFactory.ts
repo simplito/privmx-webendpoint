@@ -26,6 +26,7 @@ import { GlobalContainer, ConnectionContainer } from "../ioc/Container";
 import { T } from "../ioc/Tokens";
 import { registerGlobalServices, registerConnectionServices } from "../ioc/buildConnectionApis";
 import { setGlobalEmCrypto } from "../crypto/index";
+import { ExtKey } from "./ExtKey";
 
 /**
  * //doc-gen:ignore
@@ -136,6 +137,7 @@ export class EndpointFactory {
     private static init(lib: any) {
         this.api = new Api(lib);
         FinalizationHelper.init(lib);
+        ExtKey.init(this.api);
 
         this.globalContainer = new GlobalContainer();
         registerGlobalServices(this.globalContainer, this.api, this.assetsBasePath);

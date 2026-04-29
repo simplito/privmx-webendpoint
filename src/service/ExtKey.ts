@@ -4,67 +4,71 @@ import { FinalizationHelper } from "../FinalizationHelper";
 import { BaseApi } from "./BaseApi";
 
 export class ExtKey extends BaseApi {
-    private static makeNative(api: Api): ExtKeyNative {
-        return new ExtKeyNative(api);
+    private static api: Api;
+
+    /** @internal Called by EndpointFactory during WASM initialisation. */
+    static init(api: Api): void {
+        ExtKey.api = api;
     }
 
-    private static registerFinalization(extKey: ExtKey, ptr: ExtKeyNativePtr, api: Api): void {
+    private static makeNative(): ExtKeyNative {
+        return new ExtKeyNative(ExtKey.api);
+    }
+
+    private static registerFinalization(extKey: ExtKey, ptr: ExtKeyNativePtr): void {
         FinalizationHelper.getInstance().register(extKey, {
             ptr,
             onFree: async () => {
-                await new ExtKeyNative(api).deleteExtKey(ptr);
+                await new ExtKeyNative(ExtKey.api).deleteExtKey(ptr);
             },
         });
     }
 
     /**
      * Creates ExtKey from given seed.
-     * @param {Api} api the WASM Api instance
      * @param {Uint8Array} seed the seed used to generate Key
      * @returns {ExtKey} object
      */
-    static async fromSeed(api: Api, seed: Uint8Array): Promise<ExtKey> {
-        const native = this.makeNative(api);
+    static async fromSeed(seed: Uint8Array): Promise<ExtKey> {
+        const native = this.makeNative();
         const ptr = await native.fromSeed([seed]);
         const extKey = new ExtKey(native, ptr);
-        this.registerFinalization(extKey, ptr, api);
+        this.registerFinalization(extKey, ptr);
         return extKey;
     }
 
     /**
      * Decodes ExtKey from Base58 format.
      *
-     * @param {Api} api the WASM Api instance
      * @param {string} base58 the ExtKey in Base58
      * @returns {ExtKey} object
      */
-    static async fromBase58(api: Api, base58: string): Promise<ExtKey> {
-        const native = this.makeNative(api);
+    static async fromBase58(base58: string): Promise<ExtKey> {
+        const native = this.makeNative();
         const ptr = await native.fromBase58([base58]);
         const extKey = new ExtKey(native, ptr);
-        this.registerFinalization(extKey, ptr, api);
+        this.registerFinalization(extKey, ptr);
         return extKey;
     }
 
     /**
      * Generates a new ExtKey.
      *
-     * @param {Api} api the WASM Api instance
      * @returns {ExtKey} object
      */
-    static async generateRandom(api: Api): Promise<ExtKey> {
-        const native = this.makeNative(api);
+    static async generateRandom(): Promise<ExtKey> {
+        const native = this.makeNative();
         const ptr = await native.generateRandom([]);
         const extKey = new ExtKey(native, ptr);
-        this.registerFinalization(extKey, ptr, api);
+        this.registerFinalization(extKey, ptr);
         return extKey;
     }
 
     /**
      * //doc-gen:ignore
      */
-    static fromPtr(api: Api, ptr: ExtKeyNativePtr): ExtKey {
-        return new ExtKey(this.makeNative(api), ptr);
+    static fromPtr(ptr: ExtKeyNativePtr): ExtKey {
+        return new ExtKey(this.makeNative(), ptr);
     }
 
     private constructor(
