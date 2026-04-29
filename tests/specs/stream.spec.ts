@@ -46,19 +46,11 @@ test.describe("StreamTest", () => {
     test.beforeEach(async ({ page }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-        await page.evaluate(async () => {
-            await window.Endpoint.setup("../../assets");
-        });
     });
 
     const initPage = async (page: any) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-        await page.evaluate(async () => {
-            try {
-                await window.Endpoint.setup("../../assets");
-            } catch {}
-        });
     };
 
     const connectUserToBridge = async (
@@ -1728,11 +1720,6 @@ test.describe("StreamTest", () => {
         const initPage = async (p: any) => {
             await p.goto("/tests/harness/index.html");
             await p.waitForFunction(() => window.wasmReady === true);
-            await p.evaluate(async () => {
-                try {
-                    await window.Endpoint.setup("../../assets");
-                } catch {}
-            });
         };
         await initPage(page1);
         await initPage(page2);

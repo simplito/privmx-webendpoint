@@ -14,3 +14,4 @@ builds/
 assets/
 tests/volumes
 CLAUDE.md
+tests/pkg

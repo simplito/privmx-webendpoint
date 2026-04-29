@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html>
 <body>
-    <script src="../../dist/bundle/privmx-endpoint-web.js"></script>
+    <script src="../pkg/dist/bundle/privmx-endpoint-web.js"></script>
 
     <script>
         const lib = window.PrivmxWebEndpoint;
         window.Endpoint = lib.Endpoint;
-        window.wasmReady = true;
+        // setup() is called here so spec files' subsequent calls are no-ops
+        // (EndpointFactory.setup is idempotent — returns early if already initialized).
+        window.Endpoint.setup("../pkg/assets").then(() => {
+            window.wasmReady = true;
+        });
     </script>
 </body>
 </html>

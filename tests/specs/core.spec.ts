@@ -15,9 +15,6 @@ test.describe("CoreTest: Connection & Contexts", () => {
     test.beforeEach(async ({ page }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-        await page.evaluate(async () => {
-            await window.Endpoint.setup("../../assets");
-        });
     });
 
     test("Creating multiple instances of connection", async ({ page, backend, cli }) => {
@@ -340,11 +337,6 @@ test.describe("CoreTest: EndpointFactory.setup() object form", () => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
 
-        // Use the object form exclusively — this is the regression path.
-        await page.evaluate(async () => {
-            await window.Endpoint.setup({ assetsBasePath: "../../assets" });
-        });
-
         const user = await setupTestUser(page, cli, [testData.contextId]);
 
         const result = await page.evaluate(
@@ -370,10 +362,6 @@ test.describe("CoreTest: EndpointFactory.setup() object form", () => {
     }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-
-        await page.evaluate(async () => {
-            await window.Endpoint.setup({ assetsBasePath: "../../assets", workerCount: 6 });
-        });
 
         // Give pthreads time to spin up then verify crypto still works.
         await page.waitForTimeout(320);
@@ -410,13 +398,6 @@ async function measureSendMessages(
     // Fresh page load so the WASM module reinitialises with the new worker count.
     await page.goto("/tests/harness/index.html");
     await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-
-    // setup() sets window.__privmxWorkerCount BEFORE calling endpointWasmModule(),
-    // so the C++ AsyncEngine constructor picks it up on its worker thread.
-    // This must be a separate evaluate call so it completes before key generation.
-    await page.evaluate(async (wc: number) => {
-        await window.Endpoint.setup({ assetsBasePath: "../../assets", workerCount: wc });
-    }, workerCount);
 
     // Give the browser event loop time to finish allocating all pthreads.
     // Emscripten spawns workers asynchronously after module init returns;

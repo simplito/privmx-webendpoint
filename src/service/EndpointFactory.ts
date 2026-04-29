@@ -47,6 +47,7 @@ export class EndpointFactory {
     private static globalContainer: GlobalContainer;
     private static assetsBasePath: string;
     private static api: Api;
+    private static initialized = false;
 
     // Per-Connection containers, keyed by the Connection instance.
     // WeakMap ensures no memory leak when a Connection is garbage-collected.
@@ -60,6 +61,8 @@ export class EndpointFactory {
      * @param {number} [options.workerCount] number of async-engine worker threads (default: 4, minimum: 2)
      */
     public static async setup(options?: string | EndpointSetupOptions): Promise<void> {
+        if (this.initialized) return;
+        this.initialized = true;
         const resolved: EndpointSetupOptions =
             typeof options === "object" && options !== null
                 ? options

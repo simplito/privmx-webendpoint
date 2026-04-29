@@ -1,6 +1,6 @@
 {
   "name": "@simplito/privmx-webendpoint",
-  "version": "2.7.4",
+  "version": "2.7.5",
   "description": "PrivMX Web Endpoint library",
   "author": "Simplito",
   "license": "PrivMX Free License",
@@ -44,11 +44,12 @@
     "build:wasm": "scripts/pipeline.sh",
     "build:wasm:debug": "PRIVMX_BUILD_TYPE=debug scripts/pipeline.sh",
     "build:js": "npm run compile && npm run bundle && npm run build:worker && cp ./dist/assets/* ./assets/ && cp ./dist/bundle/rms-processor.js ./assets/",
-    "build:worker": "webpack --config ./webpack.worker.config.js",
+    "build:worker": "vite build --config ./vite.worker.config.ts",
     "clean:wasm": "scripts/clean_wasm",
     "compile": "tsc --project tsconfig.build.json",
-    "bundle": "webpack",
+    "bundle": "vite build --config ./vite.config.ts && cp src/webStreams/audio/rms-processor.js dist/bundle/",
     "watch:types": "tsc -w --project tsconfig.build.json",
+    "pretest:e2e": "npm run build-package && mkdir -p tests/pkg && tar -xzf builds/privmx-webendpoint-latest.tgz -C tests/pkg --strip-components=1",
     "test:e2e": "playwright test --project=chromium",
     "test:e2e:manybrowsers": "playwright test",
     "lint": "oxlint src/",
@@ -57,8 +58,8 @@
     "format:clang": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format -i",
     "lint:clang-format": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format --dry-run --Werror",
     "prepack": "mkdir -p ./builds",
-    "build-package": "npm pack --pack-destination ./builds",
-    "watch": "webpack serve"
+    "build-package": "npm pack --pack-destination ./builds && cd builds && mv $(ls -t simplito-privmx-webendpoint-*.tgz | head -1) privmx-webendpoint-latest.tgz",
+    "watch": "vite build --config ./vite.config.ts --watch"
   },
   "files": [
     "dist",
@@ -76,20 +77,15 @@
     "@types/aes-js": "^3.1.4",
     "@types/jest": "^29.5.14",
     "@types/node": "^20.9.0",
-    "@types/webpack": "^5.28.5",
-    "copy-webpack-plugin": "^14.0.0",
     "jest": "^29.7.0",
     "mongodb": "^7.0.0",
     "oxfmt": "^0.47.0",
     "oxlint": "^1.60.0",
     "ts-jest": "^29.2.5",
-    "ts-loader": "^9.5.1",
     "ts-node": "^10.9.1",
     "tslib": "^2.6.2",
     "typescript": "5.8",
-    "webpack": "^5.89.0",
-    "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^5.2.2"
+    "vite": "^8.0.10"
   },
   "dependencies": {
     "@noble/curves": "^2.2.0",

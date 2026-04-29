@@ -8,7 +8,8 @@ import { DataChannelSession } from "./DataChannelSession";
 import { E2eeWorker } from "./E2eeWorker";
 import { KeySyncManager } from "./KeySyncManager";
 import { StateChangeDispatcher } from "./EventDispatcher";
-import { AudioManager, AudioLevelFuncCallback } from "./AudioManager";
+import { AudioManager } from "./AudioManager";
+import type { AudioLevelFuncCallback } from "./AudioManager";
 import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry";
 
 export interface StreamsCallbackInterface {
@@ -16,7 +17,7 @@ export interface StreamsCallbackInterface {
     acceptOffer(sessionId: SessionId, sdp: Jsep): Promise<void>;
 }
 
-export { AudioLevelFuncCallback };
+export type { AudioLevelFuncCallback };
 export type { AudioLevelsStats } from "./AudioManager";
 
 /**

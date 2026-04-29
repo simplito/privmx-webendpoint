@@ -51,9 +51,6 @@ test.describe("CryptoTest", () => {
     test.beforeEach(async ({ page }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-        await page.evaluate(async () => {
-            await window.Endpoint.setup("../../assets");
-        });
     });
 
     test("Signing Data", async ({ page }) => {
