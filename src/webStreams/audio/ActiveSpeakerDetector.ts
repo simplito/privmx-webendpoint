@@ -25,8 +25,7 @@ export interface SpeakerState {
     readonly emaRms: number;
     readonly noiseFloor: number;
     readonly lastAboveThresholdTs: number;
-    readonly activeSince: number;
-    readonly active: boolean;
+    readonly activeUntil: number;
 }
 
 interface ActiveSpeakerDetectorOptions {
@@ -43,8 +42,7 @@ interface MutableSpeakerState {
     emaRms: number;
     noiseFloor: number;
     lastAboveThresholdTs: number;
-    activeSince: number;
-    active: boolean;
+    activeUntil: number;
 }
 
 /**
@@ -76,12 +74,7 @@ export class ActiveSpeakerDetector {
 
         if (state.emaRms >= adaptiveThreshold) {
             state.lastAboveThresholdTs = timestamp;
-            if (!isFinite(state.activeSince)) {
-                // Record the start of this continuous active window
-                state.activeSince = timestamp;
-            }
-        } else {
-            state.activeSince = -Infinity;
+            state.activeUntil = timestamp + this.opts.holdMs;
         }
 
         return this.selectActiveSpeakers(timestamp);
@@ -93,11 +86,6 @@ export class ActiveSpeakerDetector {
 
     private selectActiveSpeakers(now: number): SpeakerState[] {
         for (const [id, state] of this.speakers.entries()) {
-            const withinWindow = now - state.lastAboveThresholdTs <= this.opts.activityWindowMs;
-            const withinHold =
-                isFinite(state.activeSince) && now - state.activeSince < this.opts.holdMs;
-            state.active = withinWindow && withinHold;
-
             // Only prune entries that have had at least one real above-threshold frame.
             // Entries still at -Infinity were just created and should not be evicted yet.
             if (
@@ -119,8 +107,7 @@ export class ActiveSpeakerDetector {
                 emaRms: rms,
                 noiseFloor: rms,
                 lastAboveThresholdTs: -Infinity,
-                activeSince: -Infinity,
-                active: false,
+                activeUntil: -Infinity,
             };
             this.speakers.set(id, state);
         }
