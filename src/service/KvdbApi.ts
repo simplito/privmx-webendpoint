@@ -221,38 +221,6 @@ export class KvdbApi extends BaseApi {
         return this.native.deleteEntries(this.servicePtr, [kvdbId, keys]);
     }
 
-    // /**
-    //  * Subscribes for the KVDB module main events.
-    //  */
-    // async subscribeForKvdbEvents(): Promise<void> {
-    //   return this.native.subscribeForKvdbEvents(this.servicePtr, []);
-    // }
-
-    // /**
-    //  * Unsubscribes from the KVDB module main events.
-    //  */
-    // async unsubscribeFromKvdbEvents(): Promise<void> {
-    //   return this.native.unsubscribeFromKvdbEvents(this.servicePtr, []);
-    // }
-
-    // /**
-    //  * Subscribes for events in given KVDB.
-    //  * @param {string} kvdbId ID of the KVDB to subscribe
-    //  */
-    // async subscribeForEntryEvents(kvdbId: string): Promise<void> {
-    //   return this.native.subscribeForEntryEvents(this.servicePtr, [kvdbId]);
-    // }
-
-    // /**
-    //  * Unsubscribes from events in given KVDB.
-    //  * @param {string} kvdbId ID of the KVDB to unsubscribe
-    //  */
-    // async unsubscribeFromEntryEvents(kvdbId: string): Promise<void> {
-    //   return this.native.unsubscribeFromEntryEvents(this.servicePtr, [
-    //     kvdbId,
-    //   ]);
-    // }
-
     /**
      * Subscribe for the KVDB events on the given subscription query.
      *

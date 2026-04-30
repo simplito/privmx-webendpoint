@@ -627,7 +627,7 @@ test.describe("CoreTest: Thread Events", () => {
                 await threadApi.subscribeFor([`treads/update|contextId=${contextId}`]);
             });
 
-            // "store" module via threadApi (might fail depending on API strictness)
+            // "store" module subscription via threadApi must fail
             await expectError(async () => {
                 await threadApi.subscribeFor([`store/update|contextId=${contextId}`]);
             });
@@ -665,16 +665,11 @@ test.describe("CoreTest: Thread Events", () => {
                     enc.encode("p"),
                 );
 
-                // Subscribe for Collection Change (e.g. standard thread change subscription)
-                // Assuming "collection/change" or similar enum maps to COLLECTION_CHANGE
-                // If we don't know the exact string, usually generic subscriptions or ThreadEventSelectorType.THREAD_ID covers it.
-                // Using the builder:
                 const query = await threadApi.buildSubscriptionQuery(
                     eventType.COLLECTION_CHANGE,
                     selectorType.THREAD_ID,
                     tId,
                 );
-                // Note: If "collection/change" isn't the string, fallback to what the legacy test used: Types.ThreadEventType.COLLECTION_CHANGE
 
                 await threadApi.subscribeFor([query]);
 

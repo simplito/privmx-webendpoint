@@ -21,16 +21,6 @@ export class EventApi extends BaseApi {
         super(ptr);
     }
 
-    // /**
-    //  * Creates an instance of 'EventApi'.
-    //  *
-    //  * @param connection instance of 'Connection'
-    //  *
-    //  * @return EventApi object
-    //  */
-    // static EventApi create(core::Connection& connection);
-    // EventApi() = default;
-
     /**
      * Emits the custom event on the given Context and channel.
      *
@@ -47,26 +37,6 @@ export class EventApi extends BaseApi {
     ) {
         return this.native.emitEvent(this.servicePtr, [contextId, users, channelName, eventData]);
     }
-
-    // /**
-    //  * Subscribe for the custom events on the given channel.
-    //  *
-    //  * @param {string} contextId ID of the Context
-    //  * @param {string} channelName name of the Channel
-    //  */
-    // async subscribeForCustomEvents(contextId: string, channelName: string) {
-    //   return this.native.subscribeForCustomEvents(this.servicePtr, [contextId, channelName]);
-    // }
-
-    // /**
-    //  * Unsubscribe from the custom events on the given channel.
-    //  *
-    //  * @param {string} contextId ID of the Context
-    //  * @param {string} channelName name of the Channel
-    //  */
-    // async unsubscribeFromCustomEvents(contextId: string, channelName: string) {
-    //   return this.native.unsubscribeFromCustomEvents(this.servicePtr, [contextId, channelName]);
-    // }
 
     /**
      * Subscribe for the custom events on the given subscription query.

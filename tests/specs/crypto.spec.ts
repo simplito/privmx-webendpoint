@@ -168,7 +168,6 @@ test.describe("CryptoTest", () => {
     test("Generating BIP39 key", async ({ page }) => {
         await page.evaluate(async (pass) => {
             const cryptoApi = await window.Endpoint.createCryptoApi();
-            // Just verifying it doesn't crash
             await cryptoApi.generateBip39(128, pass);
         }, BIP39_DATA.password);
     });
@@ -198,7 +197,6 @@ test.describe("CryptoTest", () => {
         expect(result.bip39_entropy_hex).toEqual(BIP39_DATA.entropy_hex);
         expect(result.bip39_p_entropy_hex).toEqual(BIP39_DATA.entropy_hex);
 
-        // Note: Update BIP39_DATA with actual expected values if using a custom seed
         if (BIP39_DATA.privatePartAsBase58_withoutPassword) {
             expect(result.bip39_PrivatePartAsBase58).toEqual(
                 BIP39_DATA.privatePartAsBase58_withoutPassword,
@@ -327,13 +325,11 @@ test.describe("CryptoTest", () => {
             };
         }, BIP39_DATA);
 
-        // Basic sanity checks
         expect(result.privatePartBase58).toBeDefined();
         expect(result.publicPartBase58).toBeDefined();
         expect(result.privateKeyWIF).toHaveLength(52); // Standard WIF length
         expect(result.chainCodeHex).toHaveLength(64); // 32 bytes hex
 
-        // If you have exact expected values from HelpersEx, assert them here:
         if (BIP39_DATA.chainCode_withPassword_hex) {
             expect(result.chainCodeHex).toEqual(BIP39_DATA.chainCode_withPassword_hex);
         }

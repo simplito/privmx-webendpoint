@@ -61,7 +61,6 @@ test.describe("CoreTest: Connection & Contexts", () => {
             return { listContexts_1, listContexts_2 };
         }, args);
 
-        // Assertions
         const list1 = result.listContexts_1;
         expect(list1.totalAvailable).toBeGreaterThanOrEqual(1);
         expect(list1.readItems[0].userId).toEqual(testData.userId);
@@ -96,7 +95,6 @@ test.describe("CoreTest: Connection & Contexts", () => {
             const connection_1 = await Endpoint.connect(user1.privKey, solutionId, bridgeUrl);
             const connection_2 = await Endpoint.connect(user2.privKey, solutionId, bridgeUrl);
 
-            // Verify both work
             await connection_1.listContexts({ skip: 0, limit: 1, sortOrder: "desc" });
             await connection_2.listContexts({ skip: 0, limit: 1, sortOrder: "desc" });
 
@@ -243,9 +241,6 @@ test.describe("CoreTest: Connection & Contexts", () => {
             return { list1, list2, list3 };
         }, args);
 
-        // Assertions based on defaultDataset
-        // Assuming there are at least 2 contexts in the dataset
-
         // Skip 3 (Should be empty if we only have 2 contexts)
         expect(result.list1.readItems).toHaveLength(0);
 
@@ -334,7 +329,7 @@ test.describe("CoreTest: EndpointFactory.setup() object form", () => {
         backend,
         cli,
     }) => {
-        await page.goto("/tests/harness/index.html");
+        await page.goto("/tests/harness/index.html?workerCount=4");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
 
         const user = await setupTestUser(page, cli, [testData.contextId]);
@@ -360,7 +355,7 @@ test.describe("CoreTest: EndpointFactory.setup() object form", () => {
     test("setup({ assetsBasePath, workerCount }) applies the requested worker count", async ({
         page,
     }) => {
-        await page.goto("/tests/harness/index.html");
+        await page.goto("/tests/harness/index.html?workerCount=6");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
 
         // Give pthreads time to spin up then verify crypto still works.
@@ -396,7 +391,7 @@ async function measureSendMessages(
     messageCount: number,
 ): Promise<number> {
     // Fresh page load so the WASM module reinitialises with the new worker count.
-    await page.goto("/tests/harness/index.html");
+    await page.goto(`/tests/harness/index.html?workerCount=${workerCount}`);
     await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
 
     // Give the browser event loop time to finish allocating all pthreads.

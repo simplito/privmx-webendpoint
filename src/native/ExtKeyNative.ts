@@ -29,13 +29,11 @@ export class ExtKeyNative extends BaseNative {
     }
 
     async derive(ptr: number, args: [number]): Promise<ExtKeyNativePtr> {
-        // index: number
         return this.runAsync<ExtKeyNativePtr>((taskId) =>
             this.api.lib.ExtKey_derive(taskId, ptr, args),
         );
     }
     async deriveHardened(ptr: number, args: [number]): Promise<ExtKeyNativePtr> {
-        // index: number
         return this.runAsync<ExtKeyNativePtr>((taskId) =>
             this.api.lib.ExtKey_deriveHardened(taskId, ptr, args),
         );
@@ -84,7 +82,6 @@ export class ExtKeyNative extends BaseNative {
     }
 
     verifyCompactSignatureWithHash(ptr: number, args: [Uint8Array, Uint8Array]): Promise<boolean> {
-        // message: Uint8Array, signature: Uint8Array
         return this.runAsync<boolean>((taskId) =>
             this.api.lib.ExtKey_verifyCompactSignatureWithHash(taskId, ptr, args),
         );
