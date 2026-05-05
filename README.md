@@ -66,7 +66,6 @@ A **debug** build swaps in the following flags for the WASM module:
 | Emscripten assertions | `ASSERTIONS=0` | `ASSERTIONS=2` |
 | Heap safety checks | `SAFE_HEAP=0` | `SAFE_HEAP=1` |
 | Stack overflow check | off | `STACK_OVERFLOW_CHECK=2` |
-| Demangled stack traces | off | `DEMANGLE_SUPPORT=1` |
 | C++ `DEBUG` macro | not defined | defined |
 
 ```bash

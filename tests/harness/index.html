@@ -12,6 +12,7 @@
             ? { assetsBasePath: "../pkg/assets", workerCount }
             : "../pkg/assets";
         window.Endpoint.setup(setupOptions).then(() => {
+            console.log("SETUP OPTIONS", setupOptions)
             window.wasmReady = true;
         });
     </script>

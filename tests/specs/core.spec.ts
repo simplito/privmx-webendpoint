@@ -456,7 +456,7 @@ async function measureSendMessages(
 }
 
 test.describe("CoreTest: Worker count", () => {
-    const MESSAGE_COUNT = 100;
+    const MESSAGE_COUNT = 1000;
 
     test("EndpointFactory.setup() initialises WASM with the requested worker count", async ({
         page,
@@ -476,6 +476,7 @@ test.describe("CoreTest: Worker count", () => {
         // All three runs must complete all messages successfully (no throw = pass).
         // We log the timings for manual inspection; we don't assert a specific ordering
         // because the bridge/network RTT dominates and may swamp the worker-count effect.
+        console.log(times);
         expect(times["2w"]).toBeGreaterThan(0);
         expect(times["4w"]).toBeGreaterThan(0);
     });
