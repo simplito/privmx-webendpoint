@@ -26,7 +26,7 @@ export function assertIsNumber(value: unknown): asserts value is number {
     if (typeof value !== "number") throw new Error("Not a number");
 }
 
-export function assertArgsValid<T>(obj: any, argsType: { new (...args: any[]): T }) {
+export function assertArgsValid<T>(obj: any, argsType: new (...args: any[]) => T) {
     const objKeys = Object.keys(obj);
     const expected = Object.keys(new argsType());
     if (!objKeys.every((x) => expected.includes(x))) {
@@ -39,7 +39,7 @@ export function assertArgsValid<T>(obj: any, argsType: { new (...args: any[]): T
     }
 }
 
-export function assertArgsAndValueValid<T>(actualObj: T, defaultObj: { new (...args: any[]): T }) {
+export function assertArgsAndValueValid<T>(actualObj: T, defaultObj: new (...args: any[]) => T) {
     const objKeys = Object.keys(actualObj);
     const expected = Object.keys(new defaultObj());
     if (!objKeys.every((x) => expected.includes(x))) {

@@ -13,7 +13,7 @@ export interface InboxEntryPayload {
     /**
      * Optional files associated with the entry.
      */
-    files?: Array<{
+    files?: {
         /**
          *Optional, contains confidential data that will be encrypted before being sent to server.
          */
@@ -28,7 +28,7 @@ export interface InboxEntryPayload {
          * Content of the file.
          */
         content: File;
-    }>;
+    }[];
 }
 
 /**

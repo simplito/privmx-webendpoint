@@ -1,12 +1,27 @@
-import { ApiStatic } from "../api/ApiStatic";
-import { ExtKeyNative, ExtKeyNativePtr } from "../api/ExtKeyNative";
+import { Api } from "../native/Api";
+import { ExtKeyNative, ExtKeyNativePtr } from "../native/ExtKeyNative";
 import { FinalizationHelper } from "../FinalizationHelper";
 import { BaseApi } from "./BaseApi";
 
 export class ExtKey extends BaseApi {
-    private static async freeExtKey(ptr: number): Promise<void> {
-        const nativeApi = new ExtKeyNative(ApiStatic.getInstance());
-        await nativeApi.deleteExtKey(ptr);
+    private static api: Api;
+
+    /** @internal Called by EndpointFactory during WASM initialisation. */
+    static init(api: Api): void {
+        ExtKey.api = api;
+    }
+
+    private static makeNative(): ExtKeyNative {
+        return new ExtKeyNative(ExtKey.api);
+    }
+
+    private static registerFinalization(extKey: ExtKey, ptr: ExtKeyNativePtr): void {
+        FinalizationHelper.getInstance().register(extKey, {
+            ptr,
+            onFree: async () => {
+                await new ExtKeyNative(ExtKey.api).deleteExtKey(ptr);
+            },
+        });
     }
 
     /**
@@ -15,13 +30,13 @@ export class ExtKey extends BaseApi {
      * @returns {ExtKey} object
      */
     static async fromSeed(seed: Uint8Array): Promise<ExtKey> {
-        const ptr = await ExtKeyNative.fromSeed([seed]);
-        const native = new ExtKeyNative(ApiStatic.getInstance());
-        const extKey = new ExtKey(native, ptr as ExtKeyNativePtr);
-        const fh = FinalizationHelper.getInstance();
-        fh.register(extKey, { ptr: ptr, onFree: () => this.freeExtKey(ptr) });
+        const native = this.makeNative();
+        const ptr = await native.fromSeed([seed]);
+        const extKey = new ExtKey(native, ptr);
+        this.registerFinalization(extKey, ptr);
         return extKey;
     }
+
     /**
      * Decodes ExtKey from Base58 format.
      *
@@ -29,11 +44,10 @@ export class ExtKey extends BaseApi {
      * @returns {ExtKey} object
      */
     static async fromBase58(base58: string): Promise<ExtKey> {
-        const ptr = await ExtKeyNative.fromBase58([base58]);
-        const native = new ExtKeyNative(ApiStatic.getInstance());
-        const extKey = new ExtKey(native, ptr as ExtKeyNativePtr);
-        const fh = FinalizationHelper.getInstance();
-        fh.register(extKey, { ptr: ptr, onFree: () => this.freeExtKey(ptr) });
+        const native = this.makeNative();
+        const ptr = await native.fromBase58([base58]);
+        const extKey = new ExtKey(native, ptr);
+        this.registerFinalization(extKey, ptr);
         return extKey;
     }
 
@@ -43,42 +57,42 @@ export class ExtKey extends BaseApi {
      * @returns {ExtKey} object
      */
     static async generateRandom(): Promise<ExtKey> {
-        const ptr = await ExtKeyNative.generateRandom([]);
-        const native = new ExtKeyNative(ApiStatic.getInstance());
-        const extKey = new ExtKey(native, ptr as ExtKeyNativePtr);
-
-        const fh = FinalizationHelper.getInstance();
-        fh.register(extKey, { ptr: ptr, onFree: () => this.freeExtKey(ptr) });
+        const native = this.makeNative();
+        const ptr = await native.generateRandom([]);
+        const extKey = new ExtKey(native, ptr);
+        this.registerFinalization(extKey, ptr);
         return extKey;
     }
 
     /**
      * //doc-gen:ignore
      */
-    private constructor(
-        private native: ExtKeyNative,
-        public ptr: ExtKeyNativePtr,
-    ) {
-        super(ptr);
+    static fromPtr(ptr: ExtKeyNativePtr): ExtKey {
+        return new ExtKey(this.makeNative(), ptr);
     }
 
-    static fromPtr(ptr: ExtKeyNativePtr) {
-        const native = new ExtKeyNative(ApiStatic.getInstance());
-        return new ExtKey(native, ptr as ExtKeyNativePtr);
+    private constructor(
+        private readonly native: ExtKeyNative,
+        ptr: number,
+    ) {
+        super(ptr);
     }
 
     /**
      * Generates child ExtKey from a current ExtKey using BIP32.
      *
      * @param {number} index number from 0 to 2^31-1
-
-     * @returns {ExtKey} object 
+     * @returns {ExtKey} object
      */
     async derive(index: number): Promise<ExtKey> {
         const ptr = await this.native.derive(this.servicePtr, [index]);
         const extKey = new ExtKey(this.native, ptr);
-        const fh = FinalizationHelper.getInstance();
-        fh.register(extKey, { ptr: ptr, onFree: () => ExtKey.freeExtKey(ptr) });
+        FinalizationHelper.getInstance().register(extKey, {
+            ptr,
+            onFree: async () => {
+                await this.native.deleteExtKey(ptr);
+            },
+        });
         return extKey;
     }
 
@@ -86,12 +100,11 @@ export class ExtKey extends BaseApi {
      * Generates hardened child ExtKey from a current ExtKey using BIP32.
      *
      * @param {number} index number from 0 to 2^31-1
-
-     * @returns {ExtKey} object 
+     * @returns {ExtKey} object
      */
     async deriveHardened(index: number): Promise<ExtKey> {
-        const extKeyPtr = await this.native.deriveHardened(this.servicePtr, [index]);
-        return new ExtKey(this.native, extKeyPtr);
+        const ptr = await this.native.deriveHardened(this.servicePtr, [index]);
+        return new ExtKey(this.native, ptr);
     }
 
     /**

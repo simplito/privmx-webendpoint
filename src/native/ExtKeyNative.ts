@@ -1,11 +1,7 @@
-import { ApiStatic } from "./ApiStatic";
 import { BaseNative } from "./BaseNative";
 export type ExtKeyNativePtr = number & { __extKeyNativePtr: never };
 
 export class ExtKeyNative extends BaseNative {
-    protected async newApi(): Promise<number> {
-        throw new Error("Use the specialized version of method instead.");
-    }
     async deleteApi(ptr: number): Promise<void> {
         return this.runAsync<void>((taskId) => this.api.lib.ExtKey_deleteExtKey(taskId, ptr));
     }
@@ -14,19 +10,21 @@ export class ExtKeyNative extends BaseNative {
         return this.runAsync<void>((taskId) => this.api.lib.ExtKey_deleteExtKey(taskId, ptr));
     }
 
-    static async fromSeed(args: [Uint8Array]): Promise<ExtKeyNativePtr> {
-        const api = ApiStatic.getInstance();
-        return api.runAsync<ExtKeyNativePtr>((taskId) => api.lib.ExtKey_fromSeed(taskId, args));
+    async fromSeed(args: [Uint8Array]): Promise<ExtKeyNativePtr> {
+        return this.runAsync<ExtKeyNativePtr>((taskId) =>
+            this.api.lib.ExtKey_fromSeed(taskId, args),
+        );
     }
-    static async fromBase58(args: [string]): Promise<ExtKeyNativePtr> {
-        // base58: string
-        const api = ApiStatic.getInstance();
-        return api.runAsync<ExtKeyNativePtr>((taskId) => api.lib.ExtKey_fromBase58(taskId, args));
+
+    async fromBase58(args: [string]): Promise<ExtKeyNativePtr> {
+        return this.runAsync<ExtKeyNativePtr>((taskId) =>
+            this.api.lib.ExtKey_fromBase58(taskId, args),
+        );
     }
-    static async generateRandom(args: []): Promise<ExtKeyNativePtr> {
-        const api = ApiStatic.getInstance();
-        return api.runAsync<ExtKeyNativePtr>((taskId) =>
-            api.lib.ExtKey_generateRandom(taskId, args),
+
+    async generateRandom(args: []): Promise<ExtKeyNativePtr> {
+        return this.runAsync<ExtKeyNativePtr>((taskId) =>
+            this.api.lib.ExtKey_generateRandom(taskId, args),
         );
     }
 

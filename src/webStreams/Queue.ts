@@ -1,74 +1,62 @@
-export interface QueueTask<T> {
-    func(item: T): Promise<void>;
-}
-
-export class Queue<T> implements Iterable<T> {
+/**
+ * Simple serial async queue.
+ *
+ * Items are enqueued synchronously and processed one at a time by the function
+ * registered via `assignProcessorFunc`. Calling `processAll` while a drain is
+ * already in progress returns the same in-flight promise, preventing concurrent
+ * drains.
+ */
+export class Queue<T> {
     private items: T[] = [];
     private func: ((item: T) => Promise<void>) | undefined;
-    private processing: boolean = false;
+    private drainPromise: Promise<void> | undefined;
 
+    /** Appends `item` to the back of the queue. */
     enqueue(item: T): void {
         this.items.push(item);
     }
 
-    dequeue(): T | undefined {
-        return this.items.shift();
-    }
-
-    peek(): T | undefined {
-        return this.items[0];
-    }
-
-    get size(): number {
-        return this.items.length;
-    }
-
-    isEmpty(): boolean {
-        return this.items.length === 0;
-    }
-
-    clear(): void {
-        this.items.length = 0;
-    }
-
-    toArray(): T[] {
-        return this.items.slice();
-    }
-
-    assignProcessorFunc(func: (item: T) => Promise<void>) {
+    /**
+     * Registers the async function used to process each item.
+     * Must be called before `processAll`.
+     */
+    assignProcessorFunc(func: (item: T) => Promise<void>): void {
         this.func = func;
     }
 
-    async processAll() {
-        if (this.processing) {
-            return;
+    /**
+     * Processes all currently queued items serially, then resolves.
+     * If called while a drain is already running, joins the existing drain
+     * promise rather than starting a new one.
+     * @throws if no processor function has been assigned.
+     */
+    async processAll(): Promise<void> {
+        if (this.drainPromise) {
+            return this.drainPromise;
         }
         if (!this.func) {
             throw new Error("No task processor function assigned");
         }
-        this.processing = true;
+        this.drainPromise = this.drain(this.func);
+        try {
+            await this.drainPromise;
+        } finally {
+            this.drainPromise = undefined;
+        }
+    }
+
+    private async drain(func: (item: T) => Promise<void>): Promise<void> {
+        let itemIndex = 0;
         while (this.items.length > 0) {
             const item = this.items.shift();
             if (!item) continue;
-            const randId = Math.random();
+            const itemId = itemIndex++;
             try {
-                await this.func(item);
+                await func(item);
             } catch (err) {
-                console.error("Error while processing queue item", randId, err);
+                console.error("Error while processing queue item", itemId, err);
+                throw err;
             }
         }
-
-        this.processing = false;
-    }
-
-    [Symbol.iterator](): Iterator<T> {
-        let idx = 0;
-        const arr = this.items;
-        return {
-            next(): IteratorResult<T> {
-                if (idx < arr.length) return { value: arr[idx++], done: false };
-                return { value: undefined as any, done: true };
-            },
-        };
     }
 }

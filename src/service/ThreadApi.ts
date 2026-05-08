@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi";
-import { ThreadApiNative } from "../api/ThreadApiNative";
+import { ThreadApiNative } from "../native/ThreadApiNative";
 import {
     PagingQuery,
     PagingList,
@@ -24,7 +24,7 @@ import {
 
 export class ThreadApi extends BaseApi {
     constructor(
-        protected native: ThreadApiNative,
+        private native: ThreadApiNative,
         ptr: number,
     ) {
         super(ptr);

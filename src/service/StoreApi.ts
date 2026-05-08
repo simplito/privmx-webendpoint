@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi";
-import { StoreApiNative } from "../api/StoreApiNative";
+import { StoreApiNative } from "../native/StoreApiNative";
 import {
     PagingQuery,
     PagingList,

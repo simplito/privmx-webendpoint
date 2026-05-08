@@ -48,8 +48,6 @@ import { EventManager } from "./events";
  * await client.disconnect();
  */
 export class PrivmxClient {
-    private static cryptoApi: Promise<CryptoApi> | null = null;
-    private static eventQueue: Promise<EventQueue> | null = null;
     private static isSetup = false;
     private static eventManager: Promise<EventManager> | null = null;
 
@@ -97,17 +95,8 @@ export class PrivmxClient {
      * @returns {Promise<CryptoApi>}
      */
     public static async getCryptoApi(): Promise<CryptoApi> {
-        if (this.cryptoApi) {
-            return this.cryptoApi;
-        }
-
         this.checkSetup();
-
-        this.cryptoApi = (async () => {
-            return EndpointFactory.createCryptoApi();
-        })();
-
-        return this.cryptoApi;
+        return EndpointFactory.createCryptoApi();
     }
 
     /**
@@ -115,17 +104,8 @@ export class PrivmxClient {
      * @returns {Promise<EventQueue>}
      */
     public static async getEventQueue(): Promise<EventQueue> {
-        if (this.eventQueue) {
-            return this.eventQueue;
-        }
-
         this.checkSetup();
-
-        this.eventQueue = (async () => {
-            return EndpointFactory.getEventQueue();
-        })();
-
-        return this.eventQueue;
+        return EndpointFactory.getEventQueue();
     }
 
     /**

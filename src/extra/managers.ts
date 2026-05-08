@@ -67,7 +67,7 @@ export interface GenericEvent<K> extends Types.Event {
 }
 
 export abstract class BaseEventDispatcherManager {
-    private _listenerssymbols = new Map<symbol, string>();
+    private _listenersSymbols = new Map<symbol, string>();
     private _listeners = new Map<string, EventCallback[]>();
 
     get listeners() {
@@ -88,7 +88,7 @@ export abstract class BaseEventDispatcherManager {
     }
 
     unregisterCallback(symbol: symbol) {
-        this._listenerssymbols.delete(symbol);
+        this._listenersSymbols.delete(symbol);
         for (const keys of this._listeners.keys()) {
             const listeners = this._listeners.get(keys);
             if (listeners) {
@@ -113,7 +113,7 @@ export abstract class BaseEventDispatcherManager {
             const subscription = subscriptions[i];
             this._listeners.set(id, subscription.callbacks);
             for (const cb of subscription.callbacks) {
-                this._listenerssymbols.set(cb.symbol, id);
+                this._listenersSymbols.set(cb.symbol, id);
             }
             return subscription;
         });
@@ -123,7 +123,7 @@ export abstract class BaseEventDispatcherManager {
     async unsubscribeFrom(subscriptionsId: string[]) {
         const knownIds: string[] = [];
         for (const subscriptionId of subscriptionsId) {
-            for (const [key, callbackSubscription] of this._listenerssymbols.entries()) {
+            for (const [key, callbackSubscription] of this._listenersSymbols.entries()) {
                 if (callbackSubscription === subscriptionId) {
                     knownIds.push(subscriptionId);
                     this.unregisterCallback(key);

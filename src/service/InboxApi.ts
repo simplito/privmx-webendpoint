@@ -10,7 +10,7 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi";
-import { InboxApiNative } from "../api/InboxApiNative";
+import { InboxApiNative } from "../native/InboxApiNative";
 import {
     PagingQuery,
     PagingList,
@@ -161,7 +161,7 @@ export class InboxApi extends BaseApi {
         inboxId: string,
         data: Uint8Array,
         inboxFileHandles: number[],
-        userPrivKey?: string | undefined,
+        userPrivKey?: string,
     ): Promise<number> {
         return this.native.prepareEntry(this.servicePtr, [
             inboxId,
