@@ -50,7 +50,7 @@
     "bundle": "vite build --config ./vite.config.ts && cp src/webStreams/audio/rms-processor.js dist/bundle/",
     "watch:types": "tsc -w --project tsconfig.build.json",
     "pretest:e2e": "npm run build-package && mkdir -p tests/pkg && tar -xzf builds/privmx-webendpoint-latest.tgz -C tests/pkg --strip-components=1",
-    "test:e2e": "playwright test --project=chromium",
+    "test:e2e": "npm run build-package && playwright test --project=chromium",
     "test:e2e:manybrowsers": "playwright test",
     "lint": "oxlint src/",
     "format": "oxfmt src/",
