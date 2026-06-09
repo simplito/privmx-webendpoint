@@ -41,6 +41,9 @@ jobs:
       env:
         TERM: xterm
 
+    - name: Prepare e2e package
+      run: npm run build-package && mkdir -p tests/pkg && tar -xzf builds/privmx-webendpoint-latest.tgz -C tests/pkg --strip-components=1
+
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
 
