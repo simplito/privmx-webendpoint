@@ -604,7 +604,8 @@ test.describe("StreamTest", () => {
             // Join/Leave
             await expectError(async () => await streamApi.joinStreamRoom(fakeStreamId));
             await streamApi.joinStreamRoom(sId);
-            await streamApi.joinStreamRoom(sId); // Idempotent check
+            // Re-joining an already-joined room now throws AlreadyJoinedStreamRoomException.
+            await expectError(async () => await streamApi.joinStreamRoom(sId));
 
             await expectError(async () => await streamApi.leaveStreamRoom(fakeStreamId));
             // U2 Joins for keepalive
@@ -1365,7 +1366,7 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
-    test.skip("modifyRemoteStreamsSubscriptions: various scenarios", async ({
+    test("modifyRemoteStreamsSubscriptions: various scenarios", async ({
         page,
         backend,
         cli,
@@ -3057,7 +3058,7 @@ test.describe("StreamTest", () => {
         });
     });
 
-    test("E2E: Two users exchange video streams - second expect to receive 'remoteStreamsChanged' event", async ({
+    test("E2E: Two users exchange video streams - second expect to receive 'streamPublished' event", async ({
         createContextPage,
         backend,
         cli,
@@ -3194,7 +3195,7 @@ test.describe("StreamTest", () => {
                             const w = window as any;
                             const events = w.__eventCollector?.events ?? [];
                             return events.some((e: any) => e.type === expectedType);
-                        }, "remoteStreamsChanged"),
+                        }, "streamPublished"),
                     { timeout: 15_000 },
                 )
                 .toBe(true);

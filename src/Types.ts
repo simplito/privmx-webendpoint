@@ -851,6 +851,51 @@ export enum StreamEventType {
     STREAM_LEAVE = 5,
     STREAM_PUBLISH = 6,
     STREAM_UNPUBLISH = 7,
+    STREAM_SUBSCRIBE = 8,
+    STREAM_UNSUBSCRIBE = 9,
+    STREAM_UPDATE = 10,
+}
+
+export interface StreamRoomMemberEventData {
+    streamRoomId: StreamRoomId;
+    userId: string;
+}
+
+export interface StreamRoomReofferEventData {
+    streamRoomId: StreamRoomId;
+    jsep?: { type: "offer"; sdp: string };
+}
+
+export interface StreamSubscriptionRef {
+    streamId: number;
+    streamTrackId?: string;
+}
+
+export interface StreamSubscribedEventData {
+    streamRoomId: StreamRoomId;
+    userId: string;
+    subscriptions: StreamSubscriptionRef[];
+}
+
+export interface StreamUpdatedEventData {
+    streamRoomId: StreamRoomId;
+    streamId: number;
+    userId: string;
+    tracksAdded: TrackInfo[];
+    tracksRemoved: TrackInfo[];
+    tracksModified: { before: TrackInfo; after: TrackInfo }[];
+}
+
+export interface StreamPublishedEventData {
+    streamRoomId: StreamRoomId;
+    userId: string;
+    stream: StreamInfo;
+}
+
+export interface StreamUnpublishedEventData {
+    streamRoomId: StreamRoomId;
+    userId: string;
+    streamId: number;
 }
 
 export enum StreamEventSelectorType {

@@ -203,11 +203,6 @@ export class StreamApiNative extends BaseNative {
         );
     }
 
-    async keyManagement(ptr: number, args: [boolean]): Promise<void> {
-        return this.runAsync<void>((taskId) =>
-            this.api.lib.StreamApi_keyManagement(taskId, ptr, args),
-        );
-    }
     async getTurnCredentials(ptr: number, args: []): Promise<TurnCredentials[]> {
         return this.runAsync<TurnCredentials[]>((taskId) =>
             this.api.lib.StreamApi_getTurnCredentials(taskId, ptr, args),

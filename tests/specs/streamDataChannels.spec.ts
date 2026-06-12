@@ -241,12 +241,10 @@ test.describe("StreamTest", () => {
                             const events = w.__eventCollector?.events ?? [];
                             return (
                                 events
-                                    ?.filter((x: any) => x.type === "remoteStreamsChanged")
+                                    ?.filter((x: any) => x.type === "streamPublished")
                                     .some((event: any) =>
-                                        event?.data?.streams?.some((stream: any) =>
-                                            stream?.tracks?.some(
-                                                (track: any) => track?.type === "data",
-                                            ),
+                                        event?.data?.stream?.tracks?.some(
+                                            (track: any) => track?.type === "data",
                                         ),
                                     ) ?? false
                             );

@@ -199,7 +199,6 @@ API_FUNCTION_HEADER(StreamApi, subscribeToRemoteStreams)
 API_FUNCTION_HEADER(StreamApi, modifyRemoteStreamsSubscriptions)
 API_FUNCTION_HEADER(StreamApi, unsubscribeFromRemoteStreams)
 
-API_FUNCTION_HEADER(StreamApi, keyManagement)
 API_FUNCTION_HEADER(StreamApi, getTurnCredentials)
 API_FUNCTION_HEADER(StreamApi, subscribeFor)
 API_FUNCTION_HEADER(StreamApi, unsubscribeFrom)

@@ -189,7 +189,6 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(StreamApi, modifyRemoteStreamsSubscriptions)
     BINDING_FUNCTION(StreamApi, unsubscribeFromRemoteStreams)
 
-    BINDING_FUNCTION(StreamApi, keyManagement)
     BINDING_FUNCTION(StreamApi, getTurnCredentials)
     BINDING_FUNCTION(StreamApi, subscribeFor)
     BINDING_FUNCTION(StreamApi, unsubscribeFrom)

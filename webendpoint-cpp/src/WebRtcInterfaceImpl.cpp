@@ -17,10 +17,6 @@ using namespace privmx::webendpoint::stream;
 using namespace privmx::endpoint::stream;
 using namespace privmx::endpoint;
 using namespace emscripten;
-using SdpWithTypeModel = privmx::endpoint::stream::SdpWithTypeModel;
-using SdpWithRoomModel = privmx::endpoint::stream::SdpWithRoomModel;
-using UpdateSessionIdModel = privmx::endpoint::stream::UpdateSessionIdModel;
-using RoomModel = privmx::endpoint::stream::RoomModel;
 
 // clang-format off
 
@@ -106,8 +102,8 @@ std::string WebRtcInterfaceImpl::createOfferAndSetLocalDescription(const std::st
             auto methodName{"createOfferAndSetLocalDescription"};
             emscripten::val name = emscripten::val::u8string(methodName);
 
-            RoomModel paramsModel = {.roomId = streamRoomId};
-            emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
+            emscripten::val params = emscripten::val::object();
+            params.set("roomId", emscripten::val::u8string(streamRoomId.c_str()));
 
             webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
         },
@@ -126,8 +122,10 @@ std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::strin
             auto methodName{"createAnswerAndSetDescriptions"};
             emscripten::val name = emscripten::val::u8string(methodName);
 
-            SdpWithRoomModel paramsModel = {.roomId = streamRoomId, .sdp = sdp, .type = type};
-            emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
+            emscripten::val params = emscripten::val::object();
+            params.set("roomId", emscripten::val::u8string(streamRoomId.c_str()));
+            params.set("sdp", emscripten::val::u8string(sdp.c_str()));
+            params.set("type", emscripten::val::u8string(type.c_str()));
 
             webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
         },
@@ -148,8 +146,10 @@ void WebRtcInterfaceImpl::setAnswerAndSetRemoteDescription(const std::string& st
             auto methodName{"setAnswerAndSetRemoteDescription"};
             emscripten::val name = emscripten::val::u8string(methodName);
 
-            SdpWithRoomModel paramsModel = {.roomId = streamRoomId, .sdp = sdp, .type = type};
-            emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
+            emscripten::val params = emscripten::val::object();
+            params.set("roomId", emscripten::val::u8string(streamRoomId.c_str()));
+            params.set("sdp", emscripten::val::u8string(sdp.c_str()));
+            params.set("type", emscripten::val::u8string(type.c_str()));
 
             webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
         },
@@ -167,9 +167,11 @@ void WebRtcInterfaceImpl::updateSessionId(const std::string& streamRoomId, const
             auto methodName{"updateSessionId"};
             emscripten::val name = emscripten::val::u8string(methodName);
 
-            UpdateSessionIdModel paramsModel = {
-                .streamRoomId = streamRoomId, .connectionType = connectionType, .sessionId = sessionId};
-            emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
+            emscripten::val params = emscripten::val::object();
+            params.set("streamRoomId", emscripten::val::u8string(streamRoomId.c_str()));
+            // TS expects a plain number; cast int64 to double to avoid a JS BigInt.
+            params.set("sessionId", emscripten::val(static_cast<double>(sessionId)));
+            params.set("connectionType", emscripten::val::u8string(connectionType.c_str()));
 
             webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
         },
@@ -186,8 +188,8 @@ void WebRtcInterfaceImpl::close(const std::string& streamRoomId) {
             auto methodName{"close"};
             emscripten::val name = emscripten::val::u8string(methodName);
 
-            RoomModel paramsModel = {.roomId = streamRoomId};
-            emscripten::val params = WebRtcInterfaceImpl::mapToVal(paramsModel);
+            // TS `close(roomId)` expects the streamRoomId string directly, not an object.
+            emscripten::val params = emscripten::val::u8string(streamRoomId.c_str());
 
             webRtcJsHandler(name.as_handle(), params.as_handle(), emscripten::val(bindId).as_handle(), id);
         },

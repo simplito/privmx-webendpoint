@@ -75,7 +75,11 @@ fi
 cd "$PRIVMX_ENDPOINT_DIR"
 mkdir -p build-emscripten && cd build-emscripten
 
-if [ ! -f CMakeCache.txt ]; then
+if [ ! -f CMakeCache.txt ] || [ ! -f Makefile ]; then
+    # PRIVMX_CONAN=OFF: this is not a Conan build. Conan mode calls find_package()
+    # for Pson/gmp/drivers, but those are installed into the Emscripten sysroot as
+    # bare static libs + headers (no *Config.cmake). Use PRIVMX_IMPORTED_LIBRARIES=ON
+    # and point each dependency at its installed .a + include dir in the sysroot.
     emcmake cmake .. \
         -D PRIVMX_EXECUTOR_THREAD_POOL_SIZE=2 \
         -D PRIVMX_EMSCRIPTEN=ON \
@@ -87,6 +91,21 @@ if [ ! -f CMakeCache.txt ]; then
         -D PRIVMX_LOGGER_LEVEL=3 \
         -D PRIVMX_LOGGER_OUTPUT_STDERR=OFF \
         -D PRIVMX_LOGGER_OUTPUT_STDOUT=ON \
+        -D PRIVMX_CONAN=OFF \
+        -D PRIVMX_IMPORTED_LIBRARIES=ON \
+        -D PRIVMX_POCO_FOUNDATION="$SYSROOT_DIR/lib/libPocoFoundation.a" \
+        -D PRIVMX_POCO_JSON="$SYSROOT_DIR/lib/libPocoJSON.a" \
+        -D PRIVMX_POCO_INCLUDES="$SYSROOT_DIR/include" \
+        -D PRIVMX_PSON="$SYSROOT_DIR/lib/libPson.a" \
+        -D PRIVMX_PSON_INCLUDES="$SYSROOT_DIR/include" \
+        -D PRIVMX_GMP="$SYSROOT_DIR/lib/libgmp.a" \
+        -D PRIVMX_GMP_INCLUDES="$SYSROOT_DIR/include" \
+        -D PRIVMX_DRVCRYPTO="$SYSROOT_DIR/lib/libprivmxdrvcrypto.a" \
+        -D PRIVMX_DRVCRYPTO_INCLUDES="$SYSROOT_DIR/include" \
+        -D PRIVMX_DRVECC="$SYSROOT_DIR/lib/libprivmxdrvecc.a" \
+        -D PRIVMX_DRVECC_INCLUDES="$SYSROOT_DIR/include" \
+        -D PRIVMX_DRVNET="$SYSROOT_DIR/lib/libprivmxdrvnet.a" \
+        -D PRIVMX_DRVNET_INCLUDES="$SYSROOT_DIR/include" \
         -D CMAKE_BUILD_TYPE=MinSizeRel
 else
     echo "CMakeCache.txt exists - skipping cmake configure."
