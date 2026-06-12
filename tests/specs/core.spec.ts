@@ -426,6 +426,10 @@ async function measureSendMessages(
     return page.evaluate(
         async ({ bridgeUrl, privKey, userId, solutionId, contextId, messageCount }) => {
             const Endpoint = window.Endpoint;
+            // Yield to the event loop so any pending WASM async-engine error
+            // callbacks (queued via setTimeout during callMain) fire before
+            // connect() — in Firefox these can outlive the post-setup wait.
+            await new Promise((r) => setTimeout(r, 50));
             const connection = await Endpoint.connect(privKey, solutionId, bridgeUrl);
             const threadApi = await Endpoint.createThreadApi(connection);
             const cryptoApi = await Endpoint.createCryptoApi();
@@ -463,6 +467,9 @@ test.describe("CoreTest: Worker count", () => {
         backend,
         cli,
     }) => {
+        // Firefox benchmarks run ~2× slower than Chromium; the 2w+4w runs can
+        // take up to ~30 s in Firefox alone, so extend well past the default.
+        test.setTimeout(90_000);
         const times: Record<string, number> = {};
 
         await test.step("2 workers — baseline", async () => {
