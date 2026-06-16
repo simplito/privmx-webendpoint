@@ -1,16 +1,17 @@
-import { Jsep, StreamRoomId } from "./types/ApiTypes";
-import { PeerConnectionManager, SessionId } from "./PeerConnectionManager";
+import { Jsep, StreamRoomId } from "./types/ApiTypes.js";
+import { PeerConnectionManager, SessionId } from "./PeerConnectionManager.js";
 
 interface QueueItem {
     room: StreamRoomId;
     jsep: { sdp: string; type: RTCSdpType };
 }
-import { E2eeTransformManager } from "./E2eeTransformManager";
-import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry";
-import { Queue } from "./Queue";
-import { Logger } from "./Logger";
+import { E2eeTransformManager } from "./E2eeTransformManager.js";
+import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry.js";
+import { Queue } from "./Queue.js";
+import { Logger } from "./Logger.js";
 
 /**
+ * @internal
  * Manages the subscriber-side peer connection for a stream room:
  * SDP offer/answer negotiation, the reconfigure queue, and remote track wiring.
  */
@@ -156,8 +157,7 @@ export class SubscriberManager {
     private async reconfigureSingle(room: StreamRoomId, offer: Jsep): Promise<void> {
         const pc = this.pcm.getOrCreateConnection(room, "subscriber").pc;
 
-        // Create a bootstrap data channel on every reconfigure so that Janus
-        // sees the data-channel m= line in each offer/answer exchange.
+        // Bootstrap channel on every reconfigure so Janus sees the data-channel m= line each exchange.
         const dc = pc.createDataChannel("JanusDataChannel");
         const existing = this.bootstrapChannels.get(room) ?? [];
         existing.push(dc);

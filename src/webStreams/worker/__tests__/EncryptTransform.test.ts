@@ -1,6 +1,6 @@
-import { setGlobalEmCrypto } from "../../../crypto/index";
-import { KeyStore } from "../../KeyStore";
-import { EncryptTransform, RTCEncodedVideoFrameType } from "../EncryptTransform";
+import { setGlobalEmCrypto } from "../../../crypto/index.js";
+import { KeyStore } from "../../KeyStore.js";
+import { EncryptTransform, RTCEncodedVideoFrameType } from "../EncryptTransform.js";
 
 // ---- helpers ----------------------------------------------------------------
 

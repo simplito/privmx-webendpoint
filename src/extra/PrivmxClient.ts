@@ -8,9 +8,10 @@ import {
     ThreadApi,
     KvdbApi,
     EventApi,
-} from "../service";
+} from "../service/index.js";
 
-import { PublicConnection } from "./PublicConnection";
+import { logger } from "../webStreams/Logger.js";
+import { PublicConnection } from "./PublicConnection.js";
 import {
     ConnectionEventsManager,
     CustomEventsManager,
@@ -19,8 +20,8 @@ import {
     StoreEventsManager,
     ThreadEventsManager,
     UserEventsManager,
-} from "./managers";
-import { EventManager } from "./events";
+} from "./managers.js";
+import { EventManager } from "./events.js";
 
 /**
  * @class PrivmxClient
@@ -391,7 +392,7 @@ export class PrivmxClient {
             this.inboxEventManager = null;
             this.kvdbEventsManager = null;
         } catch (e) {
-            console.error("Error during disconnection:", e);
+            logger.error("Error during disconnection:", e);
         }
     }
 }

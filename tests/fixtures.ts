@@ -201,22 +201,24 @@ export const test = base.extend<
                 throw e;
             }
 
-            await waitForServerReady(hostPort, containerName);
-
-            await use({
-                hostPort,
-                containerName,
-                mongoUrl: internalMongoUrl,
-                db,
-                mongoClient: client,
-                dockerImage,
-                envVars,
-            });
-
-            await client.close();
             try {
-                execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
-            } catch {}
+                await waitForServerReady(hostPort, containerName);
+
+                await use({
+                    hostPort,
+                    containerName,
+                    mongoUrl: internalMongoUrl,
+                    db,
+                    mongoClient: client,
+                    dockerImage,
+                    envVars,
+                });
+            } finally {
+                await client.close().catch(() => {});
+                try {
+                    execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
+                } catch {}
+            }
         },
         { scope: "worker" },
     ],

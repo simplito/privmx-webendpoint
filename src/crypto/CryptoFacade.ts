@@ -1,5 +1,5 @@
-import { getEmCrypto } from "./index";
-import * as Types from "./Types";
+import { getEmCrypto } from "./index.js";
+import * as Types from "./Types.js";
 
 /**
  * Accepted key type for CryptoFacade operations.

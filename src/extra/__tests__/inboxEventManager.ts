@@ -1,8 +1,8 @@
-import { createTestSetup, waitForNextTick } from "../__mocks__/utils";
-import { MOCK_INBOX_CREATED_EVENT, MOCK_INBOX_ENTRY_DELETED_EVENT } from "../__mocks__/constants";
-import { createInboxSubscription } from "../subscriptions";
-import { InboxEventSelectorType, InboxEventType } from "../../Types";
-import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber";
+import { createTestSetup, waitForNextTick } from "../__mocks__/utils.js";
+import { MOCK_INBOX_CREATED_EVENT, MOCK_INBOX_ENTRY_DELETED_EVENT } from "../__mocks__/constants.js";
+import { createInboxSubscription } from "../subscriptions.js";
+import { InboxEventSelectorType, InboxEventType } from "../../Types.js";
+import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber.js";
 
 describe("Inbox event manager", () => {
     let { q, manager } = createTestSetup();

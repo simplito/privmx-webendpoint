@@ -9,11 +9,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { BaseApi } from "./BaseApi";
-import { EventApiNative } from "../native/EventApiNative";
-import { EventsEventSelectorType, UserWithPubKey } from "../Types";
+import { BaseApi } from "./BaseApi.js";
+import { EventApiNative } from "../native/EventApiNative.js";
+import { EventsEventSelectorType, UserWithPubKey } from "../Types.js";
 
 export class EventApi extends BaseApi {
+    /**
+     * @internal Created by {@link EndpointFactory.createEventApi} — never
+     * constructed by SDK users.
+     */
     constructor(
         private native: EventApiNative,
         ptr: number,
@@ -42,7 +46,7 @@ export class EventApi extends BaseApi {
      * Subscribe for the custom events on the given subscription query.
      *
      * @param {string[]} subscriptionQueries list of queries
-     * @return list of subscriptionIds in maching order to subscriptionQueries
+     * @return list of subscriptionIds in matching order to subscriptionQueries
      */
     async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
         return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);

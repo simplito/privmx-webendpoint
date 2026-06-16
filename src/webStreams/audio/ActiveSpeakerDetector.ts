@@ -1,4 +1,5 @@
 /**
+ * @internal
  * Numeric WebRTC stream ID as assigned by the remote peer.
  * Matches the `publisherId` used throughout the webStreams layer
  * (derived from `Number(RTCTrackEvent.streams[0].id)`).
@@ -6,6 +7,9 @@
  */
 export type PublisherId = number;
 
+/**
+ * @internal Default tuning parameters for {@link ActiveSpeakerDetector}.
+ */
 export const DEFAULTS = {
     rmsEmaAlpha: 0.2, // fast reaction to speech
     noiseEmaAlpha: 0.02, // slow background adaptation
@@ -14,12 +18,18 @@ export const DEFAULTS = {
     holdMs: 200,
 };
 
+/**
+ * @internal Per-frame RMS sample fed into {@link ActiveSpeakerDetector}.
+ */
 export interface FrameInput {
     id: PublisherId;
     rms: number;
     timestamp: number; // ms
 }
 
+/**
+ * @internal Immutable snapshot of a tracked speaker's smoothed audio state.
+ */
 export interface SpeakerState {
     readonly streamId: PublisherId;
     readonly emaRms: number;
@@ -36,7 +46,6 @@ interface ActiveSpeakerDetectorOptions {
     holdMs: number;
 }
 
-// Internal mutable version — not exposed to callers
 interface MutableSpeakerState {
     streamId: PublisherId;
     emaRms: number;
@@ -51,9 +60,13 @@ interface MutableSpeakerState {
  */
 const SPEAKER_PRUNE_AFTER_MS = 10_000;
 
-/** Reserved ID for the local microphone — cannot collide with remote stream IDs (which are >= 0). */
+/** @internal Reserved ID for the local microphone — cannot collide with remote stream IDs (which are >= 0). */
 export const LOCAL_PUBLISHER_ID: PublisherId = -1;
 
+/**
+ * @internal Detects active speakers from per-frame RMS levels using EMA smoothing and
+ * an adaptive noise floor. Used by AudioManager; not part of the public API.
+ */
 export class ActiveSpeakerDetector {
     private speakers = new Map<PublisherId, MutableSpeakerState>();
 
@@ -86,8 +99,7 @@ export class ActiveSpeakerDetector {
 
     private selectActiveSpeakers(now: number): SpeakerState[] {
         for (const [id, state] of this.speakers.entries()) {
-            // Only prune entries that have had at least one real above-threshold frame.
-            // Entries still at -Infinity were just created and should not be evicted yet.
+            // Only prune entries with a real above-threshold frame; -Infinity entries are brand new.
             if (
                 isFinite(state.lastAboveThresholdTs) &&
                 now - state.lastAboveThresholdTs > SPEAKER_PRUNE_AFTER_MS

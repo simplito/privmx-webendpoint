@@ -1,4 +1,4 @@
-import { Logger } from "./Logger";
+import { Logger } from "./Logger.js";
 
 type EncPair = {
     readable: ReadableStream<unknown>;
@@ -11,10 +11,11 @@ import {
     RTCRtpSenderWithTransform,
     RTCRtpReceiverWithTransform,
     WindowWithRTCRtpScriptTransform,
-} from "./types/WebRtcExtensions";
-import { E2eeWorker } from "./E2eeWorker";
+} from "./types/WebRtcExtensions.js";
+import { E2eeWorker } from "./E2eeWorker.js";
 
 /**
+ * @internal
  * Wires the E2EE worker into WebRTC sender and receiver pipelines.
  *
  * Prefers the modern `RTCRtpScriptTransform` API (available in Chrome ≥ 94 and

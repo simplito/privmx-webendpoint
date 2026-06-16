@@ -1,10 +1,10 @@
-import { E2eeTransformManager } from "../E2eeTransformManager";
-import { E2eeWorker } from "../E2eeWorker";
+import { E2eeTransformManager } from "../E2eeTransformManager.js";
+import { E2eeWorker } from "../E2eeWorker.js";
 import {
     WindowWithRTCRtpScriptTransform,
     RTCRtpReceiverWithTransform,
     RTCRtpSenderWithTransform,
-} from "../types/WebRtcExtensions";
+} from "../types/WebRtcExtensions.js";
 
 // ---- window stub (Jest runs in node, not jsdom) ------------------------------
 

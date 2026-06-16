@@ -1,5 +1,5 @@
-import { CryptoFacade } from "../../crypto/CryptoFacade";
-import { KeyStore } from "../KeyStore";
+import { CryptoFacade } from "../../crypto/CryptoFacade.js";
+import { KeyStore } from "../KeyStore.js";
 
 function genIvAsBuffer(): Uint8Array {
     return crypto.getRandomValues(new Uint8Array(12));
@@ -14,15 +14,19 @@ function numAsOneByteUint(num: number): Uint8Array {
 
 const NUM_AS_UINT8_SIZE = 1;
 
-/** The three encoded video frame types defined by the WebRTC Encoded Transform spec. */
+/** @internal The three encoded video frame types defined by the WebRTC Encoded Transform spec. */
 export type RTCEncodedVideoFrameType = "key" | "delta" | "empty";
 
+/**
+ * @internal Identifies the track and publisher a transform pipeline belongs to.
+ */
 export interface TransformContext {
     id?: string;
     publisherId?: number;
 }
 
 /**
+ * @internal
  * Per-frame AES-256-GCM encrypt/decrypt for WebRTC encoded frames.
  * Pure crypto logic — no worker messaging, no module-level globals.
  */

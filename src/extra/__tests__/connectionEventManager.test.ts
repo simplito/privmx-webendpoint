@@ -1,7 +1,7 @@
-import { MOCK_LIB_CONNECTED_EVENT } from "../__mocks__/constants";
-import { createTestSetup, waitForNextTick } from "../__mocks__/utils";
-import { ConnectionEventsManager } from "../managers";
-import { ConnectionStatusEventType, createConnectionSubscription } from "../subscriptions";
+import { MOCK_LIB_CONNECTED_EVENT } from "../__mocks__/constants.js";
+import { createTestSetup, waitForNextTick } from "../__mocks__/utils.js";
+import { ConnectionEventsManager } from "../managers.js";
+import { ConnectionStatusEventType, createConnectionSubscription } from "../subscriptions.js";
 
 describe("Connection event manager", () => {
     let { q, manager } = createTestSetup();

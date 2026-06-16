@@ -7,6 +7,7 @@ interface Registration<T> {
 }
 
 /**
+ * @internal
  * Minimal async IoC container.
  *
  * - Singletons: factory is called once; all subsequent resolves return the same Promise.
@@ -56,6 +57,7 @@ export class Container {
 }
 
 /**
+ * @internal
  * Application-lifetime container.
  * Holds singletons that are created once during `EndpointFactory.setup()` and
  * live for the entire lifetime of the application: EventQueue, CryptoApi, the
@@ -64,6 +66,7 @@ export class Container {
 export class GlobalContainer extends Container {}
 
 /**
+ * @internal
  * Per-connection scoped container.
  * Created once per `EndpointFactory.connect()` / `connectPublic()` call.
  * Holds ThreadApi, StoreApi, KvdbApi, EventApi, InboxApi, StreamApi — all
@@ -72,6 +75,7 @@ export class GlobalContainer extends Container {}
 export class ConnectionContainer extends Container {}
 
 /**
+ * @internal
  * Per-stream-session scoped container.
  * Created once per `EndpointFactory.createStreamApi()` call inside a
  * ConnectionContainer.  Holds the entire WebRTC sub-graph: KeyStore,

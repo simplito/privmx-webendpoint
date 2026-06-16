@@ -1,3 +1,7 @@
+/**
+ * @internal AudioWorklet-based RMS level meter for a local audio track. Used by
+ * AudioManager; not part of the public API.
+ */
 export class LocalAudioLevelMeter {
     public static readonly RMS_VALUE_OF_SILENCE = -99;
 
@@ -68,8 +72,7 @@ export class LocalAudioLevelMeter {
         }
     }
 
-    // Each disconnect/close call is wrapped individually because some browsers throw
-    // when a node is already disconnected or the context is already closed.
+    // Each call wrapped individually: some browsers throw on already-disconnected nodes/contexts.
     stop(): void {
         this.stopped = true;
         try {

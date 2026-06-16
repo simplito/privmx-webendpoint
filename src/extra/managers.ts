@@ -1,4 +1,4 @@
-import { Types } from "..";
+import { Types } from "../index.js";
 import {
     ConnectionStatusEventType,
     ConnectionSubscription,
@@ -10,7 +10,7 @@ import {
     SubscriberForThreadsEvents,
     SubscriberForUserEvents,
     Subscription,
-} from "./subscriptions";
+} from "./subscriptions.js";
 
 /**
  *

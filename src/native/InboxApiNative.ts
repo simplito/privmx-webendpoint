@@ -20,9 +20,13 @@ import {
     ContainerWithoutItemPolicy,
     InboxEventType,
     InboxEventSelectorType,
-} from "../Types";
-import { BaseNative } from "./BaseNative";
+} from "../Types.js";
+import { BaseNative } from "./BaseNative.js";
 
+/**
+ * @internal Raw WASM wrapper for the C++ InboxApi — holds and forwards raw pointers.
+ * Use {@link InboxApi} (src/service) instead.
+ */
 export class InboxApiNative extends BaseNative {
     async newApi(
         connectionPtr: number,

@@ -3,7 +3,7 @@ import {
     DEFAULTS,
     FrameInput,
     SpeakerState,
-} from "../audio/ActiveSpeakerDetector";
+} from "../audio/ActiveSpeakerDetector.js";
 
 // ---------------------------------------------------------------------------
 // Deterministic test options

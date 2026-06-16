@@ -1,3 +1,5 @@
+import { logger } from "./Logger.js";
+
 /**
  * Simple serial async queue.
  *
@@ -54,7 +56,7 @@ export class Queue<T> {
             try {
                 await func(item);
             } catch (err) {
-                console.error("Error while processing queue item", itemId, err);
+                logger.error("Error while processing queue item", itemId, err);
                 throw err;
             }
         }

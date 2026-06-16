@@ -1,4 +1,5 @@
 /**
+ * @internal
  * IoC container token registry.
  *
  * `global:` — created once during EndpointFactory.setup(), live for the application lifetime.
@@ -6,17 +7,15 @@
  * `rtc:`    — created once per createStreamApi() call, scoped to that connection's stream session.
  */
 export const T = {
-    // -------------------------------------------------------------------------
     // Global scope
-    // -------------------------------------------------------------------------
     Api: "global:Api",
     AssetsBasePath: "global:AssetsBasePath",
+    WorkerUrl: "global:WorkerUrl",
+    RmsProcessorUrl: "global:RmsProcessorUrl",
     EventQueue: "global:EventQueue",
     CryptoApi: "global:CryptoApi",
 
-    // -------------------------------------------------------------------------
-    // Connection scope  (one container per Connection instance)
-    // -------------------------------------------------------------------------
+    // Connection scope (one container per Connection instance)
     ConnectionPtr: "conn:ConnectionPtr",
     ThreadApi: "conn:ThreadApi",
     StoreApi: "conn:StoreApi",
@@ -25,9 +24,7 @@ export const T = {
     InboxApi: "conn:InboxApi",
     StreamApi: "conn:StreamApi",
 
-    // -------------------------------------------------------------------------
-    // WebRTC sub-graph  (connection-scoped, one per createStreamApi call)
-    // -------------------------------------------------------------------------
+    // WebRTC sub-graph (connection-scoped, one per createStreamApi call)
     KeyStore: "rtc:KeyStore",
     DataChannelCryptor: "rtc:DataChannelCryptor",
     DataChannelSession: "rtc:DataChannelSession",
@@ -43,11 +40,26 @@ export const T = {
     KeySyncManager: "rtc:KeySyncManager",
     WebRtcClient: "rtc:WebRtcClient",
 
-    // -------------------------------------------------------------------------
-    // API layer  (connection-scoped)
-    // -------------------------------------------------------------------------
+    // API layer (connection-scoped)
     StreamApiNative: "api:StreamApiNative",
     WebRtcInterfaceImpl: "api:WebRtcInterfaceImpl",
 } as const;
 
+/**
+ * @internal Union of all registered IoC token string literals.
+ */
 export type Token = (typeof T)[keyof typeof T];
+
+/**
+ * @internal Fully-resolved runtime asset locations computed once by
+ * `EndpointFactory.setup()` and shared with the WebRTC sub-graph. Each URL is
+ * either an explicit per-asset override or derived from `assetsBasePath`.
+ */
+export interface ResolvedAssetUrls {
+    /** Base path/URL unspecified assets are resolved against (legacy single-path mode). */
+    basePath: string;
+    /** Absolute URL of `privmx-worker.js`, loaded by the E2EE `Worker`. */
+    workerUrl: string;
+    /** Absolute URL of `rms-processor.js`, loaded by the audio `AudioWorklet`. */
+    rmsProcessorUrl: string;
+}

@@ -1,12 +1,12 @@
-import { Types } from "../../index";
+import { Types } from "../../index.js";
 import {
     MOCK_CONNECTION_USER_ADDED_EVENT,
     MOCK_CONNECTION_USER_STATUS_EVENT,
-} from "../__mocks__/constants";
-import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber";
-import { createTestSetup, waitForNextTick } from "../__mocks__/utils";
-import { UserEventsManager } from "../managers";
-import { createUserEventSubscription } from "../subscriptions";
+} from "../__mocks__/constants.js";
+import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber.js";
+import { createTestSetup, waitForNextTick } from "../__mocks__/utils.js";
+import { UserEventsManager } from "../managers.js";
+import { createUserEventSubscription } from "../subscriptions.js";
 
 describe("User event manager", () => {
     let { q, manager } = createTestSetup();

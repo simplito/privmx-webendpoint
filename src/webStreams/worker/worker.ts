@@ -1,16 +1,15 @@
-import * as events from "./WorkerEvents";
-import { KeyStore } from "../KeyStore";
-import { LocalAudioLevelMeter } from "../audio/LocalAudioLevelMeter";
-import { EncryptTransform, TransformContext } from "./EncryptTransform";
+import * as events from "./WorkerEvents.js";
+import { KeyStore } from "../KeyStore.js";
+import { LocalAudioLevelMeter } from "../audio/LocalAudioLevelMeter.js";
+import { EncryptTransform, TransformContext } from "./EncryptTransform.js";
 
 const keyStore = new KeyStore();
 const encryptTransform = new EncryptTransform(keyStore);
 
-// Active decode pipelines keyed by track id — stored so stop() can cancel them.
+// Active decode pipelines keyed by track id — so stop() can cancel them.
 const sessions = new Map<string, { controller: AbortController }>();
 
-// Local microphone RMS level — updated by the main thread via "rms" messages,
-// embedded in every outgoing encrypted frame so receivers can track audio activity.
+// Local mic RMS, embedded in every outgoing frame so receivers can track audio activity.
 let lastRms: number = LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
 
 // ---------------------------------------------------------------------------

@@ -3,6 +3,11 @@ interface NativeObjInfo {
     onFree: () => Promise<void>;
 }
 
+/**
+ * @internal GC-driven cleanup helper — frees native WASM pointers via a
+ * FinalizationRegistry when their JS wrappers are collected. Not part of the public
+ * API.
+ */
 export class FinalizationHelper {
     private static instance: FinalizationHelper;
     private static wasmLib: any;

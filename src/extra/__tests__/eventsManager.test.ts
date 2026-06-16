@@ -1,9 +1,9 @@
-import { createTestSetup } from "../__mocks__/utils";
-import { ThreadEventsManager } from "../managers";
-import { createThreadSubscription } from "../subscriptions";
-import { ThreadEventSelectorType, ThreadEventType } from "../../Types";
-import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber";
-import { createBaseEvent } from "../__mocks__/constants";
+import { createTestSetup } from "../__mocks__/utils.js";
+import { ThreadEventsManager } from "../managers.js";
+import { createThreadSubscription } from "../subscriptions.js";
+import { ThreadEventSelectorType, ThreadEventType } from "../../Types.js";
+import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber.js";
+import { createBaseEvent } from "../__mocks__/constants.js";
 
 describe("Events Helpers", () => {
     let { q, manager } = createTestSetup();

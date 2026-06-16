@@ -1,10 +1,11 @@
-import { Key } from "../Types";
-import { KeyStore } from "./KeyStore";
-import { E2eeWorker } from "./E2eeWorker";
-import { StreamRoomId } from "./types/ApiTypes";
-import { Logger } from "./Logger";
+import { Key } from "../Types.js";
+import { KeyStore } from "./KeyStore.js";
+import { E2eeWorker } from "./E2eeWorker.js";
+import { StreamRoomId } from "./types/ApiTypes.js";
+import { Logger } from "./Logger.js";
 
 /**
+ * @internal
  * Keeps the main-thread `KeyStore` and the E2EE worker's key registry in sync.
  *
  * `updateKeys()` updates both sides sequentially: main thread first, then the

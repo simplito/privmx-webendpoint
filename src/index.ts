@@ -9,8 +9,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EndpointFactory } from "./service/EndpointFactory";
-import { NativeError } from "./native/NativeError";
+import { EndpointFactory } from "./service/EndpointFactory.js";
+import { NativeError } from "./native/NativeError.js";
+export {
+    CoreErrorCode,
+    ConnectionErrorCode,
+    ThreadErrorCode,
+    StoreErrorCode,
+    InboxErrorCode,
+    KvdbErrorCode,
+    EventErrorCode,
+    StreamRoomErrorCode,
+} from "./native/NativeErrorCodes.js";
 import {
     EventQueue,
     StoreApi,
@@ -23,12 +33,15 @@ import {
     StreamApi,
     ExtKey,
     EventApi,
-} from "./service";
-import * as Types from "./Types";
+} from "./service/index.js";
+import * as Types from "./Types.js";
+import { setEndpointLogger } from "./webStreams/Logger.js";
+export type { LogLevelName, LogSink } from "./webStreams/Logger.js";
 
 export {
     EndpointFactory as Endpoint,
     NativeError,
+    setEndpointLogger,
     Types,
     EventQueue,
     StoreApi,

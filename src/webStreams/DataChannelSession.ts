@@ -1,6 +1,7 @@
-import { DataChannelCryptor } from "./DataChannelCryptor";
+import { DataChannelCryptor } from "./DataChannelCryptor.js";
 
 /**
+ * @internal
  * Manages encrypted data channel communication for a single client session.
  *
  * Owns the outbound monotonic sequence number and the per-remote-stream inbound

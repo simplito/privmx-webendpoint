@@ -1,17 +1,30 @@
-import { StreamHandle } from "../Types";
+import { StreamHandle } from "../Types.js";
+import { logger } from "./Logger.js";
 
+/**
+ * @internal Connection state change event delivered to {@link StateChangeDispatcher}
+ * listeners.
+ */
 export interface StateChangeEvent {
     streamHandle: StreamHandle;
     state: RTCPeerConnectionState;
 }
 
+/**
+ * @internal Listener filter — restricts events to a single stream handle.
+ */
 export interface StateChangeFilter {
     streamHandle: StreamHandle;
 }
 
+/**
+ * @internal Callback invoked by {@link StateChangeDispatcher} on connection state
+ * changes.
+ */
 export type StateChangeListener = (event: StateChangeEvent) => void;
 
 /**
+ * @internal
  * Fan-out dispatcher for `RTCPeerConnection` state changes.
  *
  * Listeners are filtered by `streamHandle` so each published stream can
@@ -52,7 +65,7 @@ export class StateChangeDispatcher {
                 try {
                     listener(event);
                 } catch (e) {
-                    console.error("StateChangeListener threw:", e);
+                    logger.error("StateChangeListener threw:", e);
                 }
             }
         }

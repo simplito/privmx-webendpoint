@@ -1,7 +1,7 @@
 /**
  * Represents a stream reader for reading a file in chunks.
  */
-import { InboxApi, StoreApi } from "..";
+import { InboxApi, StoreApi } from "../index.js";
 
 export const FILE_DEFAULT_CHUNK_SIZE = 1_048_576;
 

@@ -3,6 +3,8 @@ import type { WorkerOptions } from "./tests/fixtures";
 
 export default defineConfig<WorkerOptions>({
     testDir: './tests/specs',
+    globalSetup: './tests/dockerCleanup',
+    globalTeardown: './tests/dockerCleanup',
     workers: process.env.CI ? '100%' : undefined,
     webServer: {
         command: 'npx serve . -p 8080',

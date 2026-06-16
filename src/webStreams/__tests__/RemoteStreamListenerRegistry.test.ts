@@ -1,6 +1,6 @@
-import { RemoteStreamListenerRegistry } from "../RemoteStreamListenerRegistry";
-import { RemoteStreamListener } from "../../Types";
-import { StreamId, StreamRoomId } from "../types/ApiTypes";
+import { RemoteStreamListenerRegistry } from "../RemoteStreamListenerRegistry.js";
+import { RemoteStreamListener } from "../../Types.js";
+import { StreamId, StreamRoomId } from "../types/ApiTypes.js";
 
 const ROOM = "room-1" as StreamRoomId;
 const ROOM_2 = "room-2" as StreamRoomId;

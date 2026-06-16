@@ -9,10 +9,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EmCrypto } from "./EmCrypto";
+import { EmCrypto } from "./EmCrypto.js";
 
 let emCryptoInstance: EmCrypto | null = null;
 
+/**
+ * @internal Returns the lazily-created {@link EmCrypto} singleton. Use {@link CryptoFacade} instead.
+ */
 export function getEmCrypto(): EmCrypto {
     if (!emCryptoInstance) {
         emCryptoInstance = new EmCrypto();
@@ -20,6 +23,10 @@ export function getEmCrypto(): EmCrypto {
     return emCryptoInstance;
 }
 
+/**
+ * @internal Exposes the EmCrypto singleton as the global em_crypto object consumed by
+ * the WASM module; called by EndpointFactory.setup().
+ */
 export function setGlobalEmCrypto(): void {
     const emCrypto = getEmCrypto();
     const target =
@@ -40,9 +47,12 @@ export function setGlobalEmCrypto(): void {
     }
 }
 
+/**
+ * @internal Returns the bound EmCrypto method dispatcher used by the WASM glue code.
+ */
 export function getMethodCaller(): (name: string, params: any) => Promise<any> {
     return getEmCrypto().methodCaller.bind(getEmCrypto());
 }
 
 export { EmCrypto };
-export * from "./CryptoFacade";
+export * from "./CryptoFacade.js";

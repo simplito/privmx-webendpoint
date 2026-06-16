@@ -24,7 +24,9 @@ if(PRIVMX_BUILD_TYPE STREQUAL "debug")
     )
     target_link_options(endpoint-wasm-module PUBLIC
         -L $ENV{SDK_DIR}/upstream/emscripten/cache/sysroot/lib
-        -O0 -g
+        # -gsource-map emits endpoint-wasm-module.wasm.map so Chrome DevTools
+        # can show C++ sources while debugging (plain -g only embeds DWARF).
+        -O0 -g -gsource-map
         -sASSERTIONS=2 -sEXPORT_EXCEPTION_HANDLING_HELPERS -sLLD_REPORT_UNDEFINED -sUSE_PTHREADS -sSAFE_HEAP=1
         -sNO_EXIT_RUNTIME -sWASM=1 -sMODULARIZE -sEXPORT_NAME=endpointWasmModule
         -sALLOW_MEMORY_GROWTH=0 -sALLOW_BLOCKING_ON_MAIN_THREAD=0 -sPTHREAD_POOL_SIZE=0

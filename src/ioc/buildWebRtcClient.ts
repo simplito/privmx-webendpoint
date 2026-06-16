@@ -1,21 +1,23 @@
-import { AudioManager } from "../webStreams/AudioManager";
-import { DataChannelCryptor } from "../webStreams/DataChannelCryptor";
-import { DataChannelSession } from "../webStreams/DataChannelSession";
-import { E2eeTransformManager } from "../webStreams/E2eeTransformManager";
-import { E2eeWorker } from "../webStreams/E2eeWorker";
-import { StateChangeDispatcher } from "../webStreams/EventDispatcher";
-import { KeyStore } from "../webStreams/KeyStore";
-import { KeySyncManager } from "../webStreams/KeySyncManager";
-import { PeerConnectionFactory } from "../webStreams/PeerConnectionFactory";
-import { PeerConnectionManager } from "../webStreams/PeerConnectionManager";
-import { PublisherManager } from "../webStreams/PublisherManager";
-import { RemoteStreamListenerRegistry } from "../webStreams/RemoteStreamListenerRegistry";
-import { SubscriberManager } from "../webStreams/SubscriberManager";
-import { WebRtcClient } from "../webStreams/WebRtcClient";
-import { WebRtcContainer, Container } from "./Container";
-import { T } from "./Tokens";
+import { AudioManager } from "../webStreams/AudioManager.js";
+import { logger } from "../webStreams/Logger.js";
+import { DataChannelCryptor } from "../webStreams/DataChannelCryptor.js";
+import { DataChannelSession } from "../webStreams/DataChannelSession.js";
+import { E2eeTransformManager } from "../webStreams/E2eeTransformManager.js";
+import { E2eeWorker } from "../webStreams/E2eeWorker.js";
+import { StateChangeDispatcher } from "../webStreams/EventDispatcher.js";
+import { KeyStore } from "../webStreams/KeyStore.js";
+import { KeySyncManager } from "../webStreams/KeySyncManager.js";
+import { PeerConnectionFactory } from "../webStreams/PeerConnectionFactory.js";
+import { PeerConnectionManager } from "../webStreams/PeerConnectionManager.js";
+import { PublisherManager } from "../webStreams/PublisherManager.js";
+import { RemoteStreamListenerRegistry } from "../webStreams/RemoteStreamListenerRegistry.js";
+import { SubscriberManager } from "../webStreams/SubscriberManager.js";
+import { WebRtcClient } from "../webStreams/WebRtcClient.js";
+import { WebRtcContainer, Container } from "./Container.js";
+import { T } from "./Tokens.js";
 
 /**
+ * @internal
  * Builds a fully-wired WebRtcClient and registers all its internal sub-objects
  * into the provided container so that callback closures can resolve them lazily.
  *
@@ -35,8 +37,7 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
     const audioManager = await c.resolve<AudioManager>(T.AudioManager);
     const e2eeWorker = await c.resolve<E2eeWorker>(T.E2eeWorker);
 
-    // --- PeerConnectionFactory ---
-    // onRemoteTrack fires during a live call; SubscriberManager is resolved lazily.
+    // onRemoteTrack fires during a live call; SubscriberManager resolved lazily.
     const pcFactory = new PeerConnectionFactory(
         dispatcher,
         dataChannelSession,
@@ -48,8 +49,7 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
         },
     );
 
-    // --- PeerConnectionManager ---
-    // onTrickle fires during ICE negotiation; WebRtcClient is resolved lazily.
+    // onTrickle fires during ICE negotiation; WebRtcClient resolved lazily.
     const pcm = new PeerConnectionManager(
         (room, streamHandle) => pcFactory.create(room, streamHandle),
         (sessionId, candidate) =>
@@ -74,8 +74,7 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
         e2eeWorker,
     );
 
-    // Register all internally-constructed objects so the lazy callbacks above
-    // and any future resolver can reach them.
+    // Register internally-constructed objects so the lazy callbacks can reach them.
     c.registerValue(T.PeerConnectionFactory, pcFactory);
     c.registerValue(T.PeerConnectionManager, pcm);
     c.registerValue(T.PublisherManager, publisher);
@@ -87,6 +86,7 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
 }
 
 /**
+ * @internal
  * Registers all WebRTC-session-scoped singletons into a WebRtcContainer.
  * Call this once per createStreamApi() invocation before resolving T.WebRtcClient.
  */
@@ -108,11 +108,11 @@ export function registerWebRtcServices(c: WebRtcContainer): void {
 
     // E2eeWorker — the RMS callback resolves AudioManager lazily (built after E2eeWorker).
     c.registerSingleton(T.E2eeWorker, async (c) => {
-        const assetsDir = await c.resolve<string>(T.AssetsBasePath);
-        return new E2eeWorker(assetsDir, (publisherId, rms) => {
+        const workerUrl = await c.resolve<string>(T.WorkerUrl);
+        return new E2eeWorker(workerUrl, (publisherId, rms) => {
             c.resolve<AudioManager>(T.AudioManager)
                 .then((am) => am.onRemoteFrameRms(publisherId, rms))
-                .catch((e) => console.error("onRemoteFrameRms failed:", e));
+                .catch((e) => logger.error("onRemoteFrameRms failed:", e));
         });
     });
 
@@ -122,11 +122,10 @@ export function registerWebRtcServices(c: WebRtcContainer): void {
     );
 
     c.registerSingleton(T.AudioManager, async (c) => {
-        const assetsDir = await c.resolve<string>(T.AssetsBasePath);
+        const rmsProcessorUrl = await c.resolve<string>(T.RmsProcessorUrl);
         const e2eeWorker = await c.resolve<E2eeWorker>(T.E2eeWorker);
-        return new AudioManager(assetsDir, (rms) => e2eeWorker.sendRms(rms));
+        return new AudioManager(rmsProcessorUrl, (rms) => e2eeWorker.sendRms(rms));
     });
 
-    // WebRtcClient — delegates to buildWebRtcClient which registers the rest.
     c.registerSingleton(T.WebRtcClient, (c) => buildWebRtcClient(c));
 }

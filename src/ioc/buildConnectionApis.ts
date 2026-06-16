@@ -1,34 +1,52 @@
-import { Api } from "../native/Api";
-import { CryptoApiNative } from "../native/CryptoApiNative";
-import { EventApiNative } from "../native/EventApiNative";
-import { EventQueueNative } from "../native/EventQueueNative";
-import { InboxApiNative } from "../native/InboxApiNative";
-import { KvdbApiNative } from "../native/KvdbApiNative";
-import { StoreApiNative } from "../native/StoreApiNative";
-import { StreamApiNative } from "../native/StreamApiNative";
-import { ThreadApiNative } from "../native/ThreadApiNative";
-import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
-import { Connection } from "../service/Connection";
-import { CryptoApi } from "../service/CryptoApi";
-import { EventApi } from "../service/EventApi";
-import { EventQueue } from "../service/EventQueue";
-import { InboxApi } from "../service/InboxApi";
-import { KvdbApi } from "../service/KvdbApi";
-import { StoreApi } from "../service/StoreApi";
-import { StreamApi } from "../service/StreamApi";
-import { ThreadApi } from "../service/ThreadApi";
-import { WebRtcClient } from "../webStreams/WebRtcClient";
-import { GlobalContainer, ConnectionContainer, WebRtcContainer } from "./Container";
-import { T } from "./Tokens";
-import { registerWebRtcServices } from "./buildWebRtcClient";
+import { Api } from "../native/Api.js";
+import { CryptoApiNative } from "../native/CryptoApiNative.js";
+import { EventApiNative } from "../native/EventApiNative.js";
+import { EventQueueNative } from "../native/EventQueueNative.js";
+import { InboxApiNative } from "../native/InboxApiNative.js";
+import { KvdbApiNative } from "../native/KvdbApiNative.js";
+import { StoreApiNative } from "../native/StoreApiNative.js";
+import { StreamApiNative } from "../native/StreamApiNative.js";
+import { ThreadApiNative } from "../native/ThreadApiNative.js";
+import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl.js";
+import { Connection } from "../service/Connection.js";
+import { CryptoApi } from "../service/CryptoApi.js";
+import { EventApi } from "../service/EventApi.js";
+import { EventQueue } from "../service/EventQueue.js";
+import { InboxApi } from "../service/InboxApi.js";
+import { KvdbApi } from "../service/KvdbApi.js";
+import { StoreApi } from "../service/StoreApi.js";
+import { StreamApi } from "../service/StreamApi.js";
+import { ThreadApi } from "../service/ThreadApi.js";
+import { WebRtcClient } from "../webStreams/WebRtcClient.js";
+import { GlobalContainer, ConnectionContainer, WebRtcContainer } from "./Container.js";
+import { T, ResolvedAssetUrls } from "./Tokens.js";
+import { registerWebRtcServices } from "./buildWebRtcClient.js";
 
 /**
+ * @internal Registers the resolved asset locations (base path + per-asset URLs)
+ * into a container so the WebRTC sub-graph can resolve them regardless of scope.
+ */
+function registerAssetUrls(
+    c: GlobalContainer | ConnectionContainer,
+    assets: ResolvedAssetUrls,
+): void {
+    c.registerValue(T.AssetsBasePath, assets.basePath);
+    c.registerValue(T.WorkerUrl, assets.workerUrl);
+    c.registerValue(T.RmsProcessorUrl, assets.rmsProcessorUrl);
+}
+
+/**
+ * @internal
  * Registers all global-scope singletons into the provided GlobalContainer.
  * Call once during EndpointFactory.init().
  */
-export function registerGlobalServices(c: GlobalContainer, api: Api, assetsBasePath: string): void {
+export function registerGlobalServices(
+    c: GlobalContainer,
+    api: Api,
+    assets: ResolvedAssetUrls,
+): void {
     c.registerValue(T.Api, api);
-    c.registerValue(T.AssetsBasePath, assetsBasePath);
+    registerAssetUrls(c, assets);
 
     c.registerSingleton(T.EventQueue, async (c) => {
         const a = await c.resolve<Api>(T.Api);
@@ -47,6 +65,7 @@ export function registerGlobalServices(c: GlobalContainer, api: Api, assetsBaseP
 }
 
 /**
+ * @internal
  * Registers all connection-scoped API singletons into the provided ConnectionContainer.
  *
  * Dependency graph (resolved lazily to allow any creation order):
@@ -62,9 +81,9 @@ export function registerGlobalServices(c: GlobalContainer, api: Api, assetsBaseP
 export function registerConnectionServices(
     c: ConnectionContainer,
     api: Api,
-    assetsBasePath: string,
+    assets: ResolvedAssetUrls,
 ): void {
-    c.registerValue(T.AssetsBasePath, assetsBasePath);
+    registerAssetUrls(c, assets);
 
     c.registerSingleton(T.ThreadApi, async (c) => {
         const conn = await c.resolve<Connection>(T.ConnectionPtr);
@@ -137,9 +156,11 @@ export function registerConnectionServices(
         }
         const eventApi = await c.resolve<EventApi>(T.EventApi);
 
-        // Each StreamApi gets its own isolated WebRTC sub-graph container.
+        // Isolated WebRTC sub-graph per StreamApi.
         const rtc = new WebRtcContainer();
-        rtc.registerValue(T.AssetsBasePath, assetsBasePath);
+        rtc.registerValue(T.AssetsBasePath, assets.basePath);
+        rtc.registerValue(T.WorkerUrl, assets.workerUrl);
+        rtc.registerValue(T.RmsProcessorUrl, assets.rmsProcessorUrl);
         registerWebRtcServices(rtc);
 
         const webRtcClient = await rtc.resolve<WebRtcClient>(T.WebRtcClient);

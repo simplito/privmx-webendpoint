@@ -1,8 +1,8 @@
-import { Types } from "../../index";
-import { MOCK_CUSTOM_EVENT } from "../__mocks__/constants";
-import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber";
-import { createTestSetup, waitForNextTick } from "../__mocks__/utils";
-import { createEventSubscription } from "../subscriptions";
+import { Types } from "../../index.js";
+import { MOCK_CUSTOM_EVENT } from "../__mocks__/constants.js";
+import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber.js";
+import { createTestSetup, waitForNextTick } from "../__mocks__/utils.js";
+import { createEventSubscription } from "../subscriptions.js";
 
 describe("Custom event manager", () => {
     let { q, manager } = createTestSetup();

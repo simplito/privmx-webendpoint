@@ -1,7 +1,8 @@
-import { Inboxes } from ".";
-import { Connection, EndpointFactory, InboxApi, StoreApi, ThreadApi } from "../service";
+import { Inboxes } from "./index.js";
+import { Connection, EndpointFactory, InboxApi, StoreApi, ThreadApi } from "../service/index.js";
 
-import { InboxEntryPayload } from "./inbox";
+import { InboxEntryPayload } from "./inbox.js";
+import { logger } from "../webStreams/Logger.js";
 
 /**
  * @class PublicConnection
@@ -107,7 +108,7 @@ export class PublicConnection {
             this.storeApi = null;
             this.inboxApi = null;
         } catch (e) {
-            console.error("Error during disconnection:", e);
+            logger.error("Error during disconnection:", e);
         }
     }
 

@@ -1,9 +1,10 @@
-import { Key } from "../Types";
-import { CryptoFacade } from "../crypto/CryptoFacade";
+import { Key } from "../Types.js";
+import { CryptoFacade } from "../crypto/CryptoFacade.js";
 
 const AES_GCM_KEY_LENGTH_BYTES = 32;
 
 /**
+ * @internal
  * Owns the set of AES-256-GCM keys for a single WebRTC session.
  *
  * Keys are registered in the global CryptoFacade registry under a
@@ -83,7 +84,6 @@ export class KeyStore {
         if (!this.encryptionInternalKeyId) {
             throw new Error("No encryption key set.");
         }
-        // Strip the session prefix to recover the original external key ID.
         return this.encryptionInternalKeyId.slice(this.sessionPrefix.length + 1);
     }
 }

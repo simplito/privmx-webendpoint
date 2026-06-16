@@ -1,4 +1,4 @@
-import { Types } from "..";
+import { Types } from "../index.js";
 import {
     ConnectionStatusEventType,
     SubscriberForInboxEvents,
@@ -7,7 +7,7 @@ import {
     SubscriberForKvdbEvents,
     SubscriberForStoreEvents,
     SubscriberForThreadsEvents,
-} from "./subscriptions";
+} from "./subscriptions.js";
 import {
     BaseEventDispatcherManager,
     ConnectionChannels,
@@ -18,7 +18,7 @@ import {
     StoreEventsManager,
     ThreadEventsManager,
     UserEventsManager,
-} from "./managers";
+} from "./managers.js";
 
 function normalizeConnectionEvent(e: Types.Event): Types.Event {
     switch (e.type) {

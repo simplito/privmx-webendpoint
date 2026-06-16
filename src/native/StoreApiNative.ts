@@ -18,9 +18,13 @@ import {
     ContainerPolicy,
     StoreEventSelectorType,
     StoreEventType,
-} from "../Types";
-import { BaseNative } from "./BaseNative";
+} from "../Types.js";
+import { BaseNative } from "./BaseNative.js";
 
+/**
+ * @internal Raw WASM wrapper for the C++ StoreApi — holds and forwards raw pointers.
+ * Use {@link StoreApi} (src/service) instead.
+ */
 export class StoreApiNative extends BaseNative {
     async newApi(connectionPtr: number): Promise<number> {
         return this.runAsync<number>((taskId) =>

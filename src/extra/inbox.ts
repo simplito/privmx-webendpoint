@@ -1,5 +1,5 @@
-import { InboxApi } from "..";
-import { FileUploader } from "./files";
+import { InboxApi } from "../index.js";
+import { FileUploader } from "./files.js";
 
 /**
  * Represents payload that is sent to an Inbox.

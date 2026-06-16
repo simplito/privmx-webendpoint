@@ -9,8 +9,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Api } from "./Api";
+import { Api } from "./Api.js";
 
+/**
+ * @internal Abstract base for all raw WASM wrapper classes — holds the shared {@link Api} handle and pointer lifecycle helpers. Use the typed APIs in src/service instead.
+ */
 export abstract class BaseNative {
     protected _api: Api | null;
     constructor(api: Api) {

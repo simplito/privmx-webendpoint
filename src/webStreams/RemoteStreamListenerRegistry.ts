@@ -1,8 +1,9 @@
-import { RemoteStreamListener } from "../Types";
-import { Logger } from "./Logger";
-import { StreamRoomId } from "./types/ApiTypes";
+import { RemoteStreamListener } from "../Types.js";
+import { Logger } from "./Logger.js";
+import { StreamRoomId } from "./types/ApiTypes.js";
 
 /**
+ * @internal
  * Dispatches incoming remote media tracks and decrypted data channel frames to
  * registered `RemoteStreamListener` callbacks.
  *

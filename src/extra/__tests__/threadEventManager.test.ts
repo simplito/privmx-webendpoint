@@ -1,12 +1,12 @@
-import { createTestSetup, waitForNextTick } from "../__mocks__/utils";
-import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber";
-import { ThreadEventsManager } from "../managers";
-import { createThreadSubscription } from "../subscriptions";
-import { ThreadEventSelectorType, ThreadEventType } from "../../Types";
+import { createTestSetup, waitForNextTick } from "../__mocks__/utils.js";
+import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber.js";
+import { ThreadEventsManager } from "../managers.js";
+import { createThreadSubscription } from "../subscriptions.js";
+import { ThreadEventSelectorType, ThreadEventType } from "../../Types.js";
 import {
     MOCK_THREAD_CREATED_EVENT,
     MOCK_THREAD_MESSAGE_DELETED_EVENT,
-} from "../__mocks__/constants";
+} from "../__mocks__/constants.js";
 
 describe("Thread event manager", () => {
     let { q, manager } = createTestSetup();

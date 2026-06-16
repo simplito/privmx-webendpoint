@@ -1,4 +1,4 @@
-import { MockEventQueue } from "./mockEventQueue";
+import { MockEventQueue } from "./mockEventQueue.js";
 
 export class MockContainerSubscriber<E, S> {
     constructor(private queue: MockEventQueue) {}

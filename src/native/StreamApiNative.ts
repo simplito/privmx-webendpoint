@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Jsep } from "../webStreams/types/ApiTypes";
+import { Jsep } from "../webStreams/types/ApiTypes.js";
 import {
     ContainerPolicy,
     PagingList,
@@ -20,13 +20,17 @@ import {
     StreamRoom,
     TurnCredentials,
     UserWithPubKey,
-} from "../Types";
-import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl";
-import { WindowWithWasmHandler } from "../webStreams/types/WebRtcExtensions";
-import { Api } from "./Api";
-import { BaseNative } from "./BaseNative";
-import * as Types from "../Types";
+} from "../Types.js";
+import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl.js";
+import { WindowWithWasmHandler } from "../webStreams/types/WebRtcExtensions.js";
+import { Api } from "./Api.js";
+import { BaseNative } from "./BaseNative.js";
+import * as Types from "../Types.js";
 
+/**
+ * @internal Raw WASM wrapper for the C++ StreamApi — holds and forwards raw pointers.
+ * Use {@link StreamApi} (src/service) instead.
+ */
 export class StreamApiNative extends BaseNative {
     protected static bindingId: number = -1;
     public static getBindingId() {

@@ -1,5 +1,5 @@
-import { Types } from "..";
-import { GenericEvent } from "./managers";
+import { Types } from "../index.js";
+import { GenericEvent } from "./managers.js";
 
 export type ThreadCallbackPayload = {
     // Thread events

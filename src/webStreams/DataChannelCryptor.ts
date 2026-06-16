@@ -1,7 +1,7 @@
-import { CryptoFacade } from "../crypto/CryptoFacade";
-import { DataChannelCryptorDecryptStatus } from "../Types";
-import { KeyStore } from "./KeyStore";
-import { Logger } from "./Logger";
+import { CryptoFacade } from "../crypto/CryptoFacade.js";
+import { DataChannelCryptorDecryptStatus } from "../Types.js";
+import { KeyStore } from "./KeyStore.js";
+import { Logger } from "./Logger.js";
 
 const GCM_NONCE_LENGTH_BYTES = 12;
 const GCM_TAG_LENGTH_BYTES = 16;
@@ -17,16 +17,25 @@ const FIXED_HEADER_LENGTH =
     SEQUENCE_NUMBER_LENGTH_BYTES +
     GCM_NONCE_LENGTH_BYTES;
 
+/**
+ * @internal Input for {@link DataChannelCryptor.encryptToWireFormat}.
+ */
 export interface EncryptToWireFormatParams {
     plaintext: Uint8Array;
     sequenceNumber: number;
 }
 
+/**
+ * @internal Input for {@link DataChannelCryptor.decryptFromWireFormat}.
+ */
 export interface DecryptFromWireFormatParams {
     frame: Uint8Array;
     lastSequenceNumber: number;
 }
 
+/**
+ * @internal Decomposed wire-format frame produced by the parser inside {@link DataChannelCryptor}.
+ */
 export interface ParsedEncryptedFrame {
     version: number;
     sequenceNumber: number;
@@ -37,6 +46,7 @@ export interface ParsedEncryptedFrame {
 }
 
 /**
+ * @internal
  * Serialises and deserialises encrypted data channel frames.
  *
  * Wire format:
@@ -285,6 +295,10 @@ export class DataChannelCryptor {
     }
 }
 
+/**
+ * @internal Error thrown on data channel frame authentication, replay, or key-lookup
+ * failure — carries a DataChannelCryptorDecryptStatus code.
+ */
 export class DataChannelCryptorError extends Error {
     public readonly code: DataChannelCryptorDecryptStatus;
 

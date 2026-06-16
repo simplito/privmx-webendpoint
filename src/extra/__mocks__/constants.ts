@@ -1,4 +1,4 @@
-import { Types } from "../../index";
+import { Types } from "../../index.js";
 
 export function createBaseEvent(subsId: string) {
     return {

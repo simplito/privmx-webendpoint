@@ -1,5 +1,5 @@
-import { MockEventQueue } from "./mockEventQueue";
-import { EventManager } from "../events";
+import { MockEventQueue } from "./mockEventQueue.js";
+import { EventManager } from "../events.js";
 
 export async function utils<T>(cb: () => T): Promise<T> {
     return new Promise((resolve) => {

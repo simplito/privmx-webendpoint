@@ -1,4 +1,8 @@
-import { setGlobalEmCrypto } from "./index";
-import "../webStreams/worker/worker";
+/**
+ * @internal Vite worker bundle entry point (built to dist/assets/privmx-worker.js) —
+ * installs the global EmCrypto instance and loads the E2EE worker script.
+ */
+import { setGlobalEmCrypto } from "./index.js";
+import "../webStreams/worker/worker.js";
 
 setGlobalEmCrypto();

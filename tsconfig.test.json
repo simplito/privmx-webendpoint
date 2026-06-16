@@ -1,9 +1,13 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    // Jest/ts-jest runs CommonJS. `node` resolution + the .js-extension mapper in
+    // jest.config.cjs resolve the source's nodenext-style `.js` import specifiers.
+    "module": "CommonJS",
+    "moduleResolution": "node",
     "allowJs": true,
     "types": ["jest", "node"]
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "src/auto.ts"]
 }

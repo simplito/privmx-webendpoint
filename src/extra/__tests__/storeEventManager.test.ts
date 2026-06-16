@@ -1,9 +1,9 @@
-import { createTestSetup, waitForNextTick } from "../__mocks__/utils";
-import { MOCK_STORE_CREATED_EVENT, MOCK_STORE_FILE_DELETED_EVENT } from "../__mocks__/constants";
-import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber";
-import { StoreEventsManager } from "../managers";
-import { createStoreSubscription } from "../subscriptions";
-import { StoreEventSelectorType, StoreEventType } from "../../Types";
+import { createTestSetup, waitForNextTick } from "../__mocks__/utils.js";
+import { MOCK_STORE_CREATED_EVENT, MOCK_STORE_FILE_DELETED_EVENT } from "../__mocks__/constants.js";
+import { MockContainerSubscriber } from "../__mocks__/mockContainerSubscriber.js";
+import { StoreEventsManager } from "../managers.js";
+import { createStoreSubscription } from "../subscriptions.js";
+import { StoreEventSelectorType, StoreEventType } from "../../Types.js";
 
 describe("Store event manager", () => {
     let { q, manager } = createTestSetup();

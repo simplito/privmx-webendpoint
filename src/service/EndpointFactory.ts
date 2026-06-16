@@ -9,72 +9,190 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Api } from "../native/Api";
-import { ConnectionNative } from "../native/ConnectionNative";
-import { FinalizationHelper } from "../FinalizationHelper";
-import { PKIVerificationOptions } from "../Types";
-import { Connection } from "./Connection";
-import { CryptoApi } from "./CryptoApi";
-import { EventApi } from "./EventApi";
-import { EventQueue } from "./EventQueue";
-import { InboxApi } from "./InboxApi";
-import { KvdbApi } from "./KvdbApi";
-import { StoreApi } from "./StoreApi";
-import { StreamApi } from "./StreamApi";
-import { ThreadApi } from "./ThreadApi";
-import { GlobalContainer, ConnectionContainer } from "../ioc/Container";
-import { T } from "../ioc/Tokens";
-import { registerGlobalServices, registerConnectionServices } from "../ioc/buildConnectionApis";
-import { setGlobalEmCrypto } from "../crypto/index";
-import { ExtKey } from "./ExtKey";
+import { Api } from "../native/Api.js";
+import { ConnectionNative } from "../native/ConnectionNative.js";
+import { FinalizationHelper } from "../FinalizationHelper.js";
+import { PKIVerificationOptions } from "../Types.js";
+import { Connection } from "./Connection.js";
+import { CryptoApi } from "./CryptoApi.js";
+import { EventApi } from "./EventApi.js";
+import { EventQueue } from "./EventQueue.js";
+import { InboxApi } from "./InboxApi.js";
+import { KvdbApi } from "./KvdbApi.js";
+import { StoreApi } from "./StoreApi.js";
+import { StreamApi } from "./StreamApi.js";
+import { ThreadApi } from "./ThreadApi.js";
+import { GlobalContainer, ConnectionContainer } from "../ioc/Container.js";
+import { T, ResolvedAssetUrls } from "../ioc/Tokens.js";
+import { registerGlobalServices, registerConnectionServices } from "../ioc/buildConnectionApis.js";
+import { setGlobalEmCrypto } from "../crypto/index.js";
+import { ExtKey } from "./ExtKey.js";
 
 /**
  * //doc-gen:ignore
  */
-declare function endpointWasmModule(): Promise<any>; // Provided by emscripten js glue code
+declare function endpointWasmModule(moduleOverrides?: {
+    locateFile?: (path: string, scriptDirectory: string) => string;
+}): Promise<any>; // Provided by emscripten js glue code
 
+/**
+ * Options accepted by {@link EndpointFactory.setup}.
+ *
+ * Two ways to point the SDK at its four runtime assets:
+ * - **Single directory** (simplest): set `assetsBasePath` to a folder that
+ *   serves all four files.
+ * - **Per-asset URLs** (bundler-native): set `wasmModuleUrl` / `wasmUrl` /
+ *   `workerUrl` / `rmsProcessorUrl` individually — typically with
+ *   `new URL("…", import.meta.url).href` so a bundler (Vite, webpack 5, …)
+ *   fingerprints and serves each asset without a manual copy step. Any URL left
+ *   unset falls back to `assetsBasePath` + the default filename.
+ */
 export interface EndpointSetupOptions {
+    /**
+     * URL or path of the directory the WASM assets are served from — the four
+     * files copied out of `@simplito/privmx-webendpoint/assets`
+     * (`endpoint-wasm-module.js`, `endpoint-wasm-module.wasm`,
+     * `privmx-worker.js`, `rms-processor.js`). Defaults to `/`. Relative paths
+     * are resolved against `document.baseURI`. A wrong path rejects `setup()`
+     * with a load error instead of failing later. Ignored for any asset that
+     * has an explicit per-asset URL below.
+     */
     assetsBasePath?: string;
+    /**
+     * Absolute URL of the Emscripten glue script `endpoint-wasm-module.js`,
+     * injected as a `<script>` tag. Overrides `assetsBasePath` for the glue.
+     * Use `new URL("…/endpoint-wasm-module.js", import.meta.url).href` to let a
+     * bundler resolve it.
+     */
+    wasmModuleUrl?: string;
+    /**
+     * Absolute URL of the WebAssembly binary `endpoint-wasm-module.wasm`. When
+     * set, it is supplied to the Emscripten module via `locateFile`, so the
+     * binary may live somewhere other than next to the glue script. Defaults to
+     * the glue's own directory.
+     */
+    wasmUrl?: string;
+    /**
+     * Absolute URL of the E2EE worker `privmx-worker.js` (loaded with
+     * `new Worker(url)`). Overrides `assetsBasePath` for the streaming worker.
+     */
+    workerUrl?: string;
+    /**
+     * Absolute URL of the audio worklet `rms-processor.js` (loaded with
+     * `audioWorklet.addModule(url)`). Overrides `assetsBasePath` for audio
+     * level metering.
+     */
+    rmsProcessorUrl?: string;
+    /**
+     * Number of async-engine worker threads the WASM module spawns (default 4,
+     * clamped to a minimum of 2). Each worker holds a view of the shared WASM
+     * memory; raise this for heavily parallel file transfers.
+     */
     workerCount?: number;
 }
 
 /**
- * Contains static factory methods - generators for Connection and APIs.
+ * Static entry point of the SDK: loads the WebAssembly core and creates
+ * {@link Connection}s and all API instances.
+ *
+ * ## Workflow
+ * {@link setup} (once per application) → {@link connect} /
+ * {@link connectPublic} → {@link createThreadApi} / {@link createStoreApi} /
+ * {@link createInboxApi} / … → application work →
+ * {@link Connection.disconnect}.
+ *
+ * API instances are cached per connection — calling `createThreadApi` twice
+ * with the same connection returns the same instance — and are invalidated
+ * automatically by `disconnect()`.
+ *
+ * Prefer the higher-level `PrivmxClient` (from
+ * `@simplito/privmx-webendpoint/extra`) for new applications; it wraps this
+ * factory and manages event loops for you.
  */
 export class EndpointFactory {
     private static readonly WORKER_COUNT_MIN = 2;
 
     private static globalContainer: GlobalContainer;
-    private static assetsBasePath: string;
+    private static assets: ResolvedAssetUrls;
     private static api: Api;
-    private static initialized = false;
+    // Cached so concurrent/repeated setup() calls share one WASM load.
+    private static setupPromise: Promise<void> | undefined;
 
-    // Per-Connection containers, keyed by the Connection instance.
-    // WeakMap ensures no memory leak when a Connection is garbage-collected.
+    // WeakMap so containers are GC-eligible when their Connection is dropped.
     private static readonly connectionContainers = new WeakMap<Connection, ConnectionContainer>();
 
     /**
-     * Load the Endpoint's WASM assets and initialize the Endpoint library.
+     * Loads the Endpoint's WebAssembly assets and initializes the library. Must
+     * complete before any other Endpoint call; safe to call multiple times —
+     * concurrent and repeated calls share one initialization (a failed attempt
+     * may be retried).
      *
-     * @param {string | EndpointSetupOptions} [options] either a base path string (legacy) or an options object
-     * @param {string} [options.assetsBasePath] base path/url to the Endpoint's WebAssembly assets
-     * @param {number} [options.workerCount] number of async-engine worker threads (default: 4, minimum: 2)
+     * Injects a script tag loading `endpoint-wasm-module.js` (from
+     * `assetsBasePath` or the explicit `wasmModuleUrl`), instantiates the
+     * C++/WASM module (spawning `workerCount` async-engine worker threads on
+     * SharedArrayBuffer, which requires COOP/COEP headers; the `.wasm` is
+     * located via `wasmUrl` when given), and registers the WebCrypto-based
+     * engine the native core uses for all cryptography.
+     *
+     * Call once at application startup, before {@link connect} /
+     * {@link connectPublic}. Workflow: `setup` → {@link connect} →
+     * {@link createThreadApi} / {@link createStoreApi} / … →
+     * {@link Connection.disconnect}.
+     *
+     * @param {string | EndpointSetupOptions} [options] options object, or the
+     *   `assetsBasePath` string alone (legacy form). Use the per-asset URL
+     *   fields of {@link EndpointSetupOptions} for bundler-native loading.
+     * @throws {Error} when an asset fails to load (wrong `assetsBasePath` /
+     *   per-asset URL, or assets not copied), or when called outside a browser
+     *   environment
+     * @example
+     * // Simple: all four assets served from one directory.
+     * await EndpointFactory.setup({ assetsBasePath: "/privmx-assets" });
+     *
+     * // Bundler-native: let the bundler resolve each asset (no manual copy).
+     * await EndpointFactory.setup({
+     *     wasmModuleUrl: new URL("…/endpoint-wasm-module.js", import.meta.url).href,
+     *     wasmUrl: new URL("…/endpoint-wasm-module.wasm", import.meta.url).href,
+     *     workerUrl: new URL("…/privmx-worker.js", import.meta.url).href,
+     *     rmsProcessorUrl: new URL("…/rms-processor.js", import.meta.url).href,
+     * });
+     * const connection = await EndpointFactory.connect(userPrivKey, solutionId, bridgeUrl);
+     * const threadApi = await EndpointFactory.createThreadApi(connection);
      */
     public static async setup(options?: string | EndpointSetupOptions): Promise<void> {
-        if (this.initialized) return;
-        this.initialized = true;
+        if (!this.setupPromise) {
+            this.setupPromise = this.doSetup(options).catch((e) => {
+                // A failed load must not poison future attempts.
+                this.setupPromise = undefined;
+                throw e;
+            });
+        }
+        return this.setupPromise;
+    }
+
+    private static async doSetup(options?: string | EndpointSetupOptions): Promise<void> {
+        if (typeof window === "undefined" || typeof document === "undefined") {
+            throw new Error(
+                "PrivMX Endpoint requires a browser environment (window/document are not available). " +
+                    "In SSR frameworks call EndpointFactory.setup() from client-side code only.",
+            );
+        }
         const resolved: EndpointSetupOptions =
             typeof options === "object" && options !== null
                 ? options
                 : { assetsBasePath: options as string | undefined };
-        const { assetsBasePath, workerCount } = resolved;
+        const { assetsBasePath, wasmModuleUrl, wasmUrl, workerCount } = resolved;
 
         const basePath = this.resolveAssetsBasePath(assetsBasePath);
-        this.assetsBasePath = basePath;
+        this.assets = {
+            basePath,
+            workerUrl: resolved.workerUrl ?? this.buildAssetUrl(basePath, "privmx-worker.js"),
+            rmsProcessorUrl:
+                resolved.rmsProcessorUrl ?? this.buildAssetUrl(basePath, "rms-processor.js"),
+        };
+        const glueUrl = wasmModuleUrl ?? this.buildAssetUrl(basePath, "endpoint-wasm-module.js");
 
-        // Must be set before endpointWasmModule() is called — the C++ AsyncEngine
-        // constructor reads this global during WASM module initialization (on the
-        // worker thread), before the main thread gets control back.
+        // Must be set before endpointWasmModule() — the C++ AsyncEngine reads this global during WASM init.
         if (workerCount !== undefined) {
             (window as unknown as Record<string, unknown>).__privmxWorkerCount = Math.max(
                 EndpointFactory.WORKER_COUNT_MIN,
@@ -83,13 +201,16 @@ export class EndpointFactory {
         }
 
         setGlobalEmCrypto();
-        const assets = ["endpoint-wasm-module.js"];
 
-        for (const asset of assets) {
-            await this.loadScript(this.buildAssetUrl(basePath, asset));
-        }
+        await this.loadScript(glueUrl);
 
-        const lib = await endpointWasmModule();
+        // Override locateFile only for an explicit .wasm URL; otherwise keep Emscripten's glue-relative default.
+        const lib = wasmUrl
+            ? await endpointWasmModule({
+                  locateFile: (path: string, scriptDirectory: string) =>
+                      path.endsWith(".wasm") ? wasmUrl : scriptDirectory + path,
+              })
+            : await endpointWasmModule();
         EndpointFactory.init(lib);
     }
 
@@ -121,7 +242,7 @@ export class EndpointFactory {
     }
 
     private static async loadScript(url: string): Promise<void> {
-        return new Promise<void>((resolve) => {
+        return new Promise<void>((resolve, reject) => {
             const head = document.getElementsByTagName("head")[0];
             const script = document.createElement("script");
             script.type = "text/javascript";
@@ -129,6 +250,17 @@ export class EndpointFactory {
 
             script.onload = () => {
                 resolve();
+            };
+            script.onerror = () => {
+                script.remove();
+                reject(
+                    new Error(
+                        `PrivMX Endpoint: failed to load "${url}". ` +
+                            'Copy the WASM assets from "@simplito/privmx-webendpoint/assets" ' +
+                            "into your app's public directory and pass their location to " +
+                            "EndpointFactory.setup({ assetsBasePath }).",
+                    ),
+                );
             };
             head.appendChild(script);
         });
@@ -143,25 +275,40 @@ export class EndpointFactory {
         ExtKey.init(this.api);
 
         this.globalContainer = new GlobalContainer();
-        registerGlobalServices(this.globalContainer, this.api, this.assetsBasePath);
+        registerGlobalServices(this.globalContainer, this.api, this.assets);
     }
 
     /**
-     * Gets the EventQueue instance.
+     * Returns the application-wide {@link EventQueue} used to receive server
+     * events pushed over active connections.
      *
-     * @returns {EventQueue} instance of EventQueue
+     * The queue lives in the WASM core and is shared by all connections; this
+     * call only resolves the singleton wrapper (no server round-trip).
+     *
+     * Use it after subscribing to events (e.g. `ThreadApi.subscribeFor`) and
+     * drive it with {@link EventQueue.waitEvent} — or let the `/extra`
+     * `EventManager.startEventLoop()` consume it for you.
+     *
+     * @returns {EventQueue} the global event queue singleton (same instance on
+     *   every call)
      */
     static async getEventQueue(): Promise<EventQueue> {
         return this.globalContainer.resolve<EventQueue>(T.EventQueue);
     }
 
     /**
-     * Creates a standalone instance of the Crypto API.
+     * Returns the standalone Crypto API for key generation, signing and
+     * symmetric encryption.
      *
-     * CryptoApi is stateless and connection-independent; the same instance is
-     * returned on every call (singleton within the global container).
+     * CryptoApi runs entirely client-side in the WASM core (secp256k1 keys,
+     * ECDSA signatures, AES symmetric encryption) — it needs no connection and
+     * never contacts a server.
      *
-     * @returns {CryptoApi} instance of CryptoApi
+     * Use it before {@link connect} to generate or derive the user's private
+     * key (e.g. `derivePrivateKey2` from a password), or any time the
+     * application needs raw cryptographic operations.
+     *
+     * @returns {CryptoApi} the CryptoApi singleton (same instance on every call)
      */
     static async createCryptoApi(): Promise<CryptoApi> {
         return this.globalContainer.resolve<CryptoApi>(T.CryptoApi);
@@ -183,20 +330,43 @@ export class EndpointFactory {
         if (!c) {
             c = new ConnectionContainer();
             c.registerValue(T.ConnectionPtr, connection);
-            registerConnectionServices(c, this.api, this.assetsBasePath);
+            registerConnectionServices(c, this.api, this.assets);
             this.connectionContainers.set(connection, c);
         }
         return c;
     }
 
     /**
-     * Connects to the platform backend.
+     * Opens an authenticated session with a PrivMX Bridge server and returns
+     * the {@link Connection} all other APIs are created from.
      *
-     * @param {string} userPrivKey user's private key
-     * @param {string} solutionId ID of the Solution
-     * @param {string} bridgeUrl the Bridge Server URL
-     * @param {PKIVerificationOptions} [verificationOptions] PrivMX Bridge server instance verification options using a PKI server
-     * @returns {Connection} instance of Connection
+     * Performs an ECDHE handshake with the Bridge that encrypts the transport
+     * layer and proves the user's identity with their secp256k1 private key —
+     * the key itself never leaves the browser; the server only ever sees the
+     * derived public key. An authenticated WebSocket event channel is opened
+     * for server-pushed events.
+     *
+     * Requires {@link setup} to have completed. Next steps:
+     * {@link createThreadApi} / {@link createStoreApi} / … with the returned
+     * connection; call {@link Connection.disconnect} when done. For
+     * account-less guests (e.g. a public contact form) use
+     * {@link connectPublic} instead.
+     *
+     * @param {string} userPrivKey user's secp256k1 private key in WIF format —
+     *   generate with `CryptoApi.generatePrivateKey()` or derive from
+     *   credentials with `CryptoApi.derivePrivateKey2()`; the matching public
+     *   key must be registered in the Context for content access to work
+     * @param {string} solutionId ID of the Solution, found in the PrivMX
+     *   Bridge admin panel next to the Bridge URL
+     * @param {string} bridgeUrl base URL of the PrivMX Bridge instance, e.g.
+     *   `https://bridge.example.com`
+     * @param {PKIVerificationOptions} [verificationOptions] expected Bridge
+     *   instance ID / public key, letting the client detect a spoofed Bridge
+     *   server during the handshake
+     * @returns {Connection} authenticated connection — pass it to the
+     *   `createXApi` factory methods
+     * @throws {NativeError} when the server is unreachable, the Solution does
+     *   not exist, or the key is malformed
      */
     static async connect(
         userPrivKey: string,
@@ -217,12 +387,30 @@ export class EndpointFactory {
     }
 
     /**
-     * Connects to the Platform backend as a guest user.
+     * Opens an anonymous guest session with a PrivMX Bridge server — no user
+     * account or private key required.
      *
-     * @param {string} solutionId ID of the Solution
-     * @param {string} bridgeUrl the Bridge Server URL
-     * @param {PKIVerificationOptions} [verificationOptions] PrivMX Bridge server instance verification options using a PKI server
-     * @returns {Connection} instance of Connection
+     * Generates a random ephemeral secp256k1 key client-side for the transport
+     * handshake; the session is unauthenticated (user ID `<anonymous>`) and
+     * uses plain HTTP requests instead of the WebSocket event channel.
+     *
+     * A guest connection cannot decrypt container keys, so Threads/Stores/KVDBs
+     * are inaccessible. Its purpose is the Inbox write path: create an
+     * `InboxApi` with {@link createInboxApi} and submit entries via
+     * `prepareEntry`/`sendEntry` (entries are encrypted client-side with the
+     * Inbox's public key, so only Inbox members can read them). Typical for
+     * public contact/submission forms.
+     *
+     * @param {string} solutionId ID of the Solution, found in the PrivMX
+     *   Bridge admin panel next to the Bridge URL
+     * @param {string} bridgeUrl base URL of the PrivMX Bridge instance, e.g.
+     *   `https://bridge.example.com`
+     * @param {PKIVerificationOptions} [verificationOptions] expected Bridge
+     *   instance ID / public key, letting the client detect a spoofed Bridge
+     *   server during the handshake
+     * @returns {Connection} guest connection — pass it to {@link createInboxApi}
+     * @throws {NativeError} when the server is unreachable or the Solution
+     *   does not exist
      */
     static async connectPublic(
         solutionId: string,
@@ -240,34 +428,65 @@ export class EndpointFactory {
     }
 
     /**
-     * Creates an instance of the Thread API.
+     * Returns the Thread API (encrypted messaging) for the given connection.
      *
-     * @param {Connection} connection instance of Connection
-     * @returns {ThreadApi} instance of ThreadApi
+     * Resolved from the connection's container — the first call instantiates
+     * the WASM-side ThreadApi object, subsequent calls return the same cached
+     * instance; no server round-trip happens here.
+     *
+     * Use it for everything message-related: `createThread`, `sendMessage`,
+     * `listMessages`, Thread event subscriptions.
+     *
+     * @param {Connection} connection connection returned by {@link connect};
+     *   the API stops working (throws) after `connection.disconnect()`
+     * @returns {ThreadApi} the per-connection ThreadApi instance
      */
     static async createThreadApi(connection: Connection): Promise<ThreadApi> {
         return this.getConnectionContainer(connection).resolve<ThreadApi>(T.ThreadApi);
     }
 
     /**
-     * Creates an instance of the Store API.
+     * Returns the Store API (encrypted file storage) for the given connection.
      *
-     * @param {Connection} connection instance of Connection
-     * @returns {StoreApi} instance of StoreApi
+     * Resolved from the connection's container — the first call instantiates
+     * the WASM-side StoreApi object, subsequent calls return the same cached
+     * instance; no server round-trip happens here.
+     *
+     * Use it for everything file-related: `createStore`, file upload
+     * (`createFile` → `writeToFile` → `closeFile`), download
+     * (`openFile` → `readFromFile`), Store event subscriptions.
+     *
+     * @param {Connection} connection connection returned by {@link connect};
+     *   the API stops working (throws) after `connection.disconnect()`
+     * @returns {StoreApi} the per-connection StoreApi instance
      */
     static async createStoreApi(connection: Connection): Promise<StoreApi> {
         return this.getConnectionContainer(connection).resolve<StoreApi>(T.StoreApi);
     }
 
     /**
-     * Creates an instance of the Inbox API.
+     * Returns the Inbox API (one-way encrypted submissions) for the given
+     * connection.
      *
-     * ThreadApi and StoreApi are resolved automatically from the connection container.
+     * Resolved from the connection's container together with its internal
+     * ThreadApi/StoreApi dependencies; the first call instantiates the
+     * WASM-side object, subsequent calls return the same cached instance.
      *
-     * @param {Connection} connection instance of Connection
-     * @param {ThreadApi} [_threadApi] ignored — kept for backwards-compatible signature
-     * @param {StoreApi} [_storeApi] ignored — kept for backwards-compatible signature
-     * @returns {InboxApi} instance of InboxApi
+     * Use it to manage Inboxes on an authenticated connection, or to submit
+     * entries (`prepareEntry` → `sendEntry`) on a guest connection from
+     * {@link connectPublic}.
+     *
+     * @param {Connection} connection connection returned by {@link connect} or
+     *   {@link connectPublic}; the API stops working (throws) after
+     *   `connection.disconnect()`
+     * @param {ThreadApi} [_threadApi] ignored — kept for a backwards-compatible
+     *   signature, resolved internally instead
+     * @param {StoreApi} [_storeApi] ignored — kept for a backwards-compatible
+     *   signature, resolved internally instead
+     * @returns {InboxApi} the per-connection InboxApi instance
+     * @deprecated The `_threadApi` and `_storeApi` arguments are ignored and
+     *   will be removed in the next major release — call
+     *   `createInboxApi(connection)` with the connection only.
      */
     static async createInboxApi(
         connection: Connection,
@@ -278,33 +497,66 @@ export class EndpointFactory {
     }
 
     /**
-     * Creates an instance of the Kvdb API.
+     * Returns the KVDB API (encrypted key-value storage) for the given
+     * connection.
      *
-     * @param {Connection} connection instance of Connection
-     * @returns {KvdbApi} instance of KvdbApi
+     * Resolved from the connection's container — the first call instantiates
+     * the WASM-side KvdbApi object, subsequent calls return the same cached
+     * instance; no server round-trip happens here.
+     *
+     * Use it for structured key-value data: `createKvdb`, `setEntry`,
+     * `getEntry`, `listEntriesKeys`, KVDB event subscriptions.
+     *
+     * @param {Connection} connection connection returned by {@link connect};
+     *   the API stops working (throws) after `connection.disconnect()`
+     * @returns {KvdbApi} the per-connection KvdbApi instance
      */
     static async createKvdbApi(connection: Connection): Promise<KvdbApi> {
         return this.getConnectionContainer(connection).resolve<KvdbApi>(T.KvdbApi);
     }
 
     /**
-     * Creates an instance of 'EventApi'.
+     * Returns the Event API (custom encrypted Context events) for the given
+     * connection.
      *
-     * @param connection instance of 'Connection'
-     * @returns {EventApi} instance of EventApi
+     * Resolved from the connection's container — the first call instantiates
+     * the WASM-side EventApi object, subsequent calls return the same cached
+     * instance; no server round-trip happens here.
+     *
+     * Use it to broadcast application-defined events (`emitEvent`) to selected
+     * Context members — each event is encrypted client-side for its recipients —
+     * and to subscribe to such events from others.
+     *
+     * @param {Connection} connection connection returned by {@link connect};
+     *   the API stops working (throws) after `connection.disconnect()`
+     * @returns {EventApi} the per-connection EventApi instance
      */
     static async createEventApi(connection: Connection): Promise<EventApi> {
         return this.getConnectionContainer(connection).resolve<EventApi>(T.EventApi);
     }
 
     /**
-     * Creates an instance of the Stream API.
+     * Returns the Stream API (end-to-end encrypted WebRTC audio/video) for the
+     * given connection.
      *
-     * EventApi is resolved automatically from the connection container.
+     * Resolved from the connection's container; besides the WASM-side object,
+     * the first call wires up the WebRTC client stack (peer-connection
+     * managers, the E2EE web worker performing per-frame AES-256-GCM
+     * encryption, audio metering). All of it is torn down automatically by
+     * `connection.disconnect()`.
      *
-     * @param {Connection} connection instance of Connection
-     * @param {EventApi} [_eventApi] ignored — kept for backwards-compatible signature
-     * @returns {StreamApi} instance of StreamApi
+     * Use it for live media: `joinStreamRoom` → `createStream` →
+     * `addStreamTrack` → `publishStream`, and `subscribeToRemoteStreams` for
+     * receiving.
+     *
+     * @param {Connection} connection connection returned by {@link connect};
+     *   the API stops working (throws) after `connection.disconnect()`
+     * @param {EventApi} [_eventApi] ignored — kept for a backwards-compatible
+     *   signature, resolved internally instead
+     * @returns {StreamApi} the per-connection StreamApi instance
+     * @deprecated The `_eventApi` argument is ignored and will be removed in the
+     *   next major release — call `createStreamApi(connection)` with the
+     *   connection only.
      */
     static async createStreamApi(connection: Connection, _eventApi?: EventApi): Promise<StreamApi> {
         return this.getConnectionContainer(connection).resolve<StreamApi>(T.StreamApi);

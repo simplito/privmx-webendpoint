@@ -1,6 +1,6 @@
-import { AudioManager } from "../AudioManager";
-import { LOCAL_PUBLISHER_ID } from "../audio/ActiveSpeakerDetector";
-import { LocalAudioLevelMeter } from "../audio/LocalAudioLevelMeter";
+import { AudioManager } from "../AudioManager.js";
+import { LOCAL_PUBLISHER_ID } from "../audio/ActiveSpeakerDetector.js";
+import { LocalAudioLevelMeter } from "../audio/LocalAudioLevelMeter.js";
 
 // ---- minimal browser-API stubs needed by AudioManager ----
 
@@ -62,7 +62,7 @@ describe("AudioManager", () => {
 
     beforeEach(() => {
         onRmsForWorker = jest.fn();
-        manager = new AudioManager("/assets", onRmsForWorker);
+        manager = new AudioManager("/assets/rms-processor.js", onRmsForWorker);
     });
 
     describe("setAudioLevelCallback", () => {
