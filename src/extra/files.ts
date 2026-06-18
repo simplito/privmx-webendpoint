@@ -38,9 +38,10 @@ export class StreamReader {
     }
 
     /**
-     * Reads the next chunk of the file.
+     * Asynchronously iterates over the file, reading it chunk by chunk.
      *
-     * @returns {Promise<boolean>} A promise that resolves to true if there are more chunks to read, or false if the end of the file is reached.
+     * @yields {readonly [Uint8Array, number]} A tuple of the next chunk and its
+     *   offset within the file.
      */
 
     public async *[Symbol.asyncIterator]() {

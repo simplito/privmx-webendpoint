@@ -1,13 +1,15 @@
 import { BaseNative } from "./BaseNative.js";
 /**
- * @internal Branded numeric WASM pointer to a C++ ExtKey instance. Use {@link ExtKey}
+ * Branded numeric WASM pointer to a C++ ExtKey instance. Use {@link ExtKey}
  * (src/service) instead.
+ * @internal
  */
 export type ExtKeyNativePtr = number & { __extKeyNativePtr: never };
 
 /**
- * @internal Raw WASM wrapper for the C++ ExtKey — holds and forwards raw pointers. Use
+ * Raw WASM wrapper for the C++ ExtKey — holds and forwards raw pointers. Use
  * {@link ExtKey} (src/service) instead.
+ * @internal
  */
 export class ExtKeyNative extends BaseNative {
     async deleteApi(ptr: number): Promise<void> {

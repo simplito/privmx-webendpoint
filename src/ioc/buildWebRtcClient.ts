@@ -17,7 +17,6 @@ import { WebRtcContainer, Container } from "./Container.js";
 import { T } from "./Tokens.js";
 
 /**
- * @internal
  * Builds a fully-wired WebRtcClient and registers all its internal sub-objects
  * into the provided container so that callback closures can resolve them lazily.
  *
@@ -27,6 +26,7 @@ import { T } from "./Tokens.js";
  *   - PeerConnectionFactory.onRemoteTrack  → resolves SubscriberManager lazily
  *   - PeerConnectionManager.onTrickle      → resolves WebRtcClient lazily
  *   - E2eeWorker RMS callback              → resolves AudioManager lazily
+ * @internal
  */
 export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
     const keyStore = await c.resolve<KeyStore>(T.KeyStore);
@@ -86,9 +86,9 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
 }
 
 /**
- * @internal
  * Registers all WebRTC-session-scoped singletons into a WebRtcContainer.
  * Call this once per createStreamApi() invocation before resolving T.WebRtcClient.
+ * @internal
  */
 export function registerWebRtcServices(c: WebRtcContainer): void {
     c.registerSingleton(T.KeyStore, async () => new KeyStore());

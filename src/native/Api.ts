@@ -20,8 +20,9 @@ interface Result {
 }
 
 /**
- * @internal Async task bridge to the Emscripten WASM module — maps C++ taskId callbacks
+ * Async task bridge to the Emscripten WASM module — maps C++ taskId callbacks
  * onto Promises. Use the public Endpoint APIs (src/service) instead.
+ * @internal
  */
 export class Api {
     private promises: Map<number, any>;

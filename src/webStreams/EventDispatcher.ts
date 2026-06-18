@@ -2,8 +2,9 @@ import { StreamHandle } from "../Types.js";
 import { logger } from "./Logger.js";
 
 /**
- * @internal Connection state change event delivered to {@link StateChangeDispatcher}
+ * Connection state change event delivered to {@link StateChangeDispatcher}
  * listeners.
+ * @internal
  */
 export interface StateChangeEvent {
     streamHandle: StreamHandle;
@@ -11,25 +12,27 @@ export interface StateChangeEvent {
 }
 
 /**
- * @internal Listener filter — restricts events to a single stream handle.
+ * Listener filter — restricts events to a single stream handle.
+ * @internal
  */
 export interface StateChangeFilter {
     streamHandle: StreamHandle;
 }
 
 /**
- * @internal Callback invoked by {@link StateChangeDispatcher} on connection state
+ * Callback invoked by {@link StateChangeDispatcher} on connection state
  * changes.
+ * @internal
  */
 export type StateChangeListener = (event: StateChangeEvent) => void;
 
 /**
- * @internal
  * Fan-out dispatcher for `RTCPeerConnection` state changes.
  *
  * Listeners are filtered by `streamHandle` so each published stream can
  * independently observe its own connection state without receiving events
  * from other streams.
+ * @internal
  */
 export class StateChangeDispatcher {
     private listeners = new Set<{

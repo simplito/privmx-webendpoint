@@ -13,8 +13,9 @@ import { Event } from "../Types.js";
 import { BaseNative } from "./BaseNative.js";
 
 /**
- * @internal Raw WASM wrapper for the C++ EventQueue — holds and forwards raw pointers.
+ * Raw WASM wrapper for the C++ EventQueue — holds and forwards raw pointers.
  * Use {@link EventQueue} (src/service) instead.
+ * @internal
  */
 export class EventQueueNative extends BaseNative {
     async deleteApi(ptr: number): Promise<void> {

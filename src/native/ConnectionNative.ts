@@ -30,8 +30,9 @@ declare global {
     }
 }
 /**
- * @internal Raw WASM wrapper for the C++ Connection — holds and forwards raw pointers.
+ * Raw WASM wrapper for the C++ Connection — holds and forwards raw pointers.
  * Use {@link Connection} (src/service) instead.
+ * @internal
  */
 export class ConnectionNative extends BaseNative {
     protected lastConnectionId: number = -1;

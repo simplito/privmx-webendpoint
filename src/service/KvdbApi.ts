@@ -47,8 +47,9 @@ import {
  */
 export class KvdbApi extends BaseApi {
     /**
-     * @internal Resolved from the connection's IoC container by
+     * Resolved from the connection's IoC container by
      * {@link EndpointFactory.createKvdbApi} — do not call directly.
+     * @internal
      */
     constructor(
         private native: KvdbApiNative,
@@ -145,6 +146,7 @@ export class KvdbApi extends BaseApi {
      *   whenever you revoke access
      * @param {ContainerPolicy} [policies] new access policy overrides; omit to
      *   keep the current policy
+     * @returns {Promise<void>} resolves when the KVDB membership and metadata have been replaced
      * @throws {NativeError} when `version` does not match the server state
      *   (and `force` is `false`) or the user is not a manager
      */
@@ -184,6 +186,7 @@ export class KvdbApi extends BaseApi {
      *
      * @param {string} kvdbId KVDB to delete — value returned by
      *   {@link createKvdb} or found in `Kvdb.kvdbId` from {@link listKvdbs}
+     * @returns {Promise<void>} resolves when the KVDB and all its entries have been deleted
      * @throws {NativeError} when the KVDB does not exist or the user lacks
      *   management rights
      */
@@ -351,6 +354,7 @@ export class KvdbApi extends BaseApi {
      * @param {number} [version] current entry version from
      *   `KvdbEntry.version` returned by {@link getEntry} — required when
      *   overwriting an existing entry; omit when inserting a new one
+     * @returns {Promise<void>} resolves when the entry has been written to the server
      * @throws {NativeError} when the version does not match the server state
      *   or the user has no write access
      */
@@ -385,6 +389,7 @@ export class KvdbApi extends BaseApi {
      *   {@link createKvdb} or found in `Kvdb.kvdbId` from {@link listKvdbs}
      * @param {string} key plaintext key name of the entry, as written by
      *   {@link setEntry} or listed by {@link listEntriesKeys}
+     * @returns {Promise<void>} resolves when the entry has been removed from the server
      * @throws {NativeError} when no entry with the given key exists or the
      *   user lacks delete rights
      */
@@ -431,7 +436,7 @@ export class KvdbApi extends BaseApi {
      *   {@link buildSubscriptionQuery} or
      *   {@link buildSubscriptionQueryForSelectedEntry}; hand-written strings
      *   are not supported
-     * @return {string[]} subscription IDs, index-aligned with
+     * @returns {string[]} subscription IDs, index-aligned with
      *   `subscriptionQueries` — keep them to {@link unsubscribeFrom} later
      */
     async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
@@ -448,6 +453,7 @@ export class KvdbApi extends BaseApi {
      *
      * @param {string[]} subscriptionIds IDs returned by {@link subscribeFor};
      *   unknown IDs cause a `NativeError` rejection
+     * @returns {Promise<void>} resolves when all listed subscriptions have been cancelled
      */
     async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
         return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);

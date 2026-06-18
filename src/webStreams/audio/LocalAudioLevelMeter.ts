@@ -1,6 +1,7 @@
 /**
- * @internal AudioWorklet-based RMS level meter for a local audio track. Used by
+ * AudioWorklet-based RMS level meter for a local audio track. Used by
  * AudioManager; not part of the public API.
+ * @internal
  */
 export class LocalAudioLevelMeter {
     public static readonly RMS_VALUE_OF_SILENCE = -99;

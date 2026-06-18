@@ -14,7 +14,8 @@ import { EmCrypto } from "./EmCrypto.js";
 let emCryptoInstance: EmCrypto | null = null;
 
 /**
- * @internal Returns the lazily-created {@link EmCrypto} singleton. Use {@link CryptoFacade} instead.
+ * Returns the lazily-created {@link EmCrypto} singleton. Use {@link CryptoFacade} instead.
+ * @internal
  */
 export function getEmCrypto(): EmCrypto {
     if (!emCryptoInstance) {
@@ -24,8 +25,9 @@ export function getEmCrypto(): EmCrypto {
 }
 
 /**
- * @internal Exposes the EmCrypto singleton as the global em_crypto object consumed by
+ * Exposes the EmCrypto singleton as the global em_crypto object consumed by
  * the WASM module; called by EndpointFactory.setup().
+ * @internal
  */
 export function setGlobalEmCrypto(): void {
     const emCrypto = getEmCrypto();
@@ -48,7 +50,8 @@ export function setGlobalEmCrypto(): void {
 }
 
 /**
- * @internal Returns the bound EmCrypto method dispatcher used by the WASM glue code.
+ * Returns the bound EmCrypto method dispatcher used by the WASM glue code.
+ * @internal
  */
 export function getMethodCaller(): (name: string, params: any) => Promise<any> {
     return getEmCrypto().methodCaller.bind(getEmCrypto());

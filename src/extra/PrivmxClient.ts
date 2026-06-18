@@ -67,7 +67,6 @@ export class PrivmxClient {
     private kvdbEventsManager: Promise<KvdbEventsManager> | null = null;
 
     /**
-     * @constructor
      * @param {Connection} connection - The connection object.
      */
     private constructor(private connection: Connection) {}
@@ -93,7 +92,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Crypto API.
-     * @returns {Promise<CryptoApi>}
+     * @returns {Promise<CryptoApi>} A promise resolving to the Crypto API.
      */
     public static async getCryptoApi(): Promise<CryptoApi> {
         this.checkSetup();
@@ -102,7 +101,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Event Queue.
-     * @returns {Promise<EventQueue>}
+     * @returns {Promise<EventQueue>} A promise resolving to the Event Queue.
      */
     public static async getEventQueue(): Promise<EventQueue> {
         this.checkSetup();
@@ -111,7 +110,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Event Manager.
-     * @returns {Promise<EventManager>}
+     * @returns {Promise<EventManager>} A promise resolving to the Event Manager.
      */
     public static async getEventManager(): Promise<EventManager> {
         if (this.eventManager) {
@@ -133,7 +132,7 @@ export class PrivmxClient {
      * @param {string} privateKey user's private key
      * @param {string} solutionId ID of the Solution
      * @param {string} bridgeUrl the Bridge Server URL
-     * @returns {Promise<PrivmxClient>}
+     * @returns {Promise<PrivmxClient>} A promise resolving to a connected client instance.
      * @throws {Error} If the connection to the bridge fails.
      */
     static async connect(
@@ -173,7 +172,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the connection object.
-     * @returns {Connection}
+     * @returns {Connection} The active connection object.
      * @throws {Error} If there is no active connection.
      */
     public getConnection(): Connection {
@@ -185,7 +184,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Thread API.
-     * @returns {Promise<ThreadApi>}
+     * @returns {Promise<ThreadApi>} A promise resolving to the Thread API.
      */
     public async getThreadApi(): Promise<ThreadApi> {
         if (!this.threadApi) {
@@ -199,7 +198,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Store API.
-     * @returns {Promise<StoreApi>}
+     * @returns {Promise<StoreApi>} A promise resolving to the Store API.
      */
     public async getStoreApi(): Promise<StoreApi> {
         if (!this.storeApi) {
@@ -213,7 +212,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Inbox API.
-     * @returns {Promise<InboxApi>}
+     * @returns {Promise<InboxApi>} A promise resolving to the Inbox API.
      */
     public async getInboxApi(): Promise<InboxApi> {
         if (!this.inboxApi) {
@@ -231,7 +230,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Kvdb API.
-     * @returns {Promise<KvdbApi>}
+     * @returns {Promise<KvdbApi>} A promise resolving to the Kvdb API.
      */
     public async getKvdbApi(): Promise<KvdbApi> {
         if (!this.kvdbApi) {
@@ -245,7 +244,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Event API.
-     * @returns {Promise<EventApi>}
+     * @returns {Promise<EventApi>} A promise resolving to the Event API.
      */
     public async getEventApi(): Promise<EventApi> {
         if (!this.eventApi) {
@@ -259,7 +258,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Connection Event Manager.
-     * @returns {Promise<ConnectionEventsManager>}
+     * @returns {Promise<ConnectionEventsManager>} A promise resolving to the Connection Event Manager.
      */
     public async getConnectionEventManager(): Promise<ConnectionEventsManager> {
         if (this.connectionEventManager) {
@@ -278,7 +277,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the User Event Manager.
-     * @returns {Promise<UserEventsManager>}
+     * @returns {Promise<UserEventsManager>} A promise resolving to the User Event Manager.
      */
     public async getUserEventsManager(): Promise<UserEventsManager> {
         if (this.userEventManager) {
@@ -295,7 +294,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Thread Event Manager.
-     * @returns {Promise<ThreadEventsManager>}
+     * @returns {Promise<ThreadEventsManager>} A promise resolving to the Thread Event Manager.
      */
     public async getThreadEventManager(): Promise<ThreadEventsManager> {
         if (this.threadEventManager) {
@@ -312,7 +311,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Store Event Manager.
-     * @returns {Promise<StoreEventsManager>}
+     * @returns {Promise<StoreEventsManager>} A promise resolving to the Store Event Manager.
      */
     public async getStoreEventManager(): Promise<StoreEventsManager> {
         if (this.storeEventManager) {
@@ -329,7 +328,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Inbox Event Manager.
-     * @returns {Promise<InboxEventsManager>}
+     * @returns {Promise<InboxEventsManager>} A promise resolving to the Inbox Event Manager.
      */
     public async getInboxEventManager(): Promise<InboxEventsManager> {
         if (this.inboxEventManager) {
@@ -346,7 +345,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Custom Events Manager.
-     * @returns {Promise<CustomEventsManager>}
+     * @returns {Promise<CustomEventsManager>} A promise resolving to the Custom Events Manager.
      */
     public async getCustomEventsManager(): Promise<CustomEventsManager> {
         if (this.customEventsManager) {

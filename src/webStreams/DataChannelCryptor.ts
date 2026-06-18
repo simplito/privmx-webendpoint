@@ -18,7 +18,8 @@ const FIXED_HEADER_LENGTH =
     GCM_NONCE_LENGTH_BYTES;
 
 /**
- * @internal Input for {@link DataChannelCryptor.encryptToWireFormat}.
+ * Input for {@link DataChannelCryptor.encryptToWireFormat}.
+ * @internal
  */
 export interface EncryptToWireFormatParams {
     plaintext: Uint8Array;
@@ -26,7 +27,8 @@ export interface EncryptToWireFormatParams {
 }
 
 /**
- * @internal Input for {@link DataChannelCryptor.decryptFromWireFormat}.
+ * Input for {@link DataChannelCryptor.decryptFromWireFormat}.
+ * @internal
  */
 export interface DecryptFromWireFormatParams {
     frame: Uint8Array;
@@ -34,7 +36,8 @@ export interface DecryptFromWireFormatParams {
 }
 
 /**
- * @internal Decomposed wire-format frame produced by the parser inside {@link DataChannelCryptor}.
+ * Decomposed wire-format frame produced by the parser inside {@link DataChannelCryptor}.
+ * @internal
  */
 export interface ParsedEncryptedFrame {
     version: number;
@@ -46,7 +49,6 @@ export interface ParsedEncryptedFrame {
 }
 
 /**
- * @internal
  * Serialises and deserialises encrypted data channel frames.
  *
  * Wire format:
@@ -55,6 +57,7 @@ export interface ParsedEncryptedFrame {
  * ```
  * Everything before the ciphertext is used as AAD for AES-256-GCM.
  * Sequence numbers are strictly increasing per remote stream for replay protection.
+ * @internal
  */
 export class DataChannelCryptor {
     private readonly textEncoder = new TextEncoder();
@@ -296,8 +299,9 @@ export class DataChannelCryptor {
 }
 
 /**
- * @internal Error thrown on data channel frame authentication, replay, or key-lookup
+ * Error thrown on data channel frame authentication, replay, or key-lookup
  * failure — carries a DataChannelCryptorDecryptStatus code.
+ * @internal
  */
 export class DataChannelCryptorError extends Error {
     public readonly code: DataChannelCryptorDecryptStatus;

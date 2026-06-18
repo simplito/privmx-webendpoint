@@ -28,8 +28,9 @@ import { BaseNative } from "./BaseNative.js";
 import * as Types from "../Types.js";
 
 /**
- * @internal Raw WASM wrapper for the C++ StreamApi — holds and forwards raw pointers.
+ * Raw WASM wrapper for the C++ StreamApi — holds and forwards raw pointers.
  * Use {@link StreamApi} (src/service) instead.
+ * @internal
  */
 export class StreamApiNative extends BaseNative {
     protected static bindingId: number = -1;

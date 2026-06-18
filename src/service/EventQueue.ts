@@ -32,8 +32,9 @@ import { Event } from "../Types.js";
 export class EventQueue extends BaseApi {
     private deferedPromise: Promise<Event> | null = null;
     /**
-     * @internal Created by `EndpointFactory.getEventQueue()` — never
+     * Created by `EndpointFactory.getEventQueue()` — never
      * constructed by SDK users.
+     * @internal
      */
     constructor(
         private native: EventQueueNative,
@@ -76,6 +77,7 @@ export class EventQueue extends BaseApi {
      * server. Use it to wake up and terminate an event-processing loop
      * gracefully, e.g. before {@link Connection.disconnect}; the `/extra`
      * `EventManager.stopEventLoop()` uses this mechanism.
+     * @returns {Promise<void>} resolves when the break event has been injected into the queue
      */
     async emitBreakEvent(): Promise<void> {
         return this.native.emitBreakEvent(this.servicePtr, []);

@@ -29,6 +29,8 @@ export interface SetupAutoOptions {
     workerCount?: number;
 }
 
+const assetUrl = (file: string) => new URL(`../assets/${file}`, import.meta.url).href;
+
 /**
  * Initializes the Endpoint with **zero manual asset handling** — the four WASM
  * runtime files are located automatically, so you never copy them into a public
@@ -48,6 +50,7 @@ export interface SetupAutoOptions {
  * use `EndpointFactory.setup({ assetsBasePath })` instead.
  *
  * @param {SetupAutoOptions} [options] optional tuning (e.g. `workerCount`)
+ * @returns {Promise<void>} resolves once all assets are loaded and the Endpoint is initialized
  * @throws {Error} when an asset fails to load, or when called outside a browser
  *   environment (same conditions as {@link EndpointFactory.setup})
  * @example
@@ -58,7 +61,6 @@ export interface SetupAutoOptions {
  * const threadApi = await Endpoint.createThreadApi(connection);
  */
 export async function setupAuto(options: SetupAutoOptions = {}): Promise<void> {
-    const assetUrl = (file: string) => new URL(`../assets/${file}`, import.meta.url).href;
     return EndpointFactory.setup({
         wasmModuleUrl: assetUrl("endpoint-wasm-module.js"),
         wasmUrl: assetUrl("endpoint-wasm-module.wasm"),

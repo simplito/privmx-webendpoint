@@ -3,16 +3,19 @@ import { logger } from "./Logger.js";
 import { StreamRoomId } from "./types/ApiTypes.js";
 
 /**
- * @internal Branded numeric Janus session ID.
+ * Branded numeric Janus session ID.
+ * @internal
  */
 export type SessionId = number & { _sessionId: never };
 /**
- * @internal Direction of a Janus peer connection within a room.
+ * Direction of a Janus peer connection within a room.
+ * @internal
  */
 export type ConnectionType = "publisher" | "subscriber";
 
 /**
- * @internal Per-room peer connection record tracked by {@link PeerConnectionManager}.
+ * Per-room peer connection record tracked by {@link PeerConnectionManager}.
+ * @internal
  */
 export interface JanusConnection {
     pc: RTCPeerConnection;
@@ -22,12 +25,12 @@ export interface JanusConnection {
 }
 
 /**
- * @internal
  * Lifecycle map for Janus `RTCPeerConnection` instances, keyed by room × connection type.
  *
  * ICE candidates that arrive before a Janus session ID is assigned are queued
  * and flushed automatically when `updateSessionForConnection` is called with
  * the real session ID.
+ * @internal
  */
 export class PeerConnectionManager {
     private readonly connections: {

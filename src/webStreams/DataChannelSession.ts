@@ -1,11 +1,11 @@
 import { DataChannelCryptor } from "./DataChannelCryptor.js";
 
 /**
- * @internal
  * Manages encrypted data channel communication for a single client session.
  *
  * Owns the outbound monotonic sequence number and the per-remote-stream inbound
  * sequence tracking used for replay protection.
+ * @internal
  */
 export class DataChannelSession {
     private outboundSeq: number = 1;

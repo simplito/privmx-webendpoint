@@ -34,14 +34,13 @@ export class PublicConnection {
     private inboxApi: Promise<InboxApi> | null = null;
 
     /**
-     * @constructor
      * @param {Connection} connection - The connection object.
      */
     constructor(private connection: Connection) {}
 
     /**
      * @description Gets the connection object.
-     * @returns {Connection}
+     * @returns {Connection} The active connection object.
      * @throws {Error} If there is no active connection.
      */
     private getConnection(): Connection {
@@ -53,7 +52,7 @@ export class PublicConnection {
 
     /**
      * @description Gets the Thread API.
-     * @returns {Promise<ThreadApi>}
+     * @returns {Promise<ThreadApi>} A promise resolving to the Thread API.
      */
     private getThreadApi(): Promise<ThreadApi> {
         if (!this.threadApi) {
@@ -67,7 +66,7 @@ export class PublicConnection {
 
     /**
      * @description Gets the Store API.
-     * @returns {Promise<StoreApi>}
+     * @returns {Promise<StoreApi>} A promise resolving to the Store API.
      */
     private getStoreApi(): Promise<StoreApi> {
         if (!this.storeApi) {
@@ -81,7 +80,7 @@ export class PublicConnection {
 
     /**
      * @description Gets the Inbox API.
-     * @returns {Promise<InboxApi>}
+     * @returns {Promise<InboxApi>} A promise resolving to the Inbox API.
      */
     private getInboxApi(): Promise<InboxApi> {
         if (!this.inboxApi) {

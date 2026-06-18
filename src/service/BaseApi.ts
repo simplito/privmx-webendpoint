@@ -27,17 +27,19 @@ export class BaseApi {
     private _servicePtr: number;
 
     /**
-     * @internal Instances are created by `EndpointFactory` with a pointer
+     * Instances are created by `EndpointFactory` with a pointer
      * returned from the WASM module — never constructed by SDK users.
+     * @internal
      */
     constructor(ptr: number) {
         this._servicePtr = ptr;
     }
 
     /**
-     * @internal Raw pointer to the C++ API object, passed back into the WASM
+     * Raw pointer to the C++ API object, passed back into the WASM
      * module on every native call. Throws after {@link destroyRefs} so that a
      * stale pointer is never handed to C++ (which would be use-after-free).
+     * @internal
      */
     public get servicePtr() {
         if (this._servicePtr < 0) {
@@ -49,9 +51,10 @@ export class BaseApi {
     }
 
     /**
-     * @internal Invalidates this instance by clearing the WASM pointer. Called
+     * Invalidates this instance by clearing the WASM pointer. Called
      * automatically by `Connection.disconnect()` (via `freeApis()`) right before
      * the C++ object is deleted — not by SDK users.
+     * @internal
      */
     public destroyRefs() {
         this._servicePtr = -1;

@@ -31,7 +31,33 @@
             "plugins": ["jest"],
             "rules": {
                 "jest/expect-expect": "off",
-                "jest/require-to-throw-message": "off"
+                "jest/require-to-throw-message": "off",
+                "unicorn/consistent-function-scoping": "off",
+                "jsdoc/require-param": "off",
+                "jsdoc/require-returns": "off"
+            }
+        },
+        {
+            "files": [
+                "src/webStreams/**/*.ts",
+                "src/ioc/**/*.ts",
+                "src/native/**/*.ts",
+                "src/crypto/EmCrypto.ts",
+                "src/crypto/Utils.ts",
+                "src/crypto/assert.ts",
+                "src/crypto/workerHelper.ts",
+                "src/crypto/index.ts",
+                "src/FinalizationHelper.ts",
+                "src/bundle.ts"
+            ],
+            "rules": {
+                "jsdoc/require-param": "off",
+                "jsdoc/require-param-description": "off",
+                "jsdoc/require-param-type": "off",
+                "jsdoc/require-returns": "off",
+                "jsdoc/require-returns-description": "off",
+                "jsdoc/require-returns-type": "off",
+                "jsdoc/require-yields": "off"
             }
         }
     ],

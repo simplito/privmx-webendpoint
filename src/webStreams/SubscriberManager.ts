@@ -11,9 +11,9 @@ import { Queue } from "./Queue.js";
 import { Logger } from "./Logger.js";
 
 /**
- * @internal
  * Manages the subscriber-side peer connection for a stream room:
  * SDP offer/answer negotiation, the reconfigure queue, and remote track wiring.
+ * @internal
  */
 export class SubscriberManager {
     private readonly reconfigureQueue: Queue<QueueItem>;

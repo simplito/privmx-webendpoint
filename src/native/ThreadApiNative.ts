@@ -22,8 +22,9 @@ import {
 import { BaseNative } from "./BaseNative.js";
 
 /**
- * @internal Raw WASM wrapper for the C++ ThreadApi — holds and forwards raw pointers.
+ * Raw WASM wrapper for the C++ ThreadApi — holds and forwards raw pointers.
  * Use {@link ThreadApi} (src/service) instead.
+ * @internal
  */
 export class ThreadApiNative extends BaseNative {
     async newApi(connectionPtr: number): Promise<number> {

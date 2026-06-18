@@ -67,8 +67,9 @@ import { StreamApiNative } from "../native/StreamApiNative.js";
  */
 export class StreamApi extends BaseApi {
     /**
-     * @internal Created by {@link EndpointFactory.createStreamApi} — never
+     * Created by {@link EndpointFactory.createStreamApi} — never
      * constructed by SDK users.
+     * @internal
      */
     constructor(
         private native: StreamApiNative,
@@ -170,6 +171,7 @@ export class StreamApi extends BaseApi {
      *   decrypt media or data sent afterwards — set it whenever you revoke access
      * @param {ContainerPolicy} policies new access policies; pass `undefined` to
      *   keep the current ones
+     * @returns {Promise<void>} resolves when the Stream Room membership and metadata have been replaced
      */
     public async updateStreamRoom(
         streamRoomId: EndpointTypes.StreamRoomId,
@@ -235,6 +237,7 @@ export class StreamApi extends BaseApi {
      * @param {string} streamRoomId ID of the Stream Room to join, returned by
      *   {@link createStreamRoom} or from `StreamRoom.streamRoomId` in
      *   {@link listStreamRooms}
+     * @returns {Promise<void>} resolves when the encrypted Event channel for the room has been established
      */
     public async joinStreamRoom(streamRoomId: EndpointTypes.StreamRoomId): Promise<void> {
         return this.native.joinStreamRoom(this.servicePtr, [streamRoomId]);
@@ -253,6 +256,7 @@ export class StreamApi extends BaseApi {
      * @param {string} streamRoomId ID of the Stream Room to leave, returned by
      *   {@link createStreamRoom} or from `StreamRoom.streamRoomId` in
      *   {@link listStreamRooms}
+     * @returns {Promise<void>} resolves when the room's Event channel has been torn down
      */
     public async leaveStreamRoom(streamRoomId: EndpointTypes.StreamRoomId): Promise<void> {
         return this.native.leaveStreamRoom(this.servicePtr, [streamRoomId]);
@@ -271,6 +275,7 @@ export class StreamApi extends BaseApi {
      * @param {string} streamRoomId ID of the Stream Room to record, returned by
      *   {@link createStreamRoom} or from `StreamRoom.streamRoomId` in
      *   {@link listStreamRooms}
+     * @returns {Promise<void>} resolves when the Bridge has acknowledged the recording request
      */
     public async enableStreamRoomRecording(
         streamRoomId: EndpointTypes.StreamRoomId,
@@ -336,6 +341,7 @@ export class StreamApi extends BaseApi {
      * @param {string} streamRoomId ID of the Stream Room to delete, returned by
      *   {@link createStreamRoom} or from `StreamRoom.streamRoomId` in
      *   {@link listStreamRooms}
+     * @returns {Promise<void>} resolves when the Stream Room has been deleted from the server
      */
     public async deleteStreamRoom(streamRoomId: EndpointTypes.StreamRoomId): Promise<void> {
         return this.native.deleteStreamRoom(this.servicePtr, [streamRoomId]);
@@ -645,6 +651,7 @@ export class StreamApi extends BaseApi {
      * @param {StreamSubscription[]} subscriptions remote streams/tracks to
      *   subscribe to, selected from the descriptors returned by
      *   {@link listStreams}
+     * @returns {Promise<void>} resolves when the inbound peer connection has been negotiated
      */
     async subscribeToRemoteStreams(
         streamRoomId: EndpointTypes.StreamRoomId,
@@ -677,6 +684,7 @@ export class StreamApi extends BaseApi {
      * @param {StreamSubscription[]} subscriptionsToRemove remote streams/tracks
      *   to stop receiving, from the set previously passed to
      *   {@link subscribeToRemoteStreams}
+     * @returns {Promise<void>} resolves when the Bridge has applied the subscription changes
      */
     async modifyRemoteStreamsSubscriptions(
         streamRoomId: EndpointTypes.StreamRoomId,
@@ -707,6 +715,7 @@ export class StreamApi extends BaseApi {
      * @param {StreamSubscription[]} subscriptions remote streams/tracks to stop
      *   receiving, from the set previously passed to
      *   {@link subscribeToRemoteStreams}
+     * @returns {Promise<void>} resolves once the Bridge has stopped delivering the listed streams
      */
     async unsubscribeFromRemoteStreams(
         streamRoomId: EndpointTypes.StreamRoomId,
@@ -759,7 +768,7 @@ export class StreamApi extends BaseApi {
      *
      * @param {string[]} subscriptionQueries query strings produced by
      *   {@link buildSubscriptionQuery}; hand-written strings are not supported
-     * @return {string[]} subscription IDs, index-aligned with
+     * @returns {string[]} subscription IDs, index-aligned with
      *   `subscriptionQueries` — keep them to {@link unsubscribeFrom} later
      */
     async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
@@ -776,6 +785,7 @@ export class StreamApi extends BaseApi {
      *
      * @param {string[]} subscriptionIds IDs returned by {@link subscribeFor};
      *   unknown IDs cause a `NativeError` rejection
+     * @returns {Promise<void>} resolves when all listed event subscriptions have been cancelled
      */
     async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
         return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);

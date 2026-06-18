@@ -9,13 +9,13 @@ import {
 } from "./worker/WorkerEvents.js";
 
 /**
- * @internal
  * Owns the E2EE Web Worker process: spawning, key distribution, RMS forwarding,
  * and raw stream/transform posting.
  *
  * The worker is created lazily on the first call to `get()` and terminated by
  * `stop()`. Has no knowledge of `RTCRtpSender`/`RTCRtpReceiver` — all WebRTC
  * wiring is the responsibility of `E2eeTransformManager`.
+ * @internal
  */
 export class E2eeWorker {
     private worker: Worker | undefined;

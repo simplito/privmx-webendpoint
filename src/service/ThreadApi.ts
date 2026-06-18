@@ -45,7 +45,8 @@ import {
  */
 export class ThreadApi extends BaseApi {
     /**
-     * @internal Created by EndpointFactory — never constructed by SDK users.
+     * Created by EndpointFactory — never constructed by SDK users.
+     * @internal
      */
     constructor(
         private native: ThreadApiNative,
@@ -144,6 +145,7 @@ export class ThreadApi extends BaseApi {
      *   revoke access
      * @param {ContainerPolicy} [policies] new access policies; omit to keep
      *   the current ones
+     * @returns {Promise<void>} resolves when the Thread has been updated on the server
      * @throws {NativeError} when the Thread does not exist, the user lacks
      *   management rights, or `version` does not match the server state
      */
@@ -183,6 +185,7 @@ export class ThreadApi extends BaseApi {
      *
      * @param {string} threadId ID of the Thread to delete, returned by
      *   {@link createThread} or from `Thread.threadId` in {@link listThreads}
+     * @returns {Promise<void>} resolves when the Thread and all its messages have been deleted
      * @throws {NativeError} when the Thread does not exist or the user lacks
      *   management rights
      */
@@ -329,6 +332,7 @@ export class ThreadApi extends BaseApi {
      * @param {string} messageId ID of the message to delete, returned by
      *   {@link sendMessage} or from `Message.info.messageId` in
      *   {@link listMessages}
+     * @returns {Promise<void>} resolves when the message has been deleted from the server
      * @throws {NativeError} when the message does not exist or the user lacks
      *   the required rights
      */
@@ -355,6 +359,7 @@ export class ThreadApi extends BaseApi {
      *   client-side with the thread key
      * @param {Uint8Array} data new message payload, encrypted client-side
      *   with the thread key before upload
+     * @returns {Promise<void>} resolves when the message content has been replaced on the server
      * @throws {NativeError} when the message does not exist or the user lacks
      *   the rights to modify it
      */
@@ -419,7 +424,7 @@ export class ThreadApi extends BaseApi {
      *
      * @param {string[]} subscriptionQueries query strings produced by
      *   {@link buildSubscriptionQuery}; hand-written strings are not supported
-     * @return {string[]} subscription IDs, index-aligned with
+     * @returns {string[]} subscription IDs, index-aligned with
      *   `subscriptionQueries` — keep them to {@link unsubscribeFrom} later
      */
     async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
@@ -436,6 +441,7 @@ export class ThreadApi extends BaseApi {
      *
      * @param {string[]} subscriptionIds IDs returned by {@link subscribeFor};
      *   unknown IDs cause a `NativeError` rejection
+     * @returns {Promise<void>} resolves when all listed subscriptions have been cancelled
      */
     async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
         return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);

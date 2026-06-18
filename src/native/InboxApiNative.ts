@@ -24,8 +24,9 @@ import {
 import { BaseNative } from "./BaseNative.js";
 
 /**
- * @internal Raw WASM wrapper for the C++ InboxApi — holds and forwards raw pointers.
+ * Raw WASM wrapper for the C++ InboxApi — holds and forwards raw pointers.
  * Use {@link InboxApi} (src/service) instead.
+ * @internal
  */
 export class InboxApiNative extends BaseNative {
     async newApi(

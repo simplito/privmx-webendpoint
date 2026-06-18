@@ -10,7 +10,6 @@ import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry.js"
 import { RTCConfigurationWithInsertableStreams } from "./types/WebRtcExtensions.js";
 
 /**
- * @internal
  * Builds `RTCPeerConnection` instances with all event listeners wired.
  *
  * Responsibilities:
@@ -21,6 +20,7 @@ import { RTCConfigurationWithInsertableStreams } from "./types/WebRtcExtensions.
  *   `RemoteStreamListenerRegistry`.
  * - Forwards `track` events to a caller-supplied `onRemoteTrack` callback so
  *   the subscriber layer can install E2EE receiver transforms after ICE connects.
+ * @internal
  */
 export class PeerConnectionFactory {
     private turnCredentials: TurnCredentials[] = [];

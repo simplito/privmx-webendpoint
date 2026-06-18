@@ -46,9 +46,10 @@ export class Connection extends BaseApi {
     private jsApiInstances: { [apiId: string]: BaseApi } = {};
 
     /**
-     * @internal Used by the IoC factories to register a freshly built API's
+     * Used by the IoC factories to register a freshly built API's
      * native pointer for teardown on disconnect — not part of the public API.
      * //doc-gen:ignore
+     * @internal
      */
     registerApi(id: string, ptr: number, native: BaseNative, jsApi?: BaseApi): void {
         this.apisRefs[id] = { _apiServicePtr: ptr };
@@ -57,17 +58,19 @@ export class Connection extends BaseApi {
     }
 
     /**
-     * @internal Guards against double-registering an API on one connection — not
+     * Guards against double-registering an API on one connection — not
      * part of the public API.
      * //doc-gen:ignore
+     * @internal
      */
     hasApi(id: string): boolean {
         return id in this.apisRefs;
     }
 
     /**
-     * @internal Created by {@link EndpointFactory.connect} /
+     * Created by {@link EndpointFactory.connect} /
      * {@link EndpointFactory.connectPublic} — never constructed by SDK users.
+     * @internal
      */
     constructor(
         private native: ConnectionNative,
@@ -152,7 +155,7 @@ export class Connection extends BaseApi {
      *
      * @param {string[]} subscriptionQueries query strings produced by
      *   {@link buildSubscriptionQuery}; hand-written strings are not supported
-     * @return {string[]} subscription IDs, index-aligned with
+     * @returns {string[]} subscription IDs, index-aligned with
      *   `subscriptionQueries` — keep them to {@link unsubscribeFrom} later
      */
     async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
@@ -168,6 +171,7 @@ export class Connection extends BaseApi {
      *
      * @param {string[]} subscriptionIds IDs returned by {@link subscribeFor};
      *   unknown IDs cause a `NativeError` rejection
+     * @returns {Promise<void>} resolves when all listed subscriptions have been cancelled
      */
     async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
         return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
@@ -237,6 +241,7 @@ export class Connection extends BaseApi {
      *
      * @param {UserVerifierInterface} verifier object whose `verify(request)`
      *   resolves to one boolean per request item (`true` = sender authentic)
+     * @returns {Promise<void>} resolves when the verifier has been registered with the WASM core
      */
     setUserVerifier(verifier: UserVerifierInterface): Promise<void> {
         return this.native.setUserVerifier(this.servicePtr, [this.servicePtr, verifier]);

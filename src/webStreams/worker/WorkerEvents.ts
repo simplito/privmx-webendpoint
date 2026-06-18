@@ -3,8 +3,9 @@ import { Key } from "../../Types.js";
 // ---- Inbound messages (main thread → worker) ----
 
 /**
- * @internal Worker message: install an encrypting transform on an outbound encoded
+ * Worker message: install an encrypting transform on an outbound encoded
  * stream pair.
+ * @internal
  */
 export interface EncodeEvent {
     operation: "encode";
@@ -14,8 +15,9 @@ export interface EncodeEvent {
 }
 
 /**
- * @internal Worker message: install a decrypting transform on an inbound encoded stream
+ * Worker message: install a decrypting transform on an inbound encoded stream
  * pair.
+ * @internal
  */
 export interface DecodeEvent {
     operation: "decode";
@@ -27,7 +29,8 @@ export interface DecodeEvent {
 }
 
 /**
- * @internal Worker message: replace the worker-side key set.
+ * Worker message: replace the worker-side key set.
+ * @internal
  */
 export interface SetKeysEvent {
     operation: "setKeys";
@@ -35,8 +38,9 @@ export interface SetKeysEvent {
 }
 
 /**
- * @internal Worker message: update the local microphone RMS level embedded in outgoing
+ * Worker message: update the local microphone RMS level embedded in outgoing
  * frames.
+ * @internal
  */
 export interface RmsEvent {
     operation: "rms";
@@ -44,7 +48,8 @@ export interface RmsEvent {
 }
 
 /**
- * @internal Worker message: cancel the decode pipeline for a track.
+ * Worker message: cancel the decode pipeline for a track.
+ * @internal
  */
 export interface StopEvent {
     operation: "stop";
@@ -52,21 +57,24 @@ export interface StopEvent {
 }
 
 /**
- * @internal Union of all messages sent from the main thread to the E2EE worker.
+ * Union of all messages sent from the main thread to the E2EE worker.
+ * @internal
  */
 export type WorkerInboundEvent = EncodeEvent | DecodeEvent | SetKeysEvent | RmsEvent | StopEvent;
 
 // ---- Outbound messages (worker → main thread) ----
 
 /**
- * @internal Worker reply: confirms a setKeys message has been applied.
+ * Worker reply: confirms a setKeys message has been applied.
+ * @internal
  */
 export interface SetKeysAckEvent {
     operation: "setKeys-ack";
 }
 
 /**
- * @internal Worker event: RMS audio level extracted from a received frame.
+ * Worker event: RMS audio level extracted from a received frame.
+ * @internal
  */
 export interface RmsOutEvent {
     type: "rms";
@@ -76,7 +84,8 @@ export interface RmsOutEvent {
 }
 
 /**
- * @internal Worker event: debug payload forwarded to the main thread.
+ * Worker event: debug payload forwarded to the main thread.
+ * @internal
  */
 export interface DebugEvent {
     type: "debug";
@@ -84,7 +93,8 @@ export interface DebugEvent {
 }
 
 /**
- * @internal Worker event: error payload forwarded to the main thread.
+ * Worker event: error payload forwarded to the main thread.
+ * @internal
  */
 export interface ErrorEvent {
     type: "error";
@@ -92,6 +102,7 @@ export interface ErrorEvent {
 }
 
 /**
- * @internal Union of all messages sent from the E2EE worker to the main thread.
+ * Union of all messages sent from the E2EE worker to the main thread.
+ * @internal
  */
 export type WorkerOutboundEvent = SetKeysAckEvent | RmsOutEvent | DebugEvent | ErrorEvent;

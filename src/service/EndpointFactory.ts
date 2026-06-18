@@ -142,6 +142,7 @@ export class EndpointFactory {
      * @param {string | EndpointSetupOptions} [options] options object, or the
      *   `assetsBasePath` string alone (legacy form). Use the per-asset URL
      *   fields of {@link EndpointSetupOptions} for bundler-native loading.
+     * @returns {Promise<void>} resolves when the WASM module is fully initialised and ready to use
      * @throws {Error} when an asset fails to load (wrong `assetsBasePath` /
      *   per-asset URL, or assets not copied), or when called outside a browser
      *   environment
@@ -268,6 +269,7 @@ export class EndpointFactory {
 
     /**
      * //doc-gen:ignore
+     * @param {any} lib the initialised Emscripten module returned by `endpointWasmModule()`
      */
     private static init(lib: any) {
         this.api = new Api(lib);
@@ -324,6 +326,8 @@ export class EndpointFactory {
     /**
      * Returns (creating if necessary) the connection-scoped container for the
      * given `Connection` instance.  All per-connection API singletons live here.
+     * @param {Connection} connection the authenticated or guest connection whose container to retrieve
+     * @returns {ConnectionContainer} the per-connection IoC container for this connection
      */
     private static getConnectionContainer(connection: Connection): ConnectionContainer {
         let c = this.connectionContainers.get(connection);

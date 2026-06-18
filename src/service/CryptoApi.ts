@@ -33,7 +33,8 @@ import { BIP39 } from "../Types.js";
  */
 export class CryptoApi extends BaseApi {
     /**
-     * @internal Resolved from the {@link GlobalContainer} — use {@link EndpointFactory.createCryptoApi}.
+     * Resolved from the {@link GlobalContainer} — use {@link EndpointFactory.createCryptoApi}.
+     * @internal
      */
     constructor(
         private native: CryptoApiNative,

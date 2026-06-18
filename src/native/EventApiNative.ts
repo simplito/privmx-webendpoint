@@ -13,8 +13,9 @@ import { EventsEventSelectorType, UserWithPubKey } from "../Types.js";
 import { BaseNative } from "./BaseNative.js";
 
 /**
- * @internal Raw WASM wrapper for the C++ EventApi — holds and forwards raw pointers.
+ * Raw WASM wrapper for the C++ EventApi — holds and forwards raw pointers.
  * Use {@link EventApi} (src/service) instead.
+ * @internal
  */
 export class EventApiNative extends BaseNative {
     async newApi(connectionPtr: number): Promise<number> {

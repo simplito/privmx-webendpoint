@@ -51,7 +51,8 @@ import {
  */
 export class StoreApi extends BaseApi {
     /**
-     * @internal Created by EndpointFactory — never constructed by SDK users.
+     * Created by EndpointFactory — never constructed by SDK users.
+     * @internal
      */
     constructor(
         private native: StoreApiNative,
@@ -143,6 +144,7 @@ export class StoreApi extends BaseApi {
      *   you revoke access
      * @param {ContainerPolicy} [policies] new access policies; omit to keep
      *   the current ones
+     * @returns {Promise<void>} resolves when the Store membership and metadata have been replaced
      * @throws {NativeError} when the Store does not exist, the user lacks
      *   management rights, or `version` does not match the server state
      */
@@ -182,6 +184,7 @@ export class StoreApi extends BaseApi {
      *
      * @param {string} storeId ID of the Store to delete, returned by
      *   {@link createStore} or from `Store.storeId` in {@link listStores}
+     * @returns {Promise<void>} resolves when the Store and all its files have been deleted
      * @throws {NativeError} when the Store does not exist or the user lacks
      *   management rights
      */
@@ -340,6 +343,7 @@ export class StoreApi extends BaseApi {
      *   the server — never place secrets here
      * @param {Uint8Array} privateMeta new file metadata encrypted client-side
      *   with the Store's container key
+     * @returns {Promise<void>} resolves when the file metadata has been updated on the server
      * @throws {NativeError} when the file does not exist or the user is not a
      *   member of its Store
      */
@@ -370,6 +374,7 @@ export class StoreApi extends BaseApi {
      *   at the handle's current cursor position
      * @param {boolean} [truncate] `true` cuts the file off at current
      *   position + `dataChunk` length, discarding any data beyond it
+     * @returns {Promise<void>} resolves when the chunk has been encrypted and sent to the server
      * @throws {NativeError} when the handle is unknown or the write exceeds
      *   what the handle allows
      */
@@ -393,6 +398,7 @@ export class StoreApi extends BaseApi {
      *
      * @param {string} fileId ID of the file to delete, returned by
      *   {@link closeFile} or from `File.info.fileId` in {@link listFiles}
+     * @returns {Promise<void>} resolves when the file and all its ciphertext chunks have been deleted
      * @throws {NativeError} when the file does not exist or the user lacks
      *   the required rights
      */
@@ -514,6 +520,7 @@ export class StoreApi extends BaseApi {
      *   file where the next read/write begins
      * @throws {NativeError} when the handle is unknown or the position is
      *   outside the file
+     * @returns {Promise<void>} resolves once the handle's position has been updated
      */
     async seekInFile(fileHandle: number, position: number): Promise<void> {
         return this.native.seekInFile(this.servicePtr, [fileHandle, position]);
@@ -557,6 +564,7 @@ export class StoreApi extends BaseApi {
      *
      * @param {number} fileHandle handle returned by {@link openFile},
      *   {@link createFile} or {@link updateFile}
+     * @returns {Promise<void>} resolves when the handle has been refreshed with the latest server state
      * @throws {NativeError} when the handle is unknown or the file no longer
      *   exists on the server
      */
@@ -609,7 +617,7 @@ export class StoreApi extends BaseApi {
      *
      * @param {string[]} subscriptionQueries query strings produced by
      *   {@link buildSubscriptionQuery}; hand-written strings are not supported
-     * @return {string[]} subscription IDs, index-aligned with
+     * @returns {string[]} subscription IDs, index-aligned with
      *   `subscriptionQueries` — keep them to {@link unsubscribeFrom} later
      */
     async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
@@ -626,6 +634,7 @@ export class StoreApi extends BaseApi {
      *
      * @param {string[]} subscriptionIds IDs returned by {@link subscribeFor};
      *   unknown IDs cause a `NativeError` rejection
+     * @returns {Promise<void>} resolves when all listed subscriptions have been cancelled
      */
     async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
         return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);

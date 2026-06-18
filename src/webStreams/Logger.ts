@@ -61,9 +61,10 @@ export function setEndpointLogger(options: { level?: LogLevelName; sink?: LogSin
 }
 
 /**
- * @internal Thin severity-tagged front-end over the module-global sink/threshold
+ * Thin severity-tagged front-end over the module-global sink/threshold
  * configured by {@link setEndpointLogger}. Construct freely; all instances share
  * the same global configuration.
+ * @internal
  */
 export class Logger {
     debug(...args: unknown[]): void {
@@ -89,5 +90,8 @@ export class Logger {
     }
 }
 
-/** @internal Shared logger for module-level (non-class) call sites. */
+/**
+ * Shared logger for module-level (non-class) call sites.
+ * @internal
+ */
 export const logger = new Logger();

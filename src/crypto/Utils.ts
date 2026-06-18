@@ -10,8 +10,9 @@ limitations under the License.
 */
 
 /**
- * @internal Converts a Uint8Array view to a standalone ArrayBuffer copy. Helper for the
+ * Converts a Uint8Array view to a standalone ArrayBuffer copy. Helper for the
  * internal crypto layer.
+ * @internal
  */
 export function toArrayBuffer(buffer: Uint8Array | ArrayBuffer): ArrayBuffer {
     if (buffer instanceof ArrayBuffer) {
@@ -21,8 +22,9 @@ export function toArrayBuffer(buffer: Uint8Array | ArrayBuffer): ArrayBuffer {
 }
 
 /**
- * @internal Converts an ArrayBuffer to a Uint8Array view. Helper for the internal
+ * Converts an ArrayBuffer to a Uint8Array view. Helper for the internal
  * crypto layer.
+ * @internal
  */
 export function toBuffer(byteArray: ArrayBuffer | Uint8Array): Uint8Array {
     if (byteArray instanceof Uint8Array) {
@@ -32,8 +34,9 @@ export function toBuffer(byteArray: ArrayBuffer | Uint8Array): Uint8Array {
 }
 
 /**
- * @internal Generates a random alphanumeric string using crypto.getRandomValues. Helper
+ * Generates a random alphanumeric string using crypto.getRandomValues. Helper
  * for the internal crypto layer.
+ * @internal
  */
 export function randomString(length: number): string {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";

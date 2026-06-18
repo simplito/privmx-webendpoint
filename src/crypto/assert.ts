@@ -10,23 +10,26 @@ limitations under the License.
 */
 
 /**
- * @internal Asserts that value is a string. Internal crypto-layer validation helper.
+ * Asserts that value is a string. Internal crypto-layer validation helper.
+ * @internal
  */
 export function assertIsString(value: unknown): asserts value is string {
     if (typeof value !== "string") throw new Error("Not a string");
 }
 
 /**
- * @internal Asserts that value is an ArrayBuffer. Internal crypto-layer validation
+ * Asserts that value is an ArrayBuffer. Internal crypto-layer validation
  * helper.
+ * @internal
  */
 export function assertIsArrayBuffer(value: unknown): asserts value is ArrayBuffer {
     if (!(value instanceof ArrayBuffer)) throw new Error("Not a ArrayBuffer");
 }
 
 /**
- * @internal Asserts that value is a Uint8Array or Int8Array. Internal crypto-layer
+ * Asserts that value is a Uint8Array or Int8Array. Internal crypto-layer
  * validation helper.
+ * @internal
  */
 export function assertIsUint8Array(value: unknown): asserts value is ArrayBuffer {
     if (!(value instanceof Uint8Array) && !(value instanceof Int8Array))
@@ -34,15 +37,17 @@ export function assertIsUint8Array(value: unknown): asserts value is ArrayBuffer
 }
 
 /**
- * @internal Asserts that value is a number. Internal crypto-layer validation helper.
+ * Asserts that value is a number. Internal crypto-layer validation helper.
+ * @internal
  */
 export function assertIsNumber(value: unknown): asserts value is number {
     if (typeof value !== "number") throw new Error("Not a number");
 }
 
 /**
- * @internal Asserts that obj contains only the keys defined by argsType. Internal
+ * Asserts that obj contains only the keys defined by argsType. Internal
  * crypto-layer validation helper.
+ * @internal
  */
 export function assertArgsValid<T>(obj: any, argsType: new (...args: any[]) => T) {
     const objKeys = Object.keys(obj);
@@ -58,8 +63,9 @@ export function assertArgsValid<T>(obj: any, argsType: new (...args: any[]) => T
 }
 
 /**
- * @internal Asserts that obj's keys match defaultObj and that no value equals its
+ * Asserts that obj's keys match defaultObj and that no value equals its
  * default. Internal crypto-layer validation helper.
+ * @internal
  */
 export function assertArgsAndValueValid<T>(actualObj: T, defaultObj: new (...args: any[]) => T) {
     const objKeys = Object.keys(actualObj);

@@ -5,9 +5,9 @@ import { AudioManager } from "./AudioManager.js";
 import { E2eeTransformManager } from "./E2eeTransformManager.js";
 
 /**
- * @internal
  * Manages the publisher-side peer connection for a single stream room:
  * track setup, audio metering, and E2EE sender transform installation.
+ * @internal
  */
 export class PublisherManager {
     constructor(

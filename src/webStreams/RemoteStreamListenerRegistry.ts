@@ -3,13 +3,13 @@ import { Logger } from "./Logger.js";
 import { StreamRoomId } from "./types/ApiTypes.js";
 
 /**
- * @internal
  * Dispatches incoming remote media tracks and decrypted data channel frames to
  * registered `RemoteStreamListener` callbacks.
  *
  * Listeners are keyed by `streamRoomId` and optionally filtered to a specific
  * `streamId`. When `streamId` is `undefined` the listener receives events from
  * all remote streams in the room.
+ * @internal
  */
 export class RemoteStreamListenerRegistry {
     private readonly listeners: Map<StreamRoomId, RemoteStreamListener[]> = new Map();

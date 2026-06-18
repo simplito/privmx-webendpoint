@@ -23,8 +23,9 @@ import { T, ResolvedAssetUrls } from "./Tokens.js";
 import { registerWebRtcServices } from "./buildWebRtcClient.js";
 
 /**
- * @internal Registers the resolved asset locations (base path + per-asset URLs)
+ * Registers the resolved asset locations (base path + per-asset URLs)
  * into a container so the WebRTC sub-graph can resolve them regardless of scope.
+ * @internal
  */
 function registerAssetUrls(
     c: GlobalContainer | ConnectionContainer,
@@ -36,9 +37,9 @@ function registerAssetUrls(
 }
 
 /**
- * @internal
  * Registers all global-scope singletons into the provided GlobalContainer.
  * Call once during EndpointFactory.init().
+ * @internal
  */
 export function registerGlobalServices(
     c: GlobalContainer,
@@ -65,7 +66,6 @@ export function registerGlobalServices(
 }
 
 /**
- * @internal
  * Registers all connection-scoped API singletons into the provided ConnectionContainer.
  *
  * Dependency graph (resolved lazily to allow any creation order):
@@ -77,6 +77,7 @@ export function registerGlobalServices(
  *                 └── (connection instance shared via T.ConnectionPtr)
  *
  * Call once per Connection, after registering T.ConnectionPtr.
+ * @internal
  */
 export function registerConnectionServices(
     c: ConnectionContainer,

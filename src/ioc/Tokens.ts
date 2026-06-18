@@ -1,10 +1,10 @@
 /**
- * @internal
  * IoC container token registry.
  *
  * `global:` — created once during EndpointFactory.setup(), live for the application lifetime.
  * `conn:`   — created once per Connection (connect / connectPublic call), scoped to that connection.
  * `rtc:`    — created once per createStreamApi() call, scoped to that connection's stream session.
+ * @internal
  */
 export const T = {
     // Global scope
@@ -46,14 +46,16 @@ export const T = {
 } as const;
 
 /**
- * @internal Union of all registered IoC token string literals.
+ * Union of all registered IoC token string literals.
+ * @internal
  */
 export type Token = (typeof T)[keyof typeof T];
 
 /**
- * @internal Fully-resolved runtime asset locations computed once by
+ * Fully-resolved runtime asset locations computed once by
  * `EndpointFactory.setup()` and shared with the WebRTC sub-graph. Each URL is
  * either an explicit per-asset override or derived from `assetsBasePath`.
+ * @internal
  */
 export interface ResolvedAssetUrls {
     /** Base path/URL unspecified assets are resolved against (legacy single-path mode). */

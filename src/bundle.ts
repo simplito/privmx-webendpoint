@@ -11,7 +11,8 @@ limitations under the License.
 
 import { EndpointFactory as Endpoint } from "./service/EndpointFactory.js";
 /**
- * @internal Vite bundle entry point — exposes {@link EndpointFactory} as the Endpoint
+ * Vite bundle entry point — exposes {@link EndpointFactory} as the Endpoint
  * global in dist builds. Import from the package root instead.
+ * @internal
  */
 export { Endpoint };

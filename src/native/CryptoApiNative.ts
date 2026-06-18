@@ -15,8 +15,9 @@ import { BaseNative } from "./BaseNative.js";
 import { ExtKeyNativePtr } from "./ExtKeyNative.js";
 
 /**
- * @internal Raw BIP-39 result shape returned by the WASM layer — carries a raw ExtKey
+ * Raw BIP-39 result shape returned by the WASM layer — carries a raw ExtKey
  * pointer. Use the BIP39 type from src/Types instead.
+ * @internal
  */
 export interface BIP39Native {
     mnemonic: string;
@@ -24,8 +25,9 @@ export interface BIP39Native {
     entropy: Uint8Array;
 }
 /**
- * @internal Raw WASM wrapper for the C++ CryptoApi — holds and forwards raw pointers.
+ * Raw WASM wrapper for the C++ CryptoApi — holds and forwards raw pointers.
  * Use {@link CryptoApi} (src/service) instead.
+ * @internal
  */
 export class CryptoApiNative extends BaseNative {
     async newApi(): Promise<number> {

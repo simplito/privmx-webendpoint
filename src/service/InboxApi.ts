@@ -49,8 +49,9 @@ import {
  */
 export class InboxApi extends BaseApi {
     /**
-     * @internal Resolved from the connection's IoC container by
+     * Resolved from the connection's IoC container by
      * {@link EndpointFactory.createInboxApi} — do not call directly.
+     * @internal
      */
     constructor(
         private native: InboxApiNative,
@@ -146,6 +147,7 @@ export class InboxApi extends BaseApi {
      *   whenever you revoke access
      * @param {ContainerWithoutItemPolicy} [policies] new access policy
      *   overrides; omit to keep the current policy
+     * @returns {Promise<void>} resolves when the Inbox membership and metadata have been replaced
      * @throws {NativeError} when `version` does not match the server state
      *   (and `force` is `false`) or the user is not a manager
      */
@@ -250,6 +252,7 @@ export class InboxApi extends BaseApi {
      *
      * @param {string} inboxId Inbox to delete — value returned by
      *   {@link createInbox} or found in `Inbox.inboxId` from {@link listInboxes}
+     * @returns {Promise<void>} resolves when the Inbox and all its entries have been deleted
      * @throws {NativeError} when the Inbox does not exist or the user lacks
      *   management rights
      */
@@ -328,6 +331,7 @@ export class InboxApi extends BaseApi {
      *
      * @param {number} inboxHandle entry handle returned by {@link prepareEntry}
      *   (not an Inbox ID); invalid after this call completes
+     * @returns {Promise<void>} resolves when the entry and all its attachments have been committed to the Inbox
      * @throws {NativeError} when attachments declared in {@link prepareEntry}
      *   were not fully written or the handle is unknown
      */
@@ -394,6 +398,7 @@ export class InboxApi extends BaseApi {
      *
      * @param {string} inboxEntryId entry to delete, found in
      *   `InboxEntry.entryId` from {@link listEntries} or {@link readEntry}
+     * @returns {Promise<void>} resolves when the entry and its attachments have been deleted
      * @throws {NativeError} when the entry does not exist or the user lacks
      *   the rights to delete it
      */
@@ -451,6 +456,7 @@ export class InboxApi extends BaseApi {
      *   must have been listed in {@link prepareEntry}
      * @param {Uint8Array} dataChunk next slice of the file's content; chunks
      *   are appended in call order until `fileSize` bytes are written
+     * @returns {Promise<void>} resolves when the chunk has been encrypted and queued for upload
      * @throws {NativeError} when a handle is unknown, the file was not bound
      *   to the entry, or the write exceeds the declared `fileSize`
      */
@@ -520,6 +526,7 @@ export class InboxApi extends BaseApi {
      * @param {number} fileHandle read handle returned by {@link openFile}
      * @param {number} position new absolute cursor offset in bytes from the
      *   start of the (plaintext) file
+     * @returns {Promise<void>} resolves when the cursor has been moved to the specified position
      * @throws {NativeError} when the handle is unknown or the position is out
      *   of range
      */
@@ -560,7 +567,7 @@ export class InboxApi extends BaseApi {
      *
      * @param {string[]} subscriptionQueries query strings produced by
      *   {@link buildSubscriptionQuery}; hand-written strings are not supported
-     * @return {string[]} subscription IDs, index-aligned with
+     * @returns {string[]} subscription IDs, index-aligned with
      *   `subscriptionQueries` — keep them to {@link unsubscribeFrom} later
      */
     async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
@@ -577,6 +584,7 @@ export class InboxApi extends BaseApi {
      *
      * @param {string[]} subscriptionIds IDs returned by {@link subscribeFor};
      *   unknown IDs cause a `NativeError` rejection
+     * @returns {Promise<void>} resolves when all listed subscriptions have been cancelled
      */
     async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
         return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);

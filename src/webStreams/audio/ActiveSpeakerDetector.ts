@@ -1,14 +1,15 @@
 /**
- * @internal
  * Numeric WebRTC stream ID as assigned by the remote peer.
  * Matches the `publisherId` used throughout the webStreams layer
  * (derived from `Number(RTCTrackEvent.streams[0].id)`).
  * The value -1 is reserved for the local microphone.
+ * @internal
  */
 export type PublisherId = number;
 
 /**
- * @internal Default tuning parameters for {@link ActiveSpeakerDetector}.
+ * Default tuning parameters for {@link ActiveSpeakerDetector}.
+ * @internal
  */
 export const DEFAULTS = {
     rmsEmaAlpha: 0.2, // fast reaction to speech
@@ -19,7 +20,8 @@ export const DEFAULTS = {
 };
 
 /**
- * @internal Per-frame RMS sample fed into {@link ActiveSpeakerDetector}.
+ * Per-frame RMS sample fed into {@link ActiveSpeakerDetector}.
+ * @internal
  */
 export interface FrameInput {
     id: PublisherId;
@@ -28,7 +30,8 @@ export interface FrameInput {
 }
 
 /**
- * @internal Immutable snapshot of a tracked speaker's smoothed audio state.
+ * Immutable snapshot of a tracked speaker's smoothed audio state.
+ * @internal
  */
 export interface SpeakerState {
     readonly streamId: PublisherId;
@@ -60,12 +63,16 @@ interface MutableSpeakerState {
  */
 const SPEAKER_PRUNE_AFTER_MS = 10_000;
 
-/** @internal Reserved ID for the local microphone — cannot collide with remote stream IDs (which are >= 0). */
+/**
+ * Reserved ID for the local microphone -- cannot collide with remote stream IDs (which are >= 0).
+ * @internal
+ */
 export const LOCAL_PUBLISHER_ID: PublisherId = -1;
 
 /**
- * @internal Detects active speakers from per-frame RMS levels using EMA smoothing and
+ * Detects active speakers from per-frame RMS levels using EMA smoothing and
  * an adaptive noise floor. Used by AudioManager; not part of the public API.
+ * @internal
  */
 export class ActiveSpeakerDetector {
     private speakers = new Map<PublisherId, MutableSpeakerState>();

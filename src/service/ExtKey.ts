@@ -26,7 +26,10 @@ import { BaseApi } from "./BaseApi.js";
 export class ExtKey extends BaseApi {
     private static api: Api;
 
-    /** @internal Called by EndpointFactory during WASM initialisation. */
+    /**
+     * Called by EndpointFactory during WASM initialisation.
+     * @internal
+     */
     static init(api: Api): void {
         ExtKey.api = api;
     }
@@ -116,13 +119,16 @@ export class ExtKey extends BaseApi {
 
     /**
      * //doc-gen:ignore
+     * @param {ExtKeyNativePtr} ptr raw native pointer to an existing ExtKey WASM object
+     * @returns {ExtKey} ExtKey instance wrapping the given native pointer
      */
     static fromPtr(ptr: ExtKeyNativePtr): ExtKey {
         return new ExtKey(this.makeNative(), ptr);
     }
 
     /**
-     * @internal Instances are created by the static `from*` / `generateRandom` factories.
+     * Instances are created by the static `from*` / `generateRandom` factories.
+     * @internal
      */
     private constructor(
         private readonly native: ExtKeyNative,

@@ -23,8 +23,9 @@ import {
 import { BaseNative } from "./BaseNative.js";
 
 /**
- * @internal Raw WASM wrapper for the C++ KvdbApi — holds and forwards raw pointers. Use
+ * Raw WASM wrapper for the C++ KvdbApi — holds and forwards raw pointers. Use
  * {@link KvdbApi} (src/service) instead.
+ * @internal
  */
 export class KvdbApiNative extends BaseNative {
     async newApi(connectionPtr: number): Promise<number> {

@@ -91,8 +91,9 @@ interface KeyRegistryEntry {
 }
 
 /**
- * @internal Low-level crypto engine backing the WASM module and the E2EE worker
+ * Low-level crypto engine backing the WASM module and the E2EE worker
  * (WebCrypto, @noble/curves, @noble/ciphers). Use {@link CryptoFacade} instead.
+ * @internal
  */
 export class EmCrypto {
     static HASH_ALGORITHM_MAP: { [name: string]: string } = {
