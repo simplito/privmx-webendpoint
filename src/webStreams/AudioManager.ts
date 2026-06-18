@@ -65,7 +65,8 @@ export class AudioManager {
         });
         this.localAudioLevelMeters.set(track.id, meter);
         try {
-            await meter.init(this.assetsDir + "/rms-processor.js");
+            const base = this.assetsDir.endsWith("/") ? this.assetsDir : this.assetsDir + "/";
+            await meter.init(base + "rms-processor.js");
         } catch (e) {
             this.localAudioLevelMeters.delete(track.id);
             meter.stop();

@@ -15,9 +15,6 @@ test.describe("CoreTest: Connection & Contexts", () => {
     test.beforeEach(async ({ page }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-        await page.evaluate(async () => {
-            await window.Endpoint.setup("../../assets");
-        });
     });
 
     test("Creating multiple instances of connection", async ({ page, backend, cli }) => {
@@ -64,7 +61,6 @@ test.describe("CoreTest: Connection & Contexts", () => {
             return { listContexts_1, listContexts_2 };
         }, args);
 
-        // Assertions
         const list1 = result.listContexts_1;
         expect(list1.totalAvailable).toBeGreaterThanOrEqual(1);
         expect(list1.readItems[0].userId).toEqual(testData.userId);
@@ -99,7 +95,6 @@ test.describe("CoreTest: Connection & Contexts", () => {
             const connection_1 = await Endpoint.connect(user1.privKey, solutionId, bridgeUrl);
             const connection_2 = await Endpoint.connect(user2.privKey, solutionId, bridgeUrl);
 
-            // Verify both work
             await connection_1.listContexts({ skip: 0, limit: 1, sortOrder: "desc" });
             await connection_2.listContexts({ skip: 0, limit: 1, sortOrder: "desc" });
 
@@ -246,9 +241,6 @@ test.describe("CoreTest: Connection & Contexts", () => {
             return { list1, list2, list3 };
         }, args);
 
-        // Assertions based on defaultDataset
-        // Assuming there are at least 2 contexts in the dataset
-
         // Skip 3 (Should be empty if we only have 2 contexts)
         expect(result.list1.readItems).toHaveLength(0);
 
@@ -337,13 +329,8 @@ test.describe("CoreTest: EndpointFactory.setup() object form", () => {
         backend,
         cli,
     }) => {
-        await page.goto("/tests/harness/index.html");
+        await page.goto("/tests/harness/index.html?workerCount=4");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-
-        // Use the object form exclusively — this is the regression path.
-        await page.evaluate(async () => {
-            await window.Endpoint.setup({ assetsBasePath: "../../assets" });
-        });
 
         const user = await setupTestUser(page, cli, [testData.contextId]);
 
@@ -368,12 +355,8 @@ test.describe("CoreTest: EndpointFactory.setup() object form", () => {
     test("setup({ assetsBasePath, workerCount }) applies the requested worker count", async ({
         page,
     }) => {
-        await page.goto("/tests/harness/index.html");
+        await page.goto("/tests/harness/index.html?workerCount=6");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-
-        await page.evaluate(async () => {
-            await window.Endpoint.setup({ assetsBasePath: "../../assets", workerCount: 6 });
-        });
 
         // Give pthreads time to spin up then verify crypto still works.
         await page.waitForTimeout(320);
@@ -408,15 +391,8 @@ async function measureSendMessages(
     messageCount: number,
 ): Promise<number> {
     // Fresh page load so the WASM module reinitialises with the new worker count.
-    await page.goto("/tests/harness/index.html");
+    await page.goto(`/tests/harness/index.html?workerCount=${workerCount}`);
     await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-
-    // setup() sets window.__privmxWorkerCount BEFORE calling endpointWasmModule(),
-    // so the C++ AsyncEngine constructor picks it up on its worker thread.
-    // This must be a separate evaluate call so it completes before key generation.
-    await page.evaluate(async (wc: number) => {
-        await window.Endpoint.setup({ assetsBasePath: "../../assets", workerCount: wc });
-    }, workerCount);
 
     // Give the browser event loop time to finish allocating all pthreads.
     // Emscripten spawns workers asynchronously after module init returns;
@@ -450,6 +426,10 @@ async function measureSendMessages(
     return page.evaluate(
         async ({ bridgeUrl, privKey, userId, solutionId, contextId, messageCount }) => {
             const Endpoint = window.Endpoint;
+            // Yield to the event loop so any pending WASM async-engine error
+            // callbacks (queued via setTimeout during callMain) fire before
+            // connect() — in Firefox these can outlive the post-setup wait.
+            await new Promise((r) => setTimeout(r, 50));
             const connection = await Endpoint.connect(privKey, solutionId, bridgeUrl);
             const threadApi = await Endpoint.createThreadApi(connection);
             const cryptoApi = await Endpoint.createCryptoApi();
@@ -480,13 +460,16 @@ async function measureSendMessages(
 }
 
 test.describe("CoreTest: Worker count", () => {
-    const MESSAGE_COUNT = 100;
+    const MESSAGE_COUNT = 1000;
 
     test("EndpointFactory.setup() initialises WASM with the requested worker count", async ({
         page,
         backend,
         cli,
     }) => {
+        // Firefox benchmarks run ~2× slower than Chromium; the 2w+4w runs can
+        // take up to ~30 s in Firefox alone, so extend well past the default.
+        test.setTimeout(90_000);
         const times: Record<string, number> = {};
 
         await test.step("2 workers — baseline", async () => {
@@ -500,6 +483,7 @@ test.describe("CoreTest: Worker count", () => {
         // All three runs must complete all messages successfully (no throw = pass).
         // We log the timings for manual inspection; we don't assert a specific ordering
         // because the bridge/network RTT dominates and may swamp the worker-count effect.
+        console.log(times);
         expect(times["2w"]).toBeGreaterThan(0);
         expect(times["4w"]).toBeGreaterThan(0);
     });

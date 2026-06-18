@@ -287,36 +287,6 @@ export class InboxApi extends BaseApi {
         return this.native.closeFile(this.servicePtr, [fileHandle]);
     }
 
-    // /**
-    //  * Subscribes for the Inbox module main events.
-    //  */
-    // async subscribeForInboxEvents(): Promise<void> {
-    //   return this.native.subscribeForInboxEvents(this.servicePtr, []);
-    // }
-
-    // /**
-    //  * Unsubscribes from the Inbox module main events.
-    //  */
-    // async unsubscribeFromInboxEvents(): Promise<void> {
-    //   return this.native.unsubscribeFromInboxEvents(this.servicePtr, []);
-    // }
-
-    // /**
-    //  * Subscribes for events in given Inbox.
-    //  * @param {string} inboxId ID of the Inbox to subscribe
-    //  */
-    // async subscribeForEntryEvents(inboxId: string): Promise<void> {
-    //   return this.native.subscribeForEntryEvents(this.servicePtr, [inboxId]);
-    // }
-
-    // /**
-    //  * Unsubscribes from events in given Inbox.
-    //  * @param {string} inboxId ID of the Inbox to unsubscribe
-    //  */
-    // async unsubscribeFromEntryEvents(inboxId: string): Promise<void> {
-    //   return this.native.unsubscribeFromEntryEvents(this.servicePtr, [inboxId]);
-    // }
-
     /**
      * Subscribe for the Inbox events on the given subscription query.
      *

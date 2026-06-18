@@ -23,17 +23,10 @@ describe("Crypto Robustness: Stale Handle Recovery", () => {
         // 2. Manually unregister the key behind facade's back
         CryptoFacade.unregisterKey(keyId);
 
-        // 3. Attempt to use the same keyId again
-        // Facade should throw "not found", but if we pass the RAW BYTES again,
-        // the driver (if we were in WASM) would recover.
-        // In pure JS, CryptoFacade.aeadEncrypt(keyId, ...) will fail if keyId is unknown.
-
+        // 3. Using the evicted keyId must throw
         await expect(CryptoFacade.aeadEncrypt(keyId, iv, aad, data)).rejects.toThrow(/not found/);
 
-        // 4. Test automatic recovery when passing raw bytes again (mimicking driver behavior)
-        // High level API doesn't have automatic "re-import on failure" for handles yet,
-        // but the C++ driver DOES.
-        // Let's verify that re-importing with same bytes works and doesn't conflict.
+        // 4. Re-importing the same bytes yields a fresh key ID that still produces the same ciphertext
         const keyId2 = await CryptoFacade.importKeyAndWipeMaterial(keyBytes, "AES-GCM", [
             "encrypt",
             "decrypt",

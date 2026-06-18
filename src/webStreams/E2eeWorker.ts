@@ -30,7 +30,8 @@ export class E2eeWorker {
      */
     async get(): Promise<Worker> {
         if (!this.worker) {
-            this.worker = new Worker(this.assetsDir + "/privmx-worker.js");
+            const base = this.assetsDir.endsWith("/") ? this.assetsDir : this.assetsDir + "/";
+            this.worker = new Worker(base + "privmx-worker.js");
             this.worker.onmessage = (event: MessageEvent<WorkerOutboundEvent>) => {
                 if ("type" in event.data && event.data.type === "rms") {
                     this.onRmsFrame(event.data.publisherId ?? 0, event.data.rms);

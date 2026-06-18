@@ -12,7 +12,6 @@ limitations under the License.
 import { ExtKey } from "./service/ExtKey";
 import * as StreamsApiTypes from "./webStreams/types/ApiTypes";
 
-// export namespace core {
 export type SortOrder = "desc" | "asc";
 
 /**
@@ -184,9 +183,6 @@ export interface ContextCustomEventData {
     statusCode: number;
     schemaVersion: number;
 }
-// }
-
-// export namespace thread {
 
 /**
  * Holds all available information about a Thread.
@@ -267,9 +263,7 @@ export interface ServerMessageInfo {
     createDate: number;
     author: string;
 }
-// }
 
-// export namespace store {
 /**
  * Holds all available information about a Store.
  *
@@ -349,9 +343,7 @@ export interface ServerFileInfo {
     createDate: number;
     author: string;
 }
-// }
 
-// export namespace inbox {
 /**
  * Holds all available information about an Inbox.
  *
@@ -445,9 +437,6 @@ export interface FilesConfig {
     maxFileSize: number;
     maxWholeUploadSize: number;
 }
-// }
-
-// export namespace kvdb {
 
 /**
  * Holds all available information about a KVDB.
@@ -539,7 +528,6 @@ export interface ServerKvdbEntryInfo {
  * @type {DeleteEntriesResult}
  */
 export type DeleteEntriesResult = Map<string, boolean>;
-// }
 
 /**
  * Holds Container policies settings
@@ -736,7 +724,6 @@ export interface BridgeIdentity {
     instanceId?: string;
 }
 
-// webrtc interface tmp types
 export interface Key {
     keyId: string;
     key: Uint8Array;
