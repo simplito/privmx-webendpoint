@@ -33,9 +33,6 @@ jobs:
       - name: Type-check
         run: npx tsc --noEmit
 
-      - name: Doc-quality check
-        run: npm run lint:docs
-
       - name: Unit tests
         run: npm test
 

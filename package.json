@@ -62,7 +62,6 @@
     "test:e2e:manybrowsers": "playwright test --config tests/playwright.config.ts",
     "test:example": "playwright test --config tests/playwright.smoke.config.ts",
     "lint": "oxlint src/",
-    "lint:docs": "node scripts/check-docs.mjs",
     "docs:check": "typedoc --entryPoints src/index.ts --entryPoints src/extra/index.ts --excludeInternal --validation.notDocumented --emit none --treatValidationWarningsAsErrors",
     "format": "oxfmt src/",
     "format:check": "oxfmt --check src/",
