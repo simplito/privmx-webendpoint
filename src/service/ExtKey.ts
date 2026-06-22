@@ -7,12 +7,12 @@ import { BaseApi } from "./BaseApi.js";
  * A BIP-32 hierarchical-deterministic (HD) extended key: a secp256k1 key pair
  * plus a chain code, from which whole trees of child keys can be derived.
  *
- * All operations run locally in the C++/WASM core — keys never leave the
+ * All operations run locally in the C++/WASM core - keys never leave the
  * browser and no server is contacted; {@link EndpointFactory.setup} must have
  * completed first. Obtain instances from the static factories
  * ({@link fromSeed}, {@link fromBase58}, {@link generateRandom}) or from the
  * `extKey` field of the {@link BIP39} result of `CryptoApi.generateBip39` /
- * `fromMnemonic` — the constructor is private.
+ * `fromMnemonic` - the constructor is private.
  *
  * Typical use: derive per-purpose child keys with {@link derive} /
  * {@link deriveHardened}, then extract a WIF private key
@@ -53,13 +53,13 @@ export class ExtKey extends BaseApi {
      * Runs the standard BIP-32 master-key derivation (HMAC-SHA512 over the
      * seed) locally in the WASM core, yielding the private key and chain code.
      *
-     * Use it to recreate a deterministic key hierarchy from stored entropy —
-     * typically a 64-byte seed produced by `CryptoApi.mnemonicToSeed` — then
+     * Use it to recreate a deterministic key hierarchy from stored entropy -
+     * typically a 64-byte seed produced by `CryptoApi.mnemonicToSeed` - then
      * derive children with {@link derive} or {@link deriveHardened}.
      *
      * @param {Uint8Array} seed binary seed the master key is computed from,
      *   e.g. the 64-byte output of `CryptoApi.mnemonicToSeed`
-     * @returns {ExtKey} private root key of the hierarchy — call
+     * @returns {ExtKey} private root key of the hierarchy - call
      *   {@link derive} / {@link getPrivateKey} on it
      */
     static async fromSeed(seed: Uint8Array): Promise<ExtKey> {
@@ -78,12 +78,12 @@ export class ExtKey extends BaseApi {
      * depends on which part was serialised.
      *
      * Use it to restore a key previously exported with
-     * {@link getPrivatePartAsBase58} or {@link getPublicPartAsBase58} — e.g.
+     * {@link getPrivatePartAsBase58} or {@link getPublicPartAsBase58} - e.g.
      * one persisted by the application or received from another device.
      *
      * @param {string} base58 serialised extended key produced by
      *   {@link getPrivatePartAsBase58} or {@link getPublicPartAsBase58}
-     * @returns {ExtKey} the restored key — check {@link isPrivate} to see
+     * @returns {ExtKey} the restored key - check {@link isPrivate} to see
      *   which operations it supports
      * @throws {NativeError} when the string is not a valid Base58-encoded
      *   extended key
@@ -100,13 +100,13 @@ export class ExtKey extends BaseApi {
      * Creates a brand-new random extended key.
      *
      * Draws fresh entropy from the WASM core's CSPRNG and derives a BIP-32
-     * private key with chain code — locally, with no server involvement.
+     * private key with chain code - locally, with no server involvement.
      *
      * Use it as the root of a new key hierarchy when no mnemonic backup is
      * needed; otherwise prefer `CryptoApi.generateBip39`, which also yields a
      * recovery phrase. Persist the key with {@link getPrivatePartAsBase58}.
      *
-     * @returns {ExtKey} random private extended key — derive children with
+     * @returns {ExtKey} random private extended key - derive children with
      *   {@link derive} or export with {@link getPrivatePartAsBase58}
      */
     static async generateRandom(): Promise<ExtKey> {
@@ -147,11 +147,11 @@ export class ExtKey extends BaseApi {
      * Use it to give each purpose (device, sub-account, Context) its own key
      * under one root. Note that normal derivation also works from a
      * public-only key, so a leaked parent public key plus any child private
-     * key exposes siblings — use {@link deriveHardened} where that matters.
+     * key exposes siblings - use {@link deriveHardened} where that matters.
      *
      * @param {number} index child position in the BIP-32 tree, from 0 to
      *   2^31-1; each index deterministically yields a distinct child
-     * @returns {ExtKey} child extended key — derive further or extract keys
+     * @returns {ExtKey} child extended key - derive further or extract keys
      *   with {@link getPrivateKey} / {@link getPublicKey}
      * @throws {NativeError} when `index` is outside the non-hardened range
      */
@@ -170,7 +170,7 @@ export class ExtKey extends BaseApi {
     /**
      * Derives the hardened child key at the given index.
      *
-     * Runs BIP-32 hardened derivation locally in the WASM core — the parent
+     * Runs BIP-32 hardened derivation locally in the WASM core - the parent
      * private key (not just the public part) enters the HMAC, so hardened
      * children cannot be linked to or derived from the parent public key.
      *
@@ -180,7 +180,7 @@ export class ExtKey extends BaseApi {
      *
      * @param {number} index child position in the BIP-32 tree, from 0 to
      *   2^31-1 (mapped internally to the hardened range)
-     * @returns {ExtKey} hardened child extended key — derive further or
+     * @returns {ExtKey} hardened child extended key - derive further or
      *   extract keys with {@link getPrivateKey} / {@link getPublicKey}
      * @throws {NativeError} when this key is public-only and hardened
      *   derivation is impossible
@@ -194,14 +194,14 @@ export class ExtKey extends BaseApi {
      * Serialises the full private extended key (private key + chain code) to
      * Base58.
      *
-     * Encodes the standard BIP-32 serialisation locally in the WASM core — the
+     * Encodes the standard BIP-32 serialisation locally in the WASM core - the
      * resulting string contains secret material capable of deriving the whole
      * subtree.
      *
      * Use it to persist or transfer the key; restore later with
      * {@link fromBase58}. Treat the string like a password.
      *
-     * @returns {string} Base58 private extended key — accepted by
+     * @returns {string} Base58 private extended key - accepted by
      *   {@link fromBase58}; store it securely
      */
     async getPrivatePartAsBase58(): Promise<string> {
@@ -219,7 +219,7 @@ export class ExtKey extends BaseApi {
      * Share it where another party needs to derive or verify child public
      * keys without being able to sign; restore with {@link fromBase58}.
      *
-     * @returns {string} Base58 public extended key — accepted by
+     * @returns {string} Base58 public extended key - accepted by
      *   {@link fromBase58}, which then yields a public-only {@link ExtKey}
      */
     async getPublicPartAsBase58(): Promise<string> {
@@ -230,12 +230,12 @@ export class ExtKey extends BaseApi {
      * Extracts this node's plain ECC private key in WIF format.
      *
      * Strips the BIP-32 wrapping locally in the WASM core, leaving just the
-     * secp256k1 private key — the format the rest of the SDK works with.
+     * secp256k1 private key - the format the rest of the SDK works with.
      *
      * Use the result as the user's identity key for
      * {@link EndpointFactory.connect} or for `CryptoApi.signData`.
      *
-     * @returns {string} secp256k1 private key in WIF format — pass it to
+     * @returns {string} secp256k1 private key in WIF format - pass it to
      *   {@link EndpointFactory.connect}
      */
     async getPrivateKey(): Promise<string> {
@@ -246,12 +246,12 @@ export class ExtKey extends BaseApi {
      * Extracts this node's plain ECC public key in BASE58DER format.
      *
      * Strips the BIP-32 wrapping locally in the WASM core, leaving just the
-     * secp256k1 public key — the counterpart of {@link getPrivateKey}.
+     * secp256k1 public key - the counterpart of {@link getPrivateKey}.
      *
      * Use it wherever PrivMX expects a user's public key: Context ACLs,
      * `UserWithPubKey` arrays, or `CryptoApi.verifySignature`.
      *
-     * @returns {string} secp256k1 public key in BASE58DER format — usable in
+     * @returns {string} secp256k1 public key in BASE58DER format - usable in
      *   `UserWithPubKey` entries and `CryptoApi.verifySignature`
      */
     async getPublicKey(): Promise<string> {
@@ -261,14 +261,14 @@ export class ExtKey extends BaseApi {
     /**
      * Extracts the raw 32-byte private key, suitable for symmetric-style use.
      *
-     * Returns the unencoded secp256k1 scalar from the WASM core — no WIF or
+     * Returns the unencoded secp256k1 scalar from the WASM core - no WIF or
      * Base58 wrapping, just the bytes.
      *
      * Use it when a derived key should serve as raw secret material for a
      * custom scheme (e.g. as input to `CryptoFacade.importKeyAndWipeMaterial`);
      * for PrivMX APIs prefer the WIF form from {@link getPrivateKey}.
      *
-     * @returns {Uint8Array} 32 raw private-key bytes — secret material, wipe
+     * @returns {Uint8Array} 32 raw private-key bytes - secret material, wipe
      *   or import it promptly after use
      */
     async getPrivateEncKey(): Promise<Uint8Array> {
@@ -281,10 +281,10 @@ export class ExtKey extends BaseApi {
      * Hashes the secp256k1 public key (SHA-256 then RIPEMD-160) and
      * Base58Check-encodes the result locally in the WASM core.
      *
-     * Use it as a short, human-comparable fingerprint of the public key — e.g.
+     * Use it as a short, human-comparable fingerprint of the public key - e.g.
      * for display or out-of-band identity verification.
      *
-     * @returns {string} Base58Check address derived from the public key — a
+     * @returns {string} Base58Check address derived from the public key - a
      *   compact fingerprint for display and comparison
      */
     async getPublicKeyAsBase58Address(): Promise<string> {
@@ -314,10 +314,10 @@ export class ExtKey extends BaseApi {
      * secp256k1 signature locally in the WASM core.
      *
      * Use it to authenticate messages signed by the holder of this key's
-     * private part — e.g. signatures produced with `CryptoApi.signData` by the
+     * private part - e.g. signatures produced with `CryptoApi.signData` by the
      * key from {@link getPrivateKey}.
      *
-     * @param {Uint8Array} message exact bytes that were signed — any
+     * @param {Uint8Array} message exact bytes that were signed - any
      *   modification makes verification fail
      * @param {Uint8Array} signature compact ECDSA signature to check, e.g.
      *   produced by `CryptoApi.signData`
@@ -334,7 +334,7 @@ export class ExtKey extends BaseApi {
     /**
      * Tells whether this extended key contains the private part.
      *
-     * Inspects the key material held in the WASM core — a purely local check
+     * Inspects the key material held in the WASM core - a purely local check
      * with no derivation involved.
      *
      * Check it before calling private-only operations ({@link getPrivateKey},

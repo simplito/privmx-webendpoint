@@ -28,7 +28,7 @@ import { StreamApiNative } from "../native/StreamApiNative.js";
  * Real-time WebRTC streaming API: manages Stream Rooms (audio/video/data
  * containers shared by a fixed set of users within a Context) and the
  * end-to-end encrypted media and data channels inside them. A Stream Room is
- * an encrypted container like a Thread or Store — a 256-bit room key is
+ * an encrypted container like a Thread or Store - a 256-bit room key is
  * generated client-side and distributed to members encrypted with their public
  * keys (ECIES), so the Bridge server only ever stores ciphertext (plus the
  * deliberately public `publicMeta`).
@@ -67,7 +67,7 @@ import { StreamApiNative } from "../native/StreamApiNative.js";
  */
 export class StreamApi extends BaseApi {
     /**
-     * Created by {@link EndpointFactory.createStreamApi} — never
+     * Created by {@link EndpointFactory.createStreamApi} - never
      * constructed by SDK users.
      * @internal
      */
@@ -92,7 +92,7 @@ export class StreamApi extends BaseApi {
      * Room's ID.
      *
      * A random 256-bit room key is generated client-side and encrypted
-     * separately for each listed user with ECIES using their public key — the
+     * separately for each listed user with ECIES using their public key - the
      * server stores only the encrypted per-user key entries and cannot read the
      * key. `privateMeta` is encrypted client-side with the room key;
      * `publicMeta` is stored unencrypted on the server.
@@ -109,12 +109,12 @@ export class StreamApi extends BaseApi {
      *   delete the Stream Room; build the entries from
      *   `Connection.listContextUsers`
      * @param {Uint8Array} publicMeta metadata stored unencrypted on the server
-     *   — readable by the Bridge, so never place secrets here
+     *   - readable by the Bridge, so never place secrets here
      * @param {Uint8Array} privateMeta metadata encrypted client-side with the
      *   room key; only Stream Room members can decrypt it
      * @param {ContainerPolicy} policies fine-grained access rules overriding the
      *   Context defaults; pass `undefined` to use the defaults
-     * @returns {string} ID of the new Stream Room — pass to
+     * @returns {string} ID of the new Stream Room - pass to
      *   {@link joinStreamRoom}, {@link getStreamRoom} or {@link updateStreamRoom}
      */
     public async createStreamRoom(
@@ -145,7 +145,7 @@ export class StreamApi extends BaseApi {
      * generated and redistributed, so removed users cannot decrypt media or
      * data sent after the update.
      *
-     * The update is a full replacement, not a diff — fetch the current state
+     * The update is a full replacement, not a diff - fetch the current state
      * with {@link getStreamRoom}, modify it, and pass the Stream Room's
      * `version` back so concurrent modifications are detected. Set
      * `forceGenerateNewKey` whenever you remove users.
@@ -158,17 +158,17 @@ export class StreamApi extends BaseApi {
      * @param {UserWithPubKey[]} managers full replacement list of members with
      *   management rights (update / delete the Stream Room)
      * @param {Uint8Array} publicMeta new metadata stored unencrypted on the
-     *   server — never place secrets here
+     *   server - never place secrets here
      * @param {Uint8Array} privateMeta new metadata encrypted client-side with
      *   the room key
      * @param {number} version current Stream Room version, from
-     *   `StreamRoom.version` returned by {@link getStreamRoom} — lets the server
+     *   `StreamRoom.version` returned by {@link getStreamRoom} - lets the server
      *   reject stale updates
      * @param {boolean} force `true` skips the `version` check and overwrites any
      *   concurrent modification
      * @param {boolean} forceGenerateNewKey when `true`, a fresh room key is
      *   generated and redistributed, so users removed by this update cannot
-     *   decrypt media or data sent afterwards — set it whenever you revoke access
+     *   decrypt media or data sent afterwards - set it whenever you revoke access
      * @param {ContainerPolicy} policies new access policies; pass `undefined` to
      *   keep the current ones
      * @returns {Promise<void>} resolves when the Stream Room membership and metadata have been replaced
@@ -204,7 +204,7 @@ export class StreamApi extends BaseApi {
      * Downloads the Stream Room records from the Bridge and decrypts each
      * `privateMeta` client-side with the corresponding room key.
      *
-     * Typically the first StreamApi call after connecting — pick a Stream Room
+     * Typically the first StreamApi call after connecting - pick a Stream Room
      * from the result and enter it with {@link joinStreamRoom}.
      *
      * @param {string} contextId ID of the Context to enumerate, from
@@ -319,7 +319,7 @@ export class StreamApi extends BaseApi {
      * @param {string} streamRoomId ID of the Stream Room to fetch, returned by
      *   {@link createStreamRoom} or from `StreamRoom.streamRoomId` in
      *   {@link listStreamRooms}
-     * @returns {StreamRoom} decrypted Stream Room data — `version` feeds
+     * @returns {StreamRoom} decrypted Stream Room data - `version` feeds
      *   {@link updateStreamRoom}; `streamRoomId` feeds {@link joinStreamRoom}
      */
     public async getStreamRoom(streamRoomId: EndpointTypes.StreamRoomId): Promise<StreamRoom> {
@@ -331,7 +331,7 @@ export class StreamApi extends BaseApi {
      * entries.
      *
      * The server removes the Stream Room record and its encrypted per-user key
-     * entries — there is no undo.
+     * entries - there is no undo.
      *
      * Requires management rights to the Stream Room (see the `managers` list of
      * {@link createStreamRoom} / {@link updateStreamRoom}). To merely revoke
@@ -351,7 +351,7 @@ export class StreamApi extends BaseApi {
      * Creates a local Stream handle for publishing media or data in the given
      * Stream Room and returns the handle.
      *
-     * Only a local, in-memory Stream entry is created — nothing reaches the
+     * Only a local, in-memory Stream entry is created - nothing reaches the
      * server or peers yet. Stage tracks with {@link addStreamTrack} /
      * {@link removeStreamTrack}, then push the changes with
      * {@link publishStream} / {@link updateStream}.
@@ -377,7 +377,7 @@ export class StreamApi extends BaseApi {
      * Lists the streams currently published by all members in the given Stream
      * Room.
      *
-     * Fetches the room's live stream roster from the Bridge — these are remote
+     * Fetches the room's live stream roster from the Bridge - these are remote
      * streams produced by published peers, not the local handles created with
      * {@link createStream}.
      *
@@ -398,7 +398,7 @@ export class StreamApi extends BaseApi {
      * Stages a media track (or data channel) on a local Stream handle and
      * returns its track ID.
      *
-     * The track is recorded only in an in-memory map — it reaches the server
+     * The track is recorded only in an in-memory map - it reaches the server
      * and peers, and starts being AES-256-GCM encrypted in the E2EE worker,
      * only after {@link publishStream} (or {@link updateStream} for an
      * already-published stream).
@@ -409,10 +409,10 @@ export class StreamApi extends BaseApi {
      *
      * @param {StreamHandle} streamHandle local stream handle returned by
      *   {@link createStream}
-     * @param {StreamTrackInit} meta track/data-channel definition — `track` is
+     * @param {StreamTrackInit} meta track/data-channel definition - `track` is
      *   the browser `MediaStreamTrack` to publish and/or `createDataChannel`
      *   requests a data channel
-     * @returns {string} track ID identifying this staged track — pass to
+     * @returns {string} track ID identifying this staged track - pass to
      *   {@link sendData} for data channels
      * @throws {Error} when the given `streamHandle` does not exist, or the same
      *   browser track is already staged on that handle
@@ -602,7 +602,7 @@ export class StreamApi extends BaseApi {
      * Stops publishing the Stream and tears down its outbound peer connection.
      *
      * Notifies the Bridge to drop the stream, closes the sender
-     * `RTCPeerConnection`, and discards the handle's staged tracks and state —
+     * `RTCPeerConnection`, and discards the handle's staged tracks and state -
      * the stream stops being visible to other members.
      *
      * Follows {@link publishStream} when you are done streaming; leave the room
@@ -769,7 +769,7 @@ export class StreamApi extends BaseApi {
      * @param {string[]} subscriptionQueries query strings produced by
      *   {@link buildSubscriptionQuery}; hand-written strings are not supported
      * @returns {string[]} subscription IDs, index-aligned with
-     *   `subscriptionQueries` — keep them to {@link unsubscribeFrom} later
+     *   `subscriptionQueries` - keep them to {@link unsubscribeFrom} later
      */
     async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
         return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
@@ -796,7 +796,7 @@ export class StreamApi extends BaseApi {
      * events (e.g. "all stream events in Stream Room X").
      *
      * The query is assembled locally by the WASM core in the server's expected
-     * format — nothing is sent yet; pass the result to {@link subscribeFor} to
+     * format - nothing is sent yet; pass the result to {@link subscribeFor} to
      * activate it.
      *
      * @param {StreamEventType} eventType which Stream Room event class to listen
@@ -804,7 +804,7 @@ export class StreamApi extends BaseApi {
      * @param {StreamEventSelectorType} selectorType what `selectorId` refers to
      *   (e.g. a whole Context or a single Stream Room), narrowing the event
      *   scope
-     * @param {string} selectorId ID of the selected scope — a Stream Room ID
+     * @param {string} selectorId ID of the selected scope - a Stream Room ID
      *   returned by {@link createStreamRoom} or a Context ID from
      *   `Connection.listContexts`, depending on `selectorType`
      * @returns {string} query string consumed by {@link subscribeFor}

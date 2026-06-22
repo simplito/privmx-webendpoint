@@ -6,7 +6,7 @@ import { EncryptTransform, TransformContext } from "./EncryptTransform.js";
 const keyStore = new KeyStore();
 const encryptTransform = new EncryptTransform(keyStore);
 
-// Active decode pipelines keyed by track id — so stop() can cancel them.
+// Active decode pipelines keyed by track id - so stop() can cancel them.
 const sessions = new Map<string, { controller: AbortController }>();
 
 // Local mic RMS, embedded in every outgoing frame so receivers can track audio activity.

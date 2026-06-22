@@ -26,12 +26,12 @@ export type { AudioLevelsStats } from "./AudioManager.js";
  * focused service classes injected via the constructor.
  *
  * Dependency groups:
- *  - `publisher`       — `PublisherManager`: outbound media tracks, SDP offer/answer
- *  - `subscriber`      — `SubscriberManager`: inbound tracks, reconfigure queue
- *  - `dataChannel`     — `DataChannelSession`: encrypted data channel messages
- *  - `keys`            — `KeySyncManager`: keeps main-thread and worker keys in sync
- *  - `eventsDispatcher`— `StateChangeDispatcher`: RTCPeerConnection state change events
- *  - `listenerRegistry`— `RemoteStreamListenerRegistry`: remote stream callbacks
+ *  - `publisher`       - `PublisherManager`: outbound media tracks, SDP offer/answer
+ *  - `subscriber`      - `SubscriberManager`: inbound tracks, reconfigure queue
+ *  - `dataChannel`     - `DataChannelSession`: encrypted data channel messages
+ *  - `keys`            - `KeySyncManager`: keeps main-thread and worker keys in sync
+ *  - `eventsDispatcher`- `StateChangeDispatcher`: RTCPeerConnection state change events
+ *  - `listenerRegistry`- `RemoteStreamListenerRegistry`: remote stream callbacks
  */
 export class WebRtcClient {
     private streamsApiInterface: StreamsCallbackInterface | undefined;

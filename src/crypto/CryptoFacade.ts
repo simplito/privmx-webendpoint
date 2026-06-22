@@ -94,7 +94,7 @@ export class CryptoFacade {
      * AES-256-GCM (AEAD) Encrypt.
      * @param {FacadeKeyRef} key registered key ID or `CryptoKey` for the 256-bit AES-GCM key
      * @param {Uint8Array} iv 12-byte initialisation vector (nonce)
-     * @param {Uint8Array} aad additional authenticated data — protected but not encrypted
+     * @param {Uint8Array} aad additional authenticated data - protected but not encrypted
      * @param {Uint8Array} data plaintext bytes to encrypt
      * @returns {Promise<ArrayBuffer>} AES-256-GCM ciphertext with the 16-byte authentication tag appended
      */
@@ -130,7 +130,7 @@ export class CryptoFacade {
 
     /**
      * Derive a key using PBKDF2.
-     * @param {string | CryptoKey} password source secret — either a plain-text password or an imported `CryptoKey`
+     * @param {string | CryptoKey} password source secret - either a plain-text password or an imported `CryptoKey`
      * @param {string} salt hex-encoded salt string to mix into the derivation
      * @param {number} rounds number of PBKDF2 iterations (higher is slower and more secure)
      * @param {number} length desired output length in bits (e.g. 256 for a 32-byte key)
@@ -196,7 +196,7 @@ export class CryptoFacade {
      * Import a raw key into the registry and return its ID.
      * This is the ONLY method that accepts raw Uint8Array key bytes.
      * Uint8Array will be filled with zeros afterwards
-     * @param {Uint8Array} key raw key bytes to import — zeroed out after import
+     * @param {Uint8Array} key raw key bytes to import - zeroed out after import
      * @param {AlgorithmIdentifier} algo WebCrypto algorithm identifier for the key (e.g. `{ name: "AES-GCM" }`)
      * @param {KeyUsage[]} usages list of allowed key usages (e.g. `["encrypt", "decrypt"]`)
      * @param {string} [id] optional explicit key ID; a UUID is generated when omitted

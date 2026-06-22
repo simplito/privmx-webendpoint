@@ -1,18 +1,18 @@
-# PrivMX Web Endpoint — Vite example
+# PrivMX Web Endpoint - Vite example
 
 A minimal demo showing the correct **client / backend split**:
 
-- **Client (browser, `src/main.ts`)** — generates the user's private key **at
+- **Client (browser, `src/main.ts`)** - generates the user's private key **at
   runtime** (it never leaves the browser), hands only the **public key** to the
   backend, then connects and exchanges an end-to-end encrypted Thread message.
   Assets load via the zero-config `/auto` entry (`setupAuto()`).
-- **Backend (`src/server.ts`)** — holds the **Bridge management API key** and
+- **Backend (`src/server.ts`)** - holds the **Bridge management API key** and
   registers users' public keys in a Context (`manager/auth` →
   `context/addUserToContext`).
 
-> **⚠️ The backend is *mimicked* in the browser.** For a zero-infra demo,
+> **WARNING The backend is *mimicked* in the browser.** For a zero-infra demo,
 > `src/server.ts` runs client-side and `main.ts` calls `registerUser()` directly
-> instead of over HTTP. In a **real app this code must run on your server** — the
+> instead of over HTTP. In a **real app this code must run on your server** - the
 > management API key can administer your whole Solution and must never reach the
 > browser; the client would `fetch("/api/register-user", …)` your backend.
 
@@ -25,7 +25,7 @@ browser: generate keypair ──pubKey──▶ registerUser()  ──API key─
 ## Prerequisites
 
 - A running **PrivMX Bridge** with a **management API key** and an existing
-  **Context** (create them in the Bridge admin panel / CLI — see the
+  **Context** (create them in the Bridge admin panel / CLI - see the
   [Bridge docs](https://docs.privmx.dev)).
 - Node.js 20+.
 

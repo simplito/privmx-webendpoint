@@ -44,14 +44,14 @@ declare function endpointWasmModule(moduleOverrides?: {
  * - **Single directory** (simplest): set `assetsBasePath` to a folder that
  *   serves all four files.
  * - **Per-asset URLs** (bundler-native): set `wasmModuleUrl` / `wasmUrl` /
- *   `workerUrl` / `rmsProcessorUrl` individually — typically with
+ *   `workerUrl` / `rmsProcessorUrl` individually - typically with
  *   `new URL("…", import.meta.url).href` so a bundler (Vite, webpack 5, …)
  *   fingerprints and serves each asset without a manual copy step. Any URL left
  *   unset falls back to `assetsBasePath` + the default filename.
  */
 export interface EndpointSetupOptions {
     /**
-     * URL or path of the directory the WASM assets are served from — the four
+     * URL or path of the directory the WASM assets are served from - the four
      * files copied out of `@simplito/privmx-webendpoint/assets`
      * (`endpoint-wasm-module.js`, `endpoint-wasm-module.wasm`,
      * `privmx-worker.js`, `rms-processor.js`). Defaults to `/`. Relative paths
@@ -103,8 +103,8 @@ export interface EndpointSetupOptions {
  * {@link createInboxApi} / … → application work →
  * {@link Connection.disconnect}.
  *
- * API instances are cached per connection — calling `createThreadApi` twice
- * with the same connection returns the same instance — and are invalidated
+ * API instances are cached per connection - calling `createThreadApi` twice
+ * with the same connection returns the same instance - and are invalidated
  * automatically by `disconnect()`.
  *
  * Prefer the higher-level `PrivmxClient` (from
@@ -139,7 +139,7 @@ export class EndpointFactory {
 
     /**
      * Loads the Endpoint's WebAssembly assets and initializes the library. Must
-     * complete before any other Endpoint call; safe to call multiple times —
+     * complete before any other Endpoint call; safe to call multiple times -
      * concurrent and repeated calls share one initialization (a failed attempt
      * may be retried).
      *
@@ -225,7 +225,7 @@ export class EndpointFactory {
         };
         const glueUrl = wasmModuleUrl ?? this.buildAssetUrl(basePath, "endpoint-wasm-module.js");
 
-        // Must be set before endpointWasmModule() — the C++ AsyncEngine reads this global during WASM init.
+        // Must be set before endpointWasmModule() - the C++ AsyncEngine reads this global during WASM init.
         if (workerCount !== undefined) {
             (window as unknown as Record<string, unknown>).__privmxWorkerCount = Math.max(
                 EndpointFactory.WORKER_COUNT_MIN,
@@ -320,7 +320,7 @@ export class EndpointFactory {
      * call only resolves the singleton wrapper (no server round-trip).
      *
      * Use it after subscribing to events (e.g. `ThreadApi.subscribeFor`) and
-     * drive it with {@link EventQueue.waitEvent} — or let
+     * drive it with {@link EventQueue.waitEvent} - or let
      * {@link getEventManager} run the loop and dispatch typed callbacks for you.
      *
      * @returns {EventQueue} the global event queue singleton (same instance on
@@ -331,12 +331,12 @@ export class EndpointFactory {
     }
 
     /**
-     * Returns the application-wide event loop — the single running consumer of
+     * Returns the application-wide event loop - the single running consumer of
      * the global {@link EventQueue} that dispatches incoming server events to the
      * per-connection {@link EventManager}s (`connection.getEventManager()`).
      *
      * Started lazily on the first call and reused thereafter (one loop per
-     * application). Internal plumbing — applications use
+     * application). Internal plumbing - applications use
      * `connection.getEventManager()` instead.
      * @internal
      * @returns {EventLoop} the shared, already-running event loop
@@ -356,7 +356,7 @@ export class EndpointFactory {
      * symmetric encryption.
      *
      * CryptoApi runs entirely client-side in the WASM core (secp256k1 keys,
-     * ECDSA signatures, AES symmetric encryption) — it needs no connection and
+     * ECDSA signatures, AES symmetric encryption) - it needs no connection and
      * never contacts a server.
      *
      * Use it before {@link connect} to generate or derive the user's private
@@ -398,7 +398,7 @@ export class EndpointFactory {
      * the {@link Connection} all other APIs are created from.
      *
      * Performs an ECDHE handshake with the Bridge that encrypts the transport
-     * layer and proves the user's identity with their secp256k1 private key —
+     * layer and proves the user's identity with their secp256k1 private key -
      * the key itself never leaves the browser; the server only ever sees the
      * derived public key. An authenticated WebSocket event channel is opened
      * for server-pushed events.
@@ -409,7 +409,7 @@ export class EndpointFactory {
      * account-less guests (e.g. a public contact form) use
      * {@link connectPublic} instead.
      *
-     * @param {string} userPrivKey user's secp256k1 private key in WIF format —
+     * @param {string} userPrivKey user's secp256k1 private key in WIF format -
      *   generate with `CryptoApi.generatePrivateKey()` or derive from
      *   credentials with `CryptoApi.derivePrivateKey2()`; the matching public
      *   key must be registered in the Context for content access to work
@@ -420,7 +420,7 @@ export class EndpointFactory {
      * @param {PKIVerificationOptions} [verificationOptions] expected Bridge
      *   instance ID / public key, letting the client detect a spoofed Bridge
      *   server during the handshake
-     * @returns {Connection} authenticated connection — pass it to the
+     * @returns {Connection} authenticated connection - pass it to the
      *   `createXApi` factory methods
      * @throws {NativeError} when the server is unreachable, the Solution does
      *   not exist, or the key is malformed
@@ -445,7 +445,7 @@ export class EndpointFactory {
     }
 
     /**
-     * Opens an anonymous guest session with a PrivMX Bridge server — no user
+     * Opens an anonymous guest session with a PrivMX Bridge server - no user
      * account or private key required.
      *
      * Generates a random ephemeral secp256k1 key client-side for the transport
@@ -466,7 +466,7 @@ export class EndpointFactory {
      * @param {PKIVerificationOptions} [verificationOptions] expected Bridge
      *   instance ID / public key, letting the client detect a spoofed Bridge
      *   server during the handshake
-     * @returns {Connection} guest connection — pass it to {@link createInboxApi}
+     * @returns {Connection} guest connection - pass it to {@link createInboxApi}
      * @throws {NativeError} when the server is unreachable or the Solution
      *   does not exist
      */
@@ -489,7 +489,7 @@ export class EndpointFactory {
     /**
      * Returns the Thread API (encrypted messaging) for the given connection.
      *
-     * Resolved from the connection's container — the first call instantiates
+     * Resolved from the connection's container - the first call instantiates
      * the WASM-side ThreadApi object, subsequent calls return the same cached
      * instance; no server round-trip happens here.
      *
@@ -507,7 +507,7 @@ export class EndpointFactory {
     /**
      * Returns the Store API (encrypted file storage) for the given connection.
      *
-     * Resolved from the connection's container — the first call instantiates
+     * Resolved from the connection's container - the first call instantiates
      * the WASM-side StoreApi object, subsequent calls return the same cached
      * instance; no server round-trip happens here.
      *
@@ -544,11 +544,11 @@ export class EndpointFactory {
     /**
      * @param {Connection} connection connection returned by {@link connect} or
      *   {@link connectPublic}
-     * @param {ThreadApi} [_threadApi] ignored — resolved internally instead
-     * @param {StoreApi} [_storeApi] ignored — resolved internally instead
+     * @param {ThreadApi} [_threadApi] ignored - resolved internally instead
+     * @param {StoreApi} [_storeApi] ignored - resolved internally instead
      * @returns {InboxApi} the per-connection InboxApi instance
      * @deprecated The `_threadApi` and `_storeApi` arguments are ignored and
-     *   will be removed in the next major release — call
+     *   will be removed in the next major release - call
      *   `createInboxApi(connection)` with the connection only.
      */
     static async createInboxApi(
@@ -568,7 +568,7 @@ export class EndpointFactory {
      * Returns the KVDB API (encrypted key-value storage) for the given
      * connection.
      *
-     * Resolved from the connection's container — the first call instantiates
+     * Resolved from the connection's container - the first call instantiates
      * the WASM-side KvdbApi object, subsequent calls return the same cached
      * instance; no server round-trip happens here.
      *
@@ -587,12 +587,12 @@ export class EndpointFactory {
      * Returns the Event API (custom encrypted Context events) for the given
      * connection.
      *
-     * Resolved from the connection's container — the first call instantiates
+     * Resolved from the connection's container - the first call instantiates
      * the WASM-side EventApi object, subsequent calls return the same cached
      * instance; no server round-trip happens here.
      *
      * Use it to broadcast application-defined events (`emitEvent`) to selected
-     * Context members — each event is encrypted client-side for its recipients —
+     * Context members - each event is encrypted client-side for its recipients -
      * and to subscribe to such events from others.
      *
      * @param {Connection} connection connection returned by {@link connect};
@@ -624,10 +624,10 @@ export class EndpointFactory {
     static async createStreamApi(connection: Connection): Promise<StreamApi>;
     /**
      * @param {Connection} connection connection returned by {@link connect}
-     * @param {EventApi} [_eventApi] ignored — resolved internally instead
+     * @param {EventApi} [_eventApi] ignored - resolved internally instead
      * @returns {StreamApi} the per-connection StreamApi instance
      * @deprecated The `_eventApi` argument is ignored and will be removed in the
-     *   next major release — call `createStreamApi(connection)` with the
+     *   next major release - call `createStreamApi(connection)` with the
      *   connection only.
      */
     static async createStreamApi(connection: Connection, _eventApi?: EventApi): Promise<StreamApi>;

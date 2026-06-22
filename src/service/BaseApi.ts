@@ -17,7 +17,7 @@ limitations under the License.
  * Lifetime rule for all subclasses: an API instance is bound to the `Connection`
  * it was created from. After {@link Connection.disconnect} (or
  * `PrivmxClient.disconnect()`), every method of every API obtained from that
- * connection throws an `Error` ("This API instance is no longer valid…") —
+ * connection throws an `Error` ("This API instance is no longer valid…") -
  * create a new connection and new API instances to continue.
  *
  * Users never construct or interact with this class directly; it exists so the
@@ -28,7 +28,7 @@ export class BaseApi {
 
     /**
      * Instances are created by `EndpointFactory` with a pointer
-     * returned from the WASM module — never constructed by SDK users.
+     * returned from the WASM module - never constructed by SDK users.
      * @internal
      */
     constructor(ptr: number) {
@@ -54,7 +54,7 @@ export class BaseApi {
     /**
      * Invalidates this instance by clearing the WASM pointer. Called
      * automatically by `Connection.disconnect()` (via `freeApis()`) right before
-     * the C++ object is deleted — not by SDK users.
+     * the C++ object is deleted - not by SDK users.
      * @internal
      */
     public destroyRefs() {

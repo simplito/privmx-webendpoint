@@ -2,7 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 
 // The PrivMX WASM core runs on worker threads backed by SharedArrayBuffer, which
 // browsers only expose on a *cross-origin isolated* page. These two response
-// headers enable that isolation — without them, setup() fails with
+// headers enable that isolation - without them, setup() fails with
 // "SharedArrayBuffer is not defined". Apply the same headers in production.
 const COOP_COEP = {
     "Cross-Origin-Opener-Policy": "same-origin",

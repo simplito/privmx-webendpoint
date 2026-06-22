@@ -41,7 +41,7 @@ if [ ! -f CMakeCache.txt ]; then
         -DENABLE_NET=OFF -DENABLE_CRYPTO=OFF -DENABLE_NETSSL=OFF \
         -DCMAKE_BUILD_TYPE=MinSizeRel
 else
-    echo "CMakeCache.txt exists — skipping cmake configure."
+    echo "CMakeCache.txt exists - skipping cmake configure."
 fi
 
 emmake make -j20

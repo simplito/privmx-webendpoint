@@ -4,7 +4,7 @@
  * application code.
  */
 export interface RawCppError {
-    /** Combined numeric code: `(scopeCode << 16) | specificCode` — see `NativeErrorCodes.ts`. */
+    /** Combined numeric code: `(scopeCode << 16) | specificCode` - see `NativeErrorCodes.ts`. */
     code: number;
     /** C++ exception class name, e.g. `"StoreFileVersionMismatchException"`. */
     name: string;
@@ -18,7 +18,7 @@ export interface RawCppError {
 
 /**
  * Error type thrown (as a rejected promise) by every SDK method whose failure
- * originates in the C++/WASM core — server errors, crypto failures, missing
+ * originates in the C++/WASM core - server errors, crypto failures, missing
  * containers, access denials, version conflicts.
  *
  * Wraps the C++ exception that crossed the WASM boundary, preserving its
@@ -33,7 +33,7 @@ export interface RawCppError {
  *     await storeApi.closeFile(handle);
  * } catch (e) {
  *     if (e instanceof NativeError && e.code === StoreErrorCode.FILE_VERSION_MISMATCH) {
- *         // concurrent update — re-open and retry
+ *         // concurrent update - re-open and retry
  *     }
  * }
  * ```
@@ -42,11 +42,11 @@ export class NativeError extends Error {
     /**
      * Numeric error code, laid out as `(scopeCode << 16) | specificCode`.
      * Compare against the exported `*ErrorCode` constants. Note that the Kvdb
-     * and Event modules share scope `0x0009` — check {@link scope} when
+     * and Event modules share scope `0x0009` - check {@link scope} when
      * disambiguating bare numbers.
      */
     public readonly code: number;
-    /** Module that raised the error — `"Core"`, `"Store"`, `"Thread"`, … */
+    /** Module that raised the error - `"Core"`, `"Store"`, `"Thread"`, … */
     public readonly scope: string;
     /** Full formatted message from the C++ core (also appended to `stack`). */
     public readonly fullMessage: string;

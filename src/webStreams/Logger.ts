@@ -1,7 +1,7 @@
 /**
  * Internal logging for the SDK.
  *
- * The library is **silent by default** — it never writes to the host
+ * The library is **silent by default** - it never writes to the host
  * application's console unless logging is explicitly enabled with
  * {@link setEndpointLogger}. This keeps production consoles clean while letting
  * developers opt into diagnostics (or pipe logs to their own sink) on demand.
@@ -18,7 +18,7 @@ export type LogLevelName = "silent" | "error" | "warn" | "info" | "debug";
 
 /**
  * Destination for log records. Receives the numeric severity, its label, and
- * the original arguments — implement it to forward logs to a custom backend.
+ * the original arguments - implement it to forward logs to a custom backend.
  */
 export type LogSink = (level: number, label: string, args: unknown[]) => void;
 
@@ -41,7 +41,7 @@ let threshold = LEVELS.silent;
 let sink: LogSink = consoleSink;
 
 /**
- * Enables or reconfigures SDK logging. Off by default — call this once (e.g.
+ * Enables or reconfigures SDK logging. Off by default - call this once (e.g.
  * during development) to surface internal diagnostics, and omit it in
  * production to keep the console clean.
  *

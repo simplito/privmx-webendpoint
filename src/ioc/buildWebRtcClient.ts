@@ -21,7 +21,7 @@ import { T } from "./Tokens.js";
  * into the provided container so that callback closures can resolve them lazily.
  *
  * Circular dependencies are broken by resolving inside the callback closures that
- * are only called during an active call — well after construction completes:
+ * are only called during an active call - well after construction completes:
  *
  *   - PeerConnectionFactory.onRemoteTrack  → resolves SubscriberManager lazily
  *   - PeerConnectionManager.onTrickle      → resolves WebRtcClient lazily
@@ -106,7 +106,7 @@ export function registerWebRtcServices(c: WebRtcContainer): void {
             new DataChannelSession(await c.resolve<DataChannelCryptor>(T.DataChannelCryptor)),
     );
 
-    // E2eeWorker — the RMS callback resolves AudioManager lazily (built after E2eeWorker).
+    // E2eeWorker - the RMS callback resolves AudioManager lazily (built after E2eeWorker).
     c.registerSingleton(T.E2eeWorker, async (c) => {
         const workerUrl = await c.resolve<string>(T.WorkerUrl);
         return new E2eeWorker(workerUrl, (publisherId, rms) => {

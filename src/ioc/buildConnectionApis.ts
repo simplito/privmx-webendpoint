@@ -134,7 +134,7 @@ export function registerConnectionServices(
         return new EventApi(native, ptr);
     });
 
-    // InboxApi depends on ThreadApi + StoreApi — resolved lazily from this same container.
+    // InboxApi depends on ThreadApi + StoreApi - resolved lazily from this same container.
     c.registerSingleton(T.InboxApi, async (c) => {
         const conn = await c.resolve<Connection>(T.ConnectionPtr);
         if (conn.hasApi("inboxes")) {

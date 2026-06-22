@@ -7,7 +7,7 @@ import { BaseNative } from "./BaseNative.js";
 export type ExtKeyNativePtr = number & { __extKeyNativePtr: never };
 
 /**
- * Raw WASM wrapper for the C++ ExtKey — holds and forwards raw pointers. Use
+ * Raw WASM wrapper for the C++ ExtKey - holds and forwards raw pointers. Use
  * {@link ExtKey} (src/service) instead.
  * @internal
  */

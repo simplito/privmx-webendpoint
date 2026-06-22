@@ -26,7 +26,7 @@ export interface SetupAutoOptions {
 const assetUrl = (file: string) => new URL(`../../assets/${file}`, import.meta.url).href;
 
 /**
- * Initializes the Endpoint with **zero manual asset handling** — the four WASM
+ * Initializes the Endpoint with **zero manual asset handling** - the four WASM
  * runtime files are located automatically, so you never copy them into a public
  * directory or pass an `assetsBasePath`.
  *
@@ -37,7 +37,7 @@ const assetUrl = (file: string) => new URL(`../../assets/${file}`, import.meta.u
  * module's `locateFile`, the worker/worklet via their own URLs). It is
  * **ESM-only** because it relies on `import.meta.url`.
  *
- * Use it instead of {@link EndpointFactory.setup} in any bundled web app — it is
+ * Use it instead of {@link EndpointFactory.setup} in any bundled web app - it is
  * the recommended setup path. After it resolves, continue exactly as with the
  * classic flow: {@link EndpointFactory.connect} → `createThreadApi` / … →
  * `disconnect`. For non-bundler setups (plain `<script>`, custom CDN layout),

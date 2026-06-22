@@ -23,7 +23,7 @@ import {
 import { BaseNative } from "./BaseNative.js";
 
 /**
- * Raw WASM wrapper for the C++ KvdbApi — holds and forwards raw pointers. Use
+ * Raw WASM wrapper for the C++ KvdbApi - holds and forwards raw pointers. Use
  * {@link KvdbApi} (src/service) instead.
  * @internal
  */

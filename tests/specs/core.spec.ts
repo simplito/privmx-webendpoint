@@ -320,7 +320,7 @@ test.describe("CoreTest: Connection & Contexts", () => {
 });
 
 // ---------------------------------------------------------------------------
-// EndpointFactory.setup() — object-form regression test
+// EndpointFactory.setup() - object-form regression test
 // ---------------------------------------------------------------------------
 
 test.describe("CoreTest: EndpointFactory.setup() object form", () => {
@@ -400,7 +400,7 @@ async function measureSendMessages(
     // are ready, causing a stall or abort on high worker counts.
     await page.waitForTimeout(200 + workerCount * 20);
 
-    // Key generation in a separate evaluate — Endpoint is now fully initialised.
+    // Key generation in a separate evaluate - Endpoint is now fully initialised.
     const userKeys = await page.evaluate(async () => {
         const cryptoApi = await window.Endpoint.createCryptoApi();
         const privKey = await cryptoApi.generatePrivateKey();
@@ -428,7 +428,7 @@ async function measureSendMessages(
             const Endpoint = window.Endpoint;
             // Yield to the event loop so any pending WASM async-engine error
             // callbacks (queued via setTimeout during callMain) fire before
-            // connect() — in Firefox these can outlive the post-setup wait.
+            // connect() - in Firefox these can outlive the post-setup wait.
             await new Promise((r) => setTimeout(r, 50));
             const connection = await Endpoint.connect(privKey, solutionId, bridgeUrl);
             const threadApi = await Endpoint.createThreadApi(connection);
@@ -472,11 +472,11 @@ test.describe("CoreTest: Worker count", () => {
         test.setTimeout(90_000);
         const times: Record<string, number> = {};
 
-        await test.step("2 workers — baseline", async () => {
+        await test.step("2 workers - baseline", async () => {
             times["2w"] = await measureSendMessages(page, cli, backend.bridgeUrl, 2, MESSAGE_COUNT);
         });
 
-        await test.step("4 workers — default", async () => {
+        await test.step("4 workers - default", async () => {
             times["4w"] = await measureSendMessages(page, cli, backend.bridgeUrl, 4, MESSAGE_COUNT);
         });
 

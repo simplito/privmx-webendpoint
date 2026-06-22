@@ -54,7 +54,7 @@ export interface ConnectionServices {
  *
  * Obtain an instance via {@link EndpointFactory.connect} (full, key-based
  * session) or {@link EndpointFactory.connectPublic} (guest session for sending
- * Inbox entries) — do not construct it directly.
+ * Inbox entries) - do not construct it directly.
  *
  * ## Workflow
  * {@link EndpointFactory.setup} → {@link EndpointFactory.connect} →
@@ -76,7 +76,7 @@ export class Connection extends BaseApi {
 
     /**
      * Used by the IoC factories to register a freshly built API's
-     * native pointer for teardown on disconnect — not part of the public API.
+     * native pointer for teardown on disconnect - not part of the public API.
      * //doc-gen:ignore
      * @internal
      */
@@ -87,7 +87,7 @@ export class Connection extends BaseApi {
     }
 
     /**
-     * Guards against double-registering an API on one connection — not
+     * Guards against double-registering an API on one connection - not
      * part of the public API.
      * //doc-gen:ignore
      * @internal
@@ -98,7 +98,7 @@ export class Connection extends BaseApi {
 
     /**
      * Created by {@link EndpointFactory.connect} /
-     * {@link EndpointFactory.connectPublic} — never constructed by SDK users.
+     * {@link EndpointFactory.connectPublic} - never constructed by SDK users.
      * @internal
      */
     constructor(
@@ -112,7 +112,7 @@ export class Connection extends BaseApi {
     /**
      * Returns the numeric identifier of this connection inside the WASM core.
      *
-     * The ID is assigned locally when the connection is established — no server
+     * The ID is assigned locally when the connection is established - no server
      * round-trip happens here.
      *
      * Use it to correlate connection-scoped events (`Event.connectionId`) with
@@ -133,8 +133,8 @@ export class Connection extends BaseApi {
      * Fetches the list from the Bridge; Context metadata is server-side
      * administrative data, so no decryption is involved.
      *
-     * A Context ID is the entry point for all content APIs — e.g.
-     * `ThreadApi.createThread(contextId, …)` or `StoreApi.listStores(contextId, …)` —
+     * A Context ID is the entry point for all content APIs - e.g.
+     * `ThreadApi.createThread(contextId, …)` or `StoreApi.listStores(contextId, …)` -
      * so this is typically one of the first calls after {@link EndpointFactory.connect}.
      *
      * @param {PagingQuery} pagingQuery pagination and sorting; start with
@@ -151,7 +151,7 @@ export class Connection extends BaseApi {
      * Lists the users registered in the given Context together with their
      * public keys.
      *
-     * Fetches the membership list from the Bridge — user IDs and public keys
+     * Fetches the membership list from the Bridge - user IDs and public keys
      * are not secret, the server stores them in plaintext.
      *
      * Use it to build the `users`/`managers` arrays (`UserWithPubKey[]`)
@@ -186,7 +186,7 @@ export class Connection extends BaseApi {
      * @param {string[]} subscriptionQueries query strings produced by
      *   {@link buildSubscriptionQuery}; hand-written strings are not supported
      * @returns {string[]} subscription IDs, index-aligned with
-     *   `subscriptionQueries` — keep them to {@link unsubscribeFrom} later
+     *   `subscriptionQueries` - keep them to {@link unsubscribeFrom} later
      */
     async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
         return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
@@ -212,13 +212,13 @@ export class Connection extends BaseApi {
      * events (e.g. "all custom Context events in Context X").
      *
      * The query is assembled locally by the WASM core in the server's expected
-     * format — nothing is sent yet; pass the result to {@link subscribeFor} to
+     * format - nothing is sent yet; pass the result to {@link subscribeFor} to
      * activate it.
      *
      * @param {ConnectionEventType} eventType which Context event class to listen for
      * @param {ConnectionEventSelectorType} selectorType what `selectorId` refers to
      *   (e.g. a whole Context), narrowing the event scope
-     * @param {string} selectorId ID of the selected scope — for a Context
+     * @param {string} selectorId ID of the selected scope - for a Context
      *   selector this is `Context.contextId` from {@link listContexts}
      * @returns {string} query string consumed by {@link subscribeFor}
      */
@@ -237,7 +237,7 @@ export class Connection extends BaseApi {
     /**
      * Returns the Thread API (encrypted messaging) for this connection.
      *
-     * Convenience for `EndpointFactory.createThreadApi(connection)` — both
+     * Convenience for `EndpointFactory.createThreadApi(connection)` - both
      * resolve the same cached per-connection instance; no server round-trip
      * happens here.
      *
@@ -312,7 +312,7 @@ export class Connection extends BaseApi {
     /**
      * Returns the single {@link EventManager} for this connection. Subscribe to
      * events of any module (Threads, Stores, Inboxes, KVDBs, custom events, user
-     * and connection-state) through it — build entries with the typed
+     * and connection-state) through it - build entries with the typed
      * `create*Subscription` helpers and mix modules freely in one `subscribe()`.
      *
      * It is attached to the shared application-wide event loop (started on first
@@ -360,7 +360,7 @@ export class Connection extends BaseApi {
      * Closes the server session, then invalidates and deletes every API
      * instance created from this connection (ThreadApi, StoreApi, …, including
      * WebRTC stream sessions and the E2EE worker of StreamApi) inside the WASM
-     * module — equivalent C++ objects are freed, so no manual per-API cleanup
+     * module - equivalent C++ objects are freed, so no manual per-API cleanup
      * is needed.
      *
      * Call once when the user logs out or the application shuts down. This is
@@ -402,7 +402,7 @@ export class Connection extends BaseApi {
      * `false` are reported as unverified to the caller.
      *
      * Use it to defend against a malicious or compromised Bridge server
-     * substituting public keys — verify the key↔user binding in your
+     * substituting public keys - verify the key↔user binding in your
      * application server or a PKI. Set it right after
      * {@link EndpointFactory.connect}, before reading any container data.
      *

@@ -6,7 +6,7 @@ const CONTAINER_NAME_PREFIX = "privmx_e2e_worker_";
  * Removes all bridge containers spawned by the workerBackend fixture, including
  * stale ones left behind by a previous run that crashed or was SIGKILLed
  * (no in-process teardown can cover that case, so we sweep by name prefix).
- * Registered as both globalSetup and globalTeardown in playwright.config.ts.
+ * Registered as both globalSetup and globalTeardown in tests/playwright.config.ts.
  */
 export default function sweepBridgeContainers() {
     let ids: string[];
@@ -17,7 +17,7 @@ export default function sweepBridgeContainers() {
             .split("\n")
             .filter(Boolean);
     } catch {
-        // Docker unavailable — the fixtures will report a proper error when they need it.
+        // Docker unavailable - the fixtures will report a proper error when they need it.
         return;
     }
     if (ids.length === 0) return;

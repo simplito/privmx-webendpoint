@@ -1,15 +1,15 @@
 /**
- * MIMICKED BACKEND — stands in for your server.
+ * MIMICKED BACKEND - stands in for your server.
  *
- * ⚠️ In a real app this code runs on YOUR backend, because it uses the PrivMX
+ * WARNING: In a real app this code runs on YOUR backend, because it uses the PrivMX
  * Bridge **management API key**, which can administer your whole Solution and
  * must NEVER reach the browser. This example runs it in the browser only so the
- * demo needs no separate server process — `main.ts` imports `registerUser()` and
+ * demo needs no separate server process - `main.ts` imports `registerUser()` and
  * calls it directly instead of doing `fetch("/api/register-user")`.
  *
  * What a real backend does (and this mimics):
- *   1. `manager/auth` — exchange the API key for a short-lived Bearer token.
- *   2. `context/addUserToContext` — register a user's PUBLIC key in a Context.
+ *   1. `manager/auth` - exchange the API key for a short-lived Bearer token.
+ *   2. `context/addUserToContext` - register a user's PUBLIC key in a Context.
  * The browser generates its own private key and sends only the public key here.
  */
 
@@ -36,7 +36,7 @@ function requireConfig(): ServerConfig {
         .map(([k]) => `VITE_PRIVMX_${k.replace(/([A-Z])/g, "_$1").toUpperCase()}`);
     if (missing.length) {
         throw new Error(
-            `Backend not configured — set ${missing.join(", ")} in .env.local and restart \`npm run dev\`.`,
+            `Backend not configured - set ${missing.join(", ")} in .env.local and restart \`npm run dev\`.`,
         );
     }
     return cfg as ServerConfig;

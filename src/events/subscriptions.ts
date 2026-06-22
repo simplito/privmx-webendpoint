@@ -208,7 +208,7 @@ export interface UserEventSubscription {
 }
 /**
  * A connection-state subscription built by {@link createConnectionSubscription}.
- * Has no selector/id — it is matched purely by connection-state event type.
+ * Has no selector/id - it is matched purely by connection-state event type.
  */
 export interface ConnectionStatusSubscription {
     module: "connection";

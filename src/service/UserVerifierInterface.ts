@@ -21,13 +21,13 @@ export interface UserVerifierInterface {
      * Called by the WASM core with the senders of data being decrypted; the
      * verdicts flow back into the verification status reported alongside the
      * decrypted items. The implementation typically queries an external
-     * service — it may be `async` and is awaited.
+     * service - it may be `async` and is awaited.
      *
      * @param {VerificationRequest[]} request senders to verify; each item
      *   carries `contextId`, `senderId`, `senderPubKey` and the `date` the data
      *   was created
      * @returns {Promise<boolean[]>} one verdict per request item, in the same
-     *   order — `true` accepts the sender, `false` marks the data as coming
+     *   order - `true` accepts the sender, `false` marks the data as coming
      *   from an unverified key
      */
     verify(request: VerificationRequest[]): Promise<boolean[]>;

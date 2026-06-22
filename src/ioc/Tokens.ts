@@ -1,9 +1,9 @@
 /**
  * IoC container token registry.
  *
- * `global:` — created once during EndpointFactory.setup(), live for the application lifetime.
- * `conn:`   — created once per Connection (connect / connectPublic call), scoped to that connection.
- * `rtc:`    — created once per createStreamApi() call, scoped to that connection's stream session.
+ * `global:` - created once during EndpointFactory.setup(), live for the application lifetime.
+ * `conn:`   - created once per Connection (connect / connectPublic call), scoped to that connection.
+ * `rtc:`    - created once per createStreamApi() call, scoped to that connection's stream session.
  * @internal
  */
 export const T = {

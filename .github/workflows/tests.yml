@@ -88,6 +88,6 @@ jobs:
           sleep 15
 
       - name: Run e2e tests
-        run: npx playwright test --project=chromium --reporter=list
+        run: npx playwright test --config tests/playwright.config.ts --project=chromium --reporter=list
         env:
           CI: true

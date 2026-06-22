@@ -17,7 +17,7 @@ import { Event } from "../Types.js";
  * Blocking queue delivering server events (new messages, container changes,
  * connection state, …) to the application, one at a time.
  *
- * There is a single, global queue per application — obtain it via
+ * There is a single, global queue per application - obtain it via
  * {@link EndpointFactory.getEventQueue}; do not construct it directly. Events
  * arrive only for subjects you subscribed to first (e.g.
  * `ThreadApi.subscribeFor`, `Connection.subscribeFor`).
@@ -34,7 +34,7 @@ import { Event } from "../Types.js";
 export class EventQueue extends BaseApi implements AsyncIterable<Event> {
     private deferedPromise: Promise<Event> | null = null;
     /**
-     * Created by `EndpointFactory.getEventQueue()` — never
+     * Created by `EndpointFactory.getEventQueue()` - never
      * constructed by SDK users.
      * @internal
      */
@@ -98,7 +98,7 @@ export class EventQueue extends BaseApi implements AsyncIterable<Event> {
      * Injects an artificial "libBreak" event into the queue, causing the
      * pending (or next) {@link waitEvent} to resolve with it.
      *
-     * The event is generated locally in the WASM core — nothing is sent to the
+     * The event is generated locally in the WASM core - nothing is sent to the
      * server. Use it to wake up and terminate an event-processing loop
      * gracefully (it ends a `for await (… of queue)` loop), e.g. before
      * {@link Connection.disconnect}.

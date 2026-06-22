@@ -300,7 +300,7 @@ export class DataChannelCryptor {
 
 /**
  * Error thrown on data channel frame authentication, replay, or key-lookup
- * failure — carries a DataChannelCryptorDecryptStatus code.
+ * failure - carries a DataChannelCryptorDecryptStatus code.
  * @internal
  */
 export class DataChannelCryptorError extends Error {

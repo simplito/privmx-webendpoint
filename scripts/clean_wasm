@@ -21,7 +21,7 @@ remove "$PRIVMX_WEBENDPOINT_DRV_CRYPTO_SRC/build-emscripten"
 remove "$PRIVMX_WEBENDPOINT_DRV_ECC_SRC/build-emscripten"
 remove "$PRIVMX_WEBENDPOINT_DRV_NET_SRC/build-emscripten"
 
-# Third-party dependencies — each lives in dependency_sources/<name>/build-emscripten/
+# Third-party dependencies - each lives in dependency_sources/<name>/build-emscripten/
 for dep_dir in "$SOURCE_DIR"/*/; do
     remove "${dep_dir}build-emscripten"
 done

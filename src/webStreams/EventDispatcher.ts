@@ -12,7 +12,7 @@ export interface StateChangeEvent {
 }
 
 /**
- * Listener filter — restricts events to a single stream handle.
+ * Listener filter - restricts events to a single stream handle.
  * @internal
  */
 export interface StateChangeFilter {

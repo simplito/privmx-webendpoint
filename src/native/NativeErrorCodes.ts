@@ -11,7 +11,7 @@ limitations under the License.
 
 // Generated from the privmx-endpoint v2.7.4 C++ exception headers
 // (dependency_sources/privmx-endpoint-v2.7.4/endpoint/*/include_pub/**/*Exception.hpp).
-// Code layout: (scopeCode << 16) | specificCode — e.g. Store scope 0x0004,
+// Code layout: (scopeCode << 16) | specificCode - e.g. Store scope 0x0004,
 // FileVersionMismatch 0x0014 -> 0x40014. Regenerate when bumping the
 // privmx-endpoint version in build-manifest.sh.
 
@@ -25,12 +25,12 @@ limitations under the License.
  *         await storeApi.closeFile(handle);
  *     } catch (e) {
  *         if (e instanceof NativeError && e.code === StoreErrorCode.FILE_VERSION_MISMATCH) {
- *             // someone updated the file concurrently — re-open and retry
+ *             // someone updated the file concurrently - re-open and retry
  *         }
  *     }
  *
  * Note: the Kvdb and Event modules share the same numeric scope (0x0009) in
- * privmx-endpoint v2.7.4 — disambiguate with `NativeError.scope` when
+ * privmx-endpoint v2.7.4 - disambiguate with `NativeError.scope` when
  * handling bare numbers.
  */
 

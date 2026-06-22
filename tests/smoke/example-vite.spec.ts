@@ -6,7 +6,7 @@ import { test, expect } from "@playwright/test";
  * zero-config `/auto` entry) and asserts the WASM core initialises in a real
  * bundler + browser.
  *
- * This is the guard for regressions that unit tests can't see — e.g. a CommonJS
+ * This is the guard for regressions that unit tests can't see - e.g. a CommonJS
  * dependency that breaks under ESM, a `sideEffects` setting that tree-shakes the
  * worker, or an asset URL that no longer resolves. All of those surface here as
  * either a thrown error or the absence of the "initialised" log line.

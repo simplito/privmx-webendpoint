@@ -15,7 +15,7 @@ import { EventsEventSelectorType, UserWithPubKey } from "../Types.js";
 
 export class EventApi extends BaseApi {
     /**
-     * Created by {@link EndpointFactory.createEventApi} — never
+     * Created by {@link EndpointFactory.createEventApi} - never
      * constructed by SDK users.
      * @internal
      */

@@ -1,5 +1,5 @@
 /**
- * AES-256 ECB and CBC (no-padding) — the two modes EmCrypto implements
+ * AES-256 ECB and CBC (no-padding) - the two modes EmCrypto implements
  * with @noble/ciphers (the rest go through WebCrypto). Verified against the
  * authoritative NIST SP 800-38A test vectors, plus encrypt→decrypt round-trips.
  *
@@ -12,7 +12,7 @@ const hex = (s: string) => Uint8Array.from(s.match(/../g)!.map((b) => parseInt(b
 const toHex = (b: ArrayBuffer) =>
     [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 
-// NIST SP 800-38A, F.1.5 / F.2.5 — AES-256.
+// NIST SP 800-38A, F.1.5 / F.2.5 - AES-256.
 const KEY = hex("603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4");
 const IV = hex("000102030405060708090a0b0c0d0e0f");
 const PLAINTEXT_HEX = "6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e51";

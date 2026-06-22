@@ -1,7 +1,7 @@
 /**
  * Guards against drift between the embind exports declared in
  * webendpoint-cpp/src/Bindings.cpp and the hand-written TypeScript wrappers in
- * src/native/. The TS layer calls `this.api.lib.<Service>_<method>(…)` — a
+ * src/native/. The TS layer calls `this.api.lib.<Service>_<method>(…)` - a
  * call to a binding that no longer exists surfaces only at runtime as
  * "lib.X is not a function", so this test fails the build instead.
  */
@@ -65,7 +65,7 @@ describe("WASM bindings ↔ TypeScript wrappers", () => {
 
     test("report: bindings never called from TypeScript (informational)", () => {
         const unused = [...exported].filter((name) => !called.has(name));
-        // Not a failure — some bindings are reached via the worker or glue —
+        // Not a failure - some bindings are reached via the worker or glue -
         // but a sudden jump signals dead C++ surface worth pruning (issues/10).
         // eslint-disable-next-line no-console
         console.info(

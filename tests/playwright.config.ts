@@ -1,13 +1,20 @@
+import { fileURLToPath } from 'url';
 import { defineConfig, devices } from '@playwright/test';
-import type { WorkerOptions } from "./tests/fixtures";
+import type { WorkerOptions } from "./fixtures";
+
+// This config lives in tests/; paths below are relative to it. The harness +
+// packaged SDK are served from the repo root (specs navigate to /tests/...),
+// so the dev server's cwd is pinned one level up.
+const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
 export default defineConfig<WorkerOptions>({
-    testDir: './tests/specs',
-    globalSetup: './tests/dockerCleanup',
-    globalTeardown: './tests/dockerCleanup',
+    testDir: './specs',
+    globalSetup: './dockerCleanup',
+    globalTeardown: './dockerCleanup',
     workers: process.env.CI ? '100%' : undefined,
     webServer: {
         command: 'npx serve . -p 8080',
+        cwd: repoRoot,
         url: 'http://localhost:8080',
         reuseExistingServer: !process.env.CI,
     },

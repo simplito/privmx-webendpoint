@@ -69,7 +69,7 @@ describe("E2eeTransformManager", () => {
     // setupSenderTransform
     // -------------------------------------------------------------------------
 
-    describe("setupSenderTransform — RTCRtpScriptTransform available", () => {
+    describe("setupSenderTransform - RTCRtpScriptTransform available", () => {
         beforeEach(() => {
             testWindow.RTCRtpScriptTransform = vi.fn(function () {
                 return { _isTransform: true };
@@ -102,7 +102,7 @@ describe("E2eeTransformManager", () => {
         });
     });
 
-    describe("setupSenderTransform — EncodedStreams fallback", () => {
+    describe("setupSenderTransform - EncodedStreams fallback", () => {
         it("calls createEncodedStreams and posts encode to worker", async () => {
             const sender = makeSender();
             const { readable, writable } = sender.createEncodedStreams();
@@ -125,7 +125,7 @@ describe("E2eeTransformManager", () => {
     // setupReceiverTransform
     // -------------------------------------------------------------------------
 
-    describe("setupReceiverTransform — RTCRtpScriptTransform available", () => {
+    describe("setupReceiverTransform - RTCRtpScriptTransform available", () => {
         beforeEach(() => {
             testWindow.RTCRtpScriptTransform = vi.fn(function () {
                 return { _isTransform: true };
@@ -168,7 +168,7 @@ describe("E2eeTransformManager", () => {
         });
     });
 
-    describe("setupReceiverTransform — EncodedStreams fallback", () => {
+    describe("setupReceiverTransform - EncodedStreams fallback", () => {
         it("calls createEncodedStreams and posts decode to worker", async () => {
             const receiver = makeReceiver("track-enc");
             await manager.setupReceiverTransform(receiver, 99);

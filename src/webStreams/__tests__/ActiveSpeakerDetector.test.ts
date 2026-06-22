@@ -85,12 +85,12 @@ describe("ActiveSpeakerDetector", () => {
     });
 
     // -----------------------------------------------------------------------
-    // Hold-off — the key behaviour aligned with the Java PR.
+    // Hold-off - the key behaviour aligned with the Java PR.
     //
     // When speech stops, the speaker should remain active for holdMs (200 ms)
     // and then go silent.  The previous implementation tracked "activeSince"
     // which caused speakers to go *inactive* after 200 ms of *continuous*
-    // speech — the opposite of the intended behaviour.
+    // speech - the opposite of the intended behaviour.
     // -----------------------------------------------------------------------
     describe("holdMs (active period after speech ends)", () => {
         it("speaker stays active for holdMs after the last above-threshold frame", () => {
@@ -183,7 +183,7 @@ describe("ActiveSpeakerDetector", () => {
 
             frame(d, 1, ABOVE, 100); // speaker 1 speaks
 
-            // Process speaker 2 silently — the returned array contains both
+            // Process speaker 2 silently - the returned array contains both
             const states = frame(d, 2, NOISE_FLOOR, 100);
 
             expect(isActive(speaker(states, 1)!, 100)).toBe(true);
@@ -244,7 +244,7 @@ describe("ActiveSpeakerDetector", () => {
             frame(d, 1, NOISE_FLOOR, 0);
             d.removeSpeaker(1);
 
-            // Fresh frame for the same id — should create a new state entry
+            // Fresh frame for the same id - should create a new state entry
             const states = frame(d, 1, NOISE_FLOOR, 50);
             expect(speaker(states, 1)).toBeDefined();
             expect(isActive(speaker(states, 1)!, 50)).toBe(false);
@@ -291,7 +291,7 @@ describe("ActiveSpeakerDetector", () => {
             const stateBeforeSpeech = d.onFrame({ id: 1, rms: 1, timestamp: 1100 });
             const noiseFloorBefore = speaker(stateBeforeSpeech, 1)!.noiseFloor;
 
-            // Now speak loudly — noise floor must not be dragged up
+            // Now speak loudly - noise floor must not be dragged up
             for (let i = 0; i < 20; i++) {
                 d.onFrame({ id: 1, rms: 100, timestamp: 1200 + i * 10 });
             }
@@ -309,7 +309,7 @@ describe("ActiveSpeakerDetector", () => {
             frame(d, 1, NOISE_FLOOR, 0);
             frame(d, 1, ABOVE, 100); // lastAboveThresholdTs=100
 
-            // 10 001 ms after last speech — prune threshold exceeded
+            // 10 001 ms after last speech - prune threshold exceeded
             const states = frame(d, 1, NOISE_FLOOR, 10_101);
             expect(speaker(states, 1)).toBeUndefined();
         });
@@ -319,14 +319,14 @@ describe("ActiveSpeakerDetector", () => {
             frame(d, 1, NOISE_FLOOR, 0);
             frame(d, 1, ABOVE, 100);
 
-            // Exactly at the prune boundary (10 000 ms) — should still be present
+            // Exactly at the prune boundary (10 000 ms) - should still be present
             const states = frame(d, 1, NOISE_FLOOR, 10_100);
             expect(speaker(states, 1)).toBeDefined();
         });
 
         it("fresh speaker that has never spoken is not pruned (lastAboveThresholdTs = -Infinity)", () => {
             const d = makeDetector();
-            // Far-future timestamp — but the speaker has never spoken, so
+            // Far-future timestamp - but the speaker has never spoken, so
             // lastAboveThresholdTs = -Infinity and the guard skips it.
             const states = frame(d, 1, NOISE_FLOOR, 100_000);
             expect(speaker(states, 1)).toBeDefined();

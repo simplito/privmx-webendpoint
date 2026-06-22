@@ -31,7 +31,7 @@ export interface TransformContext {
 
 /**
  * Per-frame AES-256-GCM encrypt/decrypt for WebRTC encoded frames.
- * Pure crypto logic — no worker messaging, no module-level globals.
+ * Pure crypto logic - no worker messaging, no module-level globals.
  * @internal
  */
 export class EncryptTransform {

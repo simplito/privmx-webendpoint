@@ -74,8 +74,8 @@ Everything sensitive is encrypted in the browser before it reaches the network.
 Your private key authenticates you and decrypts data locally; **it never leaves the
 device**. The Bridge is effectively zero-knowledge about your plaintext.
 
-You bootstrap through **`Endpoint`** (the `EndpointFactory` static facade) —
-`setup` / `setupAuto`, `connect` / `connectPublic` — then create the per-feature
+You bootstrap through **`Endpoint`** (the `EndpointFactory` static facade) -
+`setup` / `setupAuto`, `connect` / `connectPublic` - then create the per-feature
 APIs straight off the connection: `connection.getThreadApi()`,
 `getStoreApi()`, `getInboxApi()`, `getKvdbApi()`, `getStreamApi()`,
 `getEventManager()`. (`Endpoint.createThreadApi(connection)` does the same thing
@@ -367,8 +367,8 @@ for await (const event of queue) {         // ends when queue.emitBreakEvent() f
 
 For a higher-level option, every connection exposes a **single event manager**
 (`connection.getEventManager()`) that runs the loop and dispatches to **typed**
-callbacks for you. Subscribe to events of any module — Threads, Stores, Inboxes,
-KVDBs, custom events, user/Context membership and connection-state — through the
+callbacks for you. Subscribe to events of any module - Threads, Stores, Inboxes,
+KVDBs, custom events, user/Context membership and connection-state - through the
 one `subscribe()` call, mixing modules freely:
 
 ```ts
@@ -403,7 +403,7 @@ Build each entry with the typed `create*Subscription` helper for the module you
 want (`createThreadSubscription`, `createStoreSubscription`,
 `createInboxSubscription`, `createKvdbSubscription`, `createEventSubscription`,
 `createUserEventSubscription`, `createConnectionSubscription`). `PrivmxClient`
-exposes the same single `getEventManager()` — see the [example](example/vite) and
+exposes the same single `getEventManager()` - see the [example](example/vite) and
 the API reference.
 
 ---

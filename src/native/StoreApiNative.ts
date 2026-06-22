@@ -22,7 +22,7 @@ import {
 import { BaseNative } from "./BaseNative.js";
 
 /**
- * Raw WASM wrapper for the C++ StoreApi — holds and forwards raw pointers.
+ * Raw WASM wrapper for the C++ StoreApi - holds and forwards raw pointers.
  * Use {@link StoreApi} (src/service) instead.
  * @internal
  */

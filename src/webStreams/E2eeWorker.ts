@@ -13,7 +13,7 @@ import {
  * and raw stream/transform posting.
  *
  * The worker is created lazily on the first call to `get()` and terminated by
- * `stop()`. Has no knowledge of `RTCRtpSender`/`RTCRtpReceiver` — all WebRTC
+ * `stop()`. Has no knowledge of `RTCRtpSender`/`RTCRtpReceiver` - all WebRTC
  * wiring is the responsibility of `E2eeTransformManager`.
  * @internal
  */
@@ -48,7 +48,7 @@ export class E2eeWorker {
             };
             this.worker.onerror = (e: ErrorEvent) => {
                 const err = new Error(
-                    `PrivMX E2EE worker error${e.message ? `: ${e.message}` : ""} — ` +
+                    `PrivMX E2EE worker error${e.message ? `: ${e.message}` : ""} - ` +
                         `verify that the worker is served from "${this.workerUrl}" ` +
                         "(assetsBasePath or workerUrl passed to EndpointFactory.setup()).",
                 );

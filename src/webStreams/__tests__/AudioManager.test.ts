@@ -119,7 +119,7 @@ describe("AudioManager", () => {
 
             const track = makeTrack("track-1");
             await manager.ensureLocalAudioLevelMeter(track);
-            await manager.ensureLocalAudioLevelMeter(track); // second call — same track
+            await manager.ensureLocalAudioLevelMeter(track); // second call - same track
 
             expect(initSpy).toHaveBeenCalledTimes(1);
             initSpy.mockRestore();

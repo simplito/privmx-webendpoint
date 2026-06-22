@@ -13,7 +13,7 @@ import * as Types from "../Types.js";
 import { ConnectionChannels, ConnectionStatusEventType } from "./subscriptions.js";
 
 /**
- * Anything the {@link EventLoop} fans incoming events out to — implemented by
+ * Anything the {@link EventLoop} fans incoming events out to - implemented by
  * {@link EventManager}.
  * @internal
  */
@@ -60,7 +60,7 @@ function normalizeConnectionEvent(e: Types.Event): Types.Event {
 /**
  * Application-wide engine that pulls events off the global {@link EventQueue}
  * and fans each one (after normalisation) to every registered
- * {@link EventManager}. One instance per application — created lazily by
+ * {@link EventManager}. One instance per application - created lazily by
  * `EndpointFactory.getEventLoop()`; not part of the public API.
  * @internal
  */
