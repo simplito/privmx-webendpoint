@@ -2,11 +2,13 @@
  * Service-layer unit tests: mock the native layer to verify argument marshalling,
  * post-disconnect invalidation, and the EventQueue/Connection orchestration.
  */
+import type { Mock } from "vitest";
 import { ThreadApi } from "../ThreadApi.js";
 import { StoreApi } from "../StoreApi.js";
 import { CryptoApi } from "../CryptoApi.js";
 import { EventQueue } from "../EventQueue.js";
 import { Connection } from "../Connection.js";
+import type { ConnectionServices } from "../Connection.js";
 import type { ThreadApiNative } from "../../native/ThreadApiNative.js";
 import type { StoreApiNative } from "../../native/StoreApiNative.js";
 import type { CryptoApiNative } from "../../native/CryptoApiNative.js";
@@ -15,10 +17,10 @@ import type { ConnectionNative } from "../../native/ConnectionNative.js";
 
 const PTR = 42;
 
-/** Builds a native-layer mock whose listed methods are jest.fn() resolving to `ret`. */
+/** Builds a native-layer mock whose listed methods are vi.fn() resolving to `ret`. */
 function nativeMock<T>(methods: string[], ret: unknown = undefined): T {
-    const obj: Record<string, jest.Mock> = {};
-    for (const m of methods) obj[m] = jest.fn().mockResolvedValue(ret);
+    const obj: Record<string, Mock> = {};
+    for (const m of methods) obj[m] = vi.fn().mockResolvedValue(ret);
     return obj as unknown as T;
 }
 
@@ -28,7 +30,7 @@ describe("ThreadApi argument marshalling", () => {
         "ok",
     );
     const api = new ThreadApi(native, PTR);
-    const m = native as unknown as Record<string, jest.Mock>;
+    const m = native as unknown as Record<string, Mock>;
 
     it("createThread forwards (ptr, [contextId, users, managers, publicMeta, privateMeta, policies])", async () => {
         const users = [{ userId: "u", pubKey: "p" }];
@@ -62,7 +64,7 @@ describe("StoreApi file workflow marshalling", () => {
         7,
     );
     const api = new StoreApi(native, PTR);
-    const m = native as unknown as Record<string, jest.Mock>;
+    const m = native as unknown as Record<string, Mock>;
 
     it("createFile defaults randomWriteSupport to false", async () => {
         const pub = new Uint8Array([1]);
@@ -90,7 +92,7 @@ describe("StoreApi file workflow marshalling", () => {
 describe("CryptoApi argument order", () => {
     const native = nativeMock<CryptoApiNative>(["signData", "derivePublicKey"], "x");
     const api = new CryptoApi(native, PTR);
-    const m = native as unknown as Record<string, jest.Mock>;
+    const m = native as unknown as Record<string, Mock>;
 
     it("signData forwards (ptr, [data, privateKey])", async () => {
         const data = new Uint8Array([1]);
@@ -108,14 +110,14 @@ describe("EventQueue", () => {
     it("waitEvent dedups concurrent calls into one native wait", async () => {
         let resolveNative: (e: unknown) => void = () => {};
         const native = {
-            waitEvent: jest.fn(() => new Promise((r) => (resolveNative = r))),
-            emitBreakEvent: jest.fn().mockResolvedValue(undefined),
+            waitEvent: vi.fn(() => new Promise((r) => (resolveNative = r))),
+            emitBreakEvent: vi.fn().mockResolvedValue(undefined),
         } as unknown as EventQueueNative;
         const queue = new EventQueue(native, PTR);
 
         const a = queue.waitEvent();
         const b = queue.waitEvent();
-        expect((native as unknown as Record<string, jest.Mock>).waitEvent).toHaveBeenCalledTimes(1);
+        expect((native as unknown as Record<string, Mock>).waitEvent).toHaveBeenCalledTimes(1);
 
         resolveNative({ type: "x" });
         expect(await a).toEqual({ type: "x" });
@@ -123,19 +125,20 @@ describe("EventQueue", () => {
 
         // After the in-flight wait settles, a fresh wait starts a new native call.
         queue.waitEvent();
-        expect((native as unknown as Record<string, jest.Mock>).waitEvent).toHaveBeenCalledTimes(2);
+        expect((native as unknown as Record<string, Mock>).waitEvent).toHaveBeenCalledTimes(2);
     });
 });
 
 describe("Connection teardown", () => {
     it("disconnect closes the session, frees registered APIs, then deletes the connection", async () => {
         const native = nativeMock<ConnectionNative>(["disconnect", "deleteConnection"]);
-        const connection = new Connection(native, PTR);
-        const m = native as unknown as Record<string, jest.Mock>;
+        // Services are unused on this path (no event manager is created).
+        const connection = new Connection(native, PTR, {} as unknown as ConnectionServices);
+        const m = native as unknown as Record<string, Mock>;
 
         // Register a fake API whose native + JS wrapper must be torn down.
-        const apiNative = { deleteApi: jest.fn().mockResolvedValue(undefined) };
-        const jsApi = { destroyRefs: jest.fn() };
+        const apiNative = { deleteApi: vi.fn().mockResolvedValue(undefined) };
+        const jsApi = { destroyRefs: vi.fn() };
         connection.registerApi("threads", 99, apiNative as never, jsApi as never);
 
         await connection.disconnect();

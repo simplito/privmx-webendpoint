@@ -1,3 +1,4 @@
+import type { Mock } from "vitest";
 import { AudioManager } from "../AudioManager.js";
 import { LOCAL_PUBLISHER_ID } from "../audio/ActiveSpeakerDetector.js";
 import { LocalAudioLevelMeter } from "../audio/LocalAudioLevelMeter.js";
@@ -24,10 +25,10 @@ class FakeMediaStreamAudioSourceNode {
 class FakeAudioContext {
     destination = {};
     audioWorklet = {
-        addModule: jest.fn().mockResolvedValue(undefined),
+        addModule: vi.fn().mockResolvedValue(undefined),
     };
-    resume = jest.fn().mockResolvedValue(undefined);
-    close = jest.fn();
+    resume = vi.fn().mockResolvedValue(undefined);
+    close = vi.fn();
     createGain() {
         return new FakeGainNode();
     }
@@ -51,23 +52,23 @@ function makeTrack(id: string, kind: "audio" | "video" = "audio"): MediaStreamTr
         kind,
         enabled: true,
         getSettings: () => ({}),
-        addEventListener: jest.fn(),
-        removeEventListener: jest.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
     } as unknown as MediaStreamTrack;
 }
 
 describe("AudioManager", () => {
-    let onRmsForWorker: jest.Mock;
+    let onRmsForWorker: Mock;
     let manager: AudioManager;
 
     beforeEach(() => {
-        onRmsForWorker = jest.fn();
+        onRmsForWorker = vi.fn();
         manager = new AudioManager("/assets/rms-processor.js", onRmsForWorker);
     });
 
     describe("setAudioLevelCallback", () => {
         it("registers the callback so onRemoteFrameRms fires it", () => {
-            const cb = jest.fn();
+            const cb = vi.fn();
             manager.setAudioLevelCallback(cb);
             manager.onRemoteFrameRms(42, 0.5);
             expect(cb).toHaveBeenCalledTimes(1);
@@ -75,7 +76,7 @@ describe("AudioManager", () => {
         });
 
         it("does not fire the callback before it is registered", () => {
-            const cb = jest.fn();
+            const cb = vi.fn();
             manager.onRemoteFrameRms(1, 0.9); // no callback yet
             manager.setAudioLevelCallback(cb);
             expect(cb).not.toHaveBeenCalled();
@@ -84,7 +85,7 @@ describe("AudioManager", () => {
 
     describe("onRemoteFrameRms", () => {
         it("passes RMS and publisherId to the active speaker detector", () => {
-            const cb = jest.fn();
+            const cb = vi.fn();
             manager.setAudioLevelCallback(cb);
 
             manager.onRemoteFrameRms(7, 0.8);
@@ -93,7 +94,7 @@ describe("AudioManager", () => {
         });
 
         it("always feeds LOCAL_PUBLISHER_ID (local) into the detector before the remote frame", () => {
-            const cb = jest.fn();
+            const cb = vi.fn();
             manager.setAudioLevelCallback(cb);
             manager.onRemoteFrameRms(5, 0.1);
             const result = cb.mock.calls[0][0];
@@ -112,7 +113,7 @@ describe("AudioManager", () => {
 
     describe("ensureLocalAudioLevelMeter", () => {
         it("does not add a second meter for the same track", async () => {
-            const initSpy = jest
+            const initSpy = vi
                 .spyOn(LocalAudioLevelMeter.prototype, "init")
                 .mockResolvedValue(undefined);
 
@@ -125,10 +126,10 @@ describe("AudioManager", () => {
         });
 
         it("removes the meter if init throws and allows retry", async () => {
-            const initSpy = jest
+            const initSpy = vi
                 .spyOn(LocalAudioLevelMeter.prototype, "init")
                 .mockRejectedValue(new Error("worklet load failed"));
-            const stopSpy = jest
+            const stopSpy = vi
                 .spyOn(LocalAudioLevelMeter.prototype, "stop")
                 .mockReturnValue(undefined);
 
@@ -148,7 +149,7 @@ describe("AudioManager", () => {
         it("forwards enabled-track RMS to onRmsForWorker", async () => {
             let capturedOnLevel: ((rms: number) => void) | undefined;
 
-            const initSpy = jest
+            const initSpy = vi
                 .spyOn(LocalAudioLevelMeter.prototype, "init")
                 .mockImplementation(async function (this: LocalAudioLevelMeter) {
                     capturedOnLevel = (this as unknown as { onLevel: (rms: number) => void })
@@ -166,7 +167,7 @@ describe("AudioManager", () => {
         it("reports silence to worker when track is disabled", async () => {
             let capturedOnLevel: ((rms: number) => void) | undefined;
 
-            const initSpy = jest
+            const initSpy = vi
                 .spyOn(LocalAudioLevelMeter.prototype, "init")
                 .mockImplementation(async function (this: LocalAudioLevelMeter) {
                     capturedOnLevel = (this as unknown as { onLevel: (rms: number) => void })
@@ -185,10 +186,10 @@ describe("AudioManager", () => {
 
     describe("stopLocalAudioLevelMeter (after adding)", () => {
         it("calls stop() on the meter and allows re-adding the same track", async () => {
-            const stopSpy = jest
+            const stopSpy = vi
                 .spyOn(LocalAudioLevelMeter.prototype, "stop")
                 .mockReturnValue(undefined);
-            jest.spyOn(LocalAudioLevelMeter.prototype, "init").mockResolvedValue(undefined);
+            vi.spyOn(LocalAudioLevelMeter.prototype, "init").mockResolvedValue(undefined);
 
             const track = makeTrack("track-stop");
             await manager.ensureLocalAudioLevelMeter(track);

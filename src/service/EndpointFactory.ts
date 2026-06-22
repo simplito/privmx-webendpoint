@@ -14,6 +14,7 @@ import { ConnectionNative } from "../native/ConnectionNative.js";
 import { FinalizationHelper } from "../FinalizationHelper.js";
 import { PKIVerificationOptions } from "../Types.js";
 import { Connection } from "./Connection.js";
+import type { ConnectionServices } from "./Connection.js";
 import { CryptoApi } from "./CryptoApi.js";
 import { EventApi } from "./EventApi.js";
 import { EventQueue } from "./EventQueue.js";
@@ -27,6 +28,7 @@ import { T, ResolvedAssetUrls } from "../ioc/Tokens.js";
 import { registerGlobalServices, registerConnectionServices } from "../ioc/buildConnectionApis.js";
 import { setGlobalEmCrypto } from "../crypto/index.js";
 import { ExtKey } from "./ExtKey.js";
+import { EventLoop } from "../events/EventLoop.js";
 
 /**
  * //doc-gen:ignore
@@ -117,9 +119,23 @@ export class EndpointFactory {
     private static api: Api;
     // Cached so concurrent/repeated setup() calls share one WASM load.
     private static setupPromise: Promise<void> | undefined;
+    // App-wide event loop, started lazily on first use and shared by all consumers.
+    private static eventLoop: Promise<EventLoop> | undefined;
 
     // WeakMap so containers are GC-eligible when their Connection is dropped.
     private static readonly connectionContainers = new WeakMap<Connection, ConnectionContainer>();
+
+    // Service closures injected into every Connection so it resolves its APIs /
+    // event loop without importing this factory (breaks the import cycle).
+    private static readonly connectionServices: ConnectionServices = {
+        createThreadApi: (c) => EndpointFactory.createThreadApi(c),
+        createStoreApi: (c) => EndpointFactory.createStoreApi(c),
+        createInboxApi: (c) => EndpointFactory.createInboxApi(c),
+        createKvdbApi: (c) => EndpointFactory.createKvdbApi(c),
+        createEventApi: (c) => EndpointFactory.createEventApi(c),
+        createStreamApi: (c) => EndpointFactory.createStreamApi(c),
+        getEventLoop: () => EndpointFactory.getEventLoop(),
+    };
 
     /**
      * Loads the Endpoint's WebAssembly assets and initializes the library. Must
@@ -169,6 +185,22 @@ export class EndpointFactory {
             });
         }
         return this.setupPromise;
+    }
+
+    /**
+     * Guards calls that require an initialised WASM core. Throws a clear error
+     * when {@link setup} / `setupAuto` was never started, and otherwise waits
+     * for an in-flight setup to finish so callers never race initialisation.
+     * @internal
+     */
+    private static async ensureSetup(): Promise<void> {
+        if (!this.setupPromise) {
+            throw new Error(
+                "PrivMX Endpoint is not initialized. Call (and await) EndpointFactory.setup() " +
+                    "or setupAuto() before connect()/connectPublic().",
+            );
+        }
+        await this.setupPromise;
     }
 
     private static async doSetup(options?: string | EndpointSetupOptions): Promise<void> {
@@ -288,14 +320,35 @@ export class EndpointFactory {
      * call only resolves the singleton wrapper (no server round-trip).
      *
      * Use it after subscribing to events (e.g. `ThreadApi.subscribeFor`) and
-     * drive it with {@link EventQueue.waitEvent} — or let the `/extra`
-     * `EventManager.startEventLoop()` consume it for you.
+     * drive it with {@link EventQueue.waitEvent} — or let
+     * {@link getEventManager} run the loop and dispatch typed callbacks for you.
      *
      * @returns {EventQueue} the global event queue singleton (same instance on
      *   every call)
      */
     static async getEventQueue(): Promise<EventQueue> {
         return this.globalContainer.resolve<EventQueue>(T.EventQueue);
+    }
+
+    /**
+     * Returns the application-wide event loop — the single running consumer of
+     * the global {@link EventQueue} that dispatches incoming server events to the
+     * per-connection {@link EventManager}s (`connection.getEventManager()`).
+     *
+     * Started lazily on the first call and reused thereafter (one loop per
+     * application). Internal plumbing — applications use
+     * `connection.getEventManager()` instead.
+     * @internal
+     * @returns {EventLoop} the shared, already-running event loop
+     */
+    static async getEventLoop(): Promise<EventLoop> {
+        if (!this.eventLoop) {
+            this.eventLoop = (async () => {
+                const queue = await this.getEventQueue();
+                return EventLoop.start(queue);
+            })();
+        }
+        return this.eventLoop;
     }
 
     /**
@@ -378,6 +431,7 @@ export class EndpointFactory {
         bridgeUrl: string,
         verificationOptions?: PKIVerificationOptions,
     ): Promise<Connection> {
+        await this.ensureSetup();
         const nativeApi = new ConnectionNative(this.api);
         const ptr = await nativeApi.newConnection();
         await nativeApi.connect(ptr, [
@@ -387,7 +441,7 @@ export class EndpointFactory {
             verificationOptions || this.generateDefaultPKIVerificationOptions(),
         ]);
 
-        return new Connection(nativeApi, ptr);
+        return new Connection(nativeApi, ptr, this.connectionServices);
     }
 
     /**
@@ -421,6 +475,7 @@ export class EndpointFactory {
         bridgeUrl: string,
         verificationOptions?: PKIVerificationOptions,
     ): Promise<Connection> {
+        await this.ensureSetup();
         const nativeApi = new ConnectionNative(this.api);
         const ptr = await nativeApi.newConnection();
         await nativeApi.connectPublic(ptr, [
@@ -428,7 +483,7 @@ export class EndpointFactory {
             bridgeUrl,
             verificationOptions || this.generateDefaultPKIVerificationOptions(),
         ]);
-        return new Connection(nativeApi, ptr);
+        return new Connection(nativeApi, ptr, this.connectionServices);
     }
 
     /**
@@ -483,15 +538,24 @@ export class EndpointFactory {
      * @param {Connection} connection connection returned by {@link connect} or
      *   {@link connectPublic}; the API stops working (throws) after
      *   `connection.disconnect()`
-     * @param {ThreadApi} [_threadApi] ignored — kept for a backwards-compatible
-     *   signature, resolved internally instead
-     * @param {StoreApi} [_storeApi] ignored — kept for a backwards-compatible
-     *   signature, resolved internally instead
+     * @returns {InboxApi} the per-connection InboxApi instance
+     */
+    static async createInboxApi(connection: Connection): Promise<InboxApi>;
+    /**
+     * @param {Connection} connection connection returned by {@link connect} or
+     *   {@link connectPublic}
+     * @param {ThreadApi} [_threadApi] ignored — resolved internally instead
+     * @param {StoreApi} [_storeApi] ignored — resolved internally instead
      * @returns {InboxApi} the per-connection InboxApi instance
      * @deprecated The `_threadApi` and `_storeApi` arguments are ignored and
      *   will be removed in the next major release — call
      *   `createInboxApi(connection)` with the connection only.
      */
+    static async createInboxApi(
+        connection: Connection,
+        _threadApi?: ThreadApi,
+        _storeApi?: StoreApi,
+    ): Promise<InboxApi>;
     static async createInboxApi(
         connection: Connection,
         _threadApi?: ThreadApi,
@@ -555,13 +619,18 @@ export class EndpointFactory {
      *
      * @param {Connection} connection connection returned by {@link connect};
      *   the API stops working (throws) after `connection.disconnect()`
-     * @param {EventApi} [_eventApi] ignored — kept for a backwards-compatible
-     *   signature, resolved internally instead
+     * @returns {StreamApi} the per-connection StreamApi instance
+     */
+    static async createStreamApi(connection: Connection): Promise<StreamApi>;
+    /**
+     * @param {Connection} connection connection returned by {@link connect}
+     * @param {EventApi} [_eventApi] ignored — resolved internally instead
      * @returns {StreamApi} the per-connection StreamApi instance
      * @deprecated The `_eventApi` argument is ignored and will be removed in the
      *   next major release — call `createStreamApi(connection)` with the
      *   connection only.
      */
+    static async createStreamApi(connection: Connection, _eventApi?: EventApi): Promise<StreamApi>;
     static async createStreamApi(connection: Connection, _eventApi?: EventApi): Promise<StreamApi> {
         return this.getConnectionContainer(connection).resolve<StreamApi>(T.StreamApi);
     }

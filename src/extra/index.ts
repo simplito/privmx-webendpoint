@@ -7,8 +7,10 @@ import { FileUploader, StreamReader, downloadFile } from "./files.js";
 import { PrivmxClient } from "./PrivmxClient.js";
 import { PublicConnection } from "./PublicConnection.js";
 
-export { EventManager } from "./events.js";
+// Event infrastructure now lives in the core `../events` module; re-exported
+// here for backwards compatibility with `@simplito/privmx-webendpoint/extra`.
 export {
+    EventManager,
     createInboxSubscription,
     createThreadSubscription,
     createConnectionSubscription,
@@ -16,11 +18,9 @@ export {
     createKvdbSubscription,
     createStoreSubscription,
     createEventSubscription,
-    EventCallback,
-    Subscription,
     ConnectionStatusEventType,
-    ConnectionSubscription,
-} from "./subscriptions.js";
+} from "../events/index.js";
+export type { EventCallback, EventSubscription } from "../events/index.js";
 
 export {
     Files,

@@ -21,6 +21,31 @@ import {
 } from "../Types.js";
 import { BaseNative } from "../native/BaseNative.js";
 import { UserVerifierInterface } from "./UserVerifierInterface.js";
+import type { ThreadApi } from "./ThreadApi.js";
+import type { StoreApi } from "./StoreApi.js";
+import type { InboxApi } from "./InboxApi.js";
+import type { KvdbApi } from "./KvdbApi.js";
+import type { EventApi } from "./EventApi.js";
+import type { StreamApi } from "./StreamApi.js";
+import { EventManager, connectionStatusSubscriber } from "../events/EventManager.js";
+import type { EventLoop } from "../events/EventLoop.js";
+
+/**
+ * Per-connection services injected by {@link EndpointFactory} at construction,
+ * so {@link Connection} need not import the factory (breaking the cycle). Each
+ * `createXApi` resolves the connection's cached API instance; `getEventLoop`
+ * returns the shared application-wide event loop.
+ * @internal
+ */
+export interface ConnectionServices {
+    createThreadApi(connection: Connection): Promise<ThreadApi>;
+    createStoreApi(connection: Connection): Promise<StoreApi>;
+    createInboxApi(connection: Connection): Promise<InboxApi>;
+    createKvdbApi(connection: Connection): Promise<KvdbApi>;
+    createEventApi(connection: Connection): Promise<EventApi>;
+    createStreamApi(connection: Connection): Promise<StreamApi>;
+    getEventLoop(): Promise<EventLoop>;
+}
 
 /**
  * An authenticated session with a PrivMX Bridge server. All other APIs
@@ -44,6 +69,10 @@ export class Connection extends BaseApi {
     private apisRefs: { [apiId: string]: { _apiServicePtr: number } } = {};
     private nativeApisDeps: { [apiId: string]: BaseNative } = {};
     private jsApiInstances: { [apiId: string]: BaseApi } = {};
+
+    // The connection's single event manager, cached so repeated getEventManager()
+    // calls reuse one dispatcher registration on the shared app-wide event loop.
+    private eventManager?: Promise<EventManager>;
 
     /**
      * Used by the IoC factories to register a freshly built API's
@@ -75,6 +104,7 @@ export class Connection extends BaseApi {
     constructor(
         private native: ConnectionNative,
         ptr: number,
+        private services: ConnectionServices,
     ) {
         super(ptr);
     }
@@ -205,6 +235,125 @@ export class Connection extends BaseApi {
     }
 
     /**
+     * Returns the Thread API (encrypted messaging) for this connection.
+     *
+     * Convenience for `EndpointFactory.createThreadApi(connection)` — both
+     * resolve the same cached per-connection instance; no server round-trip
+     * happens here.
+     *
+     * @returns {Promise<ThreadApi>} the per-connection ThreadApi instance
+     */
+    getThreadApi(): Promise<ThreadApi> {
+        return this.services.createThreadApi(this);
+    }
+
+    /**
+     * Returns the Store API (encrypted file storage) for this connection.
+     *
+     * Convenience for `EndpointFactory.createStoreApi(connection)`; resolves the
+     * same cached per-connection instance.
+     *
+     * @returns {Promise<StoreApi>} the per-connection StoreApi instance
+     */
+    getStoreApi(): Promise<StoreApi> {
+        return this.services.createStoreApi(this);
+    }
+
+    /**
+     * Returns the Inbox API (one-way encrypted submissions) for this connection.
+     *
+     * Convenience for `EndpointFactory.createInboxApi(connection)`; resolves the
+     * same cached per-connection instance. Works on a guest connection from
+     * {@link EndpointFactory.connectPublic}.
+     *
+     * @returns {Promise<InboxApi>} the per-connection InboxApi instance
+     */
+    getInboxApi(): Promise<InboxApi> {
+        return this.services.createInboxApi(this);
+    }
+
+    /**
+     * Returns the KVDB API (encrypted key-value storage) for this connection.
+     *
+     * Convenience for `EndpointFactory.createKvdbApi(connection)`; resolves the
+     * same cached per-connection instance.
+     *
+     * @returns {Promise<KvdbApi>} the per-connection KvdbApi instance
+     */
+    getKvdbApi(): Promise<KvdbApi> {
+        return this.services.createKvdbApi(this);
+    }
+
+    /**
+     * Returns the Event API (custom encrypted Context events) for this connection.
+     *
+     * Convenience for `EndpointFactory.createEventApi(connection)`; resolves the
+     * same cached per-connection instance.
+     *
+     * @returns {Promise<EventApi>} the per-connection EventApi instance
+     */
+    getEventApi(): Promise<EventApi> {
+        return this.services.createEventApi(this);
+    }
+
+    /**
+     * Returns the Stream API (E2EE WebRTC audio/video) for this connection.
+     *
+     * Convenience for `EndpointFactory.createStreamApi(connection)`; resolves the
+     * same cached per-connection instance and wires up the WebRTC client stack on
+     * first use.
+     *
+     * @returns {Promise<StreamApi>} the per-connection StreamApi instance
+     */
+    getStreamApi(): Promise<StreamApi> {
+        return this.services.createStreamApi(this);
+    }
+
+    /**
+     * Returns the single {@link EventManager} for this connection. Subscribe to
+     * events of any module (Threads, Stores, Inboxes, KVDBs, custom events, user
+     * and connection-state) through it — build entries with the typed
+     * `create*Subscription` helpers and mix modules freely in one `subscribe()`.
+     *
+     * It is attached to the shared application-wide event loop (started on first
+     * use) and cached per connection, so repeated calls return the same manager
+     * (one dispatcher registration on the loop).
+     *
+     * @returns {Promise<EventManager>} the per-connection event manager
+     */
+    getEventManager(): Promise<EventManager> {
+        if (!this.eventManager) {
+            this.eventManager = (async () => {
+                const loop = await this.services.getEventLoop();
+                const connectionId = `${await this.getConnectionId()}`;
+                const manager = new EventManager((module) => {
+                    switch (module) {
+                        case "thread":
+                            return this.getThreadApi();
+                        case "store":
+                            return this.getStoreApi();
+                        case "inbox":
+                            return this.getInboxApi();
+                        case "kvdb":
+                            return this.getKvdbApi();
+                        case "event":
+                            return this.getEventApi();
+                        case "user":
+                            return this;
+                        case "connection":
+                            return connectionStatusSubscriber(connectionId);
+                        default:
+                            throw new Error(`Unknown event module: ${module}`);
+                    }
+                });
+                loop.register(manager);
+                return manager;
+            })();
+        }
+        return this.eventManager;
+    }
+
+    /**
      * Closes the session with the Bridge and releases all native resources of
      * this connection.
      *
@@ -220,9 +369,27 @@ export class Connection extends BaseApi {
      * {@link EndpointFactory.connect} is required to continue.
      */
     async disconnect(): Promise<void> {
+        await this.detachEventManager();
         await this.native.disconnect(this.servicePtr, []);
         await this.freeApis();
         await this.native.deleteConnection(this.servicePtr);
+    }
+
+    /**
+     * Removes this connection's event manager from the shared event loop so it
+     * stops receiving events and is no longer retained by the loop. No-op if no
+     * event manager was created. Runs before native teardown so a getConnectionId()
+     * still in flight (during manager construction) can complete.
+     * @internal
+     */
+    private async detachEventManager(): Promise<void> {
+        if (!this.eventManager) {
+            return;
+        }
+        const manager = await this.eventManager;
+        const loop = await this.services.getEventLoop();
+        loop.unregister(manager);
+        this.eventManager = undefined;
     }
 
     /**
@@ -246,6 +413,7 @@ export class Connection extends BaseApi {
     setUserVerifier(verifier: UserVerifierInterface): Promise<void> {
         return this.native.setUserVerifier(this.servicePtr, [this.servicePtr, verifier]);
     }
+
 
     private async freeApis() {
         for (const apiId in this.apisRefs) {

@@ -62,7 +62,7 @@ describe("RemoteStreamListenerRegistry", () => {
 
     describe("dispatchTrack", () => {
         it("calls onRemoteStreamTrack on matching listener", () => {
-            const onTrack = jest.fn();
+            const onTrack = vi.fn();
             registry.add({ streamRoomId: ROOM, streamId: sid(10), onRemoteStreamTrack: onTrack });
             const event = makeTrackEvent(10);
             registry.dispatchTrack(ROOM, event);
@@ -70,21 +70,21 @@ describe("RemoteStreamListenerRegistry", () => {
         });
 
         it("does not call listener registered for a different streamId", () => {
-            const onTrack = jest.fn();
+            const onTrack = vi.fn();
             registry.add({ streamRoomId: ROOM, streamId: sid(10), onRemoteStreamTrack: onTrack });
             registry.dispatchTrack(ROOM, makeTrackEvent(99));
             expect(onTrack).not.toHaveBeenCalled();
         });
 
         it("calls a wildcard listener (streamId undefined) for any streamId", () => {
-            const onTrack = jest.fn();
+            const onTrack = vi.fn();
             registry.add({ streamRoomId: ROOM, onRemoteStreamTrack: onTrack });
             registry.dispatchTrack(ROOM, makeTrackEvent(42));
             expect(onTrack).toHaveBeenCalledTimes(1);
         });
 
         it("does not call listeners registered under a different room", () => {
-            const onTrack = jest.fn();
+            const onTrack = vi.fn();
             registry.add({ streamRoomId: ROOM_2, onRemoteStreamTrack: onTrack });
             registry.dispatchTrack(ROOM, makeTrackEvent(1));
             expect(onTrack).not.toHaveBeenCalled();
@@ -100,8 +100,8 @@ describe("RemoteStreamListenerRegistry", () => {
         });
 
         it("calls both a specific and a wildcard listener when event matches", () => {
-            const specific = jest.fn();
-            const wildcard = jest.fn();
+            const specific = vi.fn();
+            const wildcard = vi.fn();
             registry.add({ streamRoomId: ROOM, streamId: sid(5), onRemoteStreamTrack: specific });
             registry.add({ streamRoomId: ROOM, onRemoteStreamTrack: wildcard });
             registry.dispatchTrack(ROOM, makeTrackEvent(5));
@@ -112,7 +112,7 @@ describe("RemoteStreamListenerRegistry", () => {
 
     describe("dispatchData", () => {
         it("calls onRemoteData on matching listener", () => {
-            const onData = jest.fn();
+            const onData = vi.fn();
             registry.add({ streamRoomId: ROOM, streamId: sid(7), onRemoteData: onData });
             const data = new Uint8Array([1, 2, 3]);
             registry.dispatchData(ROOM, 7, data, 0);
@@ -120,14 +120,14 @@ describe("RemoteStreamListenerRegistry", () => {
         });
 
         it("does not call listener for a different streamId", () => {
-            const onData = jest.fn();
+            const onData = vi.fn();
             registry.add({ streamRoomId: ROOM, streamId: sid(7), onRemoteData: onData });
             registry.dispatchData(ROOM, 99, new Uint8Array(), 0);
             expect(onData).not.toHaveBeenCalled();
         });
 
         it("calls wildcard listener for any streamId", () => {
-            const onData = jest.fn();
+            const onData = vi.fn();
             registry.add({ streamRoomId: ROOM, onRemoteData: onData });
             registry.dispatchData(ROOM, 55, new Uint8Array([9]), 1);
             expect(onData).toHaveBeenCalledTimes(1);
@@ -135,7 +135,7 @@ describe("RemoteStreamListenerRegistry", () => {
         });
 
         it("forwards the statusCode unchanged", () => {
-            const onData = jest.fn();
+            const onData = vi.fn();
             registry.add({ streamRoomId: ROOM, streamId: sid(2), onRemoteData: onData });
             registry.dispatchData(ROOM, 2, new Uint8Array(), 42);
             expect(onData).toHaveBeenCalledWith(expect.any(Uint8Array), 42);
@@ -146,7 +146,7 @@ describe("RemoteStreamListenerRegistry", () => {
         });
 
         it("does not call listeners in a different room", () => {
-            const onData = jest.fn();
+            const onData = vi.fn();
             registry.add({ streamRoomId: ROOM_2, streamId: sid(1), onRemoteData: onData });
             registry.dispatchData(ROOM, 1, new Uint8Array(), 0);
             expect(onData).not.toHaveBeenCalled();

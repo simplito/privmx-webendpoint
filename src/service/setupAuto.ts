@@ -9,13 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EndpointFactory } from "./service/EndpointFactory.js";
-
-/**
- * Zero-config entry point — re-exports {@link EndpointFactory} as `Endpoint` so
- * applications can `import { Endpoint, setupAuto } from "@simplito/privmx-webendpoint/auto"`.
- */
-export { EndpointFactory as Endpoint };
+import { EndpointFactory } from "./EndpointFactory.js";
 
 /**
  * Options for {@link setupAuto}.
@@ -29,18 +23,18 @@ export interface SetupAutoOptions {
     workerCount?: number;
 }
 
-const assetUrl = (file: string) => new URL(`../assets/${file}`, import.meta.url).href;
+const assetUrl = (file: string) => new URL(`../../assets/${file}`, import.meta.url).href;
 
 /**
  * Initializes the Endpoint with **zero manual asset handling** — the four WASM
  * runtime files are located automatically, so you never copy them into a public
  * directory or pass an `assetsBasePath`.
  *
- * Resolves each asset with `new URL("../assets/<file>", import.meta.url)`,
+ * Resolves each asset with `new URL("../../assets/<file>", import.meta.url)`,
  * which a bundler (Vite, webpack 5, Rollup, Parcel, Next) graph-includes,
  * fingerprints, and serves; the resolved URLs are then handed to
  * {@link EndpointFactory.setup} (`wasmUrl` is wired through the Emscripten
- * module's `locateFile`, the worker/worklet via their own URLs). This entry is
+ * module's `locateFile`, the worker/worklet via their own URLs). It is
  * **ESM-only** because it relies on `import.meta.url`.
  *
  * Use it instead of {@link EndpointFactory.setup} in any bundled web app — it is
@@ -54,7 +48,7 @@ const assetUrl = (file: string) => new URL(`../assets/${file}`, import.meta.url)
  * @throws {Error} when an asset fails to load, or when called outside a browser
  *   environment (same conditions as {@link EndpointFactory.setup})
  * @example
- * import { Endpoint, setupAuto } from "@simplito/privmx-webendpoint/auto";
+ * import { Endpoint, setupAuto } from "@simplito/privmx-webendpoint";
  *
  * await setupAuto();
  * const connection = await Endpoint.connect(userPrivKey, solutionId, bridgeUrl);

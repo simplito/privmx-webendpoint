@@ -4,6 +4,7 @@
  * message (and allow retry), per-asset URL overrides must be honored, and
  * non-browser environments must fail fast.
  */
+import type { Mock } from "vitest";
 import { EndpointFactory } from "../EndpointFactory.js";
 
 type ScriptStub = {
@@ -11,7 +12,7 @@ type ScriptStub = {
     src?: string;
     onload?: () => void;
     onerror?: () => void;
-    remove: jest.Mock;
+    remove: Mock;
 };
 
 describe("EndpointFactory.setup", () => {
@@ -24,7 +25,7 @@ describe("EndpointFactory.setup", () => {
             baseURI: "https://app.example/",
             getElementsByTagName: () => [{ appendChild: () => {} }],
             createElement: () => {
-                const script: ScriptStub = { remove: jest.fn() };
+                const script: ScriptStub = { remove: vi.fn() };
                 createdScripts.push(script);
                 return script;
             },

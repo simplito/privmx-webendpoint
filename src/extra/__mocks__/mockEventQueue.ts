@@ -1,4 +1,4 @@
-import { Types } from "../../index.js";
+import * as Types from "../../Types.js";
 // import {Channel} from "../../managers";
 
 export class MockEventQueue {

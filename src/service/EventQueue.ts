@@ -22,14 +22,16 @@ import { Event } from "../Types.js";
  * arrive only for subjects you subscribed to first (e.g.
  * `ThreadApi.subscribeFor`, `Connection.subscribeFor`).
  *
- * Most applications should not consume this class directly: the `/extra` event
- * managers (`EventManager.startEventLoop(queue)`, `PrivmxClient.getEventManager()`)
- * run the wait-loop for you and dispatch typed callbacks.
+ * Most applications should not consume this class directly: the connection's
+ * event manager (`connection.getEventManager()`) runs the wait-loop for you and
+ * dispatches typed callbacks.
  *
- * Typical manual loop: `subscribeFor(...)` → `while (running) { const e = await
- * queue.waitEvent(); … }` → `emitBreakEvent()` to stop the loop.
+ * For manual consumption it is async-iterable, so the typical loop is
+ * `subscribeFor(...)` → `for await (const event of queue) { … }` → call
+ * {@link emitBreakEvent} to end the loop. Alternatively drive {@link waitEvent}
+ * yourself.
  */
-export class EventQueue extends BaseApi {
+export class EventQueue extends BaseApi implements AsyncIterable<Event> {
     private deferedPromise: Promise<Event> | null = null;
     /**
      * Created by `EndpointFactory.getEventQueue()` — never
@@ -70,13 +72,36 @@ export class EventQueue extends BaseApi {
     }
 
     /**
+     * Async-iterates over incoming events so the queue can be consumed with
+     * `for await (const event of queue) { … }` instead of a manual
+     * {@link waitEvent} loop.
+     *
+     * Iteration ends when a break event is injected via {@link emitBreakEvent}:
+     * the `"libBreak"` event is consumed (not yielded), so the loop exits
+     * cleanly without a manual `break`. `break`ing out of the `for await` also
+     * stops it.
+     *
+     * @yields {Event} each server event as it arrives, until a break event ends
+     *   the loop
+     */
+    async *[Symbol.asyncIterator](): AsyncIterableIterator<Event> {
+        for (;;) {
+            const event = await this.waitEvent();
+            if (event.type === "libBreak") {
+                return;
+            }
+            yield event;
+        }
+    }
+
+    /**
      * Injects an artificial "libBreak" event into the queue, causing the
      * pending (or next) {@link waitEvent} to resolve with it.
      *
      * The event is generated locally in the WASM core — nothing is sent to the
      * server. Use it to wake up and terminate an event-processing loop
-     * gracefully, e.g. before {@link Connection.disconnect}; the `/extra`
-     * `EventManager.stopEventLoop()` uses this mechanism.
+     * gracefully (it ends a `for await (… of queue)` loop), e.g. before
+     * {@link Connection.disconnect}.
      * @returns {Promise<void>} resolves when the break event has been injected into the queue
      */
     async emitBreakEvent(): Promise<void> {

@@ -1,5 +1,5 @@
 import { Inboxes } from "./index.js";
-import { Connection, EndpointFactory, InboxApi, StoreApi, ThreadApi } from "../service/index.js";
+import { Connection, EndpointFactory, InboxApi } from "../service/index.js";
 
 import { InboxEntryPayload } from "./inbox.js";
 import { logger } from "../webStreams/Logger.js";
@@ -29,8 +29,6 @@ import { logger } from "../webStreams/Logger.js";
  * await client.disconnect();
  */
 export class PublicConnection {
-    private threadApi: Promise<ThreadApi> | null = null;
-    private storeApi: Promise<StoreApi> | null = null;
     private inboxApi: Promise<InboxApi> | null = null;
 
     /**
@@ -51,34 +49,6 @@ export class PublicConnection {
     }
 
     /**
-     * @description Gets the Thread API.
-     * @returns {Promise<ThreadApi>} A promise resolving to the Thread API.
-     */
-    private getThreadApi(): Promise<ThreadApi> {
-        if (!this.threadApi) {
-            this.threadApi = (() => {
-                const connection = this.getConnection();
-                return EndpointFactory.createThreadApi(connection);
-            })();
-        }
-        return this.threadApi;
-    }
-
-    /**
-     * @description Gets the Store API.
-     * @returns {Promise<StoreApi>} A promise resolving to the Store API.
-     */
-    private getStoreApi(): Promise<StoreApi> {
-        if (!this.storeApi) {
-            this.storeApi = (async () => {
-                const connection = this.getConnection();
-                return EndpointFactory.createStoreApi(connection);
-            })();
-        }
-        return this.storeApi;
-    }
-
-    /**
      * @description Gets the Inbox API.
      * @returns {Promise<InboxApi>} A promise resolving to the Inbox API.
      */
@@ -86,11 +56,7 @@ export class PublicConnection {
         if (!this.inboxApi) {
             this.inboxApi = (async () => {
                 const connection = this.getConnection();
-                return EndpointFactory.createInboxApi(
-                    connection,
-                    await this.getThreadApi(),
-                    await this.getStoreApi(),
-                );
+                return EndpointFactory.createInboxApi(connection);
             })();
         }
         return this.inboxApi;
@@ -103,8 +69,6 @@ export class PublicConnection {
     public async disconnect(): Promise<void> {
         try {
             await this.connection.disconnect();
-            this.threadApi = null;
-            this.storeApi = null;
             this.inboxApi = null;
         } catch (e) {
             logger.error("Error during disconnection:", e);

@@ -33,13 +33,50 @@ import {
     StreamApi,
     ExtKey,
     EventApi,
+    setupAuto,
 } from "./service/index.js";
 import * as Types from "./Types.js";
 import { setEndpointLogger } from "./webStreams/Logger.js";
 export type { LogLevelName, LogSink } from "./webStreams/Logger.js";
+export type { SetupAutoOptions } from "./service/index.js";
+
+// The single event manager + typed subscription helpers (core `./events` module).
+export {
+    EventManager,
+    createThreadSubscription,
+    createStoreSubscription,
+    createKvdbSubscription,
+    createInboxSubscription,
+    createEventSubscription,
+    createConnectionSubscription,
+    createUserEventSubscription,
+    ConnectionStatusEventType,
+} from "./events/index.js";
+export type {
+    Channel,
+    GenericEvent,
+    EventCallback,
+    EventModule,
+    EventSubscriber,
+    EventSubscription,
+    ThreadSubscription,
+    StoreSubscription,
+    InboxSubscription,
+    KvdbSubscription,
+    CustomEventSubscription,
+    UserEventSubscription,
+    ConnectionStatusSubscription,
+    ThreadCallbackPayload,
+    StoreCallbackPayload,
+    InboxCallbackPayload,
+    KvdbCallbackPayload,
+    UserEventCallbackPayload,
+    EventsCallbackPayload,
+} from "./events/index.js";
 
 export {
     EndpointFactory as Endpoint,
+    setupAuto,
     NativeError,
     setEndpointLogger,
     Types,

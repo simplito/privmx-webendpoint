@@ -4,11 +4,13 @@
     "outDir": "dist",
     "target": "ESNext",
     // nodenext: emit native ESM with explicit .js import extensions (the package is
-    // "type": "module"), and allow `import.meta` (used by the ./auto entry). Source
-    // relative imports therefore carry .js extensions. tsconfig.test.json overrides
-    // to CommonJS for the Jest/ts-jest runtime.
+    // "type": "module"), and allow `import.meta` (used by setupAuto). Source
+    // relative imports therefore carry .js extensions.
     "module": "nodenext",
     "moduleResolution": "nodenext",
+    // `node` for Node built-ins; `vitest/globals` for the test globals (describe,
+    // it, expect, vi, …) used by *.test.ts files under src.
+    "types": ["node", "vitest/globals"],
     "lib": [
       "es2015",
       "es2016",

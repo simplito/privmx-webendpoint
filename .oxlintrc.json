@@ -28,10 +28,11 @@
     "overrides": [
         {
             "files": ["**/*.test.ts", "**/__tests__/**", "**/__mocks__/**"],
-            "plugins": ["jest"],
+            "plugins": ["vitest"],
             "rules": {
-                "jest/expect-expect": "off",
-                "jest/require-to-throw-message": "off",
+                "vitest/expect-expect": "off",
+                "vitest/require-to-throw-message": "off",
+                "vitest/require-mock-type-parameters": "off",
                 "unicorn/consistent-function-scoping": "off",
                 "jsdoc/require-param": "off",
                 "jsdoc/require-returns": "off"

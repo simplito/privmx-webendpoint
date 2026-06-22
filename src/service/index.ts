@@ -10,9 +10,11 @@ import { Connection } from "./Connection.js";
 import { EventQueue } from "./EventQueue.js";
 import { BaseApi } from "./BaseApi.js";
 import { ExtKey } from "./ExtKey.js";
+import { setupAuto } from "./setupAuto.js";
 
 export {
     EndpointFactory,
+    setupAuto,
     ThreadApi,
     StoreApi,
     InboxApi,
@@ -25,3 +27,4 @@ export {
     ExtKey,
     EventApi,
 };
+export type { SetupAutoOptions } from "./setupAuto.js";

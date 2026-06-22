@@ -44,7 +44,8 @@ export class BaseApi {
     public get servicePtr() {
         if (this._servicePtr < 0) {
             throw new Error(
-                "This API instance is no longer valid because the connection associated with it has been closed.",
+                "This API instance is no longer valid: its connection has been disconnected. " +
+                    "Reconnect with EndpointFactory.connect() and obtain new API instances.",
             );
         }
         return this._servicePtr;

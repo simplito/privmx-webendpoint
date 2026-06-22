@@ -24,7 +24,8 @@ export abstract class BaseNative {
     get api(): Api {
         if (!this._api) {
             throw new Error(
-                "This API instance is no longer valid because the connection associated with it has been closed.",
+                "This API instance is no longer valid: its connection has been disconnected. " +
+                    "Reconnect with EndpointFactory.connect() and obtain new API instances.",
             );
         }
         return this._api;
@@ -37,11 +38,7 @@ export abstract class BaseNative {
     }
 
     protected async runAsync<T>(func: (taskId: number) => void) {
-        if (!this.api) {
-            throw new Error(
-                "This API instance is no longer valid because the connection associated with it has been closed.",
-            );
-        }
+        // `this.api` throws the invalidation error if the connection is gone.
         return this.api.runAsync<T>(func);
     }
 }

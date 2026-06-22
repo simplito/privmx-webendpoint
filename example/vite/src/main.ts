@@ -12,7 +12,7 @@
  *
  * Assets load via the zero-config `/auto` entry (`setupAuto`) — no manual copy.
  */
-import { Endpoint, setupAuto } from "@simplito/privmx-webendpoint/auto";
+import { Endpoint, setupAuto } from "@simplito/privmx-webendpoint";
 import { registerUser } from "./server";
 
 const logEl = document.getElementById("log") as HTMLPreElement;
