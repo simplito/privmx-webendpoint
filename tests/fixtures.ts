@@ -3,7 +3,11 @@ import { execSync } from "child_process";
 import { MongoClient, Db } from "mongodb";
 import * as path from "path";
 import * as fs from "fs";
+import { fileURLToPath } from "url";
 import { testData } from "./datasets/testData";
+
+// `__dirname` is not defined in ESM (the package is "type": "module").
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const COMPOSE_NETWORK = "tests_default";
 const COMPOSE_PROJECT = "tests";
