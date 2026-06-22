@@ -38,7 +38,6 @@ export abstract class BaseNative {
     }
 
     protected async runAsync<T>(func: (taskId: number) => void) {
-        // `this.api` throws the invalidation error if the connection is gone.
         return this.api.runAsync<T>(func);
     }
 }

@@ -9,6 +9,9 @@ const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
 export default defineConfig<WorkerOptions>({
     testDir: './specs',
+    // e2e drives a real Docker bridge + per-test WASM init; 30s (the default) is
+    // tight and flakes under CI load, so allow more headroom per test.
+    timeout: 60_000,
     globalSetup: './dockerCleanup',
     globalTeardown: './dockerCleanup',
     workers: process.env.CI ? '100%' : undefined,

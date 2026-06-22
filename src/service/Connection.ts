@@ -70,8 +70,6 @@ export class Connection extends BaseApi {
     private nativeApisDeps: { [apiId: string]: BaseNative } = {};
     private jsApiInstances: { [apiId: string]: BaseApi } = {};
 
-    // The connection's single event manager, cached so repeated getEventManager()
-    // calls reuse one dispatcher registration on the shared app-wide event loop.
     private eventManager?: Promise<EventManager>;
 
     /**

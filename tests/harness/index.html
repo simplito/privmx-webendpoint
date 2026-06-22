@@ -13,7 +13,10 @@
             : "../pkg/assets";
         window.Endpoint.setup(setupOptions).then(() => {
             console.log("SETUP OPTIONS", setupOptions)
-            window.wasmReady = true;
+            // Worker threads spawn asynchronously after setup() resolves; let them
+            // come up before the first WASM task to avoid stalls under CI load.
+            const settleMs = 200 + (workerCount ?? 4) * 20;
+            setTimeout(() => { window.wasmReady = true; }, settleMs);
         });
     </script>
 </body>

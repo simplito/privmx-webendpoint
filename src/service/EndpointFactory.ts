@@ -119,7 +119,6 @@ export class EndpointFactory {
     private static api: Api;
     // Cached so concurrent/repeated setup() calls share one WASM load.
     private static setupPromise: Promise<void> | undefined;
-    // App-wide event loop, started lazily on first use and shared by all consumers.
     private static eventLoop: Promise<EventLoop> | undefined;
 
     // WeakMap so containers are GC-eligible when their Connection is dropped.
