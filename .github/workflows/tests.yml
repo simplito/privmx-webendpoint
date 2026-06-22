@@ -68,7 +68,9 @@ jobs:
       - name: Pack SDK for the example
         run: npm pack
       - name: Install example dependencies
-        run: cd example/vite && npm install
+        # No committed lock (the local SDK tarball's hash changes every build);
+        # rm guards against a stray lock so npm resolves the fresh tarball.
+        run: cd example/vite && rm -f package-lock.json && npm install
       - name: Example build/smoke test
         run: npm run test:example
         env:

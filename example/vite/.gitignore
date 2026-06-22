@@ -3,3 +3,6 @@ dist
 .env.local
 .env.*.local
 *.tgz
+# Not committed: the SDK is installed from a locally-built file: tarball whose
+# hash changes every build, so a committed lock pins a stale integrity (EINTEGRITY).
+package-lock.json
