@@ -1,6 +1,6 @@
-import { Key } from "../Types";
-import { ConnectionType } from "./PeerConnectionManager";
-import { Jsep, StreamRoomId } from "./types/ApiTypes";
+import { Key } from "../Types.js";
+import { ConnectionType } from "./PeerConnectionManager.js";
+import { Jsep, StreamRoomId } from "./types/ApiTypes.js";
 
 export class UpdateKeysModel {
     streamRoomId: StreamRoomId;

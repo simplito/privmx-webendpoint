@@ -9,10 +9,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { assertIsNumber, assertIsUint8Array, assertArgsValid, assertIsString } from "./assert";
-import * as Types from "./Types";
-import * as Utils from "./Utils";
-import * as aesjs from "aes-js";
+import { assertIsNumber, assertIsUint8Array, assertArgsValid, assertIsString } from "./assert.js";
+import * as Types from "./Types.js";
+import * as Utils from "./Utils.js";
+import { ecb, cbc } from "@noble/ciphers/aes.js";
 import { ripemd160 as nobleRipemd160 } from "@noble/hashes/legacy.js";
 import { secp256k1 as secp } from "@noble/curves/secp256k1.js";
 
@@ -23,9 +23,7 @@ const subtle =
 
 const textEncoder = new TextEncoder();
 
-// ---------------------------------------------------------------------------
-// Byte helpers — replace every Buffer.* call with native Uint8Array ops
-// ---------------------------------------------------------------------------
+// Byte helpers (native Uint8Array ops, no Buffer).
 
 function concatBytes(...arrays: Uint8Array[]): Uint8Array {
     let total = 0;
@@ -63,9 +61,7 @@ function uint8ArrayEqual(a: Uint8Array, b: Uint8Array): boolean {
     return true;
 }
 
-// ---------------------------------------------------------------------------
-// BigInt helpers — replace BN.js with native bigint
-// ---------------------------------------------------------------------------
+// BigInt helpers (native bigint, no BN.js).
 
 function bytesToBigInt(bytes: Uint8Array): bigint {
     let n = 0n;
@@ -89,13 +85,16 @@ function bigIntToBytes(n: bigint, padToLength?: number): Uint8Array {
     return bytes;
 }
 
-// ---------------------------------------------------------------------------
-
 interface KeyRegistryEntry {
     key: CryptoKey;
     wipeAfterImport?: boolean;
 }
 
+/**
+ * Low-level crypto engine backing the WASM module and the E2EE worker
+ * (WebCrypto, @noble/curves, @noble/ciphers). Use {@link CryptoFacade} instead.
+ * @internal
+ */
 export class EmCrypto {
     static HASH_ALGORITHM_MAP: { [name: string]: string } = {
         sha1: "SHA-1",
@@ -338,8 +337,9 @@ export class EmCrypto {
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
         const keyCopy = new Uint8Array(params.key);
-        const aesEcb = new aesjs.ModeOfOperation.ecb(keyCopy);
-        const encryptedBytes = aesEcb.encrypt(new Uint8Array(params.data));
+        const encryptedBytes = ecb(keyCopy, { disablePadding: true }).encrypt(
+            new Uint8Array(params.data),
+        );
         keyCopy.fill(0);
         return Utils.toArrayBuffer(encryptedBytes);
     }
@@ -349,8 +349,9 @@ export class EmCrypto {
         assertIsUint8Array(params.data);
         assertIsUint8Array(params.key);
         const keyCopy = new Uint8Array(params.key);
-        const aesEcb = new aesjs.ModeOfOperation.ecb(keyCopy);
-        const decryptedBytes = aesEcb.decrypt(new Uint8Array(params.data));
+        const decryptedBytes = ecb(keyCopy, { disablePadding: true }).decrypt(
+            new Uint8Array(params.data),
+        );
         keyCopy.fill(0);
         return Utils.toArrayBuffer(decryptedBytes);
     }
@@ -385,8 +386,9 @@ export class EmCrypto {
         assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
         const keyCopy = new Uint8Array(params.key);
-        const aesCbc = new aesjs.ModeOfOperation.cbc(keyCopy, new Uint8Array(params.iv));
-        const encryptedBytes = aesCbc.encrypt(new Uint8Array(params.data));
+        const encryptedBytes = cbc(keyCopy, new Uint8Array(params.iv), {
+            disablePadding: true,
+        }).encrypt(new Uint8Array(params.data));
         keyCopy.fill(0);
         return Utils.toArrayBuffer(encryptedBytes);
     }
@@ -397,8 +399,9 @@ export class EmCrypto {
         assertIsUint8Array(params.key);
         assertIsUint8Array(params.iv);
         const keyCopy = new Uint8Array(params.key);
-        const aesCbc = new aesjs.ModeOfOperation.cbc(keyCopy, new Uint8Array(params.iv));
-        const decryptedBytes = aesCbc.decrypt(new Uint8Array(params.data));
+        const decryptedBytes = cbc(keyCopy, new Uint8Array(params.iv), {
+            disablePadding: true,
+        }).decrypt(new Uint8Array(params.data));
         keyCopy.fill(0);
         return Utils.toArrayBuffer(decryptedBytes);
     }

@@ -1,5 +1,5 @@
-import { CryptoFacade } from "../CryptoFacade";
-import { setGlobalEmCrypto } from "../index";
+import { CryptoFacade } from "../CryptoFacade.js";
+import { setGlobalEmCrypto } from "../index.js";
 
 describe("Crypto Robustness: Stale Handle Recovery", () => {
     beforeAll(async () => {

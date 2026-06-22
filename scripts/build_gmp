@@ -63,7 +63,7 @@ if [ ! -f Makefile ]; then
         CFLAGS="-Os" \
         CXXFLAGS="-Os"
 else
-    echo "Makefile exists — skipping configure."
+    echo "Makefile exists - skipping configure."
 fi
 
 echo "Running Make..."

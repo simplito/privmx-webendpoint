@@ -16,10 +16,10 @@ import {
     UpdateKeysModel,
     WebRtcInterface,
     WebRtcMethodCall,
-} from "./WebRtcInterface";
-import { ConnectionType, SessionId } from "./PeerConnectionManager";
-import { Jsep, StreamRoomId } from "./types/ApiTypes";
-import { WebRtcClient } from "./WebRtcClient";
+} from "./WebRtcInterface.js";
+import { ConnectionType, SessionId } from "./PeerConnectionManager.js";
+import { Jsep, StreamRoomId } from "./types/ApiTypes.js";
+import { WebRtcClient } from "./WebRtcClient.js";
 
 type MethodMap = {
     [K in WebRtcMethodCall["name"]]: (

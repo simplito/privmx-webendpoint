@@ -24,7 +24,7 @@ mkdir -p build-emscripten && cd build-emscripten
 if [ ! -f CMakeCache.txt ]; then
     emcmake cmake -DSECP256K1_ENABLE_MODULE_ECDH=ON -DCMAKE_BUILD_TYPE=Release ..
 else
-    echo "CMakeCache.txt exists — skipping cmake configure."
+    echo "CMakeCache.txt exists - skipping cmake configure."
 fi
 
 emmake make -j20

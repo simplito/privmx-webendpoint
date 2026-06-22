@@ -1,12 +1,13 @@
-import { StreamHandle } from "../Types";
-import { StreamRoomId, StreamTrack } from "./types/ApiTypes";
-import { PeerConnectionManager, SessionId } from "./PeerConnectionManager";
-import { AudioManager } from "./AudioManager";
-import { E2eeTransformManager } from "./E2eeTransformManager";
+import { StreamHandle } from "../Types.js";
+import { StreamRoomId, StreamTrack } from "./types/ApiTypes.js";
+import { PeerConnectionManager, SessionId } from "./PeerConnectionManager.js";
+import { AudioManager } from "./AudioManager.js";
+import { E2eeTransformManager } from "./E2eeTransformManager.js";
 
 /**
  * Manages the publisher-side peer connection for a single stream room:
  * track setup, audio metering, and E2EE sender transform installation.
+ * @internal
  */
 export class PublisherManager {
     constructor(

@@ -1,9 +1,22 @@
-import { StreamHandle } from "../Types";
-import { StreamRoomId } from "./types/ApiTypes";
+import { StreamHandle } from "../Types.js";
+import { logger } from "./Logger.js";
+import { StreamRoomId } from "./types/ApiTypes.js";
 
+/**
+ * Branded numeric Janus session ID.
+ * @internal
+ */
 export type SessionId = number & { _sessionId: never };
+/**
+ * Direction of a Janus peer connection within a room.
+ * @internal
+ */
 export type ConnectionType = "publisher" | "subscriber";
 
+/**
+ * Per-room peer connection record tracked by {@link PeerConnectionManager}.
+ * @internal
+ */
 export interface JanusConnection {
     pc: RTCPeerConnection;
     sessionId: SessionId;
@@ -17,6 +30,7 @@ export interface JanusConnection {
  * ICE candidates that arrive before a Janus session ID is assigned are queued
  * and flushed automatically when `updateSessionForConnection` is called with
  * the real session ID.
+ * @internal
  */
 export class PeerConnectionManager {
     private readonly connections: {
@@ -71,7 +85,7 @@ export class PeerConnectionManager {
                 try {
                     this.onTrickle(current.sessionId, event.candidate);
                 } catch (err) {
-                    console.warn("Failed to trickle candidate", err);
+                    logger.warn("Failed to trickle candidate", err);
                 }
             } else {
                 current.candidateQueue.push(event.candidate);
@@ -99,7 +113,7 @@ export class PeerConnectionManager {
             try {
                 this.onTrickle(session, candidate);
             } catch (err) {
-                console.warn("Failed to trickle buffered candidate", err);
+                logger.warn("Failed to trickle buffered candidate", err);
             }
         }
         conn.candidateQueue = [];

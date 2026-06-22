@@ -426,7 +426,7 @@ test.describe("CryptoTest", () => {
 
     test.describe("ECC sign/verify: cross-layer compatibility", () => {
         // CryptoApi.signData hashes internally (SHA-256) then calls em_crypto.ecc_sign.
-        // The signature is over SHA-256(data) in [recovery|r|s] format — identical to
+        // The signature is over SHA-256(data) in [recovery|r|s] format - identical to
         // what em_crypto.eccVerify expects when given the same pre-hashed data.
         test("CryptoApi (WASM) sign → EmCrypto (CryptoFacade) verify", async ({ page }) => {
             const result = await page.evaluate(async () => {

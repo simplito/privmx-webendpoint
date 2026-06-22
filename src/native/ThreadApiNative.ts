@@ -18,9 +18,14 @@ import {
     ContainerPolicy,
     ThreadEventSelectorType,
     ThreadEventType,
-} from "../Types";
-import { BaseNative } from "./BaseNative";
+} from "../Types.js";
+import { BaseNative } from "./BaseNative.js";
 
+/**
+ * Raw WASM wrapper for the C++ ThreadApi - holds and forwards raw pointers.
+ * Use {@link ThreadApi} (src/service) instead.
+ * @internal
+ */
 export class ThreadApiNative extends BaseNative {
     async newApi(connectionPtr: number): Promise<number> {
         return this.runAsync<number>((taskId) =>

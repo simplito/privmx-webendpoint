@@ -1,14 +1,16 @@
-import * as Files from "./files";
-import * as Utils from "./utils";
-import * as Generics from "./generics";
-import * as Inboxes from "./inbox";
+import * as Files from "./files.js";
+import * as Utils from "./utils.js";
+import * as Generics from "./generics.js";
+import * as Inboxes from "./inbox.js";
 
-import { FileUploader, StreamReader, downloadFile } from "./files";
-import { PrivmxClient } from "./PrivmxClient";
-import { PublicConnection } from "./PublicConnection";
+import { FileUploader, StreamReader, downloadFile } from "./files.js";
+import { PrivmxClient } from "./PrivmxClient.js";
+import { PublicConnection } from "./PublicConnection.js";
 
-export { EventManager } from "./events";
+// Event infrastructure now lives in the core `../events` module; re-exported
+// here for backwards compatibility with `@simplito/privmx-webendpoint/extra`.
 export {
+    EventManager,
     createInboxSubscription,
     createThreadSubscription,
     createConnectionSubscription,
@@ -16,11 +18,9 @@ export {
     createKvdbSubscription,
     createStoreSubscription,
     createEventSubscription,
-    EventCallback,
-    Subscription,
     ConnectionStatusEventType,
-    ConnectionSubscription,
-} from "./subscriptions";
+} from "../events/index.js";
+export type { EventCallback, EventSubscription } from "../events/index.js";
 
 export {
     Files,

@@ -3,8 +3,14 @@
     "rootDir": "./src",
     "outDir": "dist",
     "target": "ESNext",
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    // nodenext: emit native ESM with explicit .js import extensions (the package is
+    // "type": "module"), and allow `import.meta` (used by setupAuto). Source
+    // relative imports therefore carry .js extensions.
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    // `node` for Node built-ins; `vitest/globals` for the test globals (describe,
+    // it, expect, vi, …) used by *.test.ts files under src.
+    "types": ["node", "vitest/globals"],
     "lib": [
       "es2015",
       "es2016",
@@ -13,7 +19,9 @@
       "es2021",
       "dom"
     ],
-    "declaration": true, 
+    "declaration": true,
+    "declarationMap": true,
+    "stripInternal": true,
     "strict": true,
     "strictNullChecks": false,
     "strictPropertyInitialization": false,

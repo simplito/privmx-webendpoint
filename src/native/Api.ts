@@ -9,8 +9,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IdGenerator } from "./IdGenerator";
-import { NativeError, RawCppError } from "./NativeError";
+import { IdGenerator } from "./IdGenerator.js";
+import { NativeError, RawCppError } from "./NativeError.js";
 
 interface Result {
     taskId: number;
@@ -19,6 +19,11 @@ interface Result {
     error: any;
 }
 
+/**
+ * Async task bridge to the Emscripten WASM module - maps C++ taskId callbacks
+ * onto Promises. Use the public Endpoint APIs (src/service) instead.
+ * @internal
+ */
 export class Api {
     private promises: Map<number, any>;
     private taskIdGenerator: IdGenerator;

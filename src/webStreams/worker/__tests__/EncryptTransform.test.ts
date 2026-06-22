@@ -1,6 +1,6 @@
-import { setGlobalEmCrypto } from "../../../crypto/index";
-import { KeyStore } from "../../KeyStore";
-import { EncryptTransform, RTCEncodedVideoFrameType } from "../EncryptTransform";
+import { setGlobalEmCrypto } from "../../../crypto/index.js";
+import { KeyStore } from "../../KeyStore.js";
+import { EncryptTransform, RTCEncodedVideoFrameType } from "../EncryptTransform.js";
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -78,7 +78,7 @@ async function makeKeyStore(keyByte = 0x42): Promise<{ ks: KeyStore; keyBytes: U
 // ---- tests ------------------------------------------------------------------
 
 describe("EncryptTransform", () => {
-    describe("encryptFrame + decryptFrame — audio", () => {
+    describe("encryptFrame + decryptFrame - audio", () => {
         it("body is not plaintext after encryption", async () => {
             const { ks } = await makeKeyStore();
             const et = new EncryptTransform(ks);
@@ -159,7 +159,7 @@ describe("EncryptTransform", () => {
         });
     });
 
-    describe("encryptFrame + decryptFrame — video", () => {
+    describe("encryptFrame + decryptFrame - video", () => {
         it.each<RTCEncodedVideoFrameType>(["key", "delta", "empty"])(
             "%s frame: body is encrypted, header preserved, decrypts correctly",
             async (frameType: RTCEncodedVideoFrameType) => {
@@ -204,7 +204,7 @@ describe("EncryptTransform", () => {
         );
     });
 
-    describe("wrong key — pass-through", () => {
+    describe("wrong key - pass-through", () => {
         it("enqueues the frame unchanged when the keyId is not in the store", async () => {
             const { ks: encKs } = await makeKeyStore(0x11);
             const { ks: decKs } = await makeKeyStore(0x22); // different key
@@ -226,14 +226,14 @@ describe("EncryptTransform", () => {
                 decCtrl,
             );
 
-            // Returns null — could not decrypt
+            // Returns null - could not decrypt
             expect(rms).toBeNull();
             // Frame passed through unmodified
             expect(bufEqual(new Uint8Array(decQueued[0].data), encryptedSnapshot)).toBe(true);
         });
     });
 
-    describe("tampered ciphertext — AEAD tag failure", () => {
+    describe("tampered ciphertext - AEAD tag failure", () => {
         it("enqueues the frame and returns null when ciphertext is corrupted", async () => {
             const { ks } = await makeKeyStore(0x33);
             const et = new EncryptTransform(ks);
@@ -262,12 +262,12 @@ describe("EncryptTransform", () => {
         });
     });
 
-    describe("short frame — pass-through", () => {
+    describe("short frame - pass-through", () => {
         it("enqueues a frame that is too short to contain E2EE metadata", async () => {
             const { ks } = await makeKeyStore();
             const et = new EncryptTransform(ks);
 
-            // 3 bytes total — less than headerLen(1) + 5 minimum trailer bytes
+            // 3 bytes total - less than headerLen(1) + 5 minimum trailer bytes
             const tiny = { data: new Uint8Array([0xaa, 0x01, 0x02]).buffer };
             const { controller, enqueued } = makeController();
             const rms = await et.decryptFrame(
@@ -298,7 +298,7 @@ describe("EncryptTransform", () => {
             const first = await encryptBody();
             const second = await encryptBody();
 
-            // Same plaintext, same key — but different IVs produce different ciphertext
+            // Same plaintext, same key - but different IVs produce different ciphertext
             expect(bufEqual(first, second)).toBe(false);
         });
     });

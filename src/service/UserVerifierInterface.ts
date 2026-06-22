@@ -1,19 +1,34 @@
-import { VerificationRequest } from "../Types";
+import { VerificationRequest } from "../Types.js";
 
 /**
- * An interface consisting of a single verify() method, which - when implemented - should perform verification of the provided data using an external service verification
- * should be done using an external service such as an application server or a PKI server.
+ * Application-defined check of the binding between a user ID and a public key,
+ * consulted by the WASM core whenever it decrypts data received from other
+ * users.
+ *
+ * The Bridge server distributes users' public keys, so a compromised server
+ * could substitute them; implementing this interface lets the application
+ * verify each sender against an independent source of truth (the application's
+ * own server, a PKI, a blockchain registry, …). Install the implementation
+ * with {@link Connection.setUserVerifier} right after connecting.
  *
  * @type {UserVerifierInterface}
- *
  */
 export interface UserVerifierInterface {
     /**
-     * Verifies whether the specified users are valid.
-     * Checks if each user belonged to the Context and if this is their key in `date` and return `true` or `false` otherwise.
+     * Decides, for each request item, whether `pubKey` really belonged to
+     * `userId` in the given Context at time `date`.
      *
-     * @param request List of user data to verification
-     * @returns List of verification results whose items correspond to the items in the input list
+     * Called by the WASM core with the senders of data being decrypted; the
+     * verdicts flow back into the verification status reported alongside the
+     * decrypted items. The implementation typically queries an external
+     * service - it may be `async` and is awaited.
+     *
+     * @param {VerificationRequest[]} request senders to verify; each item
+     *   carries `contextId`, `senderId`, `senderPubKey` and the `date` the data
+     *   was created
+     * @returns {Promise<boolean[]>} one verdict per request item, in the same
+     *   order - `true` accepts the sender, `false` marks the data as coming
+     *   from an unverified key
      */
     verify(request: VerificationRequest[]): Promise<boolean[]>;
 }

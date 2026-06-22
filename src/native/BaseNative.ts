@@ -9,8 +9,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Api } from "./Api";
+import { Api } from "./Api.js";
 
+/**
+ * Abstract base for all raw WASM wrapper classes - holds the shared {@link Api} handle and pointer lifecycle helpers. Use the typed APIs in src/service instead.
+ * @internal
+ */
 export abstract class BaseNative {
     protected _api: Api | null;
     constructor(api: Api) {
@@ -20,7 +24,8 @@ export abstract class BaseNative {
     get api(): Api {
         if (!this._api) {
             throw new Error(
-                "This API instance is no longer valid because the connection associated with it has been closed.",
+                "This API instance is no longer valid: its connection has been disconnected. " +
+                    "Reconnect with EndpointFactory.connect() and obtain new API instances.",
             );
         }
         return this._api;
@@ -33,11 +38,6 @@ export abstract class BaseNative {
     }
 
     protected async runAsync<T>(func: (taskId: number) => void) {
-        if (!this.api) {
-            throw new Error(
-                "This API instance is no longer valid because the connection associated with it has been closed.",
-            );
-        }
         return this.api.runAsync<T>(func);
     }
 }

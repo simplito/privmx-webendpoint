@@ -9,8 +9,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ExtKey } from "./service/ExtKey";
-import * as StreamsApiTypes from "./webStreams/types/ApiTypes";
+import { ExtKey } from "./service/ExtKey.js";
+import * as StreamsApiTypes from "./webStreams/types/ApiTypes.js";
 
 export type SortOrder = "desc" | "asc";
 

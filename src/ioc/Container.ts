@@ -14,6 +14,7 @@ interface Registration<T> {
  *
  * Circular dependencies are broken by resolving inside callback closures that are
  * called after all registrations have been set up, not at construction time.
+ * @internal
  */
 export class Container {
     private readonly reg = new Map<string | symbol, Registration<unknown>>();
@@ -60,14 +61,16 @@ export class Container {
  * Holds singletons that are created once during `EndpointFactory.setup()` and
  * live for the entire lifetime of the application: EventQueue, CryptoApi, the
  * raw WASM Api handle, etc.
+ * @internal
  */
 export class GlobalContainer extends Container {}
 
 /**
  * Per-connection scoped container.
  * Created once per `EndpointFactory.connect()` / `connectPublic()` call.
- * Holds ThreadApi, StoreApi, KvdbApi, EventApi, InboxApi, StreamApi — all
+ * Holds ThreadApi, StoreApi, KvdbApi, EventApi, InboxApi, StreamApi - all
  * tied to a single authenticated Connection instance.
+ * @internal
  */
 export class ConnectionContainer extends Container {}
 
@@ -76,5 +79,6 @@ export class ConnectionContainer extends Container {}
  * Created once per `EndpointFactory.createStreamApi()` call inside a
  * ConnectionContainer.  Holds the entire WebRTC sub-graph: KeyStore,
  * PeerConnectionManager, E2eeWorker, AudioManager, etc.
+ * @internal
  */
 export class WebRtcContainer extends Container {}

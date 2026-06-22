@@ -1,5 +1,5 @@
-import { CryptoFacade } from "../CryptoFacade";
-import { setGlobalEmCrypto, getEmCrypto } from "../index";
+import { CryptoFacade } from "../CryptoFacade.js";
+import { setGlobalEmCrypto, getEmCrypto } from "../index.js";
 
 describe("Crypto Performance Benchmarks", () => {
     beforeAll(async () => {

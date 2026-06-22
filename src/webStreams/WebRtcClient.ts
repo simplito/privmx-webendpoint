@@ -1,16 +1,16 @@
-import { Key, TurnCredentials, StreamHandle, RemoteStreamListener } from "../Types";
-import { Jsep, StreamRoomId, StreamTrack } from "./types/ApiTypes";
-import { ConnectionType, SessionId } from "./PeerConnectionManager";
-import { PeerConnectionFactory } from "./PeerConnectionFactory";
-import { PublisherManager } from "./PublisherManager";
-import { SubscriberManager } from "./SubscriberManager";
-import { DataChannelSession } from "./DataChannelSession";
-import { E2eeWorker } from "./E2eeWorker";
-import { KeySyncManager } from "./KeySyncManager";
-import { StateChangeDispatcher } from "./EventDispatcher";
-import { AudioManager } from "./AudioManager";
-import type { AudioLevelFuncCallback } from "./AudioManager";
-import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry";
+import { Key, TurnCredentials, StreamHandle, RemoteStreamListener } from "../Types.js";
+import { Jsep, StreamRoomId, StreamTrack } from "./types/ApiTypes.js";
+import { ConnectionType, SessionId } from "./PeerConnectionManager.js";
+import { PeerConnectionFactory } from "./PeerConnectionFactory.js";
+import { PublisherManager } from "./PublisherManager.js";
+import { SubscriberManager } from "./SubscriberManager.js";
+import { DataChannelSession } from "./DataChannelSession.js";
+import { E2eeWorker } from "./E2eeWorker.js";
+import { KeySyncManager } from "./KeySyncManager.js";
+import { StateChangeDispatcher } from "./EventDispatcher.js";
+import { AudioManager } from "./AudioManager.js";
+import type { AudioLevelFuncCallback } from "./AudioManager.js";
+import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry.js";
 
 export interface StreamsCallbackInterface {
     trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void>;
@@ -18,7 +18,7 @@ export interface StreamsCallbackInterface {
 }
 
 export type { AudioLevelFuncCallback };
-export type { AudioLevelsStats } from "./AudioManager";
+export type { AudioLevelsStats } from "./AudioManager.js";
 
 /**
  * Thin facade that wires all WebRTC sub-systems together and exposes the
@@ -26,12 +26,12 @@ export type { AudioLevelsStats } from "./AudioManager";
  * focused service classes injected via the constructor.
  *
  * Dependency groups:
- *  - `publisher`       — `PublisherManager`: outbound media tracks, SDP offer/answer
- *  - `subscriber`      — `SubscriberManager`: inbound tracks, reconfigure queue
- *  - `dataChannel`     — `DataChannelSession`: encrypted data channel messages
- *  - `keys`            — `KeySyncManager`: keeps main-thread and worker keys in sync
- *  - `eventsDispatcher`— `StateChangeDispatcher`: RTCPeerConnection state change events
- *  - `listenerRegistry`— `RemoteStreamListenerRegistry`: remote stream callbacks
+ *  - `publisher`       - `PublisherManager`: outbound media tracks, SDP offer/answer
+ *  - `subscriber`      - `SubscriberManager`: inbound tracks, reconfigure queue
+ *  - `dataChannel`     - `DataChannelSession`: encrypted data channel messages
+ *  - `keys`            - `KeySyncManager`: keeps main-thread and worker keys in sync
+ *  - `eventsDispatcher`- `StateChangeDispatcher`: RTCPeerConnection state change events
+ *  - `listenerRegistry`- `RemoteStreamListenerRegistry`: remote stream callbacks
  */
 export class WebRtcClient {
     private streamsApiInterface: StreamsCallbackInterface | undefined;

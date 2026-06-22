@@ -1,4 +1,4 @@
-import { deserializeObject, serializeObject, strToUint8, uint8ToStr } from "../utils";
+import { deserializeObject, serializeObject, strToUint8, uint8ToStr } from "../utils.js";
 
 describe("Serialization Helpers", () => {
     test("serializeObject should correctly serialize objects", () => {

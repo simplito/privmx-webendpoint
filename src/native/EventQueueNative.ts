@@ -9,9 +9,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Event } from "../Types";
-import { BaseNative } from "./BaseNative";
+import { Event } from "../Types.js";
+import { BaseNative } from "./BaseNative.js";
 
+/**
+ * Raw WASM wrapper for the C++ EventQueue - holds and forwards raw pointers.
+ * Use {@link EventQueue} (src/service) instead.
+ * @internal
+ */
 export class EventQueueNative extends BaseNative {
     async deleteApi(ptr: number): Promise<void> {
         await this.runAsync<void>((taskId) =>

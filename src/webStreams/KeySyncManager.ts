@@ -1,8 +1,8 @@
-import { Key } from "../Types";
-import { KeyStore } from "./KeyStore";
-import { E2eeWorker } from "./E2eeWorker";
-import { StreamRoomId } from "./types/ApiTypes";
-import { Logger } from "./Logger";
+import { Key } from "../Types.js";
+import { KeyStore } from "./KeyStore.js";
+import { E2eeWorker } from "./E2eeWorker.js";
+import { StreamRoomId } from "./types/ApiTypes.js";
+import { Logger } from "./Logger.js";
 
 /**
  * Keeps the main-thread `KeyStore` and the E2EE worker's key registry in sync.
@@ -12,6 +12,7 @@ import { Logger } from "./Logger";
  * different key sets; in practice this is safe because the worker only reads
  * keys when processing frames, which is async and does not interleave with the
  * update sequence.
+ * @internal
  */
 export class KeySyncManager {
     private readonly logger = new Logger();

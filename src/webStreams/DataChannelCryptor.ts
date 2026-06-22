@@ -1,7 +1,7 @@
-import { CryptoFacade } from "../crypto/CryptoFacade";
-import { DataChannelCryptorDecryptStatus } from "../Types";
-import { KeyStore } from "./KeyStore";
-import { Logger } from "./Logger";
+import { CryptoFacade } from "../crypto/CryptoFacade.js";
+import { DataChannelCryptorDecryptStatus } from "../Types.js";
+import { KeyStore } from "./KeyStore.js";
+import { Logger } from "./Logger.js";
 
 const GCM_NONCE_LENGTH_BYTES = 12;
 const GCM_TAG_LENGTH_BYTES = 16;
@@ -17,16 +17,28 @@ const FIXED_HEADER_LENGTH =
     SEQUENCE_NUMBER_LENGTH_BYTES +
     GCM_NONCE_LENGTH_BYTES;
 
+/**
+ * Input for {@link DataChannelCryptor.encryptToWireFormat}.
+ * @internal
+ */
 export interface EncryptToWireFormatParams {
     plaintext: Uint8Array;
     sequenceNumber: number;
 }
 
+/**
+ * Input for {@link DataChannelCryptor.decryptFromWireFormat}.
+ * @internal
+ */
 export interface DecryptFromWireFormatParams {
     frame: Uint8Array;
     lastSequenceNumber: number;
 }
 
+/**
+ * Decomposed wire-format frame produced by the parser inside {@link DataChannelCryptor}.
+ * @internal
+ */
 export interface ParsedEncryptedFrame {
     version: number;
     sequenceNumber: number;
@@ -45,6 +57,7 @@ export interface ParsedEncryptedFrame {
  * ```
  * Everything before the ciphertext is used as AAD for AES-256-GCM.
  * Sequence numbers are strictly increasing per remote stream for replay protection.
+ * @internal
  */
 export class DataChannelCryptor {
     private readonly textEncoder = new TextEncoder();
@@ -285,6 +298,11 @@ export class DataChannelCryptor {
     }
 }
 
+/**
+ * Error thrown on data channel frame authentication, replay, or key-lookup
+ * failure - carries a DataChannelCryptorDecryptStatus code.
+ * @internal
+ */
 export class DataChannelCryptorError extends Error {
     public readonly code: DataChannelCryptorDecryptStatus;
 

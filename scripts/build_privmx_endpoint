@@ -89,7 +89,7 @@ if [ ! -f CMakeCache.txt ]; then
         -D PRIVMX_LOGGER_OUTPUT_STDOUT=ON \
         -D CMAKE_BUILD_TYPE=MinSizeRel
 else
-    echo "CMakeCache.txt exists — skipping cmake configure."
+    echo "CMakeCache.txt exists - skipping cmake configure."
 fi
 
 emmake make -j20

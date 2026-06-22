@@ -1,13 +1,13 @@
-import { StreamHandle, DataChannelCryptorDecryptStatus } from "../Types";
-import { StreamRoomId } from "./types/ApiTypes";
-import { TurnCredentials } from "../Types";
-import { Logger } from "./Logger";
-import { StateChangeDispatcher } from "./EventDispatcher";
-import { DataChannelCryptorError } from "./DataChannelCryptor";
-import { DataChannelSession } from "./DataChannelSession";
-import { E2eeTransformManager } from "./E2eeTransformManager";
-import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry";
-import { RTCConfigurationWithInsertableStreams } from "./types/WebRtcExtensions";
+import { StreamHandle, DataChannelCryptorDecryptStatus } from "../Types.js";
+import { StreamRoomId } from "./types/ApiTypes.js";
+import { TurnCredentials } from "../Types.js";
+import { Logger } from "./Logger.js";
+import { StateChangeDispatcher } from "./EventDispatcher.js";
+import { DataChannelCryptorError } from "./DataChannelCryptor.js";
+import { DataChannelSession } from "./DataChannelSession.js";
+import { E2eeTransformManager } from "./E2eeTransformManager.js";
+import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry.js";
+import { RTCConfigurationWithInsertableStreams } from "./types/WebRtcExtensions.js";
 
 /**
  * Builds `RTCPeerConnection` instances with all event listeners wired.
@@ -20,6 +20,7 @@ import { RTCConfigurationWithInsertableStreams } from "./types/WebRtcExtensions"
  *   `RemoteStreamListenerRegistry`.
  * - Forwards `track` events to a caller-supplied `onRemoteTrack` callback so
  *   the subscriber layer can install E2EE receiver transforms after ICE connects.
+ * @internal
  */
 export class PeerConnectionFactory {
     private turnCredentials: TurnCredentials[] = [];

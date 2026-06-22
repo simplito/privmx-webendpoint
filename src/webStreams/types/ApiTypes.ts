@@ -1,4 +1,4 @@
-import { StreamHandle } from "../../Types";
+import { StreamHandle } from "../../Types.js";
 
 export interface UserWithPubKey {
     userId: string;

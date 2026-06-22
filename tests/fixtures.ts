@@ -3,7 +3,11 @@ import { execSync } from "child_process";
 import { MongoClient, Db } from "mongodb";
 import * as path from "path";
 import * as fs from "fs";
+import { fileURLToPath } from "url";
 import { testData } from "./datasets/testData";
+
+// `__dirname` is not defined in ESM (the package is "type": "module").
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const COMPOSE_NETWORK = "tests_default";
 const COMPOSE_PROJECT = "tests";
@@ -201,22 +205,24 @@ export const test = base.extend<
                 throw e;
             }
 
-            await waitForServerReady(hostPort, containerName);
-
-            await use({
-                hostPort,
-                containerName,
-                mongoUrl: internalMongoUrl,
-                db,
-                mongoClient: client,
-                dockerImage,
-                envVars,
-            });
-
-            await client.close();
             try {
-                execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
-            } catch {}
+                await waitForServerReady(hostPort, containerName);
+
+                await use({
+                    hostPort,
+                    containerName,
+                    mongoUrl: internalMongoUrl,
+                    db,
+                    mongoClient: client,
+                    dockerImage,
+                    envVars,
+                });
+            } finally {
+                await client.close().catch(() => {});
+                try {
+                    execSync(`docker rm -f ${containerName}`, { stdio: "ignore" });
+                } catch {}
+            }
         },
         { scope: "worker" },
     ],

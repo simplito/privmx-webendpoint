@@ -48,5 +48,5 @@ class RMSProcessor extends AudioWorkletProcessor {
 try {
     registerProcessor("rms-processor", RMSProcessor);
 } catch {
-    // Already registered — happens when the same AudioContext loads the module twice
+    // Already registered - happens when the same AudioContext loads the module twice
 }

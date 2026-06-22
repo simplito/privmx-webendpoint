@@ -19,9 +19,14 @@ import {
     DeleteEntriesResult,
     KvdbEventSelectorType,
     KvdbEventType,
-} from "../Types";
-import { BaseNative } from "./BaseNative";
+} from "../Types.js";
+import { BaseNative } from "./BaseNative.js";
 
+/**
+ * Raw WASM wrapper for the C++ KvdbApi - holds and forwards raw pointers. Use
+ * {@link KvdbApi} (src/service) instead.
+ * @internal
+ */
 export class KvdbApiNative extends BaseNative {
     async newApi(connectionPtr: number): Promise<number> {
         return this.runAsync<number>((taskId) =>

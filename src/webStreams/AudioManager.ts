@@ -3,8 +3,8 @@ import {
     DEFAULTS,
     LOCAL_PUBLISHER_ID,
     SpeakerState,
-} from "./audio/ActiveSpeakerDetector";
-import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter";
+} from "./audio/ActiveSpeakerDetector.js";
+import { LocalAudioLevelMeter } from "./audio/LocalAudioLevelMeter.js";
 
 export interface AudioLevelsStats {
     levels: SpeakerState[];
@@ -19,7 +19,7 @@ export class AudioManager {
     private audioLevelCallback: AudioLevelFuncCallback | undefined;
 
     constructor(
-        private readonly assetsDir: string,
+        private readonly rmsProcessorUrl: string,
         private readonly sendRmsToWorker: (rms: number) => void,
     ) {
         this.activeSpeakerDetector = new ActiveSpeakerDetector(DEFAULTS);
@@ -34,7 +34,7 @@ export class AudioManager {
             return;
         }
 
-        // Use a single timestamp for both frames so the detector sees them as simultaneous.
+        // Single timestamp so the detector treats both frames as simultaneous.
         const now = Date.now();
 
         this.activeSpeakerDetector.onFrame({
@@ -55,18 +55,15 @@ export class AudioManager {
             return;
         }
         const meter = new LocalAudioLevelMeter(track, (rmsDb) => {
-            // Always send the actual RMS to the worker so the encrypted frame trailer reflects
-            // real mic activity. When the track is muted the worker receives silence instead,
-            // but lastMeasuredLocalRMS stores the real value so the local speaker entry in the
-            // detector still shows the user their own microphone level while muted.
+            // Worker gets silence while muted (frame trailer reflects real activity), but
+            // lastMeasuredLocalRMS keeps the real value so the local meter still shows level.
             const rmsForWorker = track.enabled ? rmsDb : LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
             this.sendRmsToWorker(rmsForWorker);
             this.lastMeasuredLocalRMS = rmsDb;
         });
         this.localAudioLevelMeters.set(track.id, meter);
         try {
-            const base = this.assetsDir.endsWith("/") ? this.assetsDir : this.assetsDir + "/";
-            await meter.init(base + "rms-processor.js");
+            await meter.init(this.rmsProcessorUrl);
         } catch (e) {
             this.localAudioLevelMeters.delete(track.id);
             meter.stop();

@@ -1,5 +1,5 @@
-import { Key } from "../Types";
-import { CryptoFacade } from "../crypto/CryptoFacade";
+import { Key } from "../Types.js";
+import { CryptoFacade } from "../crypto/CryptoFacade.js";
 
 const AES_GCM_KEY_LENGTH_BYTES = 32;
 
@@ -12,6 +12,7 @@ const AES_GCM_KEY_LENGTH_BYTES = 32;
  *
  * Callers work exclusively with the external key IDs (as they appear on
  * the wire). `resolveKeyId()` translates to the internal registry key.
+ * @internal
  */
 export class KeyStore {
     private readonly sessionPrefix: string;
@@ -83,7 +84,6 @@ export class KeyStore {
         if (!this.encryptionInternalKeyId) {
             throw new Error("No encryption key set.");
         }
-        // Strip the session prefix to recover the original external key ID.
         return this.encryptionInternalKeyId.slice(this.sessionPrefix.length + 1);
     }
 }

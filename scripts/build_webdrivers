@@ -27,7 +27,7 @@ configure_if_needed() {
             -D CMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -D PRIVMX_BUILD_TYPE="$PRIVMX_BUILD_TYPE"
     else
-        echo "CMakeCache.txt exists with matching build type ($PRIVMX_BUILD_TYPE) — skipping cmake configure."
+        echo "CMakeCache.txt exists with matching build type ($PRIVMX_BUILD_TYPE) - skipping cmake configure."
     fi
 }
 

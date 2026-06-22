@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { UserVerifierInterface } from "../service/UserVerifierInterface";
+import { UserVerifierInterface } from "../service/UserVerifierInterface.js";
 import {
     PagingQuery,
     PagingList,
@@ -19,8 +19,8 @@ import {
     PKIVerificationOptions,
     ConnectionEventType,
     ConnectionEventSelectorType,
-} from "../Types";
-import { BaseNative } from "./BaseNative";
+} from "../Types.js";
+import { BaseNative } from "./BaseNative.js";
 
 type UserVierifierVerifyFunc = (request: VerificationRequest[]) => Promise<boolean[]>;
 
@@ -29,6 +29,11 @@ declare global {
         userVerifierBinder?: { [id: number]: { userVierifier_verify: UserVierifierVerifyFunc } };
     }
 }
+/**
+ * Raw WASM wrapper for the C++ Connection - holds and forwards raw pointers.
+ * Use {@link Connection} (src/service) instead.
+ * @internal
+ */
 export class ConnectionNative extends BaseNative {
     protected lastConnectionId: number = -1;
     protected userVerifierPtr: number = -1;

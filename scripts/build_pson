@@ -52,7 +52,7 @@ mkdir -p build-emscripten && cd build-emscripten
 if [ ! -f CMakeCache.txt ]; then
     emcmake cmake .. -D CMAKE_BUILD_TYPE=MinSizeRel
 else
-    echo "CMakeCache.txt exists — skipping cmake configure."
+    echo "CMakeCache.txt exists - skipping cmake configure."
 fi
 
 emmake make -j20

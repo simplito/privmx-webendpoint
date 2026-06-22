@@ -1,4 +1,4 @@
-import { Logger } from "./Logger";
+import { Logger } from "./Logger.js";
 
 type EncPair = {
     readable: ReadableStream<unknown>;
@@ -11,8 +11,8 @@ import {
     RTCRtpSenderWithTransform,
     RTCRtpReceiverWithTransform,
     WindowWithRTCRtpScriptTransform,
-} from "./types/WebRtcExtensions";
-import { E2eeWorker } from "./E2eeWorker";
+} from "./types/WebRtcExtensions.js";
+import { E2eeWorker } from "./E2eeWorker.js";
 
 /**
  * Wires the E2EE worker into WebRTC sender and receiver pipelines.
@@ -20,6 +20,7 @@ import { E2eeWorker } from "./E2eeWorker";
  * Prefers the modern `RTCRtpScriptTransform` API (available in Chrome ≥ 94 and
  * Safari ≥ 15.4). Falls back to the `createEncodedStreams()` API when
  * `RTCRtpScriptTransform` is absent (Firefox, older browsers).
+ * @internal
  */
 export class E2eeTransformManager {
     private readonly encByReceiver = new WeakMap<RTCRtpReceiver, EncPair>();

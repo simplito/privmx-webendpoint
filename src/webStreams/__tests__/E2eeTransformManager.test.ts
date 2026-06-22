@@ -1,10 +1,11 @@
-import { E2eeTransformManager } from "../E2eeTransformManager";
-import { E2eeWorker } from "../E2eeWorker";
+import type { Mock, Mocked } from "vitest";
+import { E2eeTransformManager } from "../E2eeTransformManager.js";
+import { E2eeWorker } from "../E2eeWorker.js";
 import {
     WindowWithRTCRtpScriptTransform,
     RTCRtpReceiverWithTransform,
     RTCRtpSenderWithTransform,
-} from "../types/WebRtcExtensions";
+} from "../types/WebRtcExtensions.js";
 
 // ---- window stub (Jest runs in node, not jsdom) ------------------------------
 
@@ -18,15 +19,15 @@ resetTestWindow();
 
 // ---- E2eeWorker mock --------------------------------------------------------
 
-function makeMockWorker(): jest.Mocked<E2eeWorker> {
+function makeMockWorker(): Mocked<E2eeWorker> {
     return {
-        get: jest.fn().mockResolvedValue({ _fakeWorker: true }),
-        setKeys: jest.fn().mockResolvedValue(undefined),
-        sendRms: jest.fn().mockResolvedValue(undefined),
-        postEncode: jest.fn().mockResolvedValue(undefined),
-        postDecode: jest.fn().mockResolvedValue(undefined),
-        postStop: jest.fn().mockResolvedValue(undefined),
-    } as unknown as jest.Mocked<E2eeWorker>;
+        get: vi.fn().mockResolvedValue({ _fakeWorker: true }),
+        setKeys: vi.fn().mockResolvedValue(undefined),
+        sendRms: vi.fn().mockResolvedValue(undefined),
+        postEncode: vi.fn().mockResolvedValue(undefined),
+        postDecode: vi.fn().mockResolvedValue(undefined),
+        postStop: vi.fn().mockResolvedValue(undefined),
+    } as unknown as Mocked<E2eeWorker>;
 }
 
 // ---- RTCRtp stubs -----------------------------------------------------------
@@ -34,7 +35,7 @@ function makeMockWorker(): jest.Mocked<E2eeWorker> {
 function makeSender(): RTCRtpSenderWithTransform {
     return {
         transform: undefined,
-        createEncodedStreams: jest.fn().mockReturnValue({
+        createEncodedStreams: vi.fn().mockReturnValue({
             readable: { _type: "readable" },
             writable: { _type: "writable" },
         }),
@@ -45,7 +46,7 @@ function makeReceiver(trackId = "track-1"): RTCRtpReceiverWithTransform {
     return {
         track: { id: trackId },
         transform: undefined,
-        createEncodedStreams: jest.fn().mockReturnValue({
+        createEncodedStreams: vi.fn().mockReturnValue({
             readable: { _type: "readable" },
             writable: { _type: "writable" },
         }),
@@ -55,7 +56,7 @@ function makeReceiver(trackId = "track-1"): RTCRtpReceiverWithTransform {
 // ---- tests ------------------------------------------------------------------
 
 describe("E2eeTransformManager", () => {
-    let worker: jest.Mocked<E2eeWorker>;
+    let worker: Mocked<E2eeWorker>;
     let manager: E2eeTransformManager;
 
     beforeEach(() => {
@@ -68,11 +69,11 @@ describe("E2eeTransformManager", () => {
     // setupSenderTransform
     // -------------------------------------------------------------------------
 
-    describe("setupSenderTransform — RTCRtpScriptTransform available", () => {
+    describe("setupSenderTransform - RTCRtpScriptTransform available", () => {
         beforeEach(() => {
-            testWindow.RTCRtpScriptTransform = jest
-                .fn()
-                .mockImplementation(() => ({ _isTransform: true }));
+            testWindow.RTCRtpScriptTransform = vi.fn(function () {
+                return { _isTransform: true };
+            });
         });
 
         it("assigns a transform on the sender", async () => {
@@ -101,11 +102,11 @@ describe("E2eeTransformManager", () => {
         });
     });
 
-    describe("setupSenderTransform — EncodedStreams fallback", () => {
+    describe("setupSenderTransform - EncodedStreams fallback", () => {
         it("calls createEncodedStreams and posts encode to worker", async () => {
             const sender = makeSender();
             const { readable, writable } = sender.createEncodedStreams();
-            (sender.createEncodedStreams as jest.Mock).mockClear();
+            (sender.createEncodedStreams as Mock).mockClear();
 
             await manager.setupSenderTransform(sender);
 
@@ -124,11 +125,11 @@ describe("E2eeTransformManager", () => {
     // setupReceiverTransform
     // -------------------------------------------------------------------------
 
-    describe("setupReceiverTransform — RTCRtpScriptTransform available", () => {
+    describe("setupReceiverTransform - RTCRtpScriptTransform available", () => {
         beforeEach(() => {
-            testWindow.RTCRtpScriptTransform = jest
-                .fn()
-                .mockImplementation(() => ({ _isTransform: true }));
+            testWindow.RTCRtpScriptTransform = vi.fn(function () {
+                return { _isTransform: true };
+            });
         });
 
         it("assigns a transform on the receiver", async () => {
@@ -167,7 +168,7 @@ describe("E2eeTransformManager", () => {
         });
     });
 
-    describe("setupReceiverTransform — EncodedStreams fallback", () => {
+    describe("setupReceiverTransform - EncodedStreams fallback", () => {
         it("calls createEncodedStreams and posts decode to worker", async () => {
             const receiver = makeReceiver("track-enc");
             await manager.setupReceiverTransform(receiver, 99);

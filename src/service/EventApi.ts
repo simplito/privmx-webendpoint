@@ -9,11 +9,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { BaseApi } from "./BaseApi";
-import { EventApiNative } from "../native/EventApiNative";
-import { EventsEventSelectorType, UserWithPubKey } from "../Types";
+import { BaseApi } from "./BaseApi.js";
+import { EventApiNative } from "../native/EventApiNative.js";
+import { EventsEventSelectorType, UserWithPubKey } from "../Types.js";
 
 export class EventApi extends BaseApi {
+    /**
+     * Created by {@link EndpointFactory.createEventApi} - never
+     * constructed by SDK users.
+     * @internal
+     */
     constructor(
         private native: EventApiNative,
         ptr: number,
@@ -28,6 +33,7 @@ export class EventApi extends BaseApi {
      * @param {UserWithPubKey[]} users list of UserWithPubKey objects which defines the recipients of the event
      * @param {string} channelName name of the Channel
      * @param {Uint8Array} eventData event's data
+     * @returns {Promise<void>} resolves when the event has been delivered to the server
      */
     async emitEvent(
         contextId: string,
@@ -42,7 +48,7 @@ export class EventApi extends BaseApi {
      * Subscribe for the custom events on the given subscription query.
      *
      * @param {string[]} subscriptionQueries list of queries
-     * @return list of subscriptionIds in maching order to subscriptionQueries
+     * @returns {Promise<string[]>} list of subscriptionIds in matching order to subscriptionQueries
      */
     async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
         return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
@@ -51,6 +57,7 @@ export class EventApi extends BaseApi {
     /**
      * Unsubscribe from events for the given subscriptionId.
      * @param {string[]} subscriptionIds list of subscriptionId
+     * @returns {Promise<void>} resolves when all subscriptions have been cancelled
      */
     async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
         return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
@@ -59,8 +66,9 @@ export class EventApi extends BaseApi {
     /**
      * Generate subscription Query for the custom events.
      * @param {string} channelName name of the Channel
-     * @param {EventSelectorType} selectorType scope on which you listen for events
+     * @param {EventsEventSelectorType} selectorType scope on which you listen for events
      * @param {string} selectorId ID of the selector
+     * @returns {Promise<string>} subscription query string consumed by {@link subscribeFor}
      */
     async buildSubscriptionQuery(
         channelName: string,

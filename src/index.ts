@@ -9,8 +9,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EndpointFactory } from "./service/EndpointFactory";
-import { NativeError } from "./native/NativeError";
+import { EndpointFactory } from "./service/EndpointFactory.js";
+import { NativeError } from "./native/NativeError.js";
+export {
+    CoreErrorCode,
+    ConnectionErrorCode,
+    ThreadErrorCode,
+    StoreErrorCode,
+    InboxErrorCode,
+    KvdbErrorCode,
+    EventErrorCode,
+    StreamRoomErrorCode,
+} from "./native/NativeErrorCodes.js";
 import {
     EventQueue,
     StoreApi,
@@ -23,12 +33,52 @@ import {
     StreamApi,
     ExtKey,
     EventApi,
-} from "./service";
-import * as Types from "./Types";
+    setupAuto,
+} from "./service/index.js";
+import * as Types from "./Types.js";
+import { setEndpointLogger } from "./webStreams/Logger.js";
+export type { LogLevelName, LogSink } from "./webStreams/Logger.js";
+export type { SetupAutoOptions } from "./service/index.js";
+
+// The single event manager + typed subscription helpers (core `./events` module).
+export {
+    EventManager,
+    createThreadSubscription,
+    createStoreSubscription,
+    createKvdbSubscription,
+    createInboxSubscription,
+    createEventSubscription,
+    createConnectionSubscription,
+    createUserEventSubscription,
+    ConnectionStatusEventType,
+} from "./events/index.js";
+export type {
+    Channel,
+    GenericEvent,
+    EventCallback,
+    EventModule,
+    EventSubscriber,
+    EventSubscription,
+    ThreadSubscription,
+    StoreSubscription,
+    InboxSubscription,
+    KvdbSubscription,
+    CustomEventSubscription,
+    UserEventSubscription,
+    ConnectionStatusSubscription,
+    ThreadCallbackPayload,
+    StoreCallbackPayload,
+    InboxCallbackPayload,
+    KvdbCallbackPayload,
+    UserEventCallbackPayload,
+    EventsCallbackPayload,
+} from "./events/index.js";
 
 export {
     EndpointFactory as Endpoint,
+    setupAuto,
     NativeError,
+    setEndpointLogger,
     Types,
     EventQueue,
     StoreApi,
