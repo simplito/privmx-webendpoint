@@ -613,7 +613,7 @@ export class EndpointFactory {
      * `connection.disconnect()`.
      *
      * Use it for live media: `joinStreamRoom` → `createStream` →
-     * `addStreamTrack` → `publishStream`, and `subscribeToRemoteStreams` for
+     * `addStreamTrack` → `publishStream`, and `createSubscriberStream` for
      * receiving.
      *
      * @param {Connection} connection connection returned by {@link connect};

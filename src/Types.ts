@@ -614,6 +614,17 @@ export interface ItemPolicy {
 export type StreamId = StreamsApiTypes.StreamId;
 export type StreamRoomId = StreamsApiTypes.StreamRoomId;
 export type StreamHandle = number & { _streamHandle: never };
+export type SubscriberStreamHandle = number & { _subscriberStreamHandle: never };
+
+/**
+ * Lifecycle state of a Stream Room.
+ *
+ * @typedef {("created" | "open" | "closed")} StreamRoomState
+ * @property {"created"} created the room exists but has never been opened
+ * @property {"open"} open the room is active and can be joined
+ * @property {"closed"} closed the room has been closed (e.g. auto-closed after the last user left)
+ */
+export type StreamRoomState = "created" | "open" | "closed";
 
 export interface StreamRoom {
     contextId: string;
@@ -629,7 +640,7 @@ export interface StreamRoom {
     privateMeta: Uint8Array;
     policy: ContainerPolicy;
     statusCode: number;
-    closed: boolean;
+    state: StreamRoomState;
 }
 
 export interface StreamInfo {

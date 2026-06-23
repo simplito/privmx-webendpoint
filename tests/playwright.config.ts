@@ -22,7 +22,7 @@ export default defineConfig<WorkerOptions>({
         reuseExistingServer: !process.env.CI,
     },
     use: {
-        dockerImage: process.env.BRIDGE_IMAGE || 'simplito/privmx-bridge:latest',
+        dockerImage: process.env.BRIDGE_IMAGE || 'hub.simplito.com/privmx/privmx-bridge:dev',
         baseURL: 'http://localhost:8080',
         launchOptions: {
           firefoxUserPrefs: {

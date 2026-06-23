@@ -1176,7 +1176,7 @@ test.describe("StreamEvents (WebRTC)", () => {
             const streams = await api1.listStreams(sId);
             if (streams.length > 0) {
                 const s = streams[0];
-                await api2.subscribeToRemoteStreams(sId, [{ streamId: s.id, streamTrackId: s.tracks[0].mid }]);
+                await api2.createSubscriberStream(sId, [{ streamId: s.id, streamTrackId: s.tracks[0].mid }]);
             }
         }, args);
 
@@ -1239,8 +1239,9 @@ test.describe("StreamEvents (WebRTC)", () => {
             const subs = streams.length > 0
                 ? [{ streamId: streams[0].id, streamTrackId: streams[0].tracks[0].mid }]
                 : [];
+            let subHandle: any = null;
             if (subs.length > 0) {
-                await api2.subscribeToRemoteStreams(sId, subs);
+                subHandle = await api2.createSubscriberStream(sId, subs);
             }
             await new Promise((r) => setTimeout(r, 500));
 
@@ -1261,8 +1262,8 @@ test.describe("StreamEvents (WebRTC)", () => {
                 }
             })();
 
-            if (subs.length > 0) {
-                await api2.unsubscribeFromRemoteStreams(sId, subs);
+            if (subHandle !== null) {
+                await api2.removeSubscriberStream(subHandle);
             }
         }, args);
 
@@ -1324,7 +1325,7 @@ test.describe("StreamEvents (WebRTC)", () => {
                 ? [{ streamId: streams[0].id, streamTrackId: streams[0].tracks[0].mid }]
                 : [];
             if (subs.length > 0) {
-                await api2.subscribeToRemoteStreams(sId, subs);
+                await api2.createSubscriberStream(sId, subs);
             }
             await new Promise((r) => setTimeout(r, 500));
 
@@ -1406,7 +1407,7 @@ test.describe("StreamEvents (WebRTC)", () => {
                 ? [{ streamId: streams[0].id, streamTrackId: streams[0].tracks[0].mid }]
                 : [];
             if (subs.length > 0) {
-                await api2.subscribeToRemoteStreams(sId, subs);
+                await api2.createSubscriberStream(sId, subs);
             }
             await new Promise((r) => setTimeout(r, 500));
 
@@ -1426,7 +1427,7 @@ test.describe("StreamEvents (WebRTC)", () => {
                 }
             })();
 
-            // u2 disconnects (does NOT call unsubscribeFromRemoteStreams) → must still fire streamUnsubscribed.
+            // u2 disconnects (does NOT call removeSubscriberStream) → must still fire streamUnsubscribed.
             await conn2.disconnect();
         }, args);
 
@@ -1854,7 +1855,7 @@ test.describe("StreamEvents (WebRTC)", () => {
                 await new Promise((r) => setTimeout(r, 500));
             }
             if (streams.length === 0) throw new Error("publisher stream never appeared");
-            await api2.subscribeToRemoteStreams(rid, [{ streamId: streams[0].id, streamTrackId: streams[0].tracks[0].mid }]);
+            await api2.createSubscriberStream(rid, [{ streamId: streams[0].id, streamTrackId: streams[0].tracks[0].mid }]);
             await new Promise((r) => setTimeout(r, 1000));
         }, { bridgeUrl: args.bridgeUrl, solutionId: args.solutionId, roomId, users });
 

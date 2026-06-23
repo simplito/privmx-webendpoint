@@ -275,7 +275,7 @@ test.describe("StreamTest", () => {
                             })),
                     );
 
-                    await api.subscribeToRemoteStreams(roomId, streamsWithDataTracks);
+                    await api.createSubscriberStream(roomId, streamsWithDataTracks);
                     api.addRemoteStreamListener({
                         streamRoomId: roomId,
                         onRemoteData: (data, statusCode) => {
@@ -311,7 +311,7 @@ test.describe("StreamTest", () => {
                             })),
                     );
 
-                    await api.subscribeToRemoteStreams(roomId, streamsWithDataTracks);
+                    await api.createSubscriberStream(roomId, streamsWithDataTracks);
                     api.addRemoteStreamListener({
                         streamRoomId: roomId,
                         onRemoteData: (data, statusCode) => {

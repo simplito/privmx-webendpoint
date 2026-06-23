@@ -18,6 +18,7 @@ import {
     StreamRoom,
     UserWithPubKey,
     StreamHandle,
+    SubscriberStreamHandle,
     StreamSubscription,
     StreamPublishResult,
     RemoteStreamListener,
@@ -52,9 +53,9 @@ import { StreamApiNative } from "../native/StreamApiNative.js";
  * (per track) → {@link publishStream} → {@link updateStream} (after staging
  * more track changes) → {@link unpublishStream} → {@link leaveStreamRoom}.
  *
- * Receive: {@link joinStreamRoom} → {@link subscribeToRemoteStreams} →
+ * Receive: {@link joinStreamRoom} → {@link createSubscriberStream} →
  * {@link addRemoteStreamListener} (remote tracks arrive via the callback) →
- * {@link modifyRemoteStreamsSubscriptions} / {@link unsubscribeFromRemoteStreams}.
+ * {@link updateSubscriberStream} / {@link removeSubscriberStream}.
  *
  * Data channel: {@link addStreamTrack} (with a data channel) →
  * {@link publishStream} → {@link sendData}.
@@ -81,6 +82,7 @@ export class StreamApi extends BaseApi {
 
     private streams: Map<StreamHandle, Stream> = new Map();
     private streamTracks: Map<StreamTrackId, StreamTrack> = new Map();
+    private subscriberStreams: Map<SubscriberStreamHandle, EndpointTypes.StreamRoomId> = new Map();
 
     public override destroyRefs(): void {
         this.client.destroy();
@@ -231,7 +233,7 @@ export class StreamApi extends BaseApi {
      * which the room key and per-stream keys are synchronized to this client.
      *
      * Required before {@link createStream} / {@link publishStream} on the
-     * publish path and before {@link subscribeToRemoteStreams} on the receive
+     * publish path and before {@link createSubscriberStream} on the receive
      * path; leave the room with {@link leaveStreamRoom}.
      *
      * @param {string} streamRoomId ID of the Stream Room to join, returned by
@@ -382,13 +384,13 @@ export class StreamApi extends BaseApi {
      * {@link createStream}.
      *
      * Use it to discover which remote streams exist before selecting some to
-     * receive with {@link subscribeToRemoteStreams}.
+     * receive with {@link createSubscriberStream}.
      *
      * @param {string} streamRoomId ID of the Stream Room to enumerate, returned
      *   by {@link createStreamRoom} or from `StreamRoom.streamRoomId` in
      *   {@link listStreamRooms}
      * @returns {StreamInfo[]} descriptors of currently published streams; pick
-     *   targets to subscribe to with {@link subscribeToRemoteStreams}
+     *   targets to subscribe to with {@link createSubscriberStream}
      */
     public async listStreams(streamRoomId: EndpointTypes.StreamRoomId): Promise<StreamInfo[]> {
         return this.native.listStreams(this.servicePtr, [streamRoomId]);
@@ -622,7 +624,7 @@ export class StreamApi extends BaseApi {
             if (track.streamHandle === streamHandle) this.streamTracks.delete(id);
         }
 
-        await this.native.unpublishStream(this.servicePtr, [streamHandle]);
+        await this.native.removeStream(this.servicePtr, [streamHandle]);
         this.client.removeSenderPeerConnectionOnUnpublish(
             stream.streamRoomId,
             stream.localMediaStream,
@@ -632,18 +634,21 @@ export class StreamApi extends BaseApi {
     }
 
     /**
-     * Subscribes this connection to selected remote streams (and optionally
-     * specific tracks) in the Stream Room.
+     * Creates a subscriber stream that receives the selected remote streams
+     * (and optionally specific tracks) in the Stream Room, and returns its
+     * handle.
      *
      * Fetches TURN credentials and negotiates an inbound WebRTC peer connection
      * with the Janus media server for the chosen streams; incoming media frames
      * are decrypted with AES-256-GCM in the E2EE worker wired into the
-     * `RTCRtpReceiver` pipeline.
+     * `RTCRtpReceiver` pipeline. The returned {@link SubscriberStreamHandle}
+     * identifies this subscriber stream for later
+     * {@link updateSubscriberStream} / {@link removeSubscriberStream} calls.
      *
      * Entry point of the receive workflow after {@link joinStreamRoom}; register
      * a callback with {@link addRemoteStreamListener} to obtain the arriving
-     * tracks, then adjust the set with {@link modifyRemoteStreamsSubscriptions}
-     * or {@link unsubscribeFromRemoteStreams}.
+     * tracks, then adjust the set with {@link updateSubscriberStream} or tear it
+     * down with {@link removeSubscriberStream}.
      *
      * @param {string} streamRoomId ID of the Stream Room to subscribe in,
      *   returned by {@link createStreamRoom} or from `StreamRoom.streamRoomId`
@@ -651,80 +656,80 @@ export class StreamApi extends BaseApi {
      * @param {StreamSubscription[]} subscriptions remote streams/tracks to
      *   subscribe to, selected from the descriptors returned by
      *   {@link listStreams}
-     * @returns {Promise<void>} resolves when the inbound peer connection has been negotiated
+     * @returns {SubscriberStreamHandle} handle identifying the new subscriber
+     *   stream - pass it to {@link updateSubscriberStream} and
+     *   {@link removeSubscriberStream}
      */
-    async subscribeToRemoteStreams(
+    async createSubscriberStream(
         streamRoomId: EndpointTypes.StreamRoomId,
         subscriptions: StreamSubscription[],
-    ): Promise<void> {
+    ): Promise<SubscriberStreamHandle> {
         const peerCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(peerCredentials);
-        await this.native.subscribeToRemoteStreams(this.servicePtr, [streamRoomId, subscriptions]);
+        const handle = await this.native.createSubscriberStream(this.servicePtr, [
+            streamRoomId,
+            subscriptions,
+        ]);
+        this.subscriberStreams.set(handle, streamRoomId);
         this.client.initializeSubscriberConnection(streamRoomId);
+        return handle;
     }
 
     /**
-     * Adds and removes remote-stream subscriptions in one call, without
-     * resubscribing from scratch.
+     * Adds and removes subscriptions on an existing subscriber stream in one
+     * call, without recreating it from scratch.
      *
      * Tells the Bridge to start delivering the added streams and stop the
-     * removed ones over the existing inbound peer connection; the E2EE worker
-     * continues decrypting frames for the streams that remain subscribed.
+     * removed ones over the subscriber stream's existing inbound peer
+     * connection; the E2EE worker continues decrypting frames for the streams
+     * that remain subscribed.
      *
-     * Use it to adjust the set established by {@link subscribeToRemoteStreams}
-     * (e.g. follow the active speaker); to drop all of them use
-     * {@link unsubscribeFromRemoteStreams}.
+     * Use it to adjust the set established by {@link createSubscriberStream}
+     * (e.g. follow the active speaker); to tear the whole subscriber stream down
+     * use {@link removeSubscriberStream}.
      *
-     * @param {string} streamRoomId ID of the Stream Room whose subscriptions
-     *   change, returned by {@link createStreamRoom} or from
-     *   `StreamRoom.streamRoomId` in {@link listStreamRooms}
+     * @param {SubscriberStreamHandle} subscriberStreamHandle handle returned by
+     *   {@link createSubscriberStream}
      * @param {StreamSubscription[]} subscriptionsToAdd remote streams/tracks to
      *   start receiving, selected from the descriptors returned by
      *   {@link listStreams}
      * @param {StreamSubscription[]} subscriptionsToRemove remote streams/tracks
      *   to stop receiving, from the set previously passed to
-     *   {@link subscribeToRemoteStreams}
+     *   {@link createSubscriberStream} or {@link updateSubscriberStream}
      * @returns {Promise<void>} resolves when the Bridge has applied the subscription changes
      */
-    async modifyRemoteStreamsSubscriptions(
-        streamRoomId: EndpointTypes.StreamRoomId,
+    async updateSubscriberStream(
+        subscriberStreamHandle: SubscriberStreamHandle,
         subscriptionsToAdd: StreamSubscription[],
         subscriptionsToRemove: StreamSubscription[],
     ): Promise<void> {
-        return this.native.modifyRemoteStreamsSubscriptions(this.servicePtr, [
-            streamRoomId,
+        return this.native.updateSubscriberStream(this.servicePtr, [
+            subscriberStreamHandle,
             subscriptionsToAdd,
             subscriptionsToRemove,
         ]);
     }
 
     /**
-     * Unsubscribes this connection from selected remote streams (and optionally
-     * specific tracks) in the Stream Room.
+     * Removes a subscriber stream, stopping delivery of all the remote streams
+     * it received.
      *
-     * Tells the Bridge to stop delivering the listed streams; their inbound
-     * tracks end and the E2EE worker stops decrypting their frames.
+     * Tells the Bridge to drop the subscriber stream; its inbound tracks end and
+     * the E2EE worker stops decrypting their frames. The inbound peer connection
+     * is torn down by the WebRTC layer when the last subscriber stream in the
+     * room is removed.
      *
-     * Use it to stop receiving streams subscribed via
-     * {@link subscribeToRemoteStreams}; to change rather than drop the set,
-     * prefer {@link modifyRemoteStreamsSubscriptions}.
+     * Use it to stop receiving streams created via
+     * {@link createSubscriberStream}; to change rather than drop the set, prefer
+     * {@link updateSubscriberStream}.
      *
-     * @param {string} streamRoomId ID of the Stream Room to unsubscribe in,
-     *   returned by {@link createStreamRoom} or from `StreamRoom.streamRoomId`
-     *   in {@link listStreamRooms}
-     * @param {StreamSubscription[]} subscriptions remote streams/tracks to stop
-     *   receiving, from the set previously passed to
-     *   {@link subscribeToRemoteStreams}
-     * @returns {Promise<void>} resolves once the Bridge has stopped delivering the listed streams
+     * @param {SubscriberStreamHandle} subscriberStreamHandle handle returned by
+     *   {@link createSubscriberStream}
+     * @returns {Promise<void>} resolves once the Bridge has stopped delivering the subscriber stream
      */
-    async unsubscribeFromRemoteStreams(
-        streamRoomId: EndpointTypes.StreamRoomId,
-        subscriptions: StreamSubscription[],
-    ): Promise<void> {
-        return this.native.unsubscribeFromRemoteStreams(this.servicePtr, [
-            streamRoomId,
-            subscriptions,
-        ]);
+    async removeSubscriberStream(subscriberStreamHandle: SubscriberStreamHandle): Promise<void> {
+        await this.native.removeSubscriberStream(this.servicePtr, [subscriberStreamHandle]);
+        this.subscriberStreams.delete(subscriberStreamHandle);
     }
 
     /**
@@ -736,7 +741,7 @@ export class StreamApi extends BaseApi {
      * frames; the delivered `MediaStreamTrack` already carries decrypted media.
      *
      * Register it on the receive path, normally right after
-     * {@link subscribeToRemoteStreams}, so the tracks selected there surface
+     * {@link createSubscriberStream}, so the tracks selected there surface
      * through `onRemoteStreamTrack`.
      *
      * @param {RemoteStreamListener} listener listener configuration object
@@ -831,7 +836,7 @@ export class StreamApi extends BaseApi {
      *
      * Use it to drive speaking indicators or volume meters in the UI; register
      * it once the session is established via {@link publishStream} or
-     * {@link subscribeToRemoteStreams}.
+     * {@link createSubscriberStream}.
      *
      * @param {(stats: AudioLevelsStats) => void} onStats callback invoked with
      *   the current per-stream audio levels each time they are recomputed

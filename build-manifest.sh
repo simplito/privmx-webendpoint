@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PRIVMX_ENDPOINT="7f68a2aa8a79ad52c854d0b710df301adb58f230"
+PRIVMX_ENDPOINT="refactor-streams"
 PSON_CPP="v1.0.7"
 GMP="6.3.0"
 POCO="1.10.1"
