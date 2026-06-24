@@ -57,6 +57,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y cmake build-essential
 
       - name: Cache C++ / WASM build
+        id: cppcache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
@@ -72,10 +73,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build WASM + JS
-        run: npm run build
+      # Exact cache hit means none of the C++ inputs changed, so the WASM core in
+      # webendpoint-cpp/build-emscripten is already valid — skip the whole C++
+      # pipeline (its make/install re-runs alone cost ~2 min). On a miss/partial
+      # hit the restore-keys cache still makes the rebuild incremental.
+      - name: Build WASM core
+        if: steps.cppcache.outputs.cache-hit != 'true'
+        run: npm run build:wasm
         env:
           TERM: xterm
+
+      - name: Build JS bundle & assemble assets
+        run: |
+          npm run clean
+          npm run build:js
+          scripts/move_wasm_assets
 
       - name: Cache Playwright browsers
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
