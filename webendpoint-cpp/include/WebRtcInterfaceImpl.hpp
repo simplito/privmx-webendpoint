@@ -58,8 +58,7 @@ public:
                          const std::string& connectionType) override;
     void closeAll(const std::string& streamRoomId) override;
     void close(const std::string& streamRoomId, const std::string& connectionType) override;
-    void updateKeys(const std::string& streamRoomId,
-                    const std::vector<privmx::endpoint::stream::Key>& keys) override;
+    void updateKeys(const std::string& streamRoomId, const std::vector<privmx::endpoint::stream::Key>& keys) override;
 
 private:
     // void setRemoteDescription(const std::string& sdp, const std::string& type);

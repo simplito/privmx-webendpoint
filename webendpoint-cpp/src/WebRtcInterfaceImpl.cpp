@@ -144,8 +144,7 @@ std::string WebRtcInterfaceImpl::createAnswerAndSetDescriptions(const std::strin
 }
 
 void WebRtcInterfaceImpl::setAnswerAndSetRemoteDescription(const std::string& streamRoomId, const std::string& sdp,
-                                                           const std::string& type,
-                                                           const std::string& connectionType) {
+                                                           const std::string& type, const std::string& connectionType) {
     auto future = AsyncEngine::getInstance()->callJsAsync(
         [=, bindId = _interfaceBindId](int id) {
             auto methodName{"setAnswerAndSetRemoteDescription"};
