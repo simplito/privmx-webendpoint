@@ -4,6 +4,14 @@
   "description": "PrivMX Web Endpoint library",
   "author": "Simplito",
   "license": "PrivMX Free License",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simplito/privmx-webendpoint.git"
+  },
+  "homepage": "https://github.com/simplito/privmx-webendpoint#readme",
+  "bugs": {
+    "url": "https://github.com/simplito/privmx-webendpoint/issues"
+  },
   "keywords": [
     "privmx",
     "endpoint",
