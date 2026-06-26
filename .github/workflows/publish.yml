@@ -12,6 +12,8 @@ jobs:
 
   ci:
     uses: ./.github/workflows/ci.yml
+    with:
+      run_e2e: false
 
   publish:
     name: Publish package

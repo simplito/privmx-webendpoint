@@ -2,6 +2,11 @@ name: CI
 
 on:
   workflow_call:
+    inputs:
+      run_e2e:
+        description: 'Run the example smoke test and the full e2e suite'
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -39,7 +44,7 @@ jobs:
       - name: Unit tests
         run: npm test
 
-  build-and-e2e:
+  build:
     name: Build WASM, smoke & e2e
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -86,28 +91,8 @@ jobs:
           scripts/move_wasm_assets
           npm run build:js
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
-
-      - name: Install Playwright (Chromium)
-        run: npx playwright install --with-deps chromium
-
-      - name: Pack SDK for the example
-        run: npm pack
-      - name: Install example dependencies
-        run: cd example/vite && rm -f package-lock.json && npm install
-      - name: Example build/smoke test
-        run: npm run test:example
-        env:
-          CI: true
-
-      - name: Prepare e2e package
-        run: npm run build-package && mkdir -p tests/pkg && tar -xzf builds/privmx-webendpoint-latest.tgz -C tests/pkg --strip-components=1
+      - name: Pack package
+        run: npm run build-package
 
       - name: Upload package tarball
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -117,13 +102,44 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+      - name: Cache Playwright browsers
+        if: ${{ inputs.run_e2e }}
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright (Chromium)
+        if: ${{ inputs.run_e2e }}
+        run: npx playwright install --with-deps chromium
+
+      - name: Pack SDK for the example
+        if: ${{ inputs.run_e2e }}
+        run: npm pack
+      - name: Install example dependencies
+        if: ${{ inputs.run_e2e }}
+        run: cd example/vite && rm -f package-lock.json && npm install
+      - name: Example build/smoke test
+        if: ${{ inputs.run_e2e }}
+        run: npm run test:example
+        env:
+          CI: true
+
+      - name: Prepare e2e package
+        if: ${{ inputs.run_e2e }}
+        run: mkdir -p tests/pkg && tar -xzf builds/privmx-webendpoint-latest.tgz -C tests/pkg --strip-components=1
+
       - name: Start backend services
+        if: ${{ inputs.run_e2e }}
         run: |
           cd tests
           docker compose up -d
           sleep 15
 
       - name: Run e2e tests
+        if: ${{ inputs.run_e2e }}
         run: npx playwright test --config tests/playwright.config.ts --project=chromium --reporter=list
         env:
           CI: true
