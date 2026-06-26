@@ -70,22 +70,29 @@ jobs:
           fi
 
       - name: Publish package
-        working-directory: ./builds
         env:
           REGISTRY: ${{ steps.target.outputs.registry }}
           DIST_TAG: ${{ steps.target.outputs.dist_tag }}
           PROVENANCE: ${{ steps.target.outputs.provenance }}
           PRIVMX_NPM_TOKEN: ${{ secrets.PRIVMX_NPM_TOKEN }}
         run: |
-          # Local .npmrc so the repo-root .npmrc is not used. For npmjs no token
-          # is set (OIDC trusted publishing handles auth); for the self-hosted
-          # registry we authenticate with PRIVMX_NPM_TOKEN.
-          {
-            echo "registry=${REGISTRY}"
-            if [ "$REGISTRY" = "https://npmregistry.privmx.com/" ]; then
-              echo "//npmregistry.privmx.com/:_authToken=\${PRIVMX_NPM_TOKEN}"
+          # Write .npmrc at the repo root (npm's project config: ./builds has no
+          # package.json, so npm walks up here). For npmjs no token is set (OIDC
+          # handles auth + provenance); for the self-hosted registry we write the
+          # token directly and force always-auth.
+          if [ "$REGISTRY" = "https://npmregistry.privmx.com/" ]; then
+            if [ -z "$PRIVMX_NPM_TOKEN" ]; then
+              echo "::error::PRIVMX_NPM_TOKEN secret is empty or not set."
+              exit 1
             fi
-          } > .npmrc
+            {
+              echo "registry=${REGISTRY}"
+              echo "//npmregistry.privmx.com/:_authToken=${PRIVMX_NPM_TOKEN}"
+              echo "always-auth=true"
+            } > .npmrc
+          else
+            echo "registry=${REGISTRY}" > .npmrc
+          fi
 
           echo "Publishing privmx-webendpoint-latest.tgz to $REGISTRY with dist-tag '$DIST_TAG'"
 
@@ -94,7 +101,8 @@ jobs:
             PROVENANCE_FLAG="--provenance"
           fi
 
-          npm publish privmx-webendpoint-latest.tgz \
+          npm publish ./builds/privmx-webendpoint-latest.tgz \
             $PROVENANCE_FLAG \
             --access public \
-            --tag "$DIST_TAG"
+            --tag "$DIST_TAG" \
+            --registry "$REGISTRY"
