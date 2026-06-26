@@ -55,10 +55,13 @@ and an encrypted message round-trip.
 
 ## Using a locally-built SDK (contributors)
 
-This example depends on the published `@simplito/privmx-webendpoint`. To test a
-local build, from the repo root run `npm run build` then `npm pack`, and install
-the tarball here:
+This example installs the SDK from the locally-built tarball at
+`builds/privmx-webendpoint-latest.tgz` (see `package.json`), so it always tests
+the package built from this repo - the same path the pipeline smoke test uses.
+From the repo root, build the package, then install here:
 
 ```bash
-npm install ../../simplito-privmx-webendpoint-*.tgz
+npm run build          # or: npm run build:js, if WASM is already built
+npm run build-package  # produces builds/privmx-webendpoint-latest.tgz
+cd example/vite && npm install
 ```

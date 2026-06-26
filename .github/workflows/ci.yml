@@ -115,9 +115,6 @@ jobs:
         if: ${{ inputs.run_e2e }}
         run: npx playwright install --with-deps chromium
 
-      - name: Pack SDK for the example
-        if: ${{ inputs.run_e2e }}
-        run: npm pack
       - name: Install example dependencies
         if: ${{ inputs.run_e2e }}
         run: cd example/vite && rm -f package-lock.json && npm install
