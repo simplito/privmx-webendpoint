@@ -1,6 +1,6 @@
 {
   "name": "@simplito/privmx-webendpoint",
-  "version": "2.7.5",
+  "version": "2.8.0-dev",
   "description": "PrivMX Web Endpoint library",
   "author": "Simplito",
   "license": "PrivMX Free License",
@@ -73,8 +73,8 @@
     "docs:check": "typedoc --entryPoints src/index.ts --entryPoints src/extra/index.ts --excludeInternal --validation.notDocumented --emit none --treatValidationWarningsAsErrors",
     "format": "oxfmt src/",
     "format:check": "oxfmt --check src/",
-    "format:clang": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format -i",
-    "lint:clang-format": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format --dry-run --Werror",
+    "format:clang": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format-18 -i",
+    "lint:clang-format": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format-18 --dry-run --Werror",
     "prepack": "mkdir -p ./builds",
     "build-package": "npm pack --pack-destination ./builds && cd builds && mv $(ls -t simplito-privmx-webendpoint-*.tgz | head -1) privmx-webendpoint-latest.tgz",
     "watch": "vite build --config ./vite.config.ts --watch"

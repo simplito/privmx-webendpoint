@@ -47,15 +47,18 @@ class WebRtcInterfaceImpl : public endpoint::stream::WebRTCInterface {
 public:
     WebRtcInterfaceImpl(int interfaceBindId);
     ~WebRtcInterfaceImpl() = default;
-    std::string createOfferAndSetLocalDescription(const std::string& streamRoomId);
+    std::string createOfferAndSetLocalDescription(const std::string& streamRoomId,
+                                                  const std::string& connectionType) override;
     std::string createAnswerAndSetDescriptions(const std::string& streamRoomId, const std::string& sdp,
-                                               const std::string& type);
+                                               const std::string& type, const std::string& connectionType) override;
     void setAnswerAndSetRemoteDescription(const std::string& streamRoomId, const std::string& sdp,
-                                          const std::string& type);
+                                          const std::string& type, const std::string& connectionType) override;
     std::string testAsync();
-    void updateSessionId(const std::string& streamRoomId, const int64_t sessionId, const std::string& connectionType);
-    void close(const std::string& streamRoomId);
-    void updateKeys(const std::string& streamRoomId, const std::vector<privmx::endpoint::stream::Key>& keys);
+    void updateSessionId(const std::string& streamRoomId, const int64_t sessionId,
+                         const std::string& connectionType) override;
+    void closeAll(const std::string& streamRoomId) override;
+    void close(const std::string& streamRoomId, const std::string& connectionType) override;
+    void updateKeys(const std::string& streamRoomId, const std::vector<privmx::endpoint::stream::Key>& keys) override;
 
 private:
     // void setRemoteDescription(const std::string& sdp, const std::string& type);

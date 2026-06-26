@@ -241,12 +241,10 @@ test.describe("StreamTest", () => {
                             const events = w.__eventCollector?.events ?? [];
                             return (
                                 events
-                                    ?.filter((x: any) => x.type === "remoteStreamsChanged")
+                                    ?.filter((x: any) => x.type === "streamPublished")
                                     .some((event: any) =>
-                                        event?.data?.streams?.some((stream: any) =>
-                                            stream?.tracks?.some(
-                                                (track: any) => track?.type === "data",
-                                            ),
+                                        event?.data?.stream?.tracks?.some(
+                                            (track: any) => track?.type === "data",
                                         ),
                                     ) ?? false
                             );
@@ -277,7 +275,7 @@ test.describe("StreamTest", () => {
                             })),
                     );
 
-                    await api.subscribeToRemoteStreams(roomId, streamsWithDataTracks);
+                    await api.createSubscriberStream(roomId, streamsWithDataTracks);
                     api.addRemoteStreamListener({
                         streamRoomId: roomId,
                         onRemoteData: (data, statusCode) => {
@@ -313,7 +311,7 @@ test.describe("StreamTest", () => {
                             })),
                     );
 
-                    await api.subscribeToRemoteStreams(roomId, streamsWithDataTracks);
+                    await api.createSubscriberStream(roomId, streamsWithDataTracks);
                     api.addRemoteStreamListener({
                         streamRoomId: roomId,
                         onRemoteData: (data, statusCode) => {

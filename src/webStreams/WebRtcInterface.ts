@@ -9,14 +9,21 @@ export class UpdateKeysModel {
 
 export interface SdpWithRoomModel extends Jsep {
     roomId: StreamRoomId;
+    connectionType: ConnectionType;
 }
 
 export interface RoomModel {
     roomId: StreamRoomId;
+    connectionType: ConnectionType;
 }
 
 export type CreateAnswerAndSetDescriptionsModel = SdpWithRoomModel;
 export type SetAnswerAndSetRemoteDescriptionModel = SdpWithRoomModel;
+
+export interface CloseModel {
+    roomId: StreamRoomId;
+    connectionType: ConnectionType;
+}
 
 export interface WebRtcInterface {
     createOfferAndSetLocalDescription(model: RoomModel): Promise<string>;
@@ -27,7 +34,8 @@ export interface WebRtcInterface {
         sessionId: number,
         connectionType: ConnectionType,
     ): Promise<void>;
-    close(roomId: StreamRoomId): Promise<void>;
+    close(model: CloseModel): Promise<void>;
+    closeAll(roomId: StreamRoomId): Promise<void>;
     updateKeys(model: UpdateKeysModel): Promise<void>;
 }
 
@@ -40,5 +48,6 @@ export type WebRtcMethodCall =
           name: "updateSessionId";
           params: { streamRoomId: StreamRoomId; sessionId: number; connectionType: ConnectionType };
       }
-    | { name: "close"; params: StreamRoomId }
+    | { name: "close"; params: CloseModel }
+    | { name: "closeAll"; params: StreamRoomId }
     | { name: "updateKeys"; params: UpdateKeysModel };

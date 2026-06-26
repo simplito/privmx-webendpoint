@@ -10,6 +10,7 @@ limitations under the License.
 */
 
 import {
+    CloseModel,
     RoomModel,
     SdpWithRoomModel,
     SetAnswerAndSetRemoteDescriptionModel,
@@ -37,6 +38,7 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         updateSessionId: (params) =>
             this.updateSessionId(params.streamRoomId, params.sessionId, params.connectionType),
         close: this.close.bind(this),
+        closeAll: this.closeAll.bind(this),
         updateKeys: this.updateKeys.bind(this),
     };
 
@@ -66,7 +68,11 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         await this.webRtcClient.setPublisherRemoteDescription(model.roomId, model.sdp, model.type);
     }
 
-    async close(roomId: StreamRoomId) {
+    async close(model: CloseModel) {
+        this.webRtcClient.closeConnection(model.roomId, model.connectionType);
+    }
+
+    async closeAll(roomId: StreamRoomId) {
         this.webRtcClient.closeConnection(roomId, "subscriber");
         this.webRtcClient.closeConnection(roomId, "publisher");
     }

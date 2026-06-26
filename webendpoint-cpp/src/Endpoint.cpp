@@ -331,14 +331,15 @@ API_FUNCTION(EventApi, unsubscribeFrom)
 API_FUNCTION(EventApi, buildSubscriptionQuery)
 
 void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr, int webRtcInterfaceBindId) {
-    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, eventsPtr, webRtcInterfaceBindId] {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, webRtcInterfaceBindId] {
         auto connection = (ConnectionVar*)connectionPtr;
-        auto eventApi = (EventApiVar*)eventsPtr;
 
+        // StreamApiLowVarInterface no longer takes an EventApi; it owns its own
+        // subscriptions internally. Construct with (connection, serializer) only.
         auto streamsApi =
-            new StreamApiVar(connection->getApi(), eventApi->getApi(),
-                             core::VarSerializer::Options{
-                                 .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+            new StreamApiVar(connection->getApi(),
+                             core::VarSerializer{core::VarSerializer::Options{
+                                 .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING}});
 
         auto webRtcInterface = std::make_shared<stream::WebRtcInterfaceImpl>(webRtcInterfaceBindId);
         streamsApi->setWebRtcInterface(webRtcInterface);
@@ -359,18 +360,17 @@ API_FUNCTION(StreamApi, listStreamRooms)
 API_FUNCTION(StreamApi, createStream)
 API_FUNCTION(StreamApi, publishStream)
 API_FUNCTION(StreamApi, updateStream)
-API_FUNCTION(StreamApi, unpublishStream)
+API_FUNCTION(StreamApi, removeStream)
 API_FUNCTION(StreamApi, joinStreamRoom)
 API_FUNCTION(StreamApi, listStreams)
 API_FUNCTION(StreamApi, leaveStreamRoom)
 API_FUNCTION(StreamApi, enableStreamRoomRecording)
 API_FUNCTION(StreamApi, getStreamRoomRecordingKeys)
 
-API_FUNCTION(StreamApi, subscribeToRemoteStreams)
-API_FUNCTION(StreamApi, modifyRemoteStreamsSubscriptions)
-API_FUNCTION(StreamApi, unsubscribeFromRemoteStreams)
+API_FUNCTION(StreamApi, createSubscriberStream)
+API_FUNCTION(StreamApi, updateSubscriberStream)
+API_FUNCTION(StreamApi, removeSubscriberStream)
 
-API_FUNCTION(StreamApi, keyManagement)
 API_FUNCTION(StreamApi, getTurnCredentials)
 API_FUNCTION(StreamApi, subscribeFor)
 API_FUNCTION(StreamApi, unsubscribeFrom)

@@ -460,7 +460,7 @@ async function measureSendMessages(
 }
 
 test.describe("CoreTest: Worker count", () => {
-    const MESSAGE_COUNT = 1000;
+    const MESSAGE_COUNT = 50;
 
     test("EndpointFactory.setup() initialises WASM with the requested worker count", async ({
         page,

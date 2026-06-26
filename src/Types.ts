@@ -614,6 +614,17 @@ export interface ItemPolicy {
 export type StreamId = StreamsApiTypes.StreamId;
 export type StreamRoomId = StreamsApiTypes.StreamRoomId;
 export type StreamHandle = number & { _streamHandle: never };
+export type SubscriberStreamHandle = number & { _subscriberStreamHandle: never };
+
+/**
+ * Lifecycle state of a Stream Room.
+ *
+ * @typedef {("created" | "open" | "closed")} StreamRoomState
+ * @property {"created"} created the room exists but has never been opened
+ * @property {"open"} open the room is active and can be joined
+ * @property {"closed"} closed the room has been closed (e.g. auto-closed after the last user left)
+ */
+export type StreamRoomState = "created" | "open" | "closed";
 
 export interface StreamRoom {
     contextId: string;
@@ -629,7 +640,7 @@ export interface StreamRoom {
     privateMeta: Uint8Array;
     policy: ContainerPolicy;
     statusCode: number;
-    closed: boolean;
+    state: StreamRoomState;
 }
 
 export interface StreamInfo {
@@ -851,6 +862,51 @@ export enum StreamEventType {
     STREAM_LEAVE = 5,
     STREAM_PUBLISH = 6,
     STREAM_UNPUBLISH = 7,
+    STREAM_SUBSCRIBE = 8,
+    STREAM_UNSUBSCRIBE = 9,
+    STREAM_UPDATE = 10,
+}
+
+export interface StreamRoomMemberEventData {
+    streamRoomId: StreamRoomId;
+    userId: string;
+}
+
+export interface StreamRoomReofferEventData {
+    streamRoomId: StreamRoomId;
+    jsep?: { type: "offer"; sdp: string };
+}
+
+export interface StreamSubscriptionRef {
+    streamId: number;
+    streamTrackId?: string;
+}
+
+export interface StreamSubscribedEventData {
+    streamRoomId: StreamRoomId;
+    userId: string;
+    subscriptions: StreamSubscriptionRef[];
+}
+
+export interface StreamUpdatedEventData {
+    streamRoomId: StreamRoomId;
+    streamId: number;
+    userId: string;
+    tracksAdded: TrackInfo[];
+    tracksRemoved: TrackInfo[];
+    tracksModified: { before: TrackInfo; after: TrackInfo }[];
+}
+
+export interface StreamPublishedEventData {
+    streamRoomId: StreamRoomId;
+    userId: string;
+    stream: StreamInfo;
+}
+
+export interface StreamUnpublishedEventData {
+    streamRoomId: StreamRoomId;
+    userId: string;
+    streamId: number;
 }
 
 export enum StreamEventSelectorType {

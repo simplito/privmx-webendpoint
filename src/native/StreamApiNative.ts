@@ -164,9 +164,9 @@ export class StreamApiNative extends BaseNative {
         return ret;
     }
 
-    async unpublishStream(ptr: number, args: [number]): Promise<void> {
+    async removeStream(ptr: number, args: [number]): Promise<void> {
         return this.runAsync<void>((taskId) =>
-            this.api.lib.StreamApi_unpublishStream(taskId, ptr, args),
+            this.api.lib.StreamApi_removeStream(taskId, ptr, args),
         );
     }
 
@@ -176,38 +176,30 @@ export class StreamApiNative extends BaseNative {
         );
     }
 
-    async subscribeToRemoteStreams(
+    async createSubscriberStream(
         ptr: number,
         args: [string, Types.StreamSubscription[]],
-    ): Promise<void> {
-        return this.runAsync<void>((taskId) =>
-            this.api.lib.StreamApi_subscribeToRemoteStreams(taskId, ptr, args),
+    ): Promise<Types.SubscriberStreamHandle> {
+        return this.runAsync<Types.SubscriberStreamHandle>((taskId) =>
+            this.api.lib.StreamApi_createSubscriberStream(taskId, ptr, args),
         );
     }
 
-    async modifyRemoteStreamsSubscriptions(
+    async updateSubscriberStream(
         ptr: number,
-        args: [string, Types.StreamSubscription[], Types.StreamSubscription[]],
+        args: [number, Types.StreamSubscription[], Types.StreamSubscription[]],
     ): Promise<void> {
         return this.runAsync<void>((taskId) =>
-            this.api.lib.StreamApi_modifyRemoteStreamsSubscriptions(taskId, ptr, args),
+            this.api.lib.StreamApi_updateSubscriberStream(taskId, ptr, args),
         );
     }
 
-    async unsubscribeFromRemoteStreams(
-        ptr: number,
-        args: [string, Types.StreamSubscription[]],
-    ): Promise<void> {
+    async removeSubscriberStream(ptr: number, args: [number]): Promise<void> {
         return this.runAsync<void>((taskId) =>
-            this.api.lib.StreamApi_unsubscribeFromRemoteStreams(taskId, ptr, args),
+            this.api.lib.StreamApi_removeSubscriberStream(taskId, ptr, args),
         );
     }
 
-    async keyManagement(ptr: number, args: [boolean]): Promise<void> {
-        return this.runAsync<void>((taskId) =>
-            this.api.lib.StreamApi_keyManagement(taskId, ptr, args),
-        );
-    }
     async getTurnCredentials(ptr: number, args: []): Promise<TurnCredentials[]> {
         return this.runAsync<TurnCredentials[]>((taskId) =>
             this.api.lib.StreamApi_getTurnCredentials(taskId, ptr, args),
