@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@simplito/privmx-webendpoint": "file:../../simplito-privmx-webendpoint-2.7.5.tgz"
+    "@simplito/privmx-webendpoint": "file:../../builds/privmx-webendpoint-latest.tgz"
   },
   "devDependencies": {
     "typescript": "^5.8.0",

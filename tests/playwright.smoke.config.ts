@@ -5,8 +5,9 @@ import { defineConfig } from "@playwright/test";
  * Standalone config for the example build/smoke check (separate from the e2e
  * config so it needs no Docker backend). Boots the `example/vite` dev server -
  * which serves the COOP/COEP headers and the zero-config assets - and runs
- * `tests/smoke/`. Requires the example's deps to be installed first:
- *   npm pack && (cd example/vite && npm install)
+ * `tests/smoke/`. Requires the locally-built SDK tarball and the example's deps
+ * to be installed first (from the repo root):
+ *   npm run build-package && (cd example/vite && npm install)
  */
 const PORT = 5180;
 
