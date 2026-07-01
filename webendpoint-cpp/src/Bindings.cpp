@@ -182,8 +182,6 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(StreamApi, joinStreamRoom)
     BINDING_FUNCTION(StreamApi, listStreams)
     BINDING_FUNCTION(StreamApi, leaveStreamRoom)
-    BINDING_FUNCTION(StreamApi, enableStreamRoomRecording)
-    BINDING_FUNCTION(StreamApi, getStreamRoomRecordingKeys)
 
     BINDING_FUNCTION(StreamApi, createSubscriberStream)
     BINDING_FUNCTION(StreamApi, updateSubscriberStream)

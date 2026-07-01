@@ -927,11 +927,6 @@ export type CollectionChangedEventData = {
     items: CollectionItemChange[];
 };
 
-export interface RecordingEncKey {
-    id: Uint8Array;
-    key: Uint8Array;
-}
-
 export enum DataChannelCryptorDecryptStatus {
     /** No error */
     OK = 0x0000,
