@@ -1,6 +1,9 @@
 import { CryptoFacade } from "../../crypto/CryptoFacade.js";
 import { KeyStore } from "../KeyStore.js";
 
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
 function genIvAsBuffer(): Uint8Array {
     return crypto.getRandomValues(new Uint8Array(12));
 }
@@ -90,7 +93,7 @@ export class EncryptTransform {
         const internalKeyId = this.keyStore.getEncryptionKeyId();
         const wireKeyId = this.keyStore.getEncryptionExternalKeyId();
         const encrypted = await this.encryptAes(internalKeyId, iv, frameBody, frameHeader);
-        const keyIdBytes = new TextEncoder().encode(wireKeyId);
+        const keyIdBytes = textEncoder.encode(wireKeyId);
 
         const posOfCipher = frameHeader.byteLength;
         const posOfIv = posOfCipher + encrypted.byteLength;
@@ -139,7 +142,7 @@ export class EncryptTransform {
         const keyIdLenPos = rmsPos - 1;
         const keyIdLen = new Uint8Array(data, keyIdLenPos, 1)[0];
         const keyIdPos = keyIdLenPos - keyIdLen;
-        const keyId = new TextDecoder().decode(new Uint8Array(data, keyIdPos, keyIdLen));
+        const keyId = textDecoder.decode(new Uint8Array(data, keyIdPos, keyIdLen));
 
         const ivLenPos = keyIdPos - 1;
         const ivLen = new Uint8Array(data, ivLenPos, 1)[0];

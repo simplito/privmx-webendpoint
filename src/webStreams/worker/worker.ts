@@ -12,6 +12,9 @@ const sessions = new Map<string, { controller: AbortController }>();
 // Local mic RMS, embedded in every outgoing frame so receivers can track audio activity.
 let lastRms: number = LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
 
+const RMS_REPORT_INTERVAL_MS = 100;
+const lastRmsReportByPublisher = new Map<number, number>();
+
 // ---------------------------------------------------------------------------
 // RTCRtpScriptTransform entry point (modern browsers)
 // ---------------------------------------------------------------------------
@@ -123,14 +126,19 @@ function handleTransform(
                     kind,
                     controller,
                 );
-                if (rms !== null && context.publisherId !== undefined) {
-                    const msg: events.RmsOutEvent = {
-                        type: "rms",
-                        rms,
-                        receiverId: context.id,
-                        publisherId: context.publisherId,
-                    };
-                    (self as unknown as Worker).postMessage(msg);
+                if (rms !== null && kind === "audio" && context.publisherId !== undefined) {
+                    const now = Date.now();
+                    const last = lastRmsReportByPublisher.get(context.publisherId) ?? 0;
+                    if (now - last >= RMS_REPORT_INTERVAL_MS) {
+                        lastRmsReportByPublisher.set(context.publisherId, now);
+                        const msg: events.RmsOutEvent = {
+                            type: "rms",
+                            rms,
+                            receiverId: context.id,
+                            publisherId: context.publisherId,
+                        };
+                        (self as unknown as Worker).postMessage(msg);
+                    }
                 }
             },
         });
