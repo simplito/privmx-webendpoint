@@ -72,6 +72,7 @@ export class StreamApiNative extends BaseNative {
             Uint8Array,
             Uint8Array,
             ContainerPolicy | undefined,
+            number | undefined,
         ],
     ): Promise<string> {
         return this.runAsync<string>((taskId) =>

@@ -2290,6 +2290,64 @@ test.describe("StreamTest", () => {
         });
     });
 
+    test("streamRoomTtl: allows rejoin and republish after leave", async ({ page, backend, cli }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const streamApi = await Endpoint.createStreamApi(
+                connection,
+                await Endpoint.createEventApi(connection),
+            );
+            const enc = new TextEncoder();
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+
+            // Grace period long enough to outlast this test, so leaving does not
+            // close the room before the second join/publish below.
+            const sId = await streamApi.createStreamRoom(
+                contextId,
+                [u1Obj],
+                [u1Obj],
+                enc.encode("public"),
+                enc.encode("private"),
+                undefined,
+                60000,
+            );
+
+            const joinAndPublishFakeVideo = async () => {
+                await streamApi.joinStreamRoom(sId);
+                const handle = await streamApi.createStream(sId);
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                await streamApi.addStreamTrack(handle, { track: stream.getVideoTracks()[0] });
+                await streamApi.publishStream(handle);
+                return handle;
+            };
+
+            // First session
+            const handle1 = await joinAndPublishFakeVideo();
+            await new Promise((r) => setTimeout(r, 1500));
+            await streamApi.unpublishStream(handle1);
+            await streamApi.leaveStreamRoom(sId);
+
+            // Second session - immediate rejoin/republish must succeed since the
+            // TTL grace period keeps the room open past this point.
+            await joinAndPublishFakeVideo();
+            await new Promise((r) => setTimeout(r, 1500));
+            await streamApi.leaveStreamRoom(sId);
+
+            return { success: true };
+        }, args);
+
+        expect(result.success).toBe(true);
+    });
+
     test("Security: Room lifecycle (Active -> Abandoned -> Closed) enforces locks", async ({
         page,
         backend,
