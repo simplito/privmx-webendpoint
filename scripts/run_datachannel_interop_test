@@ -1,0 +1,57 @@
+#!/bin/bash
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+REPO_ROOT="$SCRIPT_PATH/.."
+
+# Runs src/webStreams/__tests__/DataChannelCryptorInterop.test.ts, which cross-checks the
+# encrypted DataChannel wire format (DataChannelCryptor.ts) against the C++ implementation
+# (DataChannelMessageEncryptorV1). It builds the datachannel_vector_tool CLI from the
+# privmx-endpoint checkout named in build-manifest.sh, then runs the vitest test against it.
+
+source "$SCRIPT_PATH/config.sh"
+source "$REPO_ROOT/build-manifest.sh"
+
+VERSION_AS_DIR="${PRIVMX_ENDPOINT//\//_}"
+PRIVMX_ENDPOINT_DIR="$SOURCE_DIR/privmx-endpoint-$VERSION_AS_DIR"
+
+if [ ! -d "$PRIVMX_ENDPOINT_DIR" ]; then
+    echo "error: no privmx-endpoint checkout at $PRIVMX_ENDPOINT_DIR (from PRIVMX_ENDPOINT=$PRIVMX_ENDPOINT in build-manifest.sh)" >&2
+    exit 1
+fi
+
+BUILD_DIR="$PRIVMX_ENDPOINT_DIR/build"
+# build-with-streams.sh hardcodes this and nests the conan output under build/<type>/generators.
+CONAN_BUILD_TYPE="Debug"
+GENERATORS_DIR="$BUILD_DIR/build/$CONAN_BUILD_TYPE/generators"
+
+if [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
+    echo "No configured CMake build at $BUILD_DIR - running build-with-streams.sh (conan) for a one-time full build ..."
+    (cd "$PRIVMX_ENDPOINT_DIR" && ./build-with-streams.sh)
+fi
+
+if [ ! -f "$GENERATORS_DIR/conanrun.sh" ]; then
+    echo "error: expected conan generators at $GENERATORS_DIR (from build-with-streams.sh) but none were found" >&2
+    exit 1
+fi
+
+NPROC=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.ncpu)
+
+# datachannel_vector_tool links conan-managed shared libs (e.g. Poco); building and running it
+# needs the matching conanbuild/conanrun environments, same as build-with-streams.sh sets up.
+source "$GENERATORS_DIR/conanbuild.sh"
+echo "Building datachannel_vector_tool in $BUILD_DIR ..."
+cmake --build "$BUILD_DIR" --target datachannel_vector_tool -- -j"$NPROC"
+source "$GENERATORS_DIR/deactivate_conanbuild.sh"
+source "$GENERATORS_DIR/conanrun.sh"
+
+TOOL_BIN="$BUILD_DIR/test/datachannel_vector_tool"
+if [ ! -x "$TOOL_BIN" ]; then
+    echo "error: build finished but $TOOL_BIN was not produced" >&2
+    exit 1
+fi
+
+cd "$REPO_ROOT"
+export PRIVMX_ENDPOINT_VECTOR_TOOL="$TOOL_BIN"
+echo "Running DataChannelCryptorInterop.test.ts against $TOOL_BIN ..."
+npx vitest run src/webStreams/__tests__/DataChannelCryptorInterop.test.ts "$@"

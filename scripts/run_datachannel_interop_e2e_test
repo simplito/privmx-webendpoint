@@ -1,0 +1,59 @@
+#!/bin/bash
+set -e
+
+SCRIPT_PATH=$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )
+REPO_ROOT="$SCRIPT_PATH/.."
+
+# Runs tests/specs/streamDataChannelsInterop.spec.ts, a live E2E test that proves the
+# native (libwebrtc) and browser (WASM) DataChannel implementations interoperate over a
+# real negotiated RTCDataChannel through the dockerized Bridge. It builds the
+# datachannel_interop_client CLI from the privmx-endpoint checkout named in
+# build-manifest.sh, then runs the Playwright spec against it.
+
+source "$SCRIPT_PATH/config.sh"
+source "$REPO_ROOT/build-manifest.sh"
+
+VERSION_AS_DIR="${PRIVMX_ENDPOINT//\//_}"
+PRIVMX_ENDPOINT_DIR="$SOURCE_DIR/privmx-endpoint-$VERSION_AS_DIR"
+
+if [ ! -d "$PRIVMX_ENDPOINT_DIR" ]; then
+    echo "error: no privmx-endpoint checkout at $PRIVMX_ENDPOINT_DIR (from PRIVMX_ENDPOINT=$PRIVMX_ENDPOINT in build-manifest.sh)" >&2
+    exit 1
+fi
+
+BUILD_DIR="$PRIVMX_ENDPOINT_DIR/build"
+# build-with-streams.sh hardcodes this and nests the conan output under build/<type>/generators.
+CONAN_BUILD_TYPE="Debug"
+GENERATORS_DIR="$BUILD_DIR/build/$CONAN_BUILD_TYPE/generators"
+
+if [ ! -f "$BUILD_DIR/CMakeCache.txt" ]; then
+    echo "No configured CMake build at $BUILD_DIR - running build-with-streams.sh (conan) for a one-time full build ..."
+    (cd "$PRIVMX_ENDPOINT_DIR" && ./build-with-streams.sh)
+fi
+
+if [ ! -f "$GENERATORS_DIR/conanrun.sh" ]; then
+    echo "error: expected conan generators at $GENERATORS_DIR (from build-with-streams.sh) but none were found" >&2
+    exit 1
+fi
+
+NPROC=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.ncpu)
+
+# datachannel_interop_client links conan-managed shared libs (Poco, libwebrtc, ...);
+# building and running it needs the matching conanbuild/conanrun environments, same as
+# build-with-streams.sh sets up.
+source "$GENERATORS_DIR/conanbuild.sh"
+echo "Building datachannel_interop_client in $BUILD_DIR ..."
+cmake --build "$BUILD_DIR" --target datachannel_interop_client -- -j"$NPROC"
+source "$GENERATORS_DIR/deactivate_conanbuild.sh"
+source "$GENERATORS_DIR/conanrun.sh"
+
+CLIENT_BIN="$BUILD_DIR/test/datachannel_interop_client"
+if [ ! -x "$CLIENT_BIN" ]; then
+    echo "error: build finished but $CLIENT_BIN was not produced" >&2
+    exit 1
+fi
+
+cd "$REPO_ROOT"
+export PRIVMX_ENDPOINT_NATIVE_BIN="$CLIENT_BIN"
+echo "Running streamDataChannelsInterop.spec.ts against $CLIENT_BIN ..."
+npx playwright test --config tests/playwright.config.ts --project=chromium streamDataChannelsInterop "$@"
