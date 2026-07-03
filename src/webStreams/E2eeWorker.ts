@@ -107,11 +107,13 @@ export class E2eeWorker {
     async postEncode(
         readable: ReadableStream<unknown>,
         writable: WritableStream<unknown>,
+        kind: "audio" | "video",
     ): Promise<void> {
         const worker = await this.get();
         worker.postMessage(
             {
                 operation: "encode",
+                kind,
                 readableStream: readable,
                 writableStream: writable,
             } satisfies EncodeEvent,
@@ -126,12 +128,15 @@ export class E2eeWorker {
      *
      * @param id         Unique track ID used by the worker to identify the pipeline.
      * @param publisherId Numeric WebRTC stream ID of the remote publisher.
+     * @param kind       Track kind ("audio" | "video"); selects the frame header
+     *                   layout used as AES-GCM AAD. Must match the sender's kind.
      */
     async postDecode(
         id: string,
         publisherId: number,
         readable: ReadableStream<unknown>,
         writable: WritableStream<unknown>,
+        kind: "audio" | "video",
     ): Promise<void> {
         const worker = await this.get();
         worker.postMessage(
@@ -139,6 +144,7 @@ export class E2eeWorker {
                 operation: "decode",
                 id,
                 publisherId,
+                kind,
                 readableStream: readable,
                 writableStream: writable,
             } satisfies DecodeEvent,

@@ -33,20 +33,26 @@ export class E2eeTransformManager {
      *
      * Uses `RTCRtpScriptTransform` when available; otherwise transfers the
      * sender's encoded-stream pair to the worker via `postEncode`.
+     *
+     * `kind` MUST be passed explicitly by the caller (from the track being
+     * published) rather than read from `sender.track?.kind`: during
+     * renegotiation/reconnect the sender's track can still be null here, which
+     * would make the worker fall back to the "video" header layout and corrupt
+     * outgoing audio frames (audio uses a 1-byte header, video 1/3/10 bytes).
      */
-    async setupSenderTransform(sender: RTCRtpSender): Promise<void> {
+    async setupSenderTransform(sender: RTCRtpSender, kind: "audio" | "video"): Promise<void> {
         const win = window as unknown as WindowWithRTCRtpScriptTransform;
         const senderExt = sender as RTCRtpSenderWithTransform;
         if (win.RTCRtpScriptTransform) {
             const worker = await this.e2eeWorker.get();
             senderExt.transform = new win.RTCRtpScriptTransform(worker, {
                 operation: "encode",
-                kind: sender.track?.kind,
+                kind,
             });
         } else {
             this.logger.debug("Sender: using EncodedStreams");
             const { readable, writable } = senderExt.createEncodedStreams();
-            await this.e2eeWorker.postEncode(readable, writable);
+            await this.e2eeWorker.postEncode(readable, writable, kind);
         }
     }
 
@@ -60,6 +66,7 @@ export class E2eeTransformManager {
     async setupReceiverTransform(receiver: RTCRtpReceiver, publisherId: number): Promise<void> {
         const win = window as unknown as WindowWithRTCRtpScriptTransform;
         const receiverExt = receiver as RTCRtpReceiverWithTransform;
+        const kind = receiver.track.kind as "audio" | "video";
 
         if (win.RTCRtpScriptTransform && !receiverExt.transform) {
             this.logger.debug("Receiver: using RTCRtpScriptTransform");
@@ -68,7 +75,7 @@ export class E2eeTransformManager {
                 operation: "decode",
                 id: receiver.track.id,
                 publisherId,
-                kind: receiver.track.kind,
+                kind,
             });
             return;
         }
@@ -91,7 +98,7 @@ export class E2eeTransformManager {
             posted: false,
         };
         this.encByReceiver.set(receiver, enc);
-        await this.e2eeWorker.postDecode(enc.id, enc.publisherId, enc.readable, enc.writable);
+        await this.e2eeWorker.postDecode(enc.id, enc.publisherId, enc.readable, enc.writable, kind);
     }
 
     /**
