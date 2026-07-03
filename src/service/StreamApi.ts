@@ -20,6 +20,7 @@ import {
     StreamHandle,
     SubscriberStreamHandle,
     StreamSubscription,
+    StreamSubscriber,
     StreamPublishResult,
     RemoteStreamListener,
 } from "../Types.js";
@@ -394,6 +395,22 @@ export class StreamApi extends BaseApi {
      */
     public async listStreams(streamRoomId: EndpointTypes.StreamRoomId): Promise<StreamInfo[]> {
         return this.native.listStreams(this.servicePtr, [streamRoomId]);
+    }
+
+    /**
+     * Lists the participants of the given Stream Room, along with the stream
+     * subscriptions each of them currently has and, if they are publishing,
+     * the descriptor of their published stream.
+     *
+     * @param {string} streamRoomId ID of the Stream Room to enumerate,
+     *   returned by {@link createStreamRoom} or from
+     *   `StreamRoom.streamRoomId` in {@link listStreamRooms}
+     * @returns {StreamSubscriber[]} descriptors of the room's participants
+     */
+    public async listStreamRoomParticipants(
+        streamRoomId: EndpointTypes.StreamRoomId,
+    ): Promise<StreamSubscriber[]> {
+        return this.native.listStreamRoomParticipants(this.servicePtr, [streamRoomId]);
     }
 
     /**
