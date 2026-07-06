@@ -622,6 +622,171 @@ test.describe("StreamTest", () => {
         }, args);
     });
 
+    test("listStreamRoomParticipants: valid/invalid input data", async ({
+        page,
+        backend,
+        cli,
+    }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const connection2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
+            const streamApi = await Endpoint.createStreamApi(
+                connection,
+                await Endpoint.createEventApi(connection),
+            );
+            const streamApi2 = await Endpoint.createStreamApi(
+                connection2,
+                await Endpoint.createEventApi(connection2),
+            );
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+            const sId = await streamApi.createStreamRoom(
+                contextId,
+                [u1Obj, u2Obj],
+                [u1Obj],
+                new TextEncoder().encode("p"),
+                new TextEncoder().encode("p"),
+            );
+
+            const expectError = async (fn: any) => {
+                try {
+                    await fn();
+                } catch {
+                    return;
+                }
+                throw new Error("Expected error");
+            };
+
+            const fakeStreamId = contextId as StreamRoomId;
+
+            // Invalid room id
+            await expectError(
+                async () => await streamApi.listStreamRoomParticipants(fakeStreamId),
+            );
+
+            // No participants before anyone joins
+            const empty = await streamApi.listStreamRoomParticipants(sId);
+
+            const waitForParticipantCount = async (count: number) => {
+                let list: Types.StreamSubscriber[] = [];
+                for (let i = 0; i < 20; i++) {
+                    list = await streamApi.listStreamRoomParticipants(sId);
+                    if (list.length === count) break;
+                    await new Promise((r) => setTimeout(r, 500));
+                }
+                return list;
+            };
+
+            await streamApi.joinStreamRoom(sId);
+            const afterU1Join = await waitForParticipantCount(1);
+
+            await streamApi2.joinStreamRoom(sId);
+            const afterU2Join = await waitForParticipantCount(2);
+
+            await streamApi.leaveStreamRoom(sId);
+            const afterU1Leave = await waitForParticipantCount(1);
+
+            return {
+                emptyLength: empty.length,
+                afterU1Join: afterU1Join.map((p) => p.userId).sort(),
+                afterU2Join: afterU2Join.map((p) => p.userId).sort(),
+                afterU1Leave: afterU1Leave.map((p) => p.userId).sort(),
+            };
+        }, args);
+
+        expect(result.emptyLength).toBe(0);
+        expect(result.afterU1Join).toEqual([users.u1.id]);
+        expect(result.afterU2Join).toEqual([users.u1.id, users.u2.id].sort());
+        expect(result.afterU1Leave).toEqual([users.u2.id]);
+    });
+
+    test("listStreamRoomParticipants: reflects published stream and subscriptions", async ({
+        page,
+        backend,
+        cli,
+    }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const connection2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
+            const streamApi = await Endpoint.createStreamApi(
+                connection,
+                await Endpoint.createEventApi(connection),
+            );
+            const streamApi2 = await Endpoint.createStreamApi(
+                connection2,
+                await Endpoint.createEventApi(connection2),
+            );
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+            const sId = await streamApi.createStreamRoom(
+                contextId,
+                [u1Obj, u2Obj],
+                [u1Obj],
+                new TextEncoder().encode("p"),
+                new TextEncoder().encode("p"),
+            );
+
+            await streamApi.joinStreamRoom(sId);
+            await streamApi2.joinStreamRoom(sId);
+
+            // U1 publishes an audio stream
+            const handle = await streamApi.createStream(sId);
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            await streamApi.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+            await streamApi.publishStream(handle);
+
+            let publisherEntry: Types.StreamSubscriber | undefined;
+            for (let i = 0; i < 20; i++) {
+                const participants = await streamApi2.listStreamRoomParticipants(sId);
+                publisherEntry = participants.find((p) => p.userId === users.u1.id);
+                if (publisherEntry?.publishedStream) break;
+                await new Promise((r) => setTimeout(r, 500));
+            }
+            if (!publisherEntry?.publishedStream) throw new Error("Published stream not found");
+
+            // U2 subscribes to U1's published stream
+            const remoteStream = publisherEntry.publishedStream;
+            await streamApi2.createSubscriberStream(sId, [
+                { streamId: remoteStream.id, streamTrackId: remoteStream.tracks[0].mid },
+            ]);
+
+            let subscriberEntry: Types.StreamSubscriber | undefined;
+            for (let i = 0; i < 20; i++) {
+                const participants = await streamApi.listStreamRoomParticipants(sId);
+                subscriberEntry = participants.find((p) => p.userId === users.u2.id);
+                if (subscriberEntry && subscriberEntry.subscriptions.length > 0) break;
+                await new Promise((r) => setTimeout(r, 500));
+            }
+
+            return {
+                publisherStreamId: publisherEntry.publishedStream.id,
+                subscriberSubscriptions: (subscriberEntry?.subscriptions ?? []).map(
+                    (s) => s.streamId,
+                ),
+            };
+        }, args);
+
+        expect(result.subscriberSubscriptions).toEqual([result.publisherStreamId]);
+    });
+
     test("addTrack: valid and invalid inputs", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {

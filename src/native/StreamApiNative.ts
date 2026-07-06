@@ -176,6 +176,15 @@ export class StreamApiNative extends BaseNative {
         );
     }
 
+    async listStreamRoomParticipants(
+        ptr: number,
+        args: [string],
+    ): Promise<Types.StreamSubscriber[]> {
+        return this.runAsync<Types.StreamSubscriber[]>((taskId) =>
+            this.api.lib.StreamApi_listStreamRoomParticipants(taskId, ptr, args),
+        );
+    }
+
     async createSubscriberStream(
         ptr: number,
         args: [string, Types.StreamSubscription[]],

@@ -746,6 +746,12 @@ export interface StreamSubscription {
     streamTrackId?: string;
 }
 
+export interface StreamSubscriber {
+    userId: string;
+    subscriptions: StreamSubscription[];
+    publishedStream?: StreamInfo;
+}
+
 export interface TurnCredentials {
     url: string;
     username: string;
