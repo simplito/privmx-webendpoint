@@ -266,50 +266,6 @@ export class StreamApi extends BaseApi {
     }
 
     /**
-     * Enables server-side recording for the Stream Room.
-     *
-     * Instructs the Bridge to record the room's streams; the recordings stay
-     * encrypted, and their decryption keys are retrieved with
-     * {@link getStreamRoomRecordingKeys}.
-     *
-     * Call after {@link joinStreamRoom} when recording is desired; fetch the
-     * keys needed to decrypt the output with {@link getStreamRoomRecordingKeys}.
-     *
-     * @param {string} streamRoomId ID of the Stream Room to record, returned by
-     *   {@link createStreamRoom} or from `StreamRoom.streamRoomId` in
-     *   {@link listStreamRooms}
-     * @returns {Promise<void>} resolves when the Bridge has acknowledged the recording request
-     */
-    public async enableStreamRoomRecording(
-        streamRoomId: EndpointTypes.StreamRoomId,
-    ): Promise<void> {
-        return this.native.enableStreamRoomRecording(this.servicePtr, [streamRoomId]);
-    }
-
-    /**
-     * Gets the encryption keys needed to decrypt the Stream Room's server-side
-     * recordings.
-     *
-     * Fetches the per-recording key material from the Bridge so the encrypted
-     * recordings produced after {@link enableStreamRoomRecording} can be
-     * decrypted client-side.
-     *
-     * Use it after {@link enableStreamRoomRecording} to obtain the keys for
-     * playback or export of the recordings.
-     *
-     * @param {string} streamRoomId ID of the Stream Room whose recording keys
-     *   are requested, returned by {@link createStreamRoom} or from
-     *   `StreamRoom.streamRoomId` in {@link listStreamRooms}
-     * @returns {RecordingEncKey[]} list of recording encryption keys used to
-     *   decrypt the recordings enabled via {@link enableStreamRoomRecording}
-     */
-    public async getStreamRoomRecordingKeys(
-        streamRoomId: EndpointTypes.StreamRoomId,
-    ): Promise<EndpointTypes.RecordingEncKey[]> {
-        return this.native.getStreamRoomRecordingKeys(this.servicePtr, [streamRoomId]);
-    }
-
-    /**
      * Fetches a single Stream Room with its metadata, member lists and version.
      *
      * Downloads the Stream Room record from the Bridge and decrypts

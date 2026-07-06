@@ -193,8 +193,6 @@ API_FUNCTION_HEADER(StreamApi, joinStreamRoom)
 API_FUNCTION_HEADER(StreamApi, listStreams)
 API_FUNCTION_HEADER(StreamApi, listStreamRoomParticipants)
 API_FUNCTION_HEADER(StreamApi, leaveStreamRoom)
-API_FUNCTION_HEADER(StreamApi, enableStreamRoomRecording)
-API_FUNCTION_HEADER(StreamApi, getStreamRoomRecordingKeys)
 
 API_FUNCTION_HEADER(StreamApi, createSubscriberStream)
 API_FUNCTION_HEADER(StreamApi, updateSubscriberStream)

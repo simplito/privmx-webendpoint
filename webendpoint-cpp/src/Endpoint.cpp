@@ -365,8 +365,6 @@ API_FUNCTION(StreamApi, joinStreamRoom)
 API_FUNCTION(StreamApi, listStreams)
 API_FUNCTION(StreamApi, listStreamRoomParticipants)
 API_FUNCTION(StreamApi, leaveStreamRoom)
-API_FUNCTION(StreamApi, enableStreamRoomRecording)
-API_FUNCTION(StreamApi, getStreamRoomRecordingKeys)
 
 API_FUNCTION(StreamApi, createSubscriberStream)
 API_FUNCTION(StreamApi, updateSubscriberStream)
