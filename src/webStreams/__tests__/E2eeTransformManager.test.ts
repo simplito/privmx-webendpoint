@@ -157,14 +157,53 @@ describe("E2eeTransformManager", () => {
             );
         });
 
-        it("falls through to EncodedStreams when transform is already assigned", async () => {
+        it("replaces an already-assigned transform (recycled m-line after rejoin)", async () => {
+            const receiver = makeReceiver("track-already-transformed");
+            const existing = { _existing: true };
+            (receiver as any).transform = existing;
+
+            await manager.setupReceiverTransform(receiver, 7);
+
+            expect(testWindow.RTCRtpScriptTransform).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ operation: "decode", publisherId: 7 }),
+            );
+            expect(receiver.transform).not.toBe(existing);
+        });
+
+        it("never falls through to EncodedStreams when a transform is already assigned", async () => {
             const receiver = makeReceiver("track-already-transformed");
             (receiver as any).transform = { _existing: true };
 
             await manager.setupReceiverTransform(receiver, 1);
 
-            // RTCRtpScriptTransform constructor should not have been called
-            expect(testWindow.RTCRtpScriptTransform).not.toHaveBeenCalled();
+            expect(receiver.createEncodedStreams).not.toHaveBeenCalled();
+            expect(worker.postDecode).not.toHaveBeenCalled();
+        });
+
+        it("keeps the existing transform when the browser rejects replacement", async () => {
+            const receiver = makeReceiver("track-reject-replace");
+            await manager.setupReceiverTransform(receiver, 1);
+            const installed = receiver.transform;
+
+            (testWindow.RTCRtpScriptTransform as Mock).mockImplementation(() => {
+                throw new Error("InvalidStateError");
+            });
+
+            await expect(manager.setupReceiverTransform(receiver, 2)).resolves.toBeUndefined();
+            expect(receiver.transform).toBe(installed);
+            expect(receiver.createEncodedStreams).not.toHaveBeenCalled();
+        });
+
+        it("propagates a constructor error when no transform was installed yet", async () => {
+            const receiver = makeReceiver("track-fresh-throw");
+            (testWindow.RTCRtpScriptTransform as Mock).mockImplementation(() => {
+                throw new Error("InvalidStateError");
+            });
+
+            await expect(manager.setupReceiverTransform(receiver, 1)).rejects.toThrow(
+                "InvalidStateError",
+            );
         });
     });
 

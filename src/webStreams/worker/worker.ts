@@ -108,12 +108,18 @@ function handleTransform(
     if (operation === "encode") {
         const transform = new TransformStream({
             async transform(encodedFrame, controller) {
-                await encryptTransform.encryptFrame(
-                    encodedFrame as RTCEncodedAudioFrame | RTCEncodedVideoFrame,
-                    kind,
-                    controller,
-                    lastRms,
-                );
+                // A throw would error the TransformStream and permanently stop
+                // this track; drop the frame instead (never enqueue plaintext).
+                try {
+                    await encryptTransform.encryptFrame(
+                        encodedFrame as RTCEncodedAudioFrame | RTCEncodedVideoFrame,
+                        kind,
+                        controller,
+                        lastRms,
+                    );
+                } catch (err) {
+                    postError(err);
+                }
             },
         });
         readableStream.pipeThrough(transform).pipeTo(writableStream).catch(logPipelineError);
@@ -121,11 +127,23 @@ function handleTransform(
         const abort = new AbortController();
         const transform = new TransformStream({
             async transform(encodedFrame, controller) {
-                const rms = await encryptTransform.decryptFrame(
-                    encodedFrame as RTCEncodedVideoFrame | RTCEncodedAudioFrame,
-                    kind,
-                    controller,
-                );
+                let rms: number | null = null;
+                // Pass through on failure, matching the unknown-key/failed-AEAD
+                // behaviour, so the TransformStream never errors permanently.
+                try {
+                    rms = await encryptTransform.decryptFrame(
+                        encodedFrame as RTCEncodedVideoFrame | RTCEncodedAudioFrame,
+                        kind,
+                        controller,
+                    );
+                } catch (err) {
+                    postError(err);
+                    try {
+                        controller.enqueue(encodedFrame);
+                    } catch {
+                        // controller already errored - nothing more to salvage
+                    }
+                }
                 if (rms !== null && kind === "audio" && context.publisherId !== undefined) {
                     const now = Date.now();
                     const last = lastRmsReportByPublisher.get(context.publisherId) ?? 0;

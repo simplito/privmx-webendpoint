@@ -25,6 +25,7 @@ declare global {
         remoteTracksCount?: number;
         trackEnded?: boolean;
         trackMuted?: boolean;
+        __remoteAudioLevelCount?: number;
     }
 }
 
@@ -1922,8 +1923,12 @@ test.describe("StreamTest", () => {
                 );
                 await api.joinStreamRoom(sId);
                 const handle = await api.createStream(sId);
-                const s = await navigator.mediaDevices.getUserMedia({ video: true });
+                const s = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true,
+                });
                 await api.addStreamTrack(handle, { track: s.getVideoTracks()[0] });
+                await api.addStreamTrack(handle, { track: s.getAudioTracks()[0] });
                 await api.publishStream(handle);
                 return sId;
             },
@@ -1951,6 +1956,9 @@ test.describe("StreamTest", () => {
                         v.id = "remote-video";
                         v.autoplay = true;
                         v.playsInline = true;
+                        // Muted so autoplay policy cannot block playback now that the
+                        // remote stream also carries audio.
+                        v.muted = true;
                         document.body.appendChild(v);
                     }
                     v.srcObject = e.streams[0];
@@ -1961,9 +1969,13 @@ test.describe("StreamTest", () => {
                     streamRoomId: roomId,
                     streamId: firstStream.id as Types.StreamId,
                 });
-                const subHandle = await api.createSubscriberStream(roomId, [
-                    { streamId: firstStream.id, streamTrackId: firstStream.tracks[0].mid },
-                ]);
+                const subHandle = await api.createSubscriberStream(
+                    roomId,
+                    firstStream.tracks.map((t: any) => ({
+                        streamId: firstStream.id,
+                        streamTrackId: t.mid,
+                    })),
+                );
 
                 // 3. User 2 PUBLISHES to keep the room alive during U1's crash/reload
                 const u2Handle = await api.createStream(roomId);
@@ -2001,8 +2013,12 @@ test.describe("StreamTest", () => {
                 const api = window.streamApi!;
                 await api.joinStreamRoom(roomId);
                 const handle = await api.createStream(roomId);
-                const s = await navigator.mediaDevices.getUserMedia({ video: true });
+                const s = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true,
+                });
                 await api.addStreamTrack(handle, { track: s.getVideoTracks()[0] });
+                await api.addStreamTrack(handle, { track: s.getAudioTracks()[0] });
                 await api.publishStream(handle);
                 await new Promise((r) => setTimeout(r, 2000));
             },
@@ -2028,6 +2044,7 @@ test.describe("StreamTest", () => {
                         v.id = "remote-video";
                         v.autoplay = true;
                         v.playsInline = true;
+                        v.muted = true;
                         document.body.appendChild(v);
                     }
                     v.srcObject = e.streams[0];
@@ -2038,9 +2055,26 @@ test.describe("StreamTest", () => {
                     streamRoomId: roomId,
                     streamId: newStream.id as Types.StreamId,
                 });
-                await api.updateSubscriberStream(subHandle, [
-                    { streamId: newStream.id, streamTrackId: newStream.tracks[0].mid },
-                ], []);
+
+                // Remote audio-level reports fire only when an incoming audio frame
+                // passes AES-GCM decryption in the E2EE worker; the old feed died
+                // with the reload, so reports counted here prove the re-published
+                // audio decrypts.
+                window.__remoteAudioLevelCount = 0;
+                await api.addAudioLevelStatsListener((stats) => {
+                    if (stats.levels.some((l) => l.streamId !== -1)) {
+                        window.__remoteAudioLevelCount = (window.__remoteAudioLevelCount ?? 0) + 1;
+                    }
+                });
+
+                await api.updateSubscriberStream(
+                    subHandle,
+                    newStream.tracks.map((t: any) => ({
+                        streamId: newStream.id,
+                        streamTrackId: t.mid,
+                    })),
+                    [],
+                );
                 return newStream.id;
             },
             { roomId, initialStreamIds, subHandle },
@@ -2059,6 +2093,11 @@ test.describe("StreamTest", () => {
             expectedNewStreamId,
             { timeout: 30000 },
         );
+
+        // Several distinct RMS reports = sustained decryption of the re-published audio.
+        await page2.waitForFunction(() => (window.__remoteAudioLevelCount ?? 0) > 3, null, {
+            timeout: 30000,
+        });
     });
 
     test("E2E: Edge Case - Zombie Publisher (Abrupt Close)", async ({

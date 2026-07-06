@@ -1,4 +1,5 @@
 import { Key } from "../Types.js";
+import { Logger } from "./Logger.js";
 import {
     DecodeEvent,
     EncodeEvent,
@@ -20,6 +21,7 @@ import {
 export class E2eeWorker {
     private worker: Worker | undefined;
     private workerError: Error | undefined;
+    private readonly logger = new Logger();
     // Pending operation rejects, so worker failure/teardown rejects them instead of hanging.
     private readonly pendingRejects = new Set<(err: Error) => void>();
 
@@ -44,6 +46,8 @@ export class E2eeWorker {
             this.worker.onmessage = (event: MessageEvent<WorkerOutboundEvent>) => {
                 if ("type" in event.data && event.data.type === "rms") {
                     this.onRmsFrame(event.data.publisherId ?? 0, event.data.rms);
+                } else if ("type" in event.data && event.data.type === "error") {
+                    this.logger.error("PrivMX E2EE worker error:", event.data.data);
                 }
             };
             this.worker.onerror = (e: ErrorEvent) => {
