@@ -42,9 +42,9 @@ function makeSender(): RTCRtpSenderWithTransform {
     } as unknown as RTCRtpSenderWithTransform;
 }
 
-function makeReceiver(trackId = "track-1"): RTCRtpReceiverWithTransform {
+function makeReceiver(trackId = "track-1", kind = "audio"): RTCRtpReceiverWithTransform {
     return {
-        track: { id: trackId },
+        track: { id: trackId, kind },
         transform: undefined,
         createEncodedStreams: vi.fn().mockReturnValue({
             readable: { _type: "readable" },
@@ -78,23 +78,23 @@ describe("E2eeTransformManager", () => {
 
         it("assigns a transform on the sender", async () => {
             const sender = makeSender();
-            await manager.setupSenderTransform(sender);
+            await manager.setupSenderTransform(sender, "audio");
             expect(sender.transform).toBeDefined();
         });
 
         it("does NOT call createEncodedStreams", async () => {
             const sender = makeSender();
-            await manager.setupSenderTransform(sender);
+            await manager.setupSenderTransform(sender, "audio");
             expect(sender.createEncodedStreams).not.toHaveBeenCalled();
         });
 
         it("calls e2eeWorker.get() to obtain the worker instance", async () => {
-            await manager.setupSenderTransform(makeSender());
+            await manager.setupSenderTransform(makeSender(), "audio");
             expect(worker.get).toHaveBeenCalledTimes(1);
         });
 
         it("constructs RTCRtpScriptTransform with operation=encode", async () => {
-            await manager.setupSenderTransform(makeSender());
+            await manager.setupSenderTransform(makeSender(), "audio");
             expect(testWindow.RTCRtpScriptTransform).toHaveBeenCalledWith(
                 expect.anything(),
                 expect.objectContaining({ operation: "encode" }),
@@ -108,15 +108,15 @@ describe("E2eeTransformManager", () => {
             const { readable, writable } = sender.createEncodedStreams();
             (sender.createEncodedStreams as Mock).mockClear();
 
-            await manager.setupSenderTransform(sender);
+            await manager.setupSenderTransform(sender, "audio");
 
             expect(sender.createEncodedStreams).toHaveBeenCalledTimes(1);
-            expect(worker.postEncode).toHaveBeenCalledWith(readable, writable);
+            expect(worker.postEncode).toHaveBeenCalledWith(readable, writable, "audio");
         });
 
         it("does NOT assign sender.transform", async () => {
             const sender = makeSender();
-            await manager.setupSenderTransform(sender);
+            await manager.setupSenderTransform(sender, "audio");
             expect(sender.transform).toBeUndefined();
         });
     });
@@ -157,14 +157,53 @@ describe("E2eeTransformManager", () => {
             );
         });
 
-        it("falls through to EncodedStreams when transform is already assigned", async () => {
+        it("replaces an already-assigned transform (recycled m-line after rejoin)", async () => {
+            const receiver = makeReceiver("track-already-transformed");
+            const existing = { _existing: true };
+            (receiver as any).transform = existing;
+
+            await manager.setupReceiverTransform(receiver, 7);
+
+            expect(testWindow.RTCRtpScriptTransform).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ operation: "decode", publisherId: 7 }),
+            );
+            expect(receiver.transform).not.toBe(existing);
+        });
+
+        it("never falls through to EncodedStreams when a transform is already assigned", async () => {
             const receiver = makeReceiver("track-already-transformed");
             (receiver as any).transform = { _existing: true };
 
             await manager.setupReceiverTransform(receiver, 1);
 
-            // RTCRtpScriptTransform constructor should not have been called
-            expect(testWindow.RTCRtpScriptTransform).not.toHaveBeenCalled();
+            expect(receiver.createEncodedStreams).not.toHaveBeenCalled();
+            expect(worker.postDecode).not.toHaveBeenCalled();
+        });
+
+        it("keeps the existing transform when the browser rejects replacement", async () => {
+            const receiver = makeReceiver("track-reject-replace");
+            await manager.setupReceiverTransform(receiver, 1);
+            const installed = receiver.transform;
+
+            (testWindow.RTCRtpScriptTransform as Mock).mockImplementation(() => {
+                throw new Error("InvalidStateError");
+            });
+
+            await expect(manager.setupReceiverTransform(receiver, 2)).resolves.toBeUndefined();
+            expect(receiver.transform).toBe(installed);
+            expect(receiver.createEncodedStreams).not.toHaveBeenCalled();
+        });
+
+        it("propagates a constructor error when no transform was installed yet", async () => {
+            const receiver = makeReceiver("track-fresh-throw");
+            (testWindow.RTCRtpScriptTransform as Mock).mockImplementation(() => {
+                throw new Error("InvalidStateError");
+            });
+
+            await expect(manager.setupReceiverTransform(receiver, 1)).rejects.toThrow(
+                "InvalidStateError",
+            );
         });
     });
 
@@ -179,6 +218,7 @@ describe("E2eeTransformManager", () => {
                 99,
                 expect.anything(),
                 expect.anything(),
+                "audio",
             );
         });
 

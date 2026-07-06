@@ -17,9 +17,9 @@ import { E2eeWorker } from "./E2eeWorker.js";
 /**
  * Wires the E2EE worker into WebRTC sender and receiver pipelines.
  *
- * Prefers the modern `RTCRtpScriptTransform` API (available in Chrome ≥ 94 and
- * Safari ≥ 15.4). Falls back to the `createEncodedStreams()` API when
- * `RTCRtpScriptTransform` is absent (Firefox, older browsers).
+ * Prefers the modern `RTCRtpScriptTransform` API (Safari ≥ 15.4, Firefox ≥ 117,
+ * Chrome ≥ 141). Falls back to the `createEncodedStreams()` API when
+ * `RTCRtpScriptTransform` is absent (older Chromium-based browsers).
  * @internal
  */
 export class E2eeTransformManager {
@@ -33,20 +33,26 @@ export class E2eeTransformManager {
      *
      * Uses `RTCRtpScriptTransform` when available; otherwise transfers the
      * sender's encoded-stream pair to the worker via `postEncode`.
+     *
+     * `kind` MUST be passed explicitly by the caller (from the track being
+     * published) rather than read from `sender.track?.kind`: during
+     * renegotiation/reconnect the sender's track can still be null here, which
+     * would make the worker fall back to the "video" header layout and corrupt
+     * outgoing audio frames (audio uses a 1-byte header, video 1/3/10 bytes).
      */
-    async setupSenderTransform(sender: RTCRtpSender): Promise<void> {
+    async setupSenderTransform(sender: RTCRtpSender, kind: "audio" | "video"): Promise<void> {
         const win = window as unknown as WindowWithRTCRtpScriptTransform;
         const senderExt = sender as RTCRtpSenderWithTransform;
         if (win.RTCRtpScriptTransform) {
             const worker = await this.e2eeWorker.get();
             senderExt.transform = new win.RTCRtpScriptTransform(worker, {
                 operation: "encode",
-                kind: sender.track?.kind,
+                kind,
             });
         } else {
             this.logger.debug("Sender: using EncodedStreams");
             const { readable, writable } = senderExt.createEncodedStreams();
-            await this.e2eeWorker.postEncode(readable, writable);
+            await this.e2eeWorker.postEncode(readable, writable, kind);
         }
     }
 
@@ -56,20 +62,36 @@ export class E2eeTransformManager {
      * Uses `RTCRtpScriptTransform` when available. Falls back to `createEncodedStreams()`,
      * guarding against double-posting the same stream pair to the worker.
      * No-ops if `createEncodedStreams` is not supported by the browser.
+     *
+     * The same receiver can be handed to us more than once: when a remote peer
+     * rejoins, the SFU recycles the freed m-line and `ontrack` re-fires with a
+     * receiver whose transform is already installed. The transform is then
+     * replaced so the worker pipeline picks up the new `publisherId`; the two
+     * transform APIs are never mixed on one receiver.
      */
     async setupReceiverTransform(receiver: RTCRtpReceiver, publisherId: number): Promise<void> {
         const win = window as unknown as WindowWithRTCRtpScriptTransform;
         const receiverExt = receiver as RTCRtpReceiverWithTransform;
+        const kind = receiver.track.kind as "audio" | "video";
 
-        if (win.RTCRtpScriptTransform && !receiverExt.transform) {
+        if (win.RTCRtpScriptTransform) {
             this.logger.debug("Receiver: using RTCRtpScriptTransform");
             const worker = await this.e2eeWorker.get();
-            receiverExt.transform = new win.RTCRtpScriptTransform(worker, {
-                operation: "decode",
-                id: receiver.track.id,
-                publisherId,
-                kind: receiver.track.kind,
-            });
+            const hadTransform = !!receiverExt.transform;
+            try {
+                receiverExt.transform = new win.RTCRtpScriptTransform(worker, {
+                    operation: "decode",
+                    id: receiver.track.id,
+                    publisherId,
+                    kind,
+                });
+            } catch (e) {
+                if (!hadTransform) throw e;
+                // The existing transform shares the same worker and key store, so
+                // decryption keeps working; only RMS attribution stays on the old
+                // publisherId.
+                this.logger.warn("Receiver: keeping existing transform, replacement rejected:", e);
+            }
             return;
         }
 
@@ -91,7 +113,7 @@ export class E2eeTransformManager {
             posted: false,
         };
         this.encByReceiver.set(receiver, enc);
-        await this.e2eeWorker.postDecode(enc.id, enc.publisherId, enc.readable, enc.writable);
+        await this.e2eeWorker.postDecode(enc.id, enc.publisherId, enc.readable, enc.writable, kind);
     }
 
     /**

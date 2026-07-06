@@ -1,4 +1,5 @@
 import { Key } from "../Types.js";
+import { Logger } from "./Logger.js";
 import {
     DecodeEvent,
     EncodeEvent,
@@ -20,6 +21,7 @@ import {
 export class E2eeWorker {
     private worker: Worker | undefined;
     private workerError: Error | undefined;
+    private readonly logger = new Logger();
     // Pending operation rejects, so worker failure/teardown rejects them instead of hanging.
     private readonly pendingRejects = new Set<(err: Error) => void>();
 
@@ -44,6 +46,8 @@ export class E2eeWorker {
             this.worker.onmessage = (event: MessageEvent<WorkerOutboundEvent>) => {
                 if ("type" in event.data && event.data.type === "rms") {
                     this.onRmsFrame(event.data.publisherId ?? 0, event.data.rms);
+                } else if ("type" in event.data && event.data.type === "error") {
+                    this.logger.error("PrivMX E2EE worker error:", event.data.data);
                 }
             };
             this.worker.onerror = (e: ErrorEvent) => {
@@ -107,11 +111,13 @@ export class E2eeWorker {
     async postEncode(
         readable: ReadableStream<unknown>,
         writable: WritableStream<unknown>,
+        kind: "audio" | "video",
     ): Promise<void> {
         const worker = await this.get();
         worker.postMessage(
             {
                 operation: "encode",
+                kind,
                 readableStream: readable,
                 writableStream: writable,
             } satisfies EncodeEvent,
@@ -126,12 +132,15 @@ export class E2eeWorker {
      *
      * @param id         Unique track ID used by the worker to identify the pipeline.
      * @param publisherId Numeric WebRTC stream ID of the remote publisher.
+     * @param kind       Track kind ("audio" | "video"); selects the frame header
+     *                   layout used as AES-GCM AAD. Must match the sender's kind.
      */
     async postDecode(
         id: string,
         publisherId: number,
         readable: ReadableStream<unknown>,
         writable: WritableStream<unknown>,
+        kind: "audio" | "video",
     ): Promise<void> {
         const worker = await this.get();
         worker.postMessage(
@@ -139,6 +148,7 @@ export class E2eeWorker {
                 operation: "decode",
                 id,
                 publisherId,
+                kind,
                 readableStream: readable,
                 writableStream: writable,
             } satisfies DecodeEvent,

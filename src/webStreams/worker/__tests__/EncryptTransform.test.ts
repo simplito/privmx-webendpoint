@@ -281,6 +281,85 @@ describe("EncryptTransform", () => {
         });
     });
 
+    describe("foreign (non-wire-format) frames - pass-through, never throw", () => {
+        it("passes through when the keyIdLen byte points past the frame start", async () => {
+            const { ks } = await makeKeyStore();
+            const et = new EncryptTransform(ks);
+
+            // 20-byte frame whose second-to-last byte (keyIdLen) is 255
+            const raw = new Uint8Array(20).fill(0x55);
+            raw[18] = 255;
+            const frame = { data: raw.slice().buffer };
+
+            const { controller, enqueued } = makeController();
+            const rms = await et.decryptFrame(
+                frame as unknown as RTCEncodedAudioFrame,
+                "audio",
+                controller,
+            );
+
+            expect(rms).toBeNull();
+            expect(enqueued).toHaveLength(1);
+            expect(bufEqual(new Uint8Array(enqueued[0].data), raw)).toBe(true);
+        });
+
+        it("passes through when the ivLen byte points past the frame start", async () => {
+            const { ks } = await makeKeyStore();
+            const et = new EncryptTransform(ks);
+
+            // Trailer parses as keyIdLen=2, but ivLen=200 reaches into the header
+            const raw = new Uint8Array(30).fill(0x66);
+            raw[28] = 2; // keyIdLen
+            raw[25] = 200; // ivLen (at keyIdPos - 1 = 26 - 1)
+            const frame = { data: raw.slice().buffer };
+
+            const { controller, enqueued } = makeController();
+            const rms = await et.decryptFrame(
+                frame as unknown as RTCEncodedAudioFrame,
+                "audio",
+                controller,
+            );
+
+            expect(rms).toBeNull();
+            expect(enqueued).toHaveLength(1);
+        });
+
+        it("never throws on random audio-sized frames (fuzz)", async () => {
+            const { ks } = await makeKeyStore();
+            const et = new EncryptTransform(ks);
+
+            for (let i = 0; i < 500; i++) {
+                const raw = new Uint8Array(6 + (i % 250));
+                crypto.getRandomValues(raw);
+                const { controller, enqueued } = makeController();
+                const rms = await et.decryptFrame(
+                    { data: raw.buffer } as unknown as RTCEncodedAudioFrame,
+                    "audio",
+                    controller,
+                );
+                expect(rms).toBeNull();
+                expect(enqueued).toHaveLength(1);
+            }
+        });
+
+        it("encryptFrame passes an empty (sub-header) frame through unchanged", async () => {
+            const { ks } = await makeKeyStore();
+            const et = new EncryptTransform(ks);
+
+            const frame = { data: new ArrayBuffer(0) };
+            const { controller, enqueued } = makeController();
+            await et.encryptFrame(
+                frame as unknown as RTCEncodedAudioFrame,
+                "audio",
+                controller,
+                0,
+            );
+
+            expect(enqueued).toHaveLength(1);
+            expect(enqueued[0].data.byteLength).toBe(0);
+        });
+    });
+
     describe("multiple sequential encryptions", () => {
         it("each frame gets a unique IV (ciphertexts differ for identical plaintexts)", async () => {
             const { ks } = await makeKeyStore(0x77);

@@ -86,6 +86,12 @@ export class EncryptTransform {
             kind === "video"
                 ? this.getHeaderSizeByType((encodedFrame as RTCEncodedVideoFrame).type)
                 : 1;
+        // A frame shorter than its own header (e.g. an empty DTX audio frame)
+        // carries no payload.
+        if (encodedFrame.data.byteLength < headerLen) {
+            controller.enqueue(encodedFrame);
+            return;
+        }
         const frameHeader = new Uint8Array(encodedFrame.data, 0, headerLen);
         const frameBody = new Uint8Array(encodedFrame.data, headerLen);
 
@@ -142,11 +148,21 @@ export class EncryptTransform {
         const keyIdLenPos = rmsPos - 1;
         const keyIdLen = new Uint8Array(data, keyIdLenPos, 1)[0];
         const keyIdPos = keyIdLenPos - keyIdLen;
+        // A trailer that would reach into the header means a plain/foreign frame
+        // with arbitrary bytes in the length positions - pass it through.
+        if (keyIdPos < headerLen + 1) {
+            controller.enqueue(encodedFrame);
+            return null;
+        }
         const keyId = textDecoder.decode(new Uint8Array(data, keyIdPos, keyIdLen));
 
         const ivLenPos = keyIdPos - 1;
         const ivLen = new Uint8Array(data, ivLenPos, 1)[0];
         const ivPos = ivLenPos - ivLen;
+        if (ivPos < headerLen) {
+            controller.enqueue(encodedFrame);
+            return null;
+        }
         const iv = new Uint8Array(data, ivPos, ivLen);
 
         const payloadLen = ivPos - headerLen;

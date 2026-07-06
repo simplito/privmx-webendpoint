@@ -39,7 +39,10 @@ export class PublisherManager {
                     await this.audioManager.ensureLocalAudioLevelMeter(track);
                 }
                 const sender = pc.addTrack(track, stream);
-                await this.e2eeTransformManager.setupSenderTransform(sender);
+                await this.e2eeTransformManager.setupSenderTransform(
+                    sender,
+                    track.kind as "audio" | "video",
+                );
             }
         }
 
@@ -78,7 +81,10 @@ export class PublisherManager {
                 await this.audioManager.ensureLocalAudioLevelMeter(track);
             }
             const sender = pc.addTrack(track, localStream);
-            await this.e2eeTransformManager.setupSenderTransform(sender);
+            await this.e2eeTransformManager.setupSenderTransform(
+                sender,
+                track.kind as "audio" | "video",
+            );
         }
 
         for (const oldTrack of tracksToRemove) {
