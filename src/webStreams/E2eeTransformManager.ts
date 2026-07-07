@@ -4,8 +4,6 @@ type EncPair = {
     readable: ReadableStream<unknown>;
     writable: WritableStream<unknown>;
     id: string;
-    publisherId: number;
-    posted: boolean;
 };
 import {
     RTCRtpSenderWithTransform,
@@ -57,7 +55,7 @@ export class E2eeTransformManager {
     }
 
     /**
-     * Installs an E2EE receiver transform on `receiver` for the given `publisherId`.
+     * Installs an E2EE receiver transform on `receiver`.
      *
      * Uses `RTCRtpScriptTransform` when available. Falls back to `createEncodedStreams()`,
      * guarding against double-posting the same stream pair to the worker.
@@ -66,10 +64,9 @@ export class E2eeTransformManager {
      * The same receiver can be handed to us more than once: when a remote peer
      * rejoins, the SFU recycles the freed m-line and `ontrack` re-fires with a
      * receiver whose transform is already installed. The transform is then
-     * replaced so the worker pipeline picks up the new `publisherId`; the two
-     * transform APIs are never mixed on one receiver.
+     * replaced; the two transform APIs are never mixed on one receiver.
      */
-    async setupReceiverTransform(receiver: RTCRtpReceiver, publisherId: number): Promise<void> {
+    async setupReceiverTransform(receiver: RTCRtpReceiver): Promise<void> {
         const win = window as unknown as WindowWithRTCRtpScriptTransform;
         const receiverExt = receiver as RTCRtpReceiverWithTransform;
         const kind = receiver.track.kind as "audio" | "video";
@@ -82,14 +79,12 @@ export class E2eeTransformManager {
                 receiverExt.transform = new win.RTCRtpScriptTransform(worker, {
                     operation: "decode",
                     id: receiver.track.id,
-                    publisherId,
                     kind,
                 });
             } catch (e) {
                 if (!hadTransform) throw e;
                 // The existing transform shares the same worker and key store, so
-                // decryption keeps working; only RMS attribution stays on the old
-                // publisherId.
+                // decryption keeps working.
                 this.logger.warn("Receiver: keeping existing transform, replacement rejected:", e);
             }
             return;
@@ -109,11 +104,9 @@ export class E2eeTransformManager {
             readable,
             writable,
             id: receiver.track.id,
-            publisherId,
-            posted: false,
         };
         this.encByReceiver.set(receiver, enc);
-        await this.e2eeWorker.postDecode(enc.id, enc.publisherId, enc.readable, enc.writable, kind);
+        await this.e2eeWorker.postDecode(enc.id, enc.readable, enc.writable, kind);
     }
 
     /**

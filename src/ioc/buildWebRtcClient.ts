@@ -1,5 +1,4 @@
 import { AudioManager } from "../webStreams/AudioManager.js";
-import { logger } from "../webStreams/Logger.js";
 import { DataChannelCryptor } from "../webStreams/DataChannelCryptor.js";
 import { DataChannelSession } from "../webStreams/DataChannelSession.js";
 import { E2eeTransformManager } from "../webStreams/E2eeTransformManager.js";
@@ -25,7 +24,6 @@ import { T } from "./Tokens.js";
  *
  *   - PeerConnectionFactory.onRemoteTrack  → resolves SubscriberManager lazily
  *   - PeerConnectionManager.onTrickle      → resolves WebRtcClient lazily
- *   - E2eeWorker RMS callback              → resolves AudioManager lazily
  * @internal
  */
 export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
@@ -59,7 +57,7 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
     );
 
     const publisher = new PublisherManager(pcm, audioManager, e2eeTransform);
-    const subscriber = new SubscriberManager(pcm, e2eeTransform, registry);
+    const subscriber = new SubscriberManager(pcm, e2eeTransform, registry, audioManager);
     const keys = new KeySyncManager(keyStore, e2eeWorker);
 
     const client = new WebRtcClient(
@@ -106,14 +104,9 @@ export function registerWebRtcServices(c: WebRtcContainer): void {
             new DataChannelSession(await c.resolve<DataChannelCryptor>(T.DataChannelCryptor)),
     );
 
-    // E2eeWorker - the RMS callback resolves AudioManager lazily (built after E2eeWorker).
     c.registerSingleton(T.E2eeWorker, async (c) => {
         const workerUrl = await c.resolve<string>(T.WorkerUrl);
-        return new E2eeWorker(workerUrl, (publisherId, rms) => {
-            c.resolve<AudioManager>(T.AudioManager)
-                .then((am) => am.onRemoteFrameRms(publisherId, rms))
-                .catch((e) => logger.error("onRemoteFrameRms failed:", e));
-        });
+        return new E2eeWorker(workerUrl);
     });
 
     c.registerSingleton(
@@ -121,11 +114,7 @@ export function registerWebRtcServices(c: WebRtcContainer): void {
         async (c) => new E2eeTransformManager(await c.resolve<E2eeWorker>(T.E2eeWorker)),
     );
 
-    c.registerSingleton(T.AudioManager, async (c) => {
-        const rmsProcessorUrl = await c.resolve<string>(T.RmsProcessorUrl);
-        const e2eeWorker = await c.resolve<E2eeWorker>(T.E2eeWorker);
-        return new AudioManager(rmsProcessorUrl, (rms) => e2eeWorker.sendRms(rms));
-    });
+    c.registerSingleton(T.AudioManager, async () => new AudioManager());
 
     c.registerSingleton(T.WebRtcClient, (c) => buildWebRtcClient(c));
 }

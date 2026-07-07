@@ -11,7 +11,6 @@ export const T = {
     Api: "global:Api",
     AssetsBasePath: "global:AssetsBasePath",
     WorkerUrl: "global:WorkerUrl",
-    RmsProcessorUrl: "global:RmsProcessorUrl",
     EventQueue: "global:EventQueue",
     CryptoApi: "global:CryptoApi",
 
@@ -62,6 +61,4 @@ export interface ResolvedAssetUrls {
     basePath: string;
     /** Absolute URL of `privmx-worker.js`, loaded by the E2EE `Worker`. */
     workerUrl: string;
-    /** Absolute URL of `rms-processor.js`, loaded by the audio `AudioWorklet`. */
-    rmsProcessorUrl: string;
 }

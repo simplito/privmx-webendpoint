@@ -1,50 +1,9 @@
-import type { Mock } from "vitest";
 import { AudioManager } from "../AudioManager.js";
-import { LOCAL_PUBLISHER_ID } from "../audio/ActiveSpeakerDetector.js";
-import { LocalAudioLevelMeter } from "../audio/LocalAudioLevelMeter.js";
-
-// ---- minimal browser-API stubs needed by AudioManager ----
-
-class FakeAudioWorkletNode {
-    port = { onmessage: null as ((ev: MessageEvent) => void) | null };
-    connect() {}
-    disconnect() {}
-}
-
-class FakeGainNode {
-    gain = { value: 1 };
-    connect() {}
-    disconnect() {}
-}
-
-class FakeMediaStreamAudioSourceNode {
-    connect() {}
-    disconnect() {}
-}
-
-class FakeAudioContext {
-    destination = {};
-    audioWorklet = {
-        addModule: vi.fn().mockResolvedValue(undefined),
-    };
-    resume = vi.fn().mockResolvedValue(undefined);
-    close = vi.fn();
-    createGain() {
-        return new FakeGainNode();
-    }
-    createMediaStreamSource() {
-        return new FakeMediaStreamAudioSourceNode();
-    }
-}
-
-interface BrowserGlobals {
-    AudioContext: typeof FakeAudioContext;
-    AudioWorkletNode: typeof FakeAudioWorkletNode;
-}
-
-const g = global as unknown as BrowserGlobals;
-g.AudioContext = FakeAudioContext;
-g.AudioWorkletNode = FakeAudioWorkletNode;
+import {
+    ActiveSpeakerDetector,
+    LOCAL_PUBLISHER_ID,
+    SpeakerState,
+} from "../audio/ActiveSpeakerDetector.js";
 
 function makeTrack(id: string, kind: "audio" | "video" = "audio"): MediaStreamTrack {
     return {
@@ -57,149 +16,190 @@ function makeTrack(id: string, kind: "audio" | "video" = "audio"): MediaStreamTr
     } as unknown as MediaStreamTrack;
 }
 
+/** A sender whose getStats() resolves with a single "media-source" report. */
+function makeSenderWithLevel(track: MediaStreamTrack, audioLevel: number): RTCRtpSender {
+    return {
+        track,
+        getStats: vi.fn().mockResolvedValue({
+            forEach(cb: (stat: unknown) => void) {
+                cb({ type: "media-source", kind: "audio", audioLevel });
+            },
+        }),
+    } as unknown as RTCRtpSender;
+}
+
+/** A sender whose getStats() resolves with no usable "media-source" report. */
+function makeSenderWithoutLevel(track: MediaStreamTrack): RTCRtpSender {
+    return {
+        track,
+        getStats: vi.fn().mockResolvedValue({
+            forEach() {},
+        }),
+    } as unknown as RTCRtpSender;
+}
+
+/** A receiver whose getSynchronizationSources() reports a single audioLevel. */
+function makeReceiverWithLevel(track: MediaStreamTrack, audioLevel: number): RTCRtpReceiver {
+    return {
+        track,
+        getSynchronizationSources: vi.fn().mockReturnValue([{ audioLevel }]),
+    } as unknown as RTCRtpReceiver;
+}
+
+/** A receiver whose getSynchronizationSources() reports no usable audioLevel. */
+function makeReceiverWithoutLevel(track: MediaStreamTrack): RTCRtpReceiver {
+    return {
+        track,
+        getSynchronizationSources: vi.fn().mockReturnValue([{}]),
+    } as unknown as RTCRtpReceiver;
+}
+
+function findSpeaker(
+    stats: { levels: SpeakerState[] },
+    streamId: number,
+): SpeakerState | undefined {
+    return stats.levels.find((s) => s.streamId === streamId);
+}
+
 describe("AudioManager", () => {
-    let onRmsForWorker: Mock;
     let manager: AudioManager;
 
     beforeEach(() => {
-        onRmsForWorker = vi.fn();
-        manager = new AudioManager("/assets/rms-processor.js", onRmsForWorker);
+        manager = new AudioManager();
     });
 
-    describe("setAudioLevelCallback", () => {
-        it("registers the callback so onRemoteFrameRms fires it", () => {
-            const cb = vi.fn();
-            manager.setAudioLevelCallback(cb);
-            manager.onRemoteFrameRms(42, 0.5);
-            expect(cb).toHaveBeenCalledTimes(1);
-            expect(cb.mock.calls[0][0]).toHaveProperty("levels");
-        });
-
-        it("does not fire the callback before it is registered", () => {
-            const cb = vi.fn();
-            manager.onRemoteFrameRms(1, 0.9); // no callback yet
-            manager.setAudioLevelCallback(cb);
-            expect(cb).not.toHaveBeenCalled();
-        });
+    afterEach(() => {
+        manager.destroy();
     });
 
-    describe("onRemoteFrameRms", () => {
-        it("passes RMS and publisherId to the active speaker detector", () => {
-            const cb = vi.fn();
-            manager.setAudioLevelCallback(cb);
+    describe("readAudioStats", () => {
+        it("does not read from a sender until it is watched", async () => {
+            const sender = makeSenderWithLevel(makeTrack("t1"), 1);
 
-            manager.onRemoteFrameRms(7, 0.8);
-            const result = cb.mock.calls[0][0];
-            expect(result.levels.some((s: { streamId: number }) => s.streamId === 7)).toBe(true);
+            await manager.readAudioStats();
+
+            expect(sender.getStats).not.toHaveBeenCalled();
         });
 
-        it("always feeds LOCAL_PUBLISHER_ID (local) into the detector before the remote frame", () => {
-            const cb = vi.fn();
-            manager.setAudioLevelCallback(cb);
-            manager.onRemoteFrameRms(5, 0.1);
-            const result = cb.mock.calls[0][0];
-            expect(
-                result.levels.some((s: { streamId: number }) => s.streamId === LOCAL_PUBLISHER_ID),
-            ).toBe(true);
+        it("reads fresh on every call - there is no internal timer", async () => {
+            const sender = makeSenderWithLevel(makeTrack("t1"), 1);
+            manager.watchLocalSender(sender);
+
+            await manager.readAudioStats();
+            await manager.readAudioStats();
+            await manager.readAudioStats();
+
+            expect(sender.getStats).toHaveBeenCalledTimes(3);
+        });
+
+        it("stops reading from a sender/receiver after destroy()", async () => {
+            const sender = makeSenderWithLevel(makeTrack("t1"), 1);
+            manager.watchLocalSender(sender);
+            manager.destroy();
+
+            await manager.readAudioStats();
+
+            expect(sender.getStats).not.toHaveBeenCalled();
         });
     });
 
-    describe("stopLocalAudioLevelMeter", () => {
-        it("is a no-op when no meter exists for the track", () => {
-            const track = makeTrack("no-such-meter");
-            expect(() => manager.stopLocalAudioLevelMeter(track)).not.toThrow();
+    describe("local level - native getStats() path", () => {
+        it("feeds the sender's media-source audioLevel into the detector under LOCAL_PUBLISHER_ID", async () => {
+            manager.watchLocalSender(makeSenderWithLevel(makeTrack("t1"), 1)); // 1 -> 0 dB
+
+            const stats = await manager.readAudioStats();
+
+            const local = findSpeaker(stats, LOCAL_PUBLISHER_ID);
+            expect(local).toBeDefined();
+            expect(local!.emaRms).toBeCloseTo(0, 5);
+        });
+
+        it("converts a quieter linear level to a proportionally lower dB value", async () => {
+            manager.watchLocalSender(makeSenderWithLevel(makeTrack("t1"), 0.1)); // -> -20 dB
+
+            const stats = await manager.readAudioStats();
+
+            expect(findSpeaker(stats, LOCAL_PUBLISHER_ID)!.emaRms).toBeCloseTo(-20, 5);
+        });
+
+        it("combines multiple local senders by taking the loudest", async () => {
+            manager.watchLocalSender(makeSenderWithLevel(makeTrack("quiet"), 0.001));
+            manager.watchLocalSender(makeSenderWithLevel(makeTrack("loud"), 1));
+
+            const stats = await manager.readAudioStats();
+
+            expect(findSpeaker(stats, LOCAL_PUBLISHER_ID)!.emaRms).toBeCloseTo(0, 5);
+        });
+
+        it("stops sampling a sender after unwatchLocalSender", async () => {
+            const track = makeTrack("t1");
+            const sender = makeSenderWithLevel(track, 1);
+            manager.watchLocalSender(sender);
+            manager.unwatchLocalSender(track);
+
+            await manager.readAudioStats();
+
+            expect(sender.getStats).not.toHaveBeenCalled();
+        });
+
+        it("stays inactive when getStats() has no media-source level (no fallback)", async () => {
+            manager.watchLocalSender(makeSenderWithoutLevel(makeTrack("t1")));
+
+            const stats = await manager.readAudioStats();
+
+            // No native level -> treated as silence -> never crosses the threshold.
+            expect(findSpeaker(stats, LOCAL_PUBLISHER_ID)!.activeUntil).toBe(-Infinity);
         });
     });
 
-    describe("ensureLocalAudioLevelMeter", () => {
-        it("does not add a second meter for the same track", async () => {
-            const initSpy = vi
-                .spyOn(LocalAudioLevelMeter.prototype, "init")
-                .mockResolvedValue(undefined);
+    describe("remote level - native getSynchronizationSources() path", () => {
+        it("feeds a receiver's audioLevel into the detector under its publisherId", async () => {
+            manager.watchRemoteReceiver(7, makeReceiverWithLevel(makeTrack("r1"), 1));
 
-            const track = makeTrack("track-1");
-            await manager.ensureLocalAudioLevelMeter(track);
-            await manager.ensureLocalAudioLevelMeter(track); // second call - same track
+            const stats = await manager.readAudioStats();
 
-            expect(initSpy).toHaveBeenCalledTimes(1);
-            initSpy.mockRestore();
+            expect(findSpeaker(stats, 7)!.emaRms).toBeCloseTo(0, 5);
         });
 
-        it("removes the meter if init throws and allows retry", async () => {
-            const initSpy = vi
-                .spyOn(LocalAudioLevelMeter.prototype, "init")
-                .mockRejectedValue(new Error("worklet load failed"));
-            const stopSpy = vi
-                .spyOn(LocalAudioLevelMeter.prototype, "stop")
-                .mockReturnValue(undefined);
+        it("tracks multiple remote publishers independently", async () => {
+            manager.watchRemoteReceiver(10, makeReceiverWithLevel(makeTrack("r1"), 1));
+            manager.watchRemoteReceiver(20, makeReceiverWithLevel(makeTrack("r2"), 0.1));
 
-            const track = makeTrack("track-err");
-            await expect(manager.ensureLocalAudioLevelMeter(track)).rejects.toThrow(
-                "worklet load failed",
-            );
+            const stats = await manager.readAudioStats();
 
-            initSpy.mockResolvedValue(undefined);
-            await expect(manager.ensureLocalAudioLevelMeter(track)).resolves.not.toThrow();
-            expect(initSpy).toHaveBeenCalledTimes(2);
-
-            initSpy.mockRestore();
-            stopSpy.mockRestore();
+            expect(findSpeaker(stats, 10)!.emaRms).toBeCloseTo(0, 5);
+            expect(findSpeaker(stats, 20)!.emaRms).toBeCloseTo(-20, 5);
         });
 
-        it("forwards enabled-track RMS to onRmsForWorker", async () => {
-            let capturedOnLevel: ((rms: number) => void) | undefined;
+        it("removes the publisher from the detector on unwatchRemoteReceiver", async () => {
+            manager.watchRemoteReceiver(7, makeReceiverWithLevel(makeTrack("r1"), 1));
+            await manager.readAudioStats();
 
-            const initSpy = vi
-                .spyOn(LocalAudioLevelMeter.prototype, "init")
-                .mockImplementation(async function (this: LocalAudioLevelMeter) {
-                    capturedOnLevel = (this as unknown as { onLevel: (rms: number) => void })
-                        .onLevel;
-                });
+            manager.unwatchRemoteReceiver(7);
+            const stats = await manager.readAudioStats();
 
-            const track = makeTrack("track-rms");
-            await manager.ensureLocalAudioLevelMeter(track);
-
-            capturedOnLevel!(0.75);
-            expect(onRmsForWorker).toHaveBeenCalledWith(0.75);
-            initSpy.mockRestore();
+            expect(findSpeaker(stats, 7)).toBeUndefined();
         });
 
-        it("reports silence to worker when track is disabled", async () => {
-            let capturedOnLevel: ((rms: number) => void) | undefined;
+        it("stays inactive when getSynchronizationSources() has no level (no fallback)", async () => {
+            manager.watchRemoteReceiver(3, makeReceiverWithoutLevel(makeTrack("r1")));
 
-            const initSpy = vi
-                .spyOn(LocalAudioLevelMeter.prototype, "init")
-                .mockImplementation(async function (this: LocalAudioLevelMeter) {
-                    capturedOnLevel = (this as unknown as { onLevel: (rms: number) => void })
-                        .onLevel;
-                });
+            const stats = await manager.readAudioStats();
 
-            const track = makeTrack("track-muted");
-            Object.defineProperty(track, "enabled", { value: false, writable: false });
-            await manager.ensureLocalAudioLevelMeter(track);
-
-            capturedOnLevel!(0.9);
-            expect(onRmsForWorker).toHaveBeenCalledWith(LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE);
-            initSpy.mockRestore();
+            // No native level -> treated as silence -> never crosses the threshold.
+            expect(findSpeaker(stats, 3)!.activeUntil).toBe(-Infinity);
         });
     });
 
-    describe("stopLocalAudioLevelMeter (after adding)", () => {
-        it("calls stop() on the meter and allows re-adding the same track", async () => {
-            const stopSpy = vi
-                .spyOn(LocalAudioLevelMeter.prototype, "stop")
-                .mockReturnValue(undefined);
-            vi.spyOn(LocalAudioLevelMeter.prototype, "init").mockResolvedValue(undefined);
+    describe("configureActiveSpeakerDetector", () => {
+        it("delegates to the active speaker detector", () => {
+            const configureSpy = vi.spyOn(ActiveSpeakerDetector.prototype, "configure");
+            const config = { holdMs: 1000 };
 
-            const track = makeTrack("track-stop");
-            await manager.ensureLocalAudioLevelMeter(track);
-            manager.stopLocalAudioLevelMeter(track);
-            expect(stopSpy).toHaveBeenCalledTimes(1);
+            manager.configureActiveSpeakerDetector(config);
 
-            await manager.ensureLocalAudioLevelMeter(track);
-            expect(stopSpy).toHaveBeenCalledTimes(1); // stop not called again on re-add
-
-            stopSpy.mockRestore();
+            expect(configureSpy).toHaveBeenCalledWith(config);
+            configureSpy.mockRestore();
         });
     });
 });

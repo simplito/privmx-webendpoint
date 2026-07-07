@@ -1,5 +1,9 @@
 import * as EndpointTypes from "../Types.js";
-import { AudioLevelsStats, WebRtcClient } from "../webStreams/WebRtcClient.js";
+import {
+    AudioLevelsStats,
+    ActiveSpeakerDetectorConfig,
+    WebRtcClient,
+} from "../webStreams/WebRtcClient.js";
 import {
     Stream,
     StreamCreateMeta,
@@ -800,22 +804,49 @@ export class StreamApi extends BaseApi {
     }
 
     /**
-     * Registers a callback that receives periodic audio-level statistics for
-     * the session's local and remote audio.
+     * Reads the current audio-level statistics for the session's local and
+     * remote audio, sourced from native browser WebRTC statistics. A stream
+     * reports silence if the browser or SFU doesn't expose a native level
+     * for it.
      *
-     * The WebRTC client computes per-stream RMS audio levels (used for active
-     * speaker detection) and forwards them to the callback; the data is derived
-     * locally from the already-decrypted audio.
-     *
-     * Use it to drive speaking indicators or volume meters in the UI; register
-     * it once the session is established via {@link publishStream} or
+     * Pull-based, not a subscription: each call does one fresh read and
+     * returns immediately. Poll it on whatever interval suits your UI (e.g.
+     * every 200-500ms) to drive speaking indicators or volume meters; call it
+     * once the session is established via {@link publishStream} or
      * {@link createSubscriberStream}.
      *
-     * @param {(stats: AudioLevelsStats) => void} onStats callback invoked with
-     *   the current per-stream audio levels each time they are recomputed
+     * @returns {Promise<AudioLevelsStats>} the current per-stream audio levels
      */
-    async addAudioLevelStatsListener(onStats: (stats: AudioLevelsStats) => void): Promise<void> {
-        this.client.setAudioLevelCallback(onStats);
+    async readAudioStats(): Promise<AudioLevelsStats> {
+        return this.client.readAudioStats();
+    }
+
+    /**
+     * Tunes the active-speaker detection used by {@link readAudioStats} -
+     * pass any subset of the fields; omitted ones keep their current value.
+     * Takes effect immediately, from the next {@link readAudioStats} call.
+     *
+     * @param {ActiveSpeakerDetectorConfig} config partial tuning overrides
+     * @param {number} [config.rmsEmaAlpha] EMA smoothing factor (0..1) for the
+     *   raw level itself - higher reacts to speech onset faster but is
+     *   noisier; default 0.2
+     * @param {number} [config.noiseEmaAlpha] EMA smoothing factor (0..1) for
+     *   the adaptive background noise floor - should stay much slower than
+     *   `rmsEmaAlpha`; default 0.02
+     * @param {number} [config.thresholdOffset] dB above the noise floor a
+     *   speaker must reach to count as "speaking" - lower is more sensitive;
+     *   default 6
+     * @param {number} [config.holdMs] how long (ms) a speaker stays marked
+     *   active after the last frame that crossed the threshold - keep real
+     *   slack over however often you call {@link readAudioStats}; default 600
+     * @param {number} [config.noiseFloorMin] lower bound (dB) on the adaptive
+     *   noise floor, so it can't sink to the silence value reported for tracks
+     *   with no audio and leave everything reading "active"; raise it if quiet
+     *   tracks still register, lower it if genuinely quiet speech is missed;
+     *   default -70
+     */
+    configureActiveSpeakerDetector(config: Partial<ActiveSpeakerDetectorConfig>): void {
+        this.client.configureActiveSpeakerDetector(config);
     }
 
     /**

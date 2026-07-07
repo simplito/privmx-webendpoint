@@ -26,6 +26,8 @@ declare global {
         trackEnded?: boolean;
         trackMuted?: boolean;
         __remoteAudioLevelCount?: number;
+        __localAudioLevels?: number[];
+        __remoteAudioLevels?: number[];
     }
 }
 
@@ -1748,6 +1750,156 @@ test.describe("StreamTest", () => {
         });
     });
 
+    test("E2E: Active speaker detection reports non-silent levels for local and remote audio", async ({
+        createContextPage,
+        backend,
+        cli,
+    }) => {
+        const page1 = await createContextPage();
+        await initPage(page1);
+        const users = await setupUsers(page1, cli);
+
+        const page2 = await createContextPage();
+        await initPage(page2);
+
+        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
+        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
+
+        const contextId = testData.contextId;
+        let roomId: StreamRoomId;
+
+        // --- STEP 1: U1 publishes audio and listens for its own local level ---
+        await test.step("User 1: Create room, publish audio, listen for local level", async () => {
+            roomId = await page1.evaluate(
+                async ({ contextId, users }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 1");
+                    const api = window.streamApi;
+                    const enc = new TextEncoder();
+
+                    const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+                    const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+                    const sId = await api.createStreamRoom(
+                        contextId,
+                        [u1Obj, u2Obj],
+                        [u1Obj, u2Obj],
+                        enc.encode("p"),
+                        enc.encode("p"),
+                    );
+
+                    await api.joinStreamRoom(sId);
+                    const handle = await api.createStream(sId);
+
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    await api.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
+                    await api.publishStream(handle);
+                    await new Promise((r) => setTimeout(r, 1000));
+
+                    // readAudioStats() is pull-based (no subscription) - poll it
+                    // ourselves on whatever interval suits this check.
+                    window.__localAudioLevels = [];
+                    setInterval(async () => {
+                        const stats = await api.readAudioStats();
+                        const local = stats.levels.find((l) => l.streamId === -1);
+                        if (local) window.__localAudioLevels!.push(local.emaRms);
+                    }, 200);
+
+                    return sId;
+                },
+                { contextId, users },
+            );
+        });
+
+        // --- STEP 2: U2 subscribes and listens for the remote level ---
+        await test.step("User 2: Join, subscribe, listen for remote level", async () => {
+            await page2.evaluate(
+                async ({ roomId }) => {
+                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
+                    const api = window.streamApi;
+
+                    // --- DIAGNOSTICS (temporary): confirm whether the RFC 6464 audio
+                    // level RTP header extension is actually forwarded to this
+                    // receiver in this environment (no local-analysis fallback exists
+                    // to fall back to if it isn't).
+                    (window as any).__diag = { syncSources: [] as (number | undefined)[][] };
+                    const origGetSyncSources = RTCRtpReceiver.prototype.getSynchronizationSources;
+                    RTCRtpReceiver.prototype.getSynchronizationSources = function (
+                        ...args: []
+                    ) {
+                        const result = origGetSyncSources.apply(this, args);
+                        if (this.track?.kind === "audio") {
+                            (window as any).__diag.syncSources.push(
+                                result.map((s) => s.audioLevel),
+                            );
+                        }
+                        return result;
+                    };
+                    // --- END DIAGNOSTICS ---
+
+                    await api.joinStreamRoom(roomId);
+
+                    let remoteStreams: any[] = [];
+                    for (let i = 0; i < 20; i++) {
+                        remoteStreams = await api.listStreams(roomId);
+                        if (remoteStreams.length > 0) break;
+                        await new Promise((r) => setTimeout(r, 500));
+                    }
+                    if (remoteStreams.length === 0) throw new Error("Stream not found");
+                    const targetStream = remoteStreams[0];
+
+                    const subs = targetStream.tracks.map((t: any) => ({
+                        streamId: targetStream.id,
+                        streamTrackId: t.mid,
+                    }));
+                    await api.createSubscriberStream(roomId, subs);
+
+                    // readAudioStats() is pull-based (no subscription) - poll it
+                    // ourselves on whatever interval suits this check.
+                    window.__remoteAudioLevels = [];
+                    setInterval(async () => {
+                        const stats = await api.readAudioStats();
+                        for (const l of stats.levels) {
+                            if (l.streamId !== -1) window.__remoteAudioLevels!.push(l.emaRms);
+                        }
+                    }, 200);
+                },
+                { roomId },
+            );
+        });
+
+        // --- STEP 3: Both sides must see a level clearly above the silence floor ---
+        // (the fake audio device emits an audible tone, not silence), proving
+        // getStats()/getSynchronizationSources() actually measured real audio on
+        // both ends - there is no local-analysis fallback to fall back to.
+        await test.step("Verify local and remote levels rise above the silence floor", async () => {
+            await page1.waitForFunction(
+                () => (window.__localAudioLevels ?? []).some((rms) => rms > -90),
+                null,
+                { timeout: 15000 },
+            );
+            try {
+                await page2.waitForFunction(
+                    () => (window.__remoteAudioLevels ?? []).some((rms) => rms > -90),
+                    null,
+                    { timeout: 15000 },
+                );
+            } catch (e) {
+                const diag = await page2.evaluate(() => {
+                    const d = (window as any).__diag ?? {};
+                    return {
+                        syncSourcesTail: (d.syncSources ?? []).slice(-5),
+                        remoteLevelsTail: (window.__remoteAudioLevels ?? []).slice(-5),
+                        remoteLevelsMax: (window.__remoteAudioLevels ?? []).length
+                            ? Math.max(...window.__remoteAudioLevels!)
+                            : null,
+                    };
+                });
+                console.log("DIAG (remote audio level timeout):", JSON.stringify(diag, null, 2));
+                throw e;
+            }
+        });
+    });
+
     test("E2E: Three users exchange video streams and expect remte streams callbacks separation", async ({
         createContextPage,
         backend,
@@ -2221,16 +2373,19 @@ test.describe("StreamTest", () => {
                     streamId: newStream.id as Types.StreamId,
                 });
 
-                // Remote audio-level reports fire only when an incoming audio frame
-                // passes AES-GCM decryption in the E2EE worker; the old feed died
-                // with the reload, so reports counted here prove the re-published
-                // audio decrypts.
+                // Remote audio-level reports are sourced from
+                // RTCRtpReceiver.getSynchronizationSources() on the live receiver, so
+                // reports counted here prove the re-published audio track is actually
+                // flowing again after the reload killed the old one.
+                // readAudioStats() is pull-based (no subscription) - poll it
+                // ourselves on whatever interval suits this check.
                 window.__remoteAudioLevelCount = 0;
-                await api.addAudioLevelStatsListener((stats) => {
+                setInterval(async () => {
+                    const stats = await api.readAudioStats();
                     if (stats.levels.some((l) => l.streamId !== -1)) {
                         window.__remoteAudioLevelCount = (window.__remoteAudioLevelCount ?? 0) + 1;
                     }
-                });
+                }, 200);
 
                 await api.updateSubscriberStream(
                     subHandle,
@@ -2259,7 +2414,7 @@ test.describe("StreamTest", () => {
             { timeout: 30000 },
         );
 
-        // Several distinct RMS reports = sustained decryption of the re-published audio.
+        // Several distinct audio-level reports = the re-published audio track keeps flowing.
         await page2.waitForFunction(() => (window.__remoteAudioLevelCount ?? 0) > 3, null, {
             timeout: 30000,
         });

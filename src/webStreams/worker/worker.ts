@@ -1,6 +1,5 @@
 import * as events from "./WorkerEvents.js";
 import { KeyStore } from "../KeyStore.js";
-import { LocalAudioLevelMeter } from "../audio/LocalAudioLevelMeter.js";
 import { EncryptTransform, TransformContext } from "./EncryptTransform.js";
 
 const keyStore = new KeyStore();
@@ -9,11 +8,8 @@ const encryptTransform = new EncryptTransform(keyStore);
 // Active decode pipelines keyed by track id - so stop() can cancel them.
 const sessions = new Map<string, { controller: AbortController }>();
 
-// Local mic RMS, embedded in every outgoing frame so receivers can track audio activity.
-let lastRms: number = LocalAudioLevelMeter.RMS_VALUE_OF_SILENCE;
-
-const RMS_REPORT_INTERVAL_MS = 100;
-const lastRmsReportByPublisher = new Map<number, number>();
+// Legacy frame-trailer byte, kept only for wire-format compatibility (see EncryptTransform).
+const RMS_PLACEHOLDER = -99;
 
 // ---------------------------------------------------------------------------
 // RTCRtpScriptTransform entry point (modern browsers)
@@ -31,7 +27,6 @@ interface TransformerOptions {
     operation: "encode" | "decode";
     kind: "audio" | "video";
     id?: string;
-    publisherId?: number;
 }
 
 if ((self as unknown as { RTCTransformEvent: unknown }).RTCTransformEvent) {
@@ -43,9 +38,9 @@ if ((self as unknown as { RTCTransformEvent: unknown }).RTCTransformEvent) {
             postError("onrtctransform: options is undefined");
             return;
         }
-        const { operation, kind, id, publisherId } = options;
+        const { operation, kind, id } = options;
         handleTransform(
-            { id, publisherId },
+            { id },
             operation,
             kind ?? "video",
             event.transformer.readable,
@@ -72,7 +67,7 @@ self.addEventListener("message", (event: MessageEvent<events.WorkerInboundEvent>
         );
     } else if (msg.operation === "decode") {
         handleTransform(
-            { id: msg.id, publisherId: msg.publisherId },
+            { id: msg.id },
             msg.operation,
             msg.kind ?? "video",
             msg.readableStream,
@@ -83,8 +78,6 @@ self.addEventListener("message", (event: MessageEvent<events.WorkerInboundEvent>
             const ack: events.SetKeysAckEvent = { operation: "setKeys-ack" };
             (self as unknown as Worker).postMessage(ack);
         });
-    } else if (msg.operation === "rms") {
-        lastRms = Math.round(msg.rms);
     } else if (msg.operation === "stop") {
         const session = sessions.get(msg.id);
         if (session) {
@@ -115,7 +108,7 @@ function handleTransform(
                         encodedFrame as RTCEncodedAudioFrame | RTCEncodedVideoFrame,
                         kind,
                         controller,
-                        lastRms,
+                        RMS_PLACEHOLDER,
                     );
                 } catch (err) {
                     postError(err);
@@ -127,11 +120,10 @@ function handleTransform(
         const abort = new AbortController();
         const transform = new TransformStream({
             async transform(encodedFrame, controller) {
-                let rms: number | null = null;
                 // Pass through on failure, matching the unknown-key/failed-AEAD
                 // behaviour, so the TransformStream never errors permanently.
                 try {
-                    rms = await encryptTransform.decryptFrame(
+                    await encryptTransform.decryptFrame(
                         encodedFrame as RTCEncodedVideoFrame | RTCEncodedAudioFrame,
                         kind,
                         controller,
@@ -142,20 +134,6 @@ function handleTransform(
                         controller.enqueue(encodedFrame);
                     } catch {
                         // controller already errored - nothing more to salvage
-                    }
-                }
-                if (rms !== null && kind === "audio" && context.publisherId !== undefined) {
-                    const now = Date.now();
-                    const last = lastRmsReportByPublisher.get(context.publisherId) ?? 0;
-                    if (now - last >= RMS_REPORT_INTERVAL_MS) {
-                        lastRmsReportByPublisher.set(context.publisherId, now);
-                        const msg: events.RmsOutEvent = {
-                            type: "rms",
-                            rms,
-                            receiverId: context.id,
-                            publisherId: context.publisherId,
-                        };
-                        (self as unknown as Worker).postMessage(msg);
                     }
                 }
             },

@@ -33,7 +33,6 @@ function registerAssetUrls(
 ): void {
     c.registerValue(T.AssetsBasePath, assets.basePath);
     c.registerValue(T.WorkerUrl, assets.workerUrl);
-    c.registerValue(T.RmsProcessorUrl, assets.rmsProcessorUrl);
 }
 
 /**
@@ -161,7 +160,6 @@ export function registerConnectionServices(
         const rtc = new WebRtcContainer();
         rtc.registerValue(T.AssetsBasePath, assets.basePath);
         rtc.registerValue(T.WorkerUrl, assets.workerUrl);
-        rtc.registerValue(T.RmsProcessorUrl, assets.rmsProcessorUrl);
         registerWebRtcServices(rtc);
 
         const webRtcClient = await rtc.resolve<WebRtcClient>(T.WebRtcClient);

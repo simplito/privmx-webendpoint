@@ -26,7 +26,7 @@ export interface SetupAutoOptions {
 const assetUrl = (file: string) => new URL(`../../assets/${file}`, import.meta.url).href;
 
 /**
- * Initializes the Endpoint with **zero manual asset handling** - the four WASM
+ * Initializes the Endpoint with **zero manual asset handling** - the three WASM
  * runtime files are located automatically, so you never copy them into a public
  * directory or pass an `assetsBasePath`.
  *
@@ -34,7 +34,7 @@ const assetUrl = (file: string) => new URL(`../../assets/${file}`, import.meta.u
  * which a bundler (Vite, webpack 5, Rollup, Parcel, Next) graph-includes,
  * fingerprints, and serves; the resolved URLs are then handed to
  * {@link EndpointFactory.setup} (`wasmUrl` is wired through the Emscripten
- * module's `locateFile`, the worker/worklet via their own URLs). It is
+ * module's `locateFile`, the worker via its own URL). It is
  * **ESM-only** because it relies on `import.meta.url`.
  *
  * Use it instead of {@link EndpointFactory.setup} in any bundled web app - it is
@@ -59,7 +59,6 @@ export async function setupAuto(options: SetupAutoOptions = {}): Promise<void> {
         wasmModuleUrl: assetUrl("endpoint-wasm-module.js"),
         wasmUrl: assetUrl("endpoint-wasm-module.wasm"),
         workerUrl: assetUrl("privmx-worker.js"),
-        rmsProcessorUrl: assetUrl("rms-processor.js"),
         workerCount: options.workerCount,
     });
 }
