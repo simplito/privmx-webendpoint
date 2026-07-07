@@ -74,20 +74,23 @@ jobs:
           REGISTRY: ${{ steps.target.outputs.registry }}
           DIST_TAG: ${{ steps.target.outputs.dist_tag }}
           PROVENANCE: ${{ steps.target.outputs.provenance }}
-          PRIVMX_NPM_TOKEN: ${{ secrets.PRIVMX_NPM_TOKEN }}
+          PRIVMX_NPM_USER: ${{ secrets.PRIVMX_NPM_USER }}
+          PRIVMX_NPM_PASSWORD: ${{ secrets.PRIVMX_NPM_PASSWORD }}
         run: |
           # Write .npmrc at the repo root (npm's project config: ./builds has no
           # package.json, so npm walks up here). For npmjs no token is set (OIDC
-          # handles auth + provenance); for the self-hosted registry we write the
-          # token directly and force always-auth.
+          # handles auth + provenance); for the self-hosted (Verdaccio + htpasswd)
+          # registry we use basic auth (username + base64 password) so there is no
+          # token to expire or invalidate on server restart.
           if [ "$REGISTRY" = "https://npmregistry.privmx.com/" ]; then
-            if [ -z "$PRIVMX_NPM_TOKEN" ]; then
-              echo "::error::PRIVMX_NPM_TOKEN secret is empty or not set."
+            if [ -z "$PRIVMX_NPM_USER" ] || [ -z "$PRIVMX_NPM_PASSWORD" ]; then
+              echo "::error::PRIVMX_NPM_USER / PRIVMX_NPM_PASSWORD secret is empty or not set."
               exit 1
             fi
             {
               echo "registry=${REGISTRY}"
-              echo "//npmregistry.privmx.com/:_authToken=${PRIVMX_NPM_TOKEN}"
+              echo "//npmregistry.privmx.com/:username=${PRIVMX_NPM_USER}"
+              echo "//npmregistry.privmx.com/:_password=$(printf '%s' "$PRIVMX_NPM_PASSWORD" | base64 -w0)"
               echo "always-auth=true"
             } > .npmrc
           else
