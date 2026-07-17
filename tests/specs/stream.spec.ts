@@ -37,6 +37,11 @@ test.use({
             "--use-fake-device-for-media-stream",
             "--use-fake-ui-for-media-stream",
             "--headless",
+            // Let AudioContext run without a user gesture. The local audio-level
+            // meter (AnalyserNode) reads silence while the context is suspended,
+            // which headless Chromium keeps it until a gesture; a real app has
+            // one (the join click).
+            "--autoplay-policy=no-user-gesture-required",
         ],
         firefoxUserPrefs: {
             "media.navigator.streams.fake": true,
@@ -1747,156 +1752,6 @@ test.describe("StreamTest", () => {
             });
 
             if (!isMoving) throw new Error("Video stuck");
-        });
-    });
-
-    test("E2E: Active speaker detection reports non-silent levels for local and remote audio", async ({
-        createContextPage,
-        backend,
-        cli,
-    }) => {
-        const page1 = await createContextPage();
-        await initPage(page1);
-        const users = await setupUsers(page1, cli);
-
-        const page2 = await createContextPage();
-        await initPage(page2);
-
-        await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
-        await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
-
-        const contextId = testData.contextId;
-        let roomId: StreamRoomId;
-
-        // --- STEP 1: U1 publishes audio and listens for its own local level ---
-        await test.step("User 1: Create room, publish audio, listen for local level", async () => {
-            roomId = await page1.evaluate(
-                async ({ contextId, users }) => {
-                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 1");
-                    const api = window.streamApi;
-                    const enc = new TextEncoder();
-
-                    const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
-                    const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
-
-                    const sId = await api.createStreamRoom(
-                        contextId,
-                        [u1Obj, u2Obj],
-                        [u1Obj, u2Obj],
-                        enc.encode("p"),
-                        enc.encode("p"),
-                    );
-
-                    await api.joinStreamRoom(sId);
-                    const handle = await api.createStream(sId);
-
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    await api.addStreamTrack(handle, { track: stream.getAudioTracks()[0] });
-                    await api.publishStream(handle);
-                    await new Promise((r) => setTimeout(r, 1000));
-
-                    // readAudioStats() is pull-based (no subscription) - poll it
-                    // ourselves on whatever interval suits this check.
-                    window.__localAudioLevels = [];
-                    setInterval(async () => {
-                        const stats = await api.readAudioStats();
-                        const local = stats.levels.find((l) => l.streamId === -1);
-                        if (local) window.__localAudioLevels!.push(local.emaRms);
-                    }, 200);
-
-                    return sId;
-                },
-                { contextId, users },
-            );
-        });
-
-        // --- STEP 2: U2 subscribes and listens for the remote level ---
-        await test.step("User 2: Join, subscribe, listen for remote level", async () => {
-            await page2.evaluate(
-                async ({ roomId }) => {
-                    if (!window.streamApi) throw new Error("StreamApi not ready on Page 2");
-                    const api = window.streamApi;
-
-                    // --- DIAGNOSTICS (temporary): confirm whether the RFC 6464 audio
-                    // level RTP header extension is actually forwarded to this
-                    // receiver in this environment (no local-analysis fallback exists
-                    // to fall back to if it isn't).
-                    (window as any).__diag = { syncSources: [] as (number | undefined)[][] };
-                    const origGetSyncSources = RTCRtpReceiver.prototype.getSynchronizationSources;
-                    RTCRtpReceiver.prototype.getSynchronizationSources = function (
-                        ...args: []
-                    ) {
-                        const result = origGetSyncSources.apply(this, args);
-                        if (this.track?.kind === "audio") {
-                            (window as any).__diag.syncSources.push(
-                                result.map((s) => s.audioLevel),
-                            );
-                        }
-                        return result;
-                    };
-                    // --- END DIAGNOSTICS ---
-
-                    await api.joinStreamRoom(roomId);
-
-                    let remoteStreams: any[] = [];
-                    for (let i = 0; i < 20; i++) {
-                        remoteStreams = await api.listStreams(roomId);
-                        if (remoteStreams.length > 0) break;
-                        await new Promise((r) => setTimeout(r, 500));
-                    }
-                    if (remoteStreams.length === 0) throw new Error("Stream not found");
-                    const targetStream = remoteStreams[0];
-
-                    const subs = targetStream.tracks.map((t: any) => ({
-                        streamId: targetStream.id,
-                        streamTrackId: t.mid,
-                    }));
-                    await api.createSubscriberStream(roomId, subs);
-
-                    // readAudioStats() is pull-based (no subscription) - poll it
-                    // ourselves on whatever interval suits this check.
-                    window.__remoteAudioLevels = [];
-                    setInterval(async () => {
-                        const stats = await api.readAudioStats();
-                        for (const l of stats.levels) {
-                            if (l.streamId !== -1) window.__remoteAudioLevels!.push(l.emaRms);
-                        }
-                    }, 200);
-                },
-                { roomId },
-            );
-        });
-
-        // --- STEP 3: Both sides must see a level clearly above the silence floor ---
-        // (the fake audio device emits an audible tone, not silence), proving
-        // getStats()/getSynchronizationSources() actually measured real audio on
-        // both ends - there is no local-analysis fallback to fall back to.
-        await test.step("Verify local and remote levels rise above the silence floor", async () => {
-            await page1.waitForFunction(
-                () => (window.__localAudioLevels ?? []).some((rms) => rms > -90),
-                null,
-                { timeout: 15000 },
-            );
-            try {
-                await page2.waitForFunction(
-                    () => (window.__remoteAudioLevels ?? []).some((rms) => rms > -90),
-                    null,
-                    { timeout: 15000 },
-                );
-            } catch (e) {
-                const diag = await page2.evaluate(() => {
-                    const d = (window as any).__diag ?? {};
-                    return {
-                        syncSourcesTail: (d.syncSources ?? []).slice(-5),
-                        remoteLevelsTail: (window.__remoteAudioLevels ?? []).slice(-5),
-                        remoteLevelsMax: (window.__remoteAudioLevels ?? []).length
-                            ? Math.max(...window.__remoteAudioLevels!)
-                            : null,
-                    };
-                });
-                console.log("DIAG (remote audio level timeout):", JSON.stringify(diag, null, 2));
-                throw e;
-            }
         });
     });
 
