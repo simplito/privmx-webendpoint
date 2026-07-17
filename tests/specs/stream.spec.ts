@@ -26,6 +26,8 @@ declare global {
         trackEnded?: boolean;
         trackMuted?: boolean;
         __remoteAudioLevelCount?: number;
+        __localAudioLevels?: number[];
+        __remoteAudioLevels?: number[];
     }
 }
 
@@ -35,6 +37,11 @@ test.use({
             "--use-fake-device-for-media-stream",
             "--use-fake-ui-for-media-stream",
             "--headless",
+            // Let AudioContext run without a user gesture. The local audio-level
+            // meter (AnalyserNode) reads silence while the context is suspended,
+            // which headless Chromium keeps it until a gesture; a real app has
+            // one (the join click).
+            "--autoplay-policy=no-user-gesture-required",
         ],
         firefoxUserPrefs: {
             "media.navigator.streams.fake": true,
@@ -2221,16 +2228,19 @@ test.describe("StreamTest", () => {
                     streamId: newStream.id as Types.StreamId,
                 });
 
-                // Remote audio-level reports fire only when an incoming audio frame
-                // passes AES-GCM decryption in the E2EE worker; the old feed died
-                // with the reload, so reports counted here prove the re-published
-                // audio decrypts.
+                // Remote audio-level reports are sourced from
+                // RTCRtpReceiver.getSynchronizationSources() on the live receiver, so
+                // reports counted here prove the re-published audio track is actually
+                // flowing again after the reload killed the old one.
+                // readAudioStats() is pull-based (no subscription) - poll it
+                // ourselves on whatever interval suits this check.
                 window.__remoteAudioLevelCount = 0;
-                await api.addAudioLevelStatsListener((stats) => {
+                setInterval(async () => {
+                    const stats = await api.readAudioStats();
                     if (stats.levels.some((l) => l.streamId !== -1)) {
                         window.__remoteAudioLevelCount = (window.__remoteAudioLevelCount ?? 0) + 1;
                     }
-                });
+                }, 200);
 
                 await api.updateSubscriberStream(
                     subHandle,
@@ -2259,7 +2269,7 @@ test.describe("StreamTest", () => {
             { timeout: 30000 },
         );
 
-        // Several distinct RMS reports = sustained decryption of the re-published audio.
+        // Several distinct audio-level reports = the re-published audio track keeps flowing.
         await page2.waitForFunction(() => (window.__remoteAudioLevelCount ?? 0) > 3, null, {
             timeout: 30000,
         });

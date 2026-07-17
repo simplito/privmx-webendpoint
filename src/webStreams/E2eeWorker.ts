@@ -3,15 +3,14 @@ import { Logger } from "./Logger.js";
 import {
     DecodeEvent,
     EncodeEvent,
-    RmsEvent,
     SetKeysEvent,
     StopEvent,
     WorkerOutboundEvent,
 } from "./worker/WorkerEvents.js";
 
 /**
- * Owns the E2EE Web Worker process: spawning, key distribution, RMS forwarding,
- * and raw stream/transform posting.
+ * Owns the E2EE Web Worker process: spawning, key distribution, and raw
+ * stream/transform posting.
  *
  * The worker is created lazily on the first call to `get()` and terminated by
  * `stop()`. Has no knowledge of `RTCRtpSender`/`RTCRtpReceiver` - all WebRTC
@@ -25,10 +24,7 @@ export class E2eeWorker {
     // Pending operation rejects, so worker failure/teardown rejects them instead of hanging.
     private readonly pendingRejects = new Set<(err: Error) => void>();
 
-    constructor(
-        private readonly workerUrl: string,
-        private readonly onRmsFrame: (publisherId: number, rms: number) => void,
-    ) {}
+    constructor(private readonly workerUrl: string) {}
 
     /**
      * Returns the underlying `Worker`, creating it on first call.
@@ -44,9 +40,7 @@ export class E2eeWorker {
         if (!this.worker) {
             this.worker = new Worker(this.workerUrl);
             this.worker.onmessage = (event: MessageEvent<WorkerOutboundEvent>) => {
-                if ("type" in event.data && event.data.type === "rms") {
-                    this.onRmsFrame(event.data.publisherId ?? 0, event.data.rms);
-                } else if ("type" in event.data && event.data.type === "error") {
+                if ("type" in event.data && event.data.type === "error") {
                     this.logger.error("PrivMX E2EE worker error:", event.data.data);
                 }
             };
@@ -95,15 +89,6 @@ export class E2eeWorker {
     }
 
     /**
-     * Forwards the current local microphone RMS level to the worker so it can
-     * be embedded in the encrypted frame trailer of outbound audio frames.
-     */
-    async sendRms(rms: number): Promise<void> {
-        const worker = await this.get();
-        worker.postMessage({ operation: "rms", rms } satisfies RmsEvent);
-    }
-
-    /**
      * Transfers `readable`/`writable` encoded-stream pair to the worker for
      * encryption. Used as the `EncodedStreams` fallback when
      * `RTCRtpScriptTransform` is unavailable.
@@ -131,13 +116,11 @@ export class E2eeWorker {
      * `RTCRtpScriptTransform` is unavailable.
      *
      * @param id         Unique track ID used by the worker to identify the pipeline.
-     * @param publisherId Numeric WebRTC stream ID of the remote publisher.
      * @param kind       Track kind ("audio" | "video"); selects the frame header
      *                   layout used as AES-GCM AAD. Must match the sender's kind.
      */
     async postDecode(
         id: string,
-        publisherId: number,
         readable: ReadableStream<unknown>,
         writable: WritableStream<unknown>,
         kind: "audio" | "video",
@@ -147,7 +130,6 @@ export class E2eeWorker {
             {
                 operation: "decode",
                 id,
-                publisherId,
                 kind,
                 readableStream: readable,
                 writableStream: writable,

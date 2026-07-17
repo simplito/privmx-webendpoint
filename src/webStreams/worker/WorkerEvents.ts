@@ -23,7 +23,6 @@ export interface DecodeEvent {
     operation: "decode";
     kind?: "audio" | "video";
     id: string;
-    publisherId: number;
     readableStream: ReadableStream<unknown>;
     writableStream: WritableStream<unknown>;
 }
@@ -35,16 +34,6 @@ export interface DecodeEvent {
 export interface SetKeysEvent {
     operation: "setKeys";
     keys: Key[];
-}
-
-/**
- * Worker message: update the local microphone RMS level embedded in outgoing
- * frames.
- * @internal
- */
-export interface RmsEvent {
-    operation: "rms";
-    rms: number;
 }
 
 /**
@@ -60,7 +49,7 @@ export interface StopEvent {
  * Union of all messages sent from the main thread to the E2EE worker.
  * @internal
  */
-export type WorkerInboundEvent = EncodeEvent | DecodeEvent | SetKeysEvent | RmsEvent | StopEvent;
+export type WorkerInboundEvent = EncodeEvent | DecodeEvent | SetKeysEvent | StopEvent;
 
 // ---- Outbound messages (worker → main thread) ----
 
@@ -70,17 +59,6 @@ export type WorkerInboundEvent = EncodeEvent | DecodeEvent | SetKeysEvent | RmsE
  */
 export interface SetKeysAckEvent {
     operation: "setKeys-ack";
-}
-
-/**
- * Worker event: RMS audio level extracted from a received frame.
- * @internal
- */
-export interface RmsOutEvent {
-    type: "rms";
-    rms: number;
-    receiverId: string | undefined;
-    publisherId: number | undefined;
 }
 
 /**
@@ -105,4 +83,4 @@ export interface ErrorEvent {
  * Union of all messages sent from the E2EE worker to the main thread.
  * @internal
  */
-export type WorkerOutboundEvent = SetKeysAckEvent | RmsOutEvent | DebugEvent | ErrorEvent;
+export type WorkerOutboundEvent = SetKeysAckEvent | DebugEvent | ErrorEvent;
