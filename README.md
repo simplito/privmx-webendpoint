@@ -260,7 +260,7 @@ via your server -> connect and exchange an end-to-end encrypted message. Run
 
 ## Loading the WASM assets
 
-The four assets are exported at `@simplito/privmx-webendpoint/assets/*`. Pick the
+The three assets are exported at `@simplito/privmx-webendpoint/assets/*`. Pick the
 strategy that fits your setup:
 
 **A. Zero-config (recommended, any bundler)** - Vite / webpack 5 / Rollup / Parcel / Next:
@@ -285,10 +285,9 @@ await setupAuto();                       // resolves assets via import.meta.url
 ```ts
 import { Endpoint } from "@simplito/privmx-webendpoint";
 await Endpoint.setup({
-  wasmModuleUrl:   new URL("@simplito/privmx-webendpoint/assets/endpoint-wasm-module.js",   import.meta.url).href,
-  wasmUrl:         new URL("@simplito/privmx-webendpoint/assets/endpoint-wasm-module.wasm", import.meta.url).href,
-  workerUrl:       new URL("@simplito/privmx-webendpoint/assets/privmx-worker.js",          import.meta.url).href,
-  rmsProcessorUrl: new URL("@simplito/privmx-webendpoint/assets/rms-processor.js",          import.meta.url).href,
+  wasmModuleUrl: new URL("@simplito/privmx-webendpoint/assets/endpoint-wasm-module.js",   import.meta.url).href,
+  wasmUrl:       new URL("@simplito/privmx-webendpoint/assets/endpoint-wasm-module.wasm", import.meta.url).href,
+  workerUrl:     new URL("@simplito/privmx-webendpoint/assets/privmx-worker.js",          import.meta.url).href,
 });
 ```
 
@@ -308,7 +307,6 @@ await Endpoint.setup({ assetsBasePath: "/privmx-assets" });
 | `endpoint-wasm-module.js` | Emscripten glue (injected by `setup()`) |
 | `endpoint-wasm-module.wasm` | The C++ core (~4.4 MB; serve gzip/brotli) |
 | `privmx-worker.js` | E2EE web worker (streaming) |
-| `rms-processor.js` | Audio-level worklet (streaming) |
 
 Framework copy snippets (for strategy C): **Vite** -
 [`vite-plugin-static-copy`](https://www.npmjs.com/package/vite-plugin-static-copy);

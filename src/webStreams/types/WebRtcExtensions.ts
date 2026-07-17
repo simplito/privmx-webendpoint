@@ -11,7 +11,6 @@ export interface EncodedStreams {
 export interface RTCRtpScriptTransformOptions {
     operation: "encode" | "decode";
     id?: string;
-    publisherId?: number;
     kind?: string;
 }
 

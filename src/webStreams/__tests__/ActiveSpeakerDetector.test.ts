@@ -12,15 +12,17 @@ import {
 //   noiseEmaAlpha = 0.0 → noise floor frozen at the value from the first frame
 //                         (set by getOrCreateState), so threshold is predictable
 //   thresholdOffset = 10 → speaker is active when rms >= noiseFloor + 10
-//   activityWindowMs = 400
 //   holdMs = 200
+//   noiseFloorMin = -Infinity → the noise-floor clamp is disabled, so these
+//                               deterministic tests use the raw first-frame
+//                               value as the floor (they work in small +ve dB)
 // ---------------------------------------------------------------------------
 const OPTS = {
     rmsEmaAlpha: 1.0,
     noiseEmaAlpha: 0.0,
     thresholdOffset: 10,
-    activityWindowMs: 400,
     holdMs: 200,
+    noiseFloorMin: -Infinity,
 };
 
 // Noise floor is established by the first frame for a stream.
@@ -121,7 +123,7 @@ describe("ActiveSpeakerDetector", () => {
 
             let states: SpeakerState[] = [];
             let t = 0;
-            // 500 ms of continuous speech (> holdMs=200 and > activityWindowMs=400)
+            // 500 ms of continuous speech (> holdMs=200)
             for (t = 100; t <= 600; t += 20) {
                 states = frame(d, 1, ABOVE, t); // each frame resets activeUntil
             }
@@ -145,32 +147,6 @@ describe("ActiveSpeakerDetector", () => {
             frame(d, 1, NOISE_FLOOR, 0);
             const states = frame(d, 1, ABOVE, 100);
             expect(speaker(states, 1)!.activeUntil).toBe(100 + OPTS.holdMs);
-        });
-    });
-
-    // -----------------------------------------------------------------------
-    describe("activityWindowMs", () => {
-        it("speaker inactive when last speech is older than activityWindowMs", () => {
-            const d = makeDetector();
-            frame(d, 1, NOISE_FLOOR, 0);
-            frame(d, 1, ABOVE, 100); // lastAboveThresholdTs=100, activeUntil=300
-
-            // t=501: 401 ms since last speech > activityWindowMs(400)
-            const states = frame(d, 1, NOISE_FLOOR, 501);
-            expect(isActive(speaker(states, 1)!, 501)).toBe(false);
-        });
-
-        it("speaker remains active just inside activityWindowMs", () => {
-            const d = makeDetector();
-            frame(d, 1, NOISE_FLOOR, 0);
-            frame(d, 1, ABOVE, 100); // lastAboveThresholdTs=100, activeUntil=300
-
-            // Send a fresh above-threshold frame to refresh activeUntil at t=350
-            frame(d, 1, ABOVE, 350); // activeUntil=550
-
-            // t=490: 490-350=140 ms inside window (400), 490 < 550 → active
-            const states = frame(d, 1, NOISE_FLOOR, 490);
-            expect(isActive(speaker(states, 1)!, 490)).toBe(true);
         });
     });
 
@@ -252,6 +228,41 @@ describe("ActiveSpeakerDetector", () => {
     });
 
     // -----------------------------------------------------------------------
+    // `this.speakers`' values are mutated in place every frame; onFrame() must
+    // hand out independent, frozen copies so a caller holding a reference from
+    // an earlier call never observes a later frame's values through it.
+    describe("snapshot immutability", () => {
+        it("returns a frozen object that cannot be mutated", () => {
+            const d = makeDetector();
+            const states = frame(d, 1, ABOVE, 100);
+
+            expect(Object.isFrozen(speaker(states, 1))).toBe(true);
+            expect(() => {
+                (speaker(states, 1) as unknown as { emaRms: number }).emaRms = 0;
+            }).toThrow();
+        });
+
+        it("does not change a previously returned snapshot when a later frame updates the same speaker", () => {
+            const d = makeDetector();
+            const firstCall = frame(d, 1, ABOVE, 100);
+            const firstSnapshot = speaker(firstCall, 1)!;
+            const emaRmsAtFirstCall = firstSnapshot.emaRms;
+
+            frame(d, 1, ABOVE, 300); // same speaker, later frame
+
+            expect(firstSnapshot.emaRms).toBe(emaRmsAtFirstCall);
+        });
+
+        it("returns a new array reference on every call", () => {
+            const d = makeDetector();
+            const first = frame(d, 1, ABOVE, 100);
+            const second = frame(d, 1, ABOVE, 200);
+
+            expect(first).not.toBe(second);
+        });
+    });
+
+    // -----------------------------------------------------------------------
     describe("noise floor adaptation", () => {
         it("noise floor drops over many silence frames and raises the effective sensitivity", () => {
             // Use DEFAULTS (noiseEmaAlpha=0.02) so the noise floor adapts.
@@ -279,26 +290,96 @@ describe("ActiveSpeakerDetector", () => {
             expect(isActive(speaker(states, 1)!, lastTs)).toBe(true);
         });
 
-        it("noise floor does not update during above-threshold frames", () => {
-            // With DEFAULTS, the noise floor should remain stable while speaking.
+        it("floor falls fast toward a newly quieter level", () => {
             const d = new ActiveSpeakerDetector(DEFAULTS);
+            d.onFrame({ id: 1, rms: -30, timestamp: 0 }); // floor initialises to -30
 
-            // Warm up with silence to get a stable noise floor near 0
-            for (let i = 0; i < 100; i++) {
-                d.onFrame({ id: 1, rms: 1, timestamp: i * 10 });
+            // Drop to a quiet level; the floor should chase it down within a few frames.
+            let states: SpeakerState[] = [];
+            for (let i = 1; i <= 5; i++) {
+                states = d.onFrame({ id: 1, rms: -60, timestamp: i * 300 });
             }
+            expect(speaker(states, 1)!.noiseFloor).toBeLessThan(-50);
+        });
 
-            const stateBeforeSpeech = d.onFrame({ id: 1, rms: 1, timestamp: 1100 });
-            const noiseFloorBefore = speaker(stateBeforeSpeech, 1)!.noiseFloor;
+        it("floor rises slowly to absorb a sustained above-threshold level", () => {
+            const d = new ActiveSpeakerDetector(DEFAULTS);
+            d.onFrame({ id: 1, rms: -70, timestamp: 0 }); // floor initialises low
 
-            // Now speak loudly - noise floor must not be dragged up
-            for (let i = 0; i < 20; i++) {
-                d.onFrame({ id: 1, rms: 100, timestamp: 1200 + i * 10 });
+            // A steady tone well above the floor: it should creep the floor up
+            // over many frames (absorbing ambient) but never overshoot the level.
+            let states: SpeakerState[] = [];
+            for (let i = 1; i <= 100; i++) {
+                states = d.onFrame({ id: 1, rms: -50, timestamp: i * 300 });
             }
-            const stateAfterSpeech = d.onFrame({ id: 1, rms: 1, timestamp: 1420 });
-            const noiseFloorAfter = speaker(stateAfterSpeech, 1)!.noiseFloor;
+            const floor = speaker(states, 1)!.noiseFloor;
+            expect(floor).toBeGreaterThan(-70);
+            expect(floor).toBeLessThanOrEqual(-50);
+        });
 
-            expect(noiseFloorAfter).toBeCloseTo(noiseFloorBefore, 1);
+        it("rises far slower than it falls (a brief loud burst barely moves the floor)", () => {
+            const d = new ActiveSpeakerDetector(DEFAULTS);
+            const settled = d.onFrame({ id: 1, rms: -60, timestamp: 0 }); // floor at -60
+            const before = speaker(settled, 1)!.noiseFloor;
+
+            // A few loud frames - slow rise means the floor barely budges.
+            let states: SpeakerState[] = [];
+            for (let i = 1; i <= 3; i++) {
+                states = d.onFrame({ id: 1, rms: -20, timestamp: i * 300 });
+            }
+            const after = speaker(states, 1)!.noiseFloor;
+            expect(after - before).toBeLessThan(5); // moved only a few dB in 3 frames
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Regression: with native WebRTC audio levels, tracks with no audio report
+    // the -99 dB silence value. Without a lower bound the adaptive noise floor
+    // pinned there (threshold ~-93 dB), so every track read "active" on the
+    // faintest sound and never recovered. noiseFloorMin (DEFAULTS: -70) prevents
+    // that. These tests use realistic negative-dB levels and DEFAULTS tuning.
+    describe("noiseFloorMin (regression: permanent-active on native silence)", () => {
+        const SILENCE = -99;
+        const SPEECH = -40;
+
+        function feed(
+            d: ActiveSpeakerDetector,
+            rms: number,
+            count: number,
+            startTs: number,
+        ): { states: SpeakerState[]; ts: number } {
+            let states: SpeakerState[] = [];
+            let ts = startTs;
+            for (let i = 0; i < count; i++) {
+                ts = startTs + i * 300; // 300ms polling cadence
+                states = d.onFrame({ id: 1, rms, timestamp: ts });
+            }
+            return { states, ts };
+        }
+
+        it("initializes the noise floor no lower than noiseFloorMin", () => {
+            const d = new ActiveSpeakerDetector(DEFAULTS);
+            const states = d.onFrame({ id: 1, rms: SILENCE, timestamp: 0 });
+            expect(speaker(states, 1)!.noiseFloor).toBe(DEFAULTS.noiseFloorMin);
+        });
+
+        it("does not let sustained silence sink the noise floor below noiseFloorMin", () => {
+            const d = new ActiveSpeakerDetector(DEFAULTS);
+            const { states } = feed(d, SILENCE, 50, 0);
+            expect(speaker(states, 1)!.noiseFloor).toBe(DEFAULTS.noiseFloorMin);
+        });
+
+        it("marks a speaker active while speaking and inactive again after silence", () => {
+            const d = new ActiveSpeakerDetector(DEFAULTS);
+            feed(d, SILENCE, 3, 0); // pre-speech silence
+
+            const speaking = feed(d, SPEECH, 6, 900); // ~1.8s of speech
+            expect(isActive(speaker(speaking.states, 1)!, speaking.ts)).toBe(true);
+
+            // Long silence afterwards must let the speaker fall inactive - the
+            // pre-fix bug left them active forever here.
+            const afterSilence = feed(d, SILENCE, 15, speaking.ts + 300);
+            expect(isActive(speaker(afterSilence.states, 1)!, afterSilence.ts)).toBe(false);
         });
     });
 
@@ -385,6 +466,78 @@ describe("ActiveSpeakerDetector", () => {
 
             expect(isActive(speaker(states, 10)!, 100)).toBe(true);
             expect(isActive(speaker(states, 20)!, 100)).toBe(false);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    describe("configure", () => {
+        it("overriding one field leaves the others unchanged", () => {
+            const d = makeDetector();
+            d.configure({ holdMs: 1000 });
+
+            frame(d, 1, NOISE_FLOOR, 0);
+            // thresholdOffset (10) was never touched - BELOW is still inactive.
+            const states = frame(d, 1, BELOW, 100);
+            expect(isActive(speaker(states, 1)!, 100)).toBe(false);
+        });
+
+        it("a holdMs override changes how long a speaker stays active", () => {
+            const d = makeDetector();
+            d.configure({ holdMs: 1000 });
+
+            frame(d, 1, NOISE_FLOOR, 0);
+            frame(d, 1, ABOVE, 100); // activeUntil = 100 + 1000 = 1100
+
+            // t=1050: past the 200ms default hold, well within the 1000ms override.
+            const states = frame(d, 1, NOISE_FLOOR, 1050);
+            expect(isActive(speaker(states, 1)!, 1050)).toBe(true);
+        });
+
+        it("takes effect on the next onFrame(), not retroactively on already-stored state", () => {
+            const d = makeDetector(); // rmsEmaAlpha=1.0 (no smoothing lag)
+            frame(d, 1, ABOVE, 0); // emaRms = ABOVE
+
+            d.configure({ rmsEmaAlpha: 0 }); // freeze smoothing going forward
+
+            // alpha=0 => emaRms = 0*rms + 1*prevEma - unchanged despite the new rms.
+            const states = frame(d, 1, NOISE_FLOOR, 100);
+            expect(speaker(states, 1)!.emaRms).toBe(ABOVE);
+        });
+
+        it("clamps rmsEmaAlpha to a maximum of 1", () => {
+            const d = makeDetector();
+            d.configure({ rmsEmaAlpha: 5 }); // unclamped would give 5*16 + (1-5)*5 = 60
+
+            frame(d, 1, NOISE_FLOOR, 0); // emaRms = NOISE_FLOOR (5)
+            const states = frame(d, 1, ABOVE, 100);
+            expect(speaker(states, 1)!.emaRms).toBe(ABOVE);
+        });
+
+        it("clamps a negative noiseEmaAlpha to a minimum of 0", () => {
+            const d = makeDetector();
+            d.configure({ noiseEmaAlpha: -1 }); // unclamped would give -1*14 + 2*5 = -4
+
+            frame(d, 1, NOISE_FLOOR, 0); // establishes noiseFloor = NOISE_FLOOR (5)
+            const states = frame(d, 1, BELOW, 100); // BELOW stays under the update branch
+            expect(speaker(states, 1)!.noiseFloor).toBe(NOISE_FLOOR);
+        });
+
+        it("clamps holdMs to a minimum of 0", () => {
+            const d = makeDetector();
+            d.configure({ holdMs: -500 });
+
+            frame(d, 1, NOISE_FLOOR, 0);
+            const states = frame(d, 1, ABOVE, 100);
+            expect(speaker(states, 1)!.activeUntil).toBe(100);
+        });
+
+        it("a noiseFloorMin override raises the floor a new speaker initializes to", () => {
+            const d = new ActiveSpeakerDetector(DEFAULTS);
+            d.configure({ noiseFloorMin: -50 });
+
+            // First frame is silence (-99); init clamps the floor up to -50.
+            const states = d.onFrame({ id: 1, rms: -99, timestamp: 0 });
+            expect(speaker(states, 1)!.noiseFloor).toBe(-50);
         });
     });
 });
