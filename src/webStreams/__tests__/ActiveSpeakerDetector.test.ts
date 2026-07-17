@@ -290,26 +290,45 @@ describe("ActiveSpeakerDetector", () => {
             expect(isActive(speaker(states, 1)!, lastTs)).toBe(true);
         });
 
-        it("noise floor does not update during above-threshold frames", () => {
-            // With DEFAULTS, the noise floor should remain stable while speaking.
+        it("floor falls fast toward a newly quieter level", () => {
             const d = new ActiveSpeakerDetector(DEFAULTS);
+            d.onFrame({ id: 1, rms: -30, timestamp: 0 }); // floor initialises to -30
 
-            // Warm up with silence to get a stable noise floor near 0
-            for (let i = 0; i < 100; i++) {
-                d.onFrame({ id: 1, rms: 1, timestamp: i * 10 });
+            // Drop to a quiet level; the floor should chase it down within a few frames.
+            let states: SpeakerState[] = [];
+            for (let i = 1; i <= 5; i++) {
+                states = d.onFrame({ id: 1, rms: -60, timestamp: i * 300 });
             }
+            expect(speaker(states, 1)!.noiseFloor).toBeLessThan(-50);
+        });
 
-            const stateBeforeSpeech = d.onFrame({ id: 1, rms: 1, timestamp: 1100 });
-            const noiseFloorBefore = speaker(stateBeforeSpeech, 1)!.noiseFloor;
+        it("floor rises slowly to absorb a sustained above-threshold level", () => {
+            const d = new ActiveSpeakerDetector(DEFAULTS);
+            d.onFrame({ id: 1, rms: -70, timestamp: 0 }); // floor initialises low
 
-            // Now speak loudly - noise floor must not be dragged up
-            for (let i = 0; i < 20; i++) {
-                d.onFrame({ id: 1, rms: 100, timestamp: 1200 + i * 10 });
+            // A steady tone well above the floor: it should creep the floor up
+            // over many frames (absorbing ambient) but never overshoot the level.
+            let states: SpeakerState[] = [];
+            for (let i = 1; i <= 100; i++) {
+                states = d.onFrame({ id: 1, rms: -50, timestamp: i * 300 });
             }
-            const stateAfterSpeech = d.onFrame({ id: 1, rms: 1, timestamp: 1420 });
-            const noiseFloorAfter = speaker(stateAfterSpeech, 1)!.noiseFloor;
+            const floor = speaker(states, 1)!.noiseFloor;
+            expect(floor).toBeGreaterThan(-70);
+            expect(floor).toBeLessThanOrEqual(-50);
+        });
 
-            expect(noiseFloorAfter).toBeCloseTo(noiseFloorBefore, 1);
+        it("rises far slower than it falls (a brief loud burst barely moves the floor)", () => {
+            const d = new ActiveSpeakerDetector(DEFAULTS);
+            const settled = d.onFrame({ id: 1, rms: -60, timestamp: 0 }); // floor at -60
+            const before = speaker(settled, 1)!.noiseFloor;
+
+            // A few loud frames - slow rise means the floor barely budges.
+            let states: SpeakerState[] = [];
+            for (let i = 1; i <= 3; i++) {
+                states = d.onFrame({ id: 1, rms: -20, timestamp: i * 300 });
+            }
+            const after = speaker(states, 1)!.noiseFloor;
+            expect(after - before).toBeLessThan(5); // moved only a few dB in 3 frames
         });
     });
 

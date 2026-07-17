@@ -805,9 +805,10 @@ export class StreamApi extends BaseApi {
 
     /**
      * Reads the current audio-level statistics for the session's local and
-     * remote audio, sourced from native browser WebRTC statistics. A stream
-     * reports silence if the browser or SFU doesn't expose a native level
-     * for it.
+     * remote audio. Your local mic is measured directly from its track (a
+     * consistent reading in every browser); remote levels come from native
+     * WebRTC statistics, so a remote stream is simply omitted when the browser
+     * or SFU exposes no level for it.
      *
      * Pull-based, not a subscription: each call does one fresh read and
      * returns immediately. Poll it on whatever interval suits your UI (e.g.
@@ -815,7 +816,19 @@ export class StreamApi extends BaseApi {
      * once the session is established via {@link publishStream} or
      * {@link createSubscriberStream}.
      *
-     * @returns {Promise<AudioLevelsStats>} the current per-stream audio levels
+     * Each entry in `levels` is identified by `streamId`: **your own local
+     * microphone is reported under `streamId === -1`**, and each remote
+     * publisher under its own (non-negative) stream ID from {@link listStreams}.
+     * A stream only appears once it has reported a level, and drops out after
+     * prolonged silence - so the local entry is absent in a subscribe-only
+     * session and may briefly disappear between utterances; treat a missing
+     * entry as "not speaking." Per entry, `emaRms` is the smoothed level in
+     * dBFS (roughly -70 when quiet up to ~0 when loud) and `activeUntil` is the
+     * timestamp until which the stream counts as actively speaking (compare it
+     * against `Date.now()`).
+     *
+     * @returns {Promise<AudioLevelsStats>} the current per-stream audio levels;
+     *   `levels[i].streamId === -1` is the local microphone
      */
     async readAudioStats(): Promise<AudioLevelsStats> {
         return this.client.readAudioStats();

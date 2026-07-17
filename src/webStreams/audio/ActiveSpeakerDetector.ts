@@ -27,9 +27,13 @@ export interface ActiveSpeakerDetectorConfig {
      */
     rmsEmaAlpha: number;
     /**
-     * EMA smoothing factor (0..1) applied to the adaptive background
-     * noise-floor estimate. Should be much slower than `rmsEmaAlpha` so it
-     * tracks ambient noise rather than speech. Default 0.02.
+     * How fast the noise floor *rises* toward sustained energy (0..1). The
+     * floor snaps down instantly to newly-observed quiet levels but climbs up
+     * only at this rate, so steady room ambience or a mic-AGC ramp is absorbed
+     * over a few seconds while a real, gappy talker - whose level keeps dipping
+     * between words and snapping the floor back down - is not. Higher absorbs
+     * ambient sooner but risks de-activating a long, gapless utterance; much
+     * slower than `rmsEmaAlpha` on purpose. Default 0.05.
      */
     noiseEmaAlpha: number;
     /**
@@ -47,15 +51,12 @@ export interface ActiveSpeakerDetectorConfig {
      */
     holdMs: number;
     /**
-     * Lower bound (dB) applied to every incoming level *and* to the adaptive
-     * noise floor - levels below this are treated as silence. Two purposes:
-     * (1) the noise floor can't sink toward the digital-silence value reported
-     * for tracks with no audio (DTX gaps, an SFU that drops the level), which
-     * would otherwise pin the threshold near -93 and mark every track active
-     * on the faintest sound; (2) bounding the input keeps the level EMA from
-     * diving to -99 between words, so the next quiet utterance activates
-     * promptly instead of having to climb ~80 dB first. Real audio louder than
-     * this is unaffected. Default -70.
+     * Lower bound (dB) on both the incoming level and the adaptive noise
+     * floor. A safety net: ticks with no audio are skipped entirely (the floor
+     * only ever sees real levels), but should a source still report a
+     * near-silence value this stops the floor sinking so low that the
+     * threshold sits under all real audio. Real audio louder than this is
+     * unaffected. Default -70.
      */
     noiseFloorMin: number;
 }
@@ -69,7 +70,7 @@ export const DEFAULTS: ActiveSpeakerDetectorConfig = {
     // utterance register within a frame or two, and releases within ~1s of
     // speech stopping, while still smoothing single-frame jitter.
     rmsEmaAlpha: 0.5,
-    noiseEmaAlpha: 0.02, // slow background adaptation
+    noiseEmaAlpha: 0.05, // slow upward adaptation of the noise floor (see field doc)
     thresholdOffset: 6, // dB above noise floor to consider speech
     // AudioManager.readAudioStats() is pull-based - the caller decides how
     // often to call it (a few hundred ms is typical). holdMs needs real slack
@@ -78,12 +79,9 @@ export const DEFAULTS: ActiveSpeakerDetectorConfig = {
     // background-tab throttling) would let activeUntil lapse between reads,
     // flickering "active" to false mid-speech.
     holdMs: 500,
-    // Lower bound on both the input level and the adaptive noise floor. Keeps
-    // the floor off the -99 digital-silence value we report for tracks with no
-    // native level (DTX gaps) - which would otherwise leave the threshold at
-    // ~-93 and mark every track active on the faintest sound - and keeps the
-    // level EMA from diving to -99 between words so quiet speech re-activates
-    // promptly. -70 dB sits above typical comfort noise and below speech.
+    // Safety lower bound on the level/floor; no-audio ticks are skipped rather
+    // than fed as silence, so this only guards against a source reporting an
+    // implausibly low level. -70 dB sits below speech, above typical ambience.
     noiseFloorMin: -70,
 };
 
@@ -122,6 +120,14 @@ interface MutableSpeakerState {
  * Speakers that go silent for longer than this are pruned from the map.
  */
 const SPEAKER_PRUNE_AFTER_MS = 10_000;
+
+/**
+ * How fast the noise floor drops toward a newly-observed quieter level. Near
+ * instant so the floor tracks the quiet baseline between words - that baseline
+ * is what the speaking threshold sits above. (The upward rate is the slow,
+ * configurable `noiseEmaAlpha`; see its field doc for why the two differ.)
+ */
+const NOISE_FLOOR_FALL_ALPHA = 0.5;
 
 /**
  * Reserved ID for the local microphone -- cannot collide with remote stream IDs (which are >= 0).
@@ -163,39 +169,54 @@ export class ActiveSpeakerDetector {
         }
     }
 
-    onFrame({ id, rms, timestamp }: FrameInput): SpeakerState[] {
-        // Treat anything below the floor as silence: bounding the input keeps
-        // the level EMA from diving to the -99 no-audio value between words,
-        // which would otherwise force the next (quiet) utterance to climb ~80 dB
-        // before it could cross the threshold.
+    /**
+     * Convenience for callers that always have a level: folds in the sample
+     * and returns the current snapshot. `AudioManager` instead calls
+     * {@link observe} only for sources that reported a level this tick and
+     * {@link snapshot} once at the end, so silent sources are skipped rather
+     * than fed synthetic silence.
+     */
+    onFrame(input: FrameInput): SpeakerState[] {
+        this.observe(input);
+        return this.snapshot(input.timestamp);
+    }
+
+    /**
+     * Folds one real level sample into `id`'s tracked state. Only ever called
+     * with a genuine measured level - a tick where a source reports no audio is
+     * skipped by the caller, not passed here as silence, so each stream's noise
+     * floor settles at its own true ambient regardless of how loud or quiet a
+     * given browser's levels run.
+     */
+    observe({ id, rms, timestamp }: FrameInput): void {
         const level = Math.max(rms, this.opts.noiseFloorMin);
         const state = this.getOrCreateState(id, level);
 
         state.emaRms = this.opts.rmsEmaAlpha * level + (1 - this.opts.rmsEmaAlpha) * state.emaRms;
 
-        if (state.emaRms < state.noiseFloor + this.opts.thresholdOffset) {
-            state.noiseFloor = Math.max(
-                this.opts.noiseFloorMin,
-                this.opts.noiseEmaAlpha * state.emaRms +
-                    (1 - this.opts.noiseEmaAlpha) * state.noiseFloor,
-            );
-        }
+        // Track the floor toward the signal in both directions but
+        // asymmetrically - snap down fast to a new quiet baseline, creep up
+        // slowly - so steady ambience/AGC ramp is absorbed while a gappy
+        // talker (dipping between words) keeps it pinned near the quiet level.
+        const floorAlpha =
+            state.emaRms < state.noiseFloor ? NOISE_FLOOR_FALL_ALPHA : this.opts.noiseEmaAlpha;
+        state.noiseFloor = Math.max(
+            this.opts.noiseFloorMin,
+            floorAlpha * state.emaRms + (1 - floorAlpha) * state.noiseFloor,
+        );
 
-        const adaptiveThreshold = state.noiseFloor + this.opts.thresholdOffset;
-
-        if (state.emaRms >= adaptiveThreshold) {
+        if (state.emaRms >= state.noiseFloor + this.opts.thresholdOffset) {
             state.lastAboveThresholdTs = timestamp;
             state.activeUntil = timestamp + this.opts.holdMs;
         }
-
-        return this.selectActiveSpeakers(timestamp);
     }
 
-    removeSpeaker(id: PublisherId): void {
-        this.speakers.delete(id);
-    }
-
-    private selectActiveSpeakers(now: number): SpeakerState[] {
+    /**
+     * Prunes speakers that have been silent past the stale window and returns
+     * a frozen snapshot of the rest. Pass the current time so `activeUntil`
+     * comparisons and pruning use one consistent instant.
+     */
+    snapshot(now: number): SpeakerState[] {
         for (const [id, state] of this.speakers.entries()) {
             // Only prune entries with a real above-threshold frame; -Infinity entries are brand new.
             if (
@@ -210,6 +231,10 @@ export class ActiveSpeakerDetector {
         // frame, so handing them out directly would let a caller observe a
         // later tick's values through a reference captured on an earlier one.
         return Array.from(this.speakers.values(), (state) => Object.freeze({ ...state }));
+    }
+
+    removeSpeaker(id: PublisherId): void {
+        this.speakers.delete(id);
     }
 
     private getOrCreateState(id: PublisherId, rms: number): MutableSpeakerState {

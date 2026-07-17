@@ -6,6 +6,7 @@ import {
     PublisherId,
     SpeakerState,
 } from "./audio/ActiveSpeakerDetector.js";
+import { TrackRmsAnalyser } from "./audio/TrackRmsAnalyser.js";
 
 export type { ActiveSpeakerDetectorConfig };
 
@@ -22,12 +23,22 @@ const RMS_VALUE_OF_SILENCE = -99;
  * one fresh read of every watched sender/receiver each time it's called - the
  * caller decides how often that is.
  *
- * Sourced entirely from native browser APIs, no worker or dedicated audio
- * graph involved: `RTCRtpSender.getStats()` ("media-source" report) for the
- * local mic, and the synchronous `RTCRtpReceiver.getSynchronizationSources()`
- * (RFC 6464 RTP header extension) for remote tracks. If a browser or SFU
- * doesn't surface a native level for a given track, that track reports
- * silence - there is no local-analysis fallback.
+ * Sources, no worker involved:
+ * - **Local mic**: always a `TrackRmsAnalyser` (a plain `AnalyserNode` on the
+ *   raw local track we own) - one consistent cross-browser reading. We do not
+ *   use `RTCRtpSender.getStats()`: its media-source `audioLevel` is absent in
+ *   some browsers (Firefox) and differently scaled across the rest, which made
+ *   "local" behave differently per browser.
+ * - **Remote tracks**: the synchronous `RTCRtpReceiver.getSynchronizationSources()`
+ *   per-SSRC `audioLevel` (RFC 6464 RTP header extension) - we don't own remote
+ *   tracks, so this is the only option.
+ *
+ * A source that reports no level for a tick is skipped, not fed as silence -
+ * so its detector state simply stops updating and lapses to inactive, and its
+ * noise floor settles at its own true ambient (the detector never sees a
+ * synthetic silence value). This keeps the local (analyser) and remote (RFC
+ * 6464) scales comparable: only level *relative to each stream's own ambient*
+ * matters.
  *
  * `ActiveSpeakerDetector`'s EMA smoothing and `holdMs` hold-time are tuned
  * for roughly one call every few hundred ms; calling much less often than
@@ -40,6 +51,9 @@ export class AudioManager {
 
     private readonly localSenders = new Map<string, RTCRtpSender>();
     private readonly remoteReceivers = new Map<PublisherId, RTCRtpReceiver>();
+    // Per-local-track level analysers, keyed by track id. Lazily created the
+    // first time a watched local track is read.
+    private readonly localAnalysers = new Map<string, TrackRmsAnalyser>();
 
     /**
      * Starts sampling the local microphone's audio level from `sender`.
@@ -56,6 +70,7 @@ export class AudioManager {
      */
     unwatchLocalSender(track: MediaStreamTrack): void {
         this.localSenders.delete(track.id);
+        this.stopLocalAnalyser(track.id);
     }
 
     /**
@@ -86,72 +101,101 @@ export class AudioManager {
 
     /**
      * Reads the current audio level for every watched sender/receiver right
-     * now, feeds the samples into the active-speaker detector, and returns
-     * the result. No internal timer - call this as often as you need.
+     * now, feeds the ones that report a level into the active-speaker detector,
+     * and returns the result. No internal timer - call this as often as you
+     * need. Sources with no level this tick are skipped (not fed as silence),
+     * so a stream simply stops updating and lapses to inactive.
      */
     async readAudioStats(): Promise<AudioLevelsStats> {
         const now = Date.now();
-        const localRms = await this.readLocalRms();
-        let states: SpeakerState[] = this.activeSpeakerDetector.onFrame({
-            id: LOCAL_PUBLISHER_ID,
-            rms: localRms,
-            timestamp: now,
-        });
+
+        const localRms = this.readLocalRms();
+        if (localRms !== undefined) {
+            this.activeSpeakerDetector.observe({
+                id: LOCAL_PUBLISHER_ID,
+                rms: localRms,
+                timestamp: now,
+            });
+        }
 
         for (const [publisherId, receiver] of this.remoteReceivers) {
             const rms = this.readRemoteRms(receiver);
-            states = this.activeSpeakerDetector.onFrame({ id: publisherId, rms, timestamp: now });
+            if (rms !== undefined) {
+                this.activeSpeakerDetector.observe({ id: publisherId, rms, timestamp: now });
+            }
         }
 
-        return { levels: states };
+        return { levels: this.activeSpeakerDetector.snapshot(now) };
     }
 
     destroy(): void {
+        for (const analyser of this.localAnalysers.values()) {
+            analyser.stop();
+        }
+        this.localAnalysers.clear();
         this.localSenders.clear();
         this.remoteReceivers.clear();
     }
 
-    private async readLocalRms(): Promise<number> {
-        let best = RMS_VALUE_OF_SILENCE;
+    /** dB level of the loudest watched local track, or `undefined` if none reported a level. */
+    private readLocalRms(): number | undefined {
+        let best: number | undefined;
         for (const sender of this.localSenders.values()) {
-            const native = await this.readNativeSenderLevel(sender);
-            const rms = native !== undefined ? this.levelToDb(native) : RMS_VALUE_OF_SILENCE;
-            if (rms > best) best = rms;
+            const track = sender.track;
+            if (!track) continue;
+            const rms = this.readLocalTrackRms(track);
+            if (rms !== undefined && (best === undefined || rms > best)) best = rms;
         }
         return best;
     }
 
-    private readRemoteRms(receiver: RTCRtpReceiver): number {
-        const native = this.readNativeReceiverLevel(receiver);
-        return native !== undefined ? this.levelToDb(native) : RMS_VALUE_OF_SILENCE;
-    }
-
-    /** Linear (0..1) local mic level from the sender's "media-source" stats report. */
-    private async readNativeSenderLevel(sender: RTCRtpSender): Promise<number | undefined> {
-        if (typeof sender.getStats !== "function") return undefined;
-        try {
-            const report = await sender.getStats();
-            let level: number | undefined;
-            report.forEach((stat: { type: string; kind?: string; audioLevel?: number }) => {
-                if (
-                    stat.type === "media-source" &&
-                    stat.kind === "audio" &&
-                    typeof stat.audioLevel === "number"
-                ) {
-                    level = stat.audioLevel;
-                }
-            });
-            return level;
-        } catch {
-            return undefined;
+    /**
+     * Measures `track`'s level via a per-track `AnalyserNode` (lazily created).
+     * Local is always metered this way - a consistent cross-browser reading -
+     * rather than via `RTCRtpSender.getStats()`, whose media-source `audioLevel`
+     * is missing in some browsers and differently scaled across the rest.
+     * Returns `undefined` (no signal this tick) if Web Audio is unavailable or
+     * the track reads silence.
+     */
+    private readLocalTrackRms(track: MediaStreamTrack): number | undefined {
+        let analyser = this.localAnalysers.get(track.id);
+        if (!analyser) {
+            analyser = new TrackRmsAnalyser(track);
+            try {
+                analyser.init();
+            } catch {
+                return undefined;
+            }
+            this.localAnalysers.set(track.id, analyser);
         }
+        const db = analyser.readRmsDb();
+        return db <= TrackRmsAnalyser.RMS_VALUE_OF_SILENCE ? undefined : db;
     }
 
-    /** Linear (0..1) remote level from the RFC 6464 header extension, if present. */
+    private stopLocalAnalyser(trackId: string): void {
+        const analyser = this.localAnalysers.get(trackId);
+        if (!analyser) return;
+        this.localAnalysers.delete(trackId);
+        analyser.stop();
+    }
+
+    /** dB level of `receiver`, or `undefined` if it reported no level this tick. */
+    private readRemoteRms(receiver: RTCRtpReceiver): number | undefined {
+        const native = this.readNativeReceiverLevel(receiver);
+        return native !== undefined ? this.levelToDb(native) : undefined;
+    }
+
+    /**
+     * Linear (0..1) remote level from the RFC 6464 header extension, or
+     * `undefined` if absent or zero. Absent is the normal DTX-silence case -
+     * the stream simply isn't fed this tick.
+     */
     private readNativeReceiverLevel(receiver: RTCRtpReceiver): number | undefined {
         if (typeof receiver.getSynchronizationSources !== "function") return undefined;
         for (const source of receiver.getSynchronizationSources()) {
-            if (typeof source.audioLevel === "number") return source.audioLevel;
+            if (typeof source.audioLevel === "number" && source.audioLevel > 0) {
+                return source.audioLevel;
+            }
         }
         return undefined;
     }
