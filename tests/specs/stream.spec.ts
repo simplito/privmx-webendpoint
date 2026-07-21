@@ -2290,7 +2290,7 @@ test.describe("StreamTest", () => {
         });
     });
 
-    test("streamRoomTtl: allows rejoin and republish after leave", async ({ page, backend, cli }) => {
+    test("emptyRoomTtl: allows rejoin and republish after leave", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {
             bridgeUrl: backend.bridgeUrl,
