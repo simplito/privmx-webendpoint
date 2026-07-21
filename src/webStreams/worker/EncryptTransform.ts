@@ -1,7 +1,6 @@
 import { CryptoFacade } from "../../crypto/CryptoFacade.js";
 import { KeyStore } from "../KeyStore.js";
 
-const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
 function genIvAsBuffer(): Uint8Array {
@@ -52,7 +51,7 @@ export class EncryptTransform {
         data: Uint8Array,
         header: Uint8Array,
     ): Promise<Uint8Array> {
-        return new Uint8Array(await CryptoFacade.aeadEncrypt(keyId, iv, header, data));
+        return new Uint8Array(await CryptoFacade.aeadEncryptFrame(keyId, iv, header, data));
     }
 
     private async decryptAes(
@@ -61,11 +60,14 @@ export class EncryptTransform {
         encryptedData: Uint8Array,
         header: Uint8Array,
     ): Promise<Uint8Array | null> {
+        // encryptedData is the contiguous ciphertext+tag exactly as it arrived on
+        // the wire; the frame AEAD route verifies the trailing 16-byte GCM tag in
+        // place, so there is no need to split it into ciphertext and tag here.
         if (encryptedData.length < 16) return null;
-        const data = encryptedData.slice(0, encryptedData.length - 16);
-        const tag = encryptedData.slice(encryptedData.length - 16);
         try {
-            return new Uint8Array(await CryptoFacade.aeadDecrypt(keyId, iv, header, data, tag));
+            return new Uint8Array(
+                await CryptoFacade.aeadDecryptFrame(keyId, iv, header, encryptedData),
+            );
         } catch {
             return null;
         }
@@ -99,9 +101,10 @@ export class EncryptTransform {
 
         const iv = genIvAsBuffer();
         const internalKeyId = this.keyStore.getEncryptionKeyId();
-        const wireKeyId = this.keyStore.getEncryptionExternalKeyId();
+        // Cached at setKeys time - not re-encoded per frame. set() below copies
+        // from it, so sharing the KeyStore's array is safe.
+        const keyIdBytes = this.keyStore.getEncryptionExternalKeyIdBytes();
         const encrypted = await this.encryptAes(internalKeyId, iv, frameBody, frameHeader);
-        const keyIdBytes = textEncoder.encode(wireKeyId);
 
         const posOfCipher = frameHeader.byteLength;
         const posOfIv = posOfCipher + encrypted.byteLength;

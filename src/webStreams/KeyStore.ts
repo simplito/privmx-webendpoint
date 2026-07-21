@@ -3,6 +3,8 @@ import { CryptoFacade } from "../crypto/CryptoFacade.js";
 
 const AES_GCM_KEY_LENGTH_BYTES = 32;
 
+const textEncoder = new TextEncoder();
+
 /**
  * Owns the set of AES-256-GCM keys for a single WebRTC session.
  *
@@ -18,6 +20,12 @@ export class KeyStore {
     private readonly sessionPrefix: string;
     private readonly externalToInternal = new Map<string, string>();
     private encryptionInternalKeyId: string | undefined = undefined;
+    // Wire-format (external) ID of the active encryption key and its UTF-8
+    // bytes, both cached at setKeys time. They are written into every outgoing
+    // frame, so deriving them per frame - a String.slice plus a
+    // TextEncoder.encode - would be pure hot-path waste.
+    private encryptionExternalKeyId: string | undefined = undefined;
+    private encryptionExternalKeyIdBytes: Uint8Array | undefined = undefined;
 
     constructor() {
         this.sessionPrefix = crypto.randomUUID();
@@ -29,6 +37,8 @@ export class KeyStore {
         }
         this.externalToInternal.clear();
         this.encryptionInternalKeyId = undefined;
+        this.encryptionExternalKeyId = undefined;
+        this.encryptionExternalKeyIdBytes = undefined;
 
         for (const k of keys) {
             const rawKey = new Uint8Array(k.key);
@@ -45,6 +55,8 @@ export class KeyStore {
             this.externalToInternal.set(k.keyId, internalId);
             if (k.type === 0) {
                 this.encryptionInternalKeyId = internalId;
+                this.encryptionExternalKeyId = k.keyId;
+                this.encryptionExternalKeyIdBytes = textEncoder.encode(k.keyId);
             }
         }
     }
@@ -81,9 +93,23 @@ export class KeyStore {
      * Throws if no encryption key has been set.
      */
     getEncryptionExternalKeyId(): string {
-        if (!this.encryptionInternalKeyId) {
+        if (this.encryptionExternalKeyId === undefined) {
             throw new Error("No encryption key set.");
         }
-        return this.encryptionInternalKeyId.slice(this.sessionPrefix.length + 1);
+        return this.encryptionExternalKeyId;
+    }
+
+    /**
+     * Returns the cached UTF-8 bytes of the active encryption key's external
+     * (wire-format) ID, ready to write straight into an outgoing frame. Computed
+     * once per {@link setKeys} rather than re-encoded per frame. The returned
+     * array is shared - callers must copy from it (e.g. `result.set(...)`), not
+     * mutate it. Throws if no encryption key has been set.
+     */
+    getEncryptionExternalKeyIdBytes(): Uint8Array {
+        if (this.encryptionExternalKeyIdBytes === undefined) {
+            throw new Error("No encryption key set.");
+        }
+        return this.encryptionExternalKeyIdBytes;
     }
 }
