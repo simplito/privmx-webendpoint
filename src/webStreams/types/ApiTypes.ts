@@ -1,5 +1,3 @@
-import { StreamHandle } from "../../Types.js";
-
 export interface UserWithPubKey {
     userId: string;
     key: string;
@@ -26,6 +24,10 @@ export interface Stream {
 }
 
 export type StreamId = number & { __streamId: never };
+
+export type StreamHandle = number & { __streamHandle: never };
+
+export type SubscriberStreamHandle = number & { __subscriberStreamHandle: never };
 
 export interface DataChannelMeta {
     created: boolean;
