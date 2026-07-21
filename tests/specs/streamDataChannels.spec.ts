@@ -3,8 +3,6 @@ import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
 import type { Endpoint, StreamApi } from "../../src";
-import { StreamRoomId } from "../../src/webStreams/types/ApiTypes";
-import { StreamHandle } from "../../src/Types";
 import { StreamEventType, StreamEventSelectorType } from "../../src/Types";
 
 interface TestUser {
@@ -21,7 +19,7 @@ declare global {
         streamApi?: StreamApi;
         currentUser?: TestUser;
 
-        myHandle?: StreamHandle;
+        myHandle?: number;
 
         remoteTracksCount?: number;
         trackEnded?: boolean;
@@ -103,9 +101,9 @@ test.describe("StreamTest", () => {
         await connectUserToBridge(page3, users.u3, backend.bridgeUrl, testData.solutionId);
 
         const contextId = testData.contextId;
-        let roomId: StreamRoomId;
+        let roomId: string;
         let dataTrackId: string;
-        let streamHandle: StreamHandle;
+        let streamHandle: number;
         const testMessage = "test message";
 
         let resolvePage1: () => void;
