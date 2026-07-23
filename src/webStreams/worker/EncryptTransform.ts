@@ -1,26 +1,18 @@
 import { CryptoFacade } from "../../crypto/CryptoFacade.js";
 import { KeyStore } from "../KeyStore.js";
+import { FrameIvGenerator } from "./FrameIvGenerator.js";
+import { clearHeaderLength, RTCEncodedVideoFrameType } from "./codecHeader.js";
+import {
+    FRAME_V2_FLAG_KEYFRAME,
+    assembleFrameV2,
+    frameV2Aad,
+    parseFrameV2,
+    serializeFrameV2Trailer,
+} from "./frameV2.js";
 
-const textDecoder = new TextDecoder();
+const GCM_TAG_LENGTH_BYTES = 16;
 
-function genIvAsBuffer(): Uint8Array {
-    return crypto.getRandomValues(new Uint8Array(12));
-}
-
-function numAsOneByteUint(num: number): Uint8Array {
-    if (num > 255) throw new Error("Out of bounds value");
-    const arr = new Uint8Array(1);
-    arr[0] = num;
-    return arr;
-}
-
-const NUM_AS_UINT8_SIZE = 1;
-
-/**
- * The three encoded video frame types defined by the WebRTC Encoded Transform spec.
- * @internal
- */
-export type RTCEncodedVideoFrameType = "key" | "delta" | "empty";
+export type { RTCEncodedVideoFrameType } from "./codecHeader.js";
 
 /**
  * Identifies the track a transform pipeline belongs to.
@@ -31,170 +23,117 @@ export interface TransformContext {
 }
 
 /**
- * Per-frame AES-256-GCM encrypt/decrypt for WebRTC encoded frames.
- * Pure crypto logic - no worker messaging, no module-level globals.
+ * Orchestrates per-frame AES-256-GCM encrypt/decrypt for WebRTC encoded frames
+ * using the version-2 wire format. Holds no wire-layout or codec knowledge -
+ * frame framing lives in {@link ./frameV2.js} and the cleartext-header length in
+ * {@link ./codecHeader.js}; this class only splits the frame, drives the key/
+ * nonce, and calls the crypto facade.
  * @internal
  */
 export class EncryptTransform {
-    constructor(private readonly keyStore: KeyStore) {}
-
-    private getHeaderSizeByType(type: RTCEncodedVideoFrameType): number {
-        if (type === "key") return 10;
-        if (type === "delta") return 3;
-        if (type === "empty") return 1;
-        return 0;
-    }
+    constructor(
+        private readonly keyStore: KeyStore,
+        private readonly ivGenerator: FrameIvGenerator = new FrameIvGenerator(),
+    ) {}
 
     private async encryptAes(
         keyId: string,
         iv: Uint8Array,
         data: Uint8Array,
-        header: Uint8Array,
+        aad: Uint8Array,
     ): Promise<Uint8Array> {
-        return new Uint8Array(await CryptoFacade.aeadEncryptFrame(keyId, iv, header, data));
+        return new Uint8Array(await CryptoFacade.aeadEncryptFrame(keyId, iv, aad, data));
     }
 
     private async decryptAes(
         keyId: string,
         iv: Uint8Array,
-        encryptedData: Uint8Array,
-        header: Uint8Array,
+        dataWithTag: Uint8Array,
+        aad: Uint8Array,
     ): Promise<Uint8Array | null> {
-        // encryptedData is the contiguous ciphertext+tag exactly as it arrived on
-        // the wire; the frame AEAD route verifies the trailing 16-byte GCM tag in
-        // place, so there is no need to split it into ciphertext and tag here.
-        if (encryptedData.length < 16) return null;
+        // dataWithTag is the contiguous ciphertext+tag from the wire; the frame
+        // AEAD route verifies the trailing 16-byte GCM tag in place.
+        if (dataWithTag.length < GCM_TAG_LENGTH_BYTES) return null;
         try {
-            return new Uint8Array(
-                await CryptoFacade.aeadDecryptFrame(keyId, iv, header, encryptedData),
-            );
+            return new Uint8Array(await CryptoFacade.aeadDecryptFrame(keyId, iv, aad, dataWithTag));
         } catch {
             return null;
         }
     }
 
     /**
-     * @param lastRms - value embedded in the frame trailer's legacy RMS byte,
-     *                  kept only so the wire format stays byte-compatible with
-     *                  older/other clients. Callers should pass a fixed
-     *                  placeholder; nothing derives real audio activity from it
-     *                  on this side anymore (see `AudioManager`).
+     * Encrypts `encodedFrame` in place into a v2 wire frame and enqueues it. The
+     * codec header stays cleartext at the front; the trailer and codec header are
+     * authenticated as AAD.
      */
     async encryptFrame(
         encodedFrame: RTCEncodedAudioFrame | RTCEncodedVideoFrame,
         kind: string,
         controller: TransformStreamDefaultController<unknown>,
-        lastRms: number,
     ): Promise<void> {
-        const headerLen =
-            kind === "video"
-                ? this.getHeaderSizeByType((encodedFrame as RTCEncodedVideoFrame).type)
-                : 1;
+        const videoType = (encodedFrame as RTCEncodedVideoFrame).type as
+            | RTCEncodedVideoFrameType
+            | undefined;
+        const headerLen = clearHeaderLength(kind, videoType);
         // A frame shorter than its own header (e.g. an empty DTX audio frame)
         // carries no payload.
         if (encodedFrame.data.byteLength < headerLen) {
             controller.enqueue(encodedFrame);
             return;
         }
-        const frameHeader = new Uint8Array(encodedFrame.data, 0, headerLen);
-        const frameBody = new Uint8Array(encodedFrame.data, headerLen);
+        const codecHeader = new Uint8Array(encodedFrame.data, 0, headerLen);
+        const body = new Uint8Array(encodedFrame.data, headerLen);
 
-        const iv = genIvAsBuffer();
-        const internalKeyId = this.keyStore.getEncryptionKeyId();
-        // Cached at setKeys time - not re-encoded per frame. set() below copies
-        // from it, so sharing the KeyStore's array is safe.
-        const keyIdBytes = this.keyStore.getEncryptionExternalKeyIdBytes();
-        const encrypted = await this.encryptAes(internalKeyId, iv, frameBody, frameHeader);
+        const iv = this.ivGenerator.next(); // Prefix ∥ Counter
+        const flags = kind === "video" && videoType === "key" ? FRAME_V2_FLAG_KEYFRAME : 0;
+        const trailer = serializeFrameV2Trailer(
+            iv,
+            this.keyStore.getEncryptionEpoch(),
+            headerLen,
+            flags,
+        );
+        const aad = frameV2Aad(codecHeader, trailer);
 
-        const posOfCipher = frameHeader.byteLength;
-        const posOfIv = posOfCipher + encrypted.byteLength;
-        const posOfIvSize = posOfIv + iv.byteLength;
-        const posOfKeyId = posOfIvSize + NUM_AS_UINT8_SIZE;
-        const posOfKeyIdSize = posOfKeyId + keyIdBytes.byteLength;
-        const posOfRMS = posOfKeyIdSize + NUM_AS_UINT8_SIZE;
+        const encrypted = await this.encryptAes(this.keyStore.getEncryptionKeyId(), iv, body, aad);
 
-        const result = new Uint8Array(posOfRMS + NUM_AS_UINT8_SIZE);
-        result.set(frameHeader);
-        result.set(encrypted, posOfCipher);
-        result.set(iv, posOfIv);
-        result.set(numAsOneByteUint(iv.byteLength), posOfIvSize);
-        result.set(keyIdBytes, posOfKeyId);
-        result.set(numAsOneByteUint(keyIdBytes.byteLength), posOfKeyIdSize);
-        result.set(numAsOneByteUint(lastRms + 100), posOfRMS);
-
-        encodedFrame.data = result.buffer;
+        encodedFrame.data = assembleFrameV2(codecHeader, encrypted, trailer);
         controller.enqueue(encodedFrame);
     }
 
     /**
-     * Decrypts `encodedFrame` in place and enqueues it, or - never throwing -
-     * enqueues it unmodified when the key is unknown, the AEAD tag fails, or
-     * the frame is too short/malformed to contain the wire-format trailer.
-     * The trailer's legacy RMS byte is skipped for offset purposes only; its
-     * value is never read (see `AudioManager` for real audio-level acquisition).
+     * Decrypts a v2 `encodedFrame` in place and enqueues it, or - never throwing
+     * - enqueues it unmodified when the frame is not v2, is malformed, carries an
+     * unknown key epoch, or fails the AEAD tag.
      */
     async decryptFrame(
         encodedFrame: RTCEncodedVideoFrame | RTCEncodedAudioFrame,
-        kind: string,
         controller: TransformStreamDefaultController<unknown>,
     ): Promise<void> {
-        const headerLen =
-            kind === "video"
-                ? this.getHeaderSizeByType((encodedFrame as RTCEncodedVideoFrame).type)
-                : 1;
-        const data = encodedFrame.data;
-
-        if (data.byteLength < headerLen + 5) {
+        const parsed = parseFrameV2(encodedFrame.data);
+        if (!parsed) {
+            // Not a v2 frame (wrong/absent version marker or too short) - a plain
+            // or foreign frame. Pass through unchanged.
             controller.enqueue(encodedFrame);
             return;
         }
+        const { iv, epoch, codecHeader, ciphertext, aad } = parsed;
 
-        const frameHeader = new Uint8Array(data, 0, headerLen);
-        const rmsTrailerPos = data.byteLength - 1;
-
-        const keyIdLenPos = rmsTrailerPos - 1;
-        const keyIdLen = new Uint8Array(data, keyIdLenPos, 1)[0];
-        const keyIdPos = keyIdLenPos - keyIdLen;
-        // A trailer that would reach into the header means a plain/foreign frame
-        // with arbitrary bytes in the length positions - pass it through.
-        if (keyIdPos < headerLen + 1) {
-            controller.enqueue(encodedFrame);
-            return;
-        }
-        const keyId = textDecoder.decode(new Uint8Array(data, keyIdPos, keyIdLen));
-
-        const ivLenPos = keyIdPos - 1;
-        const ivLen = new Uint8Array(data, ivLenPos, 1)[0];
-        const ivPos = ivLenPos - ivLen;
-        if (ivPos < headerLen) {
-            controller.enqueue(encodedFrame);
-            return;
-        }
-        const iv = new Uint8Array(data, ivPos, ivLen);
-
-        const payloadLen = ivPos - headerLen;
-        const payload = new Uint8Array(data.slice(headerLen, headerLen + payloadLen));
-
-        if (!this.keyStore.hasKey(keyId)) {
-            controller.enqueue(encodedFrame);
-            return;
+        // Epoch selects the candidate key(s); the correct key is always among
+        // them because the epoch tag is derived from the (shared) key id.
+        for (const internalKeyId of this.keyStore.resolveInternalKeyIdsByEpoch(epoch)) {
+            const plain = await this.decryptAes(internalKeyId, iv, ciphertext, aad);
+            if (plain) {
+                const result = new Uint8Array(codecHeader.length + plain.length);
+                result.set(codecHeader);
+                result.set(plain, codecHeader.length);
+                encodedFrame.data = result.buffer;
+                controller.enqueue(encodedFrame);
+                return;
+            }
         }
 
-        const plain = await this.decryptAes(
-            this.keyStore.resolveKeyId(keyId),
-            iv,
-            payload,
-            frameHeader,
-        );
-        if (!plain) {
-            controller.enqueue(encodedFrame);
-            return;
-        }
-
-        const result = new Uint8Array(frameHeader.byteLength + plain.byteLength);
-        result.set(frameHeader);
-        result.set(plain, frameHeader.byteLength);
-        encodedFrame.data = result.buffer;
+        // v2-shaped but undecryptable (unknown epoch, tampered, or a foreign
+        // frame whose last byte happened to equal the version marker).
         controller.enqueue(encodedFrame);
     }
 }

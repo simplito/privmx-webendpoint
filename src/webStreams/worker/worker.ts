@@ -8,9 +8,6 @@ const encryptTransform = new EncryptTransform(keyStore);
 // Active decode pipelines keyed by track id - so stop() can cancel them.
 const sessions = new Map<string, { controller: AbortController }>();
 
-// Legacy frame-trailer byte, kept only for wire-format compatibility (see EncryptTransform).
-const RMS_PLACEHOLDER = -99;
-
 // ---------------------------------------------------------------------------
 // RTCRtpScriptTransform entry point (modern browsers)
 // ---------------------------------------------------------------------------
@@ -74,10 +71,22 @@ self.addEventListener("message", (event: MessageEvent<events.WorkerInboundEvent>
             msg.writableStream,
         );
     } else if (msg.operation === "setKeys") {
-        keyStore.setKeys(msg.keys).then(() => {
-            const ack: events.SetKeysAckEvent = { operation: "setKeys-ack" };
-            (self as unknown as Worker).postMessage(ack);
-        });
+        keyStore
+            .setKeys(msg.keys)
+            .then(() => {
+                const ack: events.SetKeysAckEvent = { operation: "setKeys-ack" };
+                (self as unknown as Worker).postMessage(ack);
+            })
+            .catch((err) => {
+                // Report the failure so the main thread rejects its pending
+                // promise instead of hanging on an ack that will never come.
+                // setKeys is atomic, so the previous key set is still intact.
+                const nack: events.SetKeysNackEvent = {
+                    operation: "setKeys-nack",
+                    error: String(err),
+                };
+                (self as unknown as Worker).postMessage(nack);
+            });
     } else if (msg.operation === "stop") {
         const session = sessions.get(msg.id);
         if (session) {
@@ -108,7 +117,6 @@ function handleTransform(
                         encodedFrame as RTCEncodedAudioFrame | RTCEncodedVideoFrame,
                         kind,
                         controller,
-                        RMS_PLACEHOLDER,
                     );
                 } catch (err) {
                     postError(err);
@@ -125,7 +133,6 @@ function handleTransform(
                 try {
                     await encryptTransform.decryptFrame(
                         encodedFrame as RTCEncodedVideoFrame | RTCEncodedAudioFrame,
-                        kind,
                         controller,
                     );
                 } catch (err) {

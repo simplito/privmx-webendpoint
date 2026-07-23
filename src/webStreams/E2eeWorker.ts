@@ -8,6 +8,9 @@ import {
     WorkerOutboundEvent,
 } from "./worker/WorkerEvents.js";
 
+/** Settles a chained promise regardless of outcome, keeping the chain alive. */
+const swallow = (): void => undefined;
+
 /**
  * Owns the E2EE Web Worker process: spawning, key distribution, and raw
  * stream/transform posting.
@@ -23,6 +26,8 @@ export class E2eeWorker {
     private readonly logger = new Logger();
     // Pending operation rejects, so worker failure/teardown rejects them instead of hanging.
     private readonly pendingRejects = new Set<(err: Error) => void>();
+    // Serializes key updates so at most one setKeys is in flight at a time.
+    private keyUpdateChain: Promise<void> = Promise.resolve();
 
     constructor(private readonly workerUrl: string) {}
 
@@ -65,10 +70,21 @@ export class E2eeWorker {
     }
 
     /**
-     * Sends a `setKeys` message to the worker and waits for the `setKeys-ack`
-     * acknowledgement before resolving.
+     * Applies a new key set on the worker, waiting for its ack. Updates are
+     * serialized: each waits for the previous to settle, so there is never more
+     * than one `setKeys` message in flight (whose acks would otherwise be
+     * indistinguishable) nor overlapping worker-side key mutations.
      */
     async setKeys(keys: Key[]): Promise<void> {
+        const run = (): Promise<void> => this.postSetKeys(keys);
+        const result = this.keyUpdateChain.then(run, run);
+        // Keep the chain alive regardless of this update's outcome (a rejection
+        // must not break the link for the next update).
+        this.keyUpdateChain = result.then(swallow, swallow);
+        return result;
+    }
+
+    private async postSetKeys(keys: Key[]): Promise<void> {
         const worker = await this.get();
         return new Promise<void>((resolve, reject) => {
             const rejectPending = (err: Error) => {
@@ -76,10 +92,15 @@ export class E2eeWorker {
                 reject(err);
             };
             const ack = (ev: MessageEvent<WorkerOutboundEvent>) => {
-                if ("operation" in ev.data && ev.data.operation === "setKeys-ack") {
+                if (!("operation" in ev.data)) return;
+                if (ev.data.operation === "setKeys-ack") {
                     worker.removeEventListener("message", ack);
                     this.pendingRejects.delete(rejectPending);
                     resolve();
+                } else if (ev.data.operation === "setKeys-nack") {
+                    worker.removeEventListener("message", ack);
+                    this.pendingRejects.delete(rejectPending);
+                    reject(new Error(`Worker setKeys failed: ${ev.data.error ?? "unknown error"}`));
                 }
             };
             this.pendingRejects.add(rejectPending);

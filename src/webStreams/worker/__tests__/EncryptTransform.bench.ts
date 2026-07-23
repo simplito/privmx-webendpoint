@@ -105,7 +105,6 @@ for (const p of PROFILES) {
         p.kind,
         { enqueue: (f: unknown) => captured.push(f as { data: ArrayBuffer }) } as unknown as
             TransformStreamDefaultController<unknown>,
-        -99,
     );
 
     prepared.push({
@@ -145,24 +144,6 @@ for (const { p, aad, body, ciphertextWithTag } of prepared) {
     });
 }
 
-// --- #3: per-frame wire key-id derivation, old vs new -----------------------
-
-const textEncoder = new TextEncoder();
-// A representative internal key id (`<uuid>:<keyId>`) to strip like the old
-// getEncryptionExternalKeyId did.
-const fakeInternalId = `${crypto.randomUUID()}:${KEY_ID}`;
-const prefixLen = fakeInternalId.length - KEY_ID.length;
-
-describe("wire key-id per frame (#3)", () => {
-    bench("OLD String.slice + TextEncoder.encode per frame", () => {
-        const ext = fakeInternalId.slice(prefixLen);
-        textEncoder.encode(ext);
-    });
-    bench("NEW cached bytes (getEncryptionExternalKeyIdBytes)", () => {
-        keyStore.getEncryptionExternalKeyIdBytes();
-    });
-});
-
 // --- Absolute throughput of the shipping frame path (new impl only) ---------
 // Includes the per-iteration frame-buffer clone (slice(0)) that the mutation of
 // encodedFrame.data forces; a real pipeline gets each frame fresh from WebRTC.
@@ -170,10 +151,10 @@ describe("wire key-id per frame (#3)", () => {
 for (const { p, plaintextTemplate, encryptedTemplate } of prepared) {
     describe(`full path — ${p.name}`, () => {
         bench("encryptFrame (crypto + wire-framing + cached key id)", async () => {
-            await et.encryptFrame(makeFrame(plaintextTemplate, p.videoType), p.kind, noopController, -99);
+            await et.encryptFrame(makeFrame(plaintextTemplate, p.videoType), p.kind, noopController);
         });
         bench("decryptFrame (parse + crypto)", async () => {
-            await et.decryptFrame(makeFrame(encryptedTemplate, p.videoType), p.kind, noopController);
+            await et.decryptFrame(makeFrame(encryptedTemplate, p.videoType), noopController);
         });
     });
 }

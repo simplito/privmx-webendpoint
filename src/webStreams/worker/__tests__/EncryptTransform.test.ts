@@ -1,6 +1,8 @@
 import { setGlobalEmCrypto } from "../../../crypto/index.js";
 import { KeyStore } from "../../KeyStore.js";
+import { Key } from "../../../Types.js";
 import { EncryptTransform, RTCEncodedVideoFrameType } from "../EncryptTransform.js";
+import { FRAME_V2_VERSION } from "../frameV2.js";
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -66,7 +68,7 @@ beforeAll(() => {
     setGlobalEmCrypto();
 });
 
-/** Build a KeyStore with a single 32-byte key loaded and return both. */
+/** Build a KeyStore with a single 32-byte type-0 key loaded and return both. */
 async function makeKeyStore(keyByte = 0x42): Promise<{ ks: KeyStore; keyBytes: Uint8Array }> {
     const keyBytes = new Uint8Array(32).fill(keyByte);
     const ks = new KeyStore();
@@ -75,9 +77,22 @@ async function makeKeyStore(keyByte = 0x42): Promise<{ ks: KeyStore; keyBytes: U
     return { ks, keyBytes };
 }
 
+/** Build a KeyStore holding several keys (for epoch-resolution / rotation tests). */
+async function makeMultiKeyStore(
+    keys: Array<{ keyId: string; byte: number; type: number }>,
+): Promise<KeyStore> {
+    const ks = new KeyStore();
+    await ks.setKeys(
+        keys.map(
+            (k): Key => ({ keyId: k.keyId, key: new Uint8Array(32).fill(k.byte), type: k.type }),
+        ),
+    );
+    return ks;
+}
+
 // ---- tests ------------------------------------------------------------------
 
-describe("EncryptTransform", () => {
+describe("EncryptTransform (v2 wire format)", () => {
     describe("encryptFrame + decryptFrame - audio", () => {
         it("body is not plaintext after encryption", async () => {
             const { ks } = await makeKeyStore();
@@ -88,20 +103,22 @@ describe("EncryptTransform", () => {
             const originalBody = new Uint8Array(body);
 
             const { controller, enqueued } = makeController();
-            await et.encryptFrame(frame, "audio", controller, 0);
+            await et.encryptFrame(frame, "audio", controller);
 
             expect(enqueued).toHaveLength(1);
             const encryptedData = new Uint8Array(enqueued[0].data);
 
-            // Output is larger than input (IV + keyId + lengths + RMS appended)
+            // Output is larger than input (ciphertext+tag + 16B trailer).
             expect(encryptedData.byteLength).toBeGreaterThan(1 + body.length);
+            // Version byte is the last byte of the frame.
+            expect(encryptedData[encryptedData.byteLength - 1]).toBe(FRAME_V2_VERSION);
 
             // Body bytes (after 1B audio header) should differ from original plaintext
             const encryptedBody = encryptedData.slice(1, 1 + body.length);
             expect(bufEqual(encryptedBody, originalBody)).toBe(false);
         });
 
-        it("header byte is preserved unencrypted (AAD)", async () => {
+        it("codec header byte is preserved unencrypted (AAD)", async () => {
             const { ks } = await makeKeyStore();
             const et = new EncryptTransform(ks);
 
@@ -109,7 +126,7 @@ describe("EncryptTransform", () => {
             const originalHeader = new Uint8Array(frame.data, 0, 1)[0];
 
             const { controller, enqueued } = makeController();
-            await et.encryptFrame(frame, "audio", controller, 0);
+            await et.encryptFrame(frame, "audio", controller);
 
             expect(new Uint8Array(enqueued[0].data)[0]).toBe(originalHeader);
         });
@@ -122,41 +139,14 @@ describe("EncryptTransform", () => {
             const frame = makeAudioFrame(body) as RTCEncodedAudioFrame;
 
             const { controller: encCtrl, enqueued: encQueued } = makeController();
-            await et.encryptFrame(frame, "audio", encCtrl, 0);
+            await et.encryptFrame(frame, "audio", encCtrl);
 
             const { controller: decCtrl, enqueued: decQueued } = makeController();
-            await et.decryptFrame(
-                encQueued[0] as unknown as RTCEncodedAudioFrame,
-                "audio",
-                decCtrl,
-            );
+            await et.decryptFrame(encQueued[0] as unknown as RTCEncodedAudioFrame, decCtrl);
 
             const decrypted = new Uint8Array(decQueued[0].data);
             // 1B header + original body
             expect(decrypted.byteLength).toBe(1 + body.length);
-            expect(Array.from(decrypted.slice(1))).toEqual(body);
-        });
-
-        it("decrypts correctly regardless of the trailer's legacy RMS byte value (wire-format compat)", async () => {
-            const { ks } = await makeKeyStore();
-            const et = new EncryptTransform(ks);
-
-            // Simulates a foreign/older sender that still writes a real value there.
-            const foreignRmsValue = 37;
-            const body = [1, 2, 3, 4];
-            const frame = makeAudioFrame(body) as RTCEncodedAudioFrame;
-
-            const { controller: encCtrl, enqueued: encQueued } = makeController();
-            await et.encryptFrame(frame, "audio", encCtrl, foreignRmsValue);
-
-            const { controller: decCtrl, enqueued: decQueued } = makeController();
-            await et.decryptFrame(
-                encQueued[0] as unknown as RTCEncodedAudioFrame,
-                "audio",
-                decCtrl,
-            );
-
-            const decrypted = new Uint8Array(decQueued[0].data);
             expect(Array.from(decrypted.slice(1))).toEqual(body);
         });
     });
@@ -180,7 +170,7 @@ describe("EncryptTransform", () => {
                 const originalHeader = copyBuffer(frame.data).slice(0, hLen);
 
                 const { controller: encCtrl, enqueued: encQueued } = makeController();
-                await et.encryptFrame(frame, "video", encCtrl, 0);
+                await et.encryptFrame(frame, "video", encCtrl);
 
                 const encryptedData = new Uint8Array(encQueued[0].data);
 
@@ -193,23 +183,46 @@ describe("EncryptTransform", () => {
                 const bodyAfterHeader = encryptedData.slice(hLen, hLen + body.length);
                 expect(bufEqual(bodyAfterHeader, new Uint8Array(body))).toBe(false);
 
-                // Decrypt restores original body
+                // Decrypt restores original body - reading ClearLen from the trailer,
+                // NOT from the frame type (decode is codec-agnostic).
                 const { controller: decCtrl, enqueued: decQueued } = makeController();
-                await et.decryptFrame(
-                    encQueued[0] as unknown as RTCEncodedVideoFrame,
-                    "video",
-                    decCtrl,
-                );
+                await et.decryptFrame(encQueued[0] as unknown as RTCEncodedVideoFrame, decCtrl);
                 const decrypted = new Uint8Array(decQueued[0].data);
                 expect(Array.from(decrypted.slice(hLen))).toEqual(body);
             },
         );
     });
 
+    describe("key resolution by epoch", () => {
+        it("decrypts using a held non-encryption (previous-epoch) key", async () => {
+            // Sender's active key is "epoch4"; the receiver holds "epoch5" as its
+            // current (type 0) key plus "epoch4" retained (type 1) during rotation.
+            const encKs = await makeMultiKeyStore([{ keyId: "epoch4", byte: 0x41, type: 0 }]);
+            const decKs = await makeMultiKeyStore([
+                { keyId: "epoch5", byte: 0x55, type: 0 },
+                { keyId: "epoch4", byte: 0x41, type: 1 },
+            ]);
+
+            const body = [9, 8, 7, 6, 5, 4, 3, 2];
+            const frame = makeAudioFrame(body) as RTCEncodedAudioFrame;
+
+            const { controller: encCtrl, enqueued: encQueued } = makeController();
+            await new EncryptTransform(encKs).encryptFrame(frame, "audio", encCtrl);
+
+            const { controller: decCtrl, enqueued: decQueued } = makeController();
+            await new EncryptTransform(decKs).decryptFrame(
+                encQueued[0] as unknown as RTCEncodedAudioFrame,
+                decCtrl,
+            );
+
+            expect(Array.from(new Uint8Array(decQueued[0].data).slice(1))).toEqual(body);
+        });
+    });
+
     describe("wrong key - pass-through", () => {
-        it("enqueues the frame unchanged when the keyId is not in the store", async () => {
+        it("enqueues the frame unchanged when no held key matches the epoch", async () => {
             const { ks: encKs } = await makeKeyStore(0x11);
-            const { ks: decKs } = await makeKeyStore(0x22); // different key
+            const { ks: decKs } = await makeKeyStore(0x22); // different key/id
             const encEt = new EncryptTransform(encKs);
             const decEt = new EncryptTransform(decKs);
 
@@ -217,24 +230,19 @@ describe("EncryptTransform", () => {
             const frame = makeAudioFrame(body) as RTCEncodedAudioFrame;
 
             const { controller: encCtrl, enqueued: encQueued } = makeController();
-            await encEt.encryptFrame(frame, "audio", encCtrl, 0);
+            await encEt.encryptFrame(frame, "audio", encCtrl);
 
             const encryptedSnapshot = copyBuffer(encQueued[0].data);
 
             const { controller: decCtrl, enqueued: decQueued } = makeController();
-            await decEt.decryptFrame(
-                encQueued[0] as unknown as RTCEncodedAudioFrame,
-                "audio",
-                decCtrl,
-            );
+            await decEt.decryptFrame(encQueued[0] as unknown as RTCEncodedAudioFrame, decCtrl);
 
-            // Frame passed through unmodified - could not decrypt
             expect(bufEqual(new Uint8Array(decQueued[0].data), encryptedSnapshot)).toBe(true);
         });
     });
 
-    describe("tampered ciphertext - AEAD tag failure", () => {
-        it("enqueues the frame unchanged when ciphertext is corrupted", async () => {
+    describe("authentication - AEAD tag failure -> pass-through", () => {
+        it("enqueues unchanged when the ciphertext is corrupted", async () => {
             const { ks } = await makeKeyStore(0x33);
             const et = new EncryptTransform(ks);
 
@@ -242,76 +250,86 @@ describe("EncryptTransform", () => {
             const frame = makeAudioFrame(body) as RTCEncodedAudioFrame;
 
             const { controller: encCtrl, enqueued: encQueued } = makeController();
-            await et.encryptFrame(frame, "audio", encCtrl, 0);
+            await et.encryptFrame(frame, "audio", encCtrl);
 
-            // Flip a byte in the middle of the ciphertext (after 1B audio header)
+            // Flip a byte in the ciphertext (after the 1B audio header).
             const tampered = new Uint8Array(encQueued[0].data.slice(0));
             tampered[2] ^= 0xff;
             encQueued[0].data = tampered.buffer;
             const tamperedSnapshot = copyBuffer(encQueued[0].data);
 
             const { controller: decCtrl, enqueued: decQueued } = makeController();
-            await et.decryptFrame(
-                encQueued[0] as unknown as RTCEncodedAudioFrame,
-                "audio",
-                decCtrl,
-            );
+            await et.decryptFrame(encQueued[0] as unknown as RTCEncodedAudioFrame, decCtrl);
 
-            // The corrupted frame is still enqueued, unmodified (pass-through on failure)
             expect(decQueued).toHaveLength(1);
+            expect(bufEqual(new Uint8Array(decQueued[0].data), tamperedSnapshot)).toBe(true);
+        });
+
+        it("enqueues unchanged when a trailer metadata byte is tampered (trailer is AAD)", async () => {
+            const { ks } = await makeKeyStore(0x34);
+            const et = new EncryptTransform(ks);
+
+            const body = [1, 2, 3, 4, 5, 6, 7, 8];
+            const frame = makeAudioFrame(body) as RTCEncodedAudioFrame;
+
+            const { controller: encCtrl, enqueued: encQueued } = makeController();
+            await et.encryptFrame(frame, "audio", encCtrl);
+
+            // Flip the Flags byte (2nd from last). Epoch/ClearLen/Version are intact,
+            // so the key still resolves - but the AAD changed, so the tag must fail.
+            const tampered = new Uint8Array(encQueued[0].data.slice(0));
+            tampered[tampered.length - 2] ^= 0xff;
+            encQueued[0].data = tampered.buffer;
+            const tamperedSnapshot = copyBuffer(encQueued[0].data);
+
+            const { controller: decCtrl, enqueued: decQueued } = makeController();
+            await et.decryptFrame(encQueued[0] as unknown as RTCEncodedAudioFrame, decCtrl);
+
             expect(bufEqual(new Uint8Array(decQueued[0].data), tamperedSnapshot)).toBe(true);
         });
     });
 
-    describe("short frame - pass-through", () => {
-        it("enqueues a frame that is too short to contain E2EE metadata", async () => {
+    describe("non-v2 / malformed frames - pass-through, never throw", () => {
+        it("passes through a frame whose version byte is not 2", async () => {
             const { ks } = await makeKeyStore();
             const et = new EncryptTransform(ks);
 
-            // 3 bytes total - less than headerLen(1) + 5 minimum trailer bytes
+            const raw = new Uint8Array(40).fill(0x55);
+            raw[raw.length - 1] = 99; // not the v2 marker
+            const { controller, enqueued } = makeController();
+            await et.decryptFrame({ data: raw.slice().buffer } as unknown as RTCEncodedAudioFrame, controller);
+
+            expect(enqueued).toHaveLength(1);
+            expect(bufEqual(new Uint8Array(enqueued[0].data), raw)).toBe(true);
+        });
+
+        it("passes through a frame too short to hold a trailer", async () => {
+            const { ks } = await makeKeyStore();
+            const et = new EncryptTransform(ks);
+
             const tiny = { data: new Uint8Array([0xaa, 0x01, 0x02]).buffer };
             const { controller, enqueued } = makeController();
-            await et.decryptFrame(tiny as unknown as RTCEncodedAudioFrame, "audio", controller);
+            await et.decryptFrame(tiny as unknown as RTCEncodedAudioFrame, controller);
 
             expect(enqueued).toHaveLength(1);
         });
-    });
 
-    describe("foreign (non-wire-format) frames - pass-through, never throw", () => {
-        it("passes through when the keyIdLen byte points past the frame start", async () => {
+        it("passes through a v2-shaped frame with an out-of-bounds ClearLen", async () => {
             const { ks } = await makeKeyStore();
             const et = new EncryptTransform(ks);
 
-            // 20-byte frame whose second-to-last byte (keyIdLen) is 255
-            const raw = new Uint8Array(20).fill(0x55);
-            raw[18] = 255;
-            const frame = { data: raw.slice().buffer };
-
+            // Version byte set to 2, ClearLen (3rd from last) set huge.
+            const raw = new Uint8Array(40).fill(0x00);
+            raw[raw.length - 1] = FRAME_V2_VERSION;
+            raw[raw.length - 3] = 250; // ClearLen far past the ciphertext region
             const { controller, enqueued } = makeController();
-            await et.decryptFrame(frame as unknown as RTCEncodedAudioFrame, "audio", controller);
+            await et.decryptFrame({ data: raw.slice().buffer } as unknown as RTCEncodedAudioFrame, controller);
 
             expect(enqueued).toHaveLength(1);
             expect(bufEqual(new Uint8Array(enqueued[0].data), raw)).toBe(true);
         });
 
-        it("passes through when the ivLen byte points past the frame start", async () => {
-            const { ks } = await makeKeyStore();
-            const et = new EncryptTransform(ks);
-
-            // Trailer parses as keyIdLen=2, but ivLen=200 reaches into the header
-            const raw = new Uint8Array(30).fill(0x66);
-            raw[28] = 2; // keyIdLen
-            raw[25] = 200; // ivLen (at keyIdPos - 1 = 26 - 1)
-            const frame = { data: raw.slice().buffer };
-
-            const { controller, enqueued } = makeController();
-            await et.decryptFrame(frame as unknown as RTCEncodedAudioFrame, "audio", controller);
-
-            expect(enqueued).toHaveLength(1);
-            expect(bufEqual(new Uint8Array(enqueued[0].data), raw)).toBe(true);
-        });
-
-        it("never throws on random audio-sized frames (fuzz)", async () => {
+        it("never throws on random frames (fuzz)", async () => {
             const { ks } = await makeKeyStore();
             const et = new EncryptTransform(ks);
 
@@ -322,7 +340,6 @@ describe("EncryptTransform", () => {
                 const { controller, enqueued } = makeController();
                 await et.decryptFrame(
                     { data: raw.buffer } as unknown as RTCEncodedAudioFrame,
-                    "audio",
                     controller,
                 );
                 expect(enqueued).toHaveLength(1);
@@ -336,7 +353,7 @@ describe("EncryptTransform", () => {
 
             const frame = { data: new ArrayBuffer(0) };
             const { controller, enqueued } = makeController();
-            await et.encryptFrame(frame as unknown as RTCEncodedAudioFrame, "audio", controller, 0);
+            await et.encryptFrame(frame as unknown as RTCEncodedAudioFrame, "audio", controller);
 
             expect(enqueued).toHaveLength(1);
             expect(enqueued[0].data.byteLength).toBe(0);
@@ -353,14 +370,13 @@ describe("EncryptTransform", () => {
             async function encryptBody(): Promise<Uint8Array> {
                 const frame = makeAudioFrame(body) as RTCEncodedAudioFrame;
                 const { controller, enqueued } = makeController();
-                await et.encryptFrame(frame, "audio", controller, 0);
+                await et.encryptFrame(frame, "audio", controller);
                 return new Uint8Array(enqueued[0].data);
             }
 
             const first = await encryptBody();
             const second = await encryptBody();
 
-            // Same plaintext, same key - but different IVs produce different ciphertext
             expect(bufEqual(first, second)).toBe(false);
         });
     });

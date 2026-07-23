@@ -62,6 +62,17 @@ export interface SetKeysAckEvent {
 }
 
 /**
+ * Worker reply: a setKeys message failed to apply (e.g. an invalid key length or
+ * a key-import error). Lets the main thread reject its pending `setKeys` promise
+ * instead of waiting forever for an ack that will never arrive.
+ * @internal
+ */
+export interface SetKeysNackEvent {
+    operation: "setKeys-nack";
+    error?: string;
+}
+
+/**
  * Worker event: debug payload forwarded to the main thread.
  * @internal
  */
@@ -83,4 +94,4 @@ export interface ErrorEvent {
  * Union of all messages sent from the E2EE worker to the main thread.
  * @internal
  */
-export type WorkerOutboundEvent = SetKeysAckEvent | DebugEvent | ErrorEvent;
+export type WorkerOutboundEvent = SetKeysAckEvent | SetKeysNackEvent | DebugEvent | ErrorEvent;
