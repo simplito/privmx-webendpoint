@@ -21,12 +21,13 @@ export class RemoteStreamListenerRegistry {
      * @throws if a listener with the same `streamRoomId` and `streamId` is already registered.
      */
     add(listener: RemoteStreamListener): void {
-        const existing = this.listeners.get(listener.streamRoomId) ?? [];
+        const streamRoomId = listener.streamRoomId as StreamRoomId;
+        const existing = this.listeners.get(streamRoomId) ?? [];
         if (existing.find((x) => x.streamId === listener.streamId)) {
             throw new Error("RemoteStreamListener with given params already exists.");
         }
         existing.push(listener);
-        this.listeners.set(listener.streamRoomId, existing);
+        this.listeners.set(streamRoomId, existing);
     }
 
     /**

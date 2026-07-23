@@ -10,7 +10,6 @@ limitations under the License.
 */
 
 import { ExtKey } from "./service/ExtKey.js";
-import * as StreamsApiTypes from "./webStreams/types/ApiTypes.js";
 
 export type SortOrder = "desc" | "asc";
 
@@ -611,11 +610,6 @@ export interface ItemPolicy {
     delete?: PolicyEntry;
 }
 
-export type StreamId = StreamsApiTypes.StreamId;
-export type StreamRoomId = StreamsApiTypes.StreamRoomId;
-export type StreamHandle = number & { _streamHandle: never };
-export type SubscriberStreamHandle = number & { _subscriberStreamHandle: never };
-
 /**
  * Lifecycle state of a Stream Room.
  *
@@ -666,7 +660,7 @@ export interface TrackInfo {
 export interface StreamPublishResult {
     published: boolean;
     data?: {
-        streamRoomId: StreamRoomId;
+        streamRoomId: string;
         stream: StreamInfo;
         userId: string;
     };
@@ -760,8 +754,8 @@ export interface TurnCredentials {
 }
 
 export interface RemoteStreamListener {
-    streamRoomId: StreamRoomId;
-    streamId?: StreamId;
+    streamRoomId: string;
+    streamId?: number;
     onRemoteStreamTrack?: (event: RTCTrackEvent) => void;
     onRemoteData?: (data: Uint8Array, statusCode: number) => void;
 }
@@ -874,12 +868,12 @@ export enum StreamEventType {
 }
 
 export interface StreamRoomMemberEventData {
-    streamRoomId: StreamRoomId;
+    streamRoomId: string;
     userId: string;
 }
 
 export interface StreamRoomReofferEventData {
-    streamRoomId: StreamRoomId;
+    streamRoomId: string;
     jsep?: { type: "offer"; sdp: string };
 }
 
@@ -889,13 +883,13 @@ export interface StreamSubscriptionRef {
 }
 
 export interface StreamSubscribedEventData {
-    streamRoomId: StreamRoomId;
+    streamRoomId: string;
     userId: string;
     subscriptions: StreamSubscriptionRef[];
 }
 
 export interface StreamUpdatedEventData {
-    streamRoomId: StreamRoomId;
+    streamRoomId: string;
     streamId: number;
     userId: string;
     tracksAdded: TrackInfo[];
@@ -904,13 +898,13 @@ export interface StreamUpdatedEventData {
 }
 
 export interface StreamPublishedEventData {
-    streamRoomId: StreamRoomId;
+    streamRoomId: string;
     userId: string;
     stream: StreamInfo;
 }
 
 export interface StreamUnpublishedEventData {
-    streamRoomId: StreamRoomId;
+    streamRoomId: string;
     userId: string;
     streamId: number;
 }

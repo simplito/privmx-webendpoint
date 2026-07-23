@@ -3,8 +3,8 @@ import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
 import type { Endpoint, StreamApi, Types } from "../../src";
-import { StreamRoomId, StreamTrackInit } from "../../src/webStreams/types/ApiTypes";
-import { SortOrder, StreamHandle, StreamInfo, SubscriberStreamHandle } from "../../src/Types";
+import { StreamTrackInit } from "../../src/webStreams/types/ApiTypes";
+import { SortOrder, StreamInfo } from "../../src/Types";
 import { StreamEventType, StreamEventSelectorType } from "../../src/Types";
 interface TestUser {
     id: string;
@@ -20,7 +20,7 @@ declare global {
         streamApi?: StreamApi;
         currentUser?: TestUser;
 
-        myHandle?: StreamHandle;
+        myHandle?: number;
 
         remoteTracksCount?: number;
         trackEnded?: boolean;
@@ -129,7 +129,7 @@ test.describe("StreamTest", () => {
             };
 
             // Invalid ID
-            await expectError(async () => await streamApi.getStreamRoom(contextId as StreamRoomId));
+            await expectError(async () => await streamApi.getStreamRoom(contextId));
 
             // Valid ID
             const room = await streamApi.getStreamRoom(sId);
@@ -354,7 +354,7 @@ test.describe("StreamTest", () => {
             await expectError(
                 async () =>
                     await streamApi.updateStreamRoom(
-                        "invalid" as StreamRoomId,
+                        "invalid",
                         [u1Obj],
                         [u1Obj],
                         enc.encode("p"),
@@ -548,7 +548,7 @@ test.describe("StreamTest", () => {
                 throw new Error("Expected error");
             };
 
-            await expectError(async () => await api1.deleteStreamRoom(contextId as StreamRoomId));
+            await expectError(async () => await api1.deleteStreamRoom(contextId));
 
             // Unauthorized delete (User 2)
             await expectError(async () => await api2.deleteStreamRoom(sId));
@@ -603,7 +603,7 @@ test.describe("StreamTest", () => {
                 throw new Error("Expected error");
             };
 
-            const fakeStreamId = contextId as StreamRoomId;
+            const fakeStreamId = contextId;
 
             // List Streams (Valid/Invalid)
             await expectError(async () => await streamApi.listStreams(fakeStreamId));
@@ -673,7 +673,7 @@ test.describe("StreamTest", () => {
                 throw new Error("Expected error");
             };
 
-            const fakeStreamId = contextId as StreamRoomId;
+            const fakeStreamId = contextId;
 
             // Invalid room id
             await expectError(
@@ -837,13 +837,13 @@ test.describe("StreamTest", () => {
             // Valid Track  s
             await expectError(
                 async () =>
-                    await streamApi.addStreamTrack(-1 as StreamHandle, { track: audioTrack }),
+                    await streamApi.addStreamTrack(-1, { track: audioTrack }),
             );
             await streamApi.addStreamTrack(handle, { track: audioTrack });
 
             await expectError(
                 async () =>
-                    await streamApi.addStreamTrack(-1 as StreamHandle, { track: videoTrack }),
+                    await streamApi.addStreamTrack(-1, { track: videoTrack }),
             );
 
             await streamApi.addStreamTrack(handle, { track: videoTrack });
@@ -890,7 +890,7 @@ test.describe("StreamTest", () => {
                 throw new Error("Expected error");
             };
 
-            await expectError(async () => await streamApi.publishStream(-1 as StreamHandle));
+            await expectError(async () => await streamApi.publishStream(-1));
             await expectError(async () => await streamApi.publishStream(handle)); // Handle with no tracks
 
             return { success: true };
@@ -941,7 +941,7 @@ test.describe("StreamTest", () => {
 
             await expectError(
                 "Publish stream with invalid handle",
-                async () => await streamApi.publishStream(-1 as StreamHandle),
+                async () => await streamApi.publishStream(-1),
             );
             await streamApi.publishStream(handle);
 
@@ -1394,7 +1394,7 @@ test.describe("StreamTest", () => {
             };
 
             // Empty
-            await expectError(async () => await streamApi.removeSubscriberStream(-1 as SubscriberStreamHandle));
+            await expectError(async () => await streamApi.removeSubscriberStream(-1));
 
             // Publish & Subscribe first
             const handle = await streamApi.createStream(sId);
@@ -1408,7 +1408,7 @@ test.describe("StreamTest", () => {
                 const subHandle = await streamApi.createSubscriberStream(sId, sub);
 
                 // Invalid Unsub
-                await expectError(async () => await streamApi.removeSubscriberStream(-1 as SubscriberStreamHandle));
+                await expectError(async () => await streamApi.removeSubscriberStream(-1));
 
                 // Valid Unsub
                 await streamApi.removeSubscriberStream(subHandle);
@@ -1642,7 +1642,7 @@ test.describe("StreamTest", () => {
         await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
 
         const contextId = testData.contextId;
-        let roomId: StreamRoomId;
+        let roomId: string;
 
         // --- STEP 1: U1 Creates Room & Publishes ---
         await test.step("User 1: Create Room, Join, Publish", async () => {
@@ -1776,7 +1776,7 @@ test.describe("StreamTest", () => {
         await connectUserToBridge(page3, users.u3, backend.bridgeUrl, testData.solutionId);
 
         const contextId = testData.contextId;
-        let roomId: StreamRoomId;
+        let roomId: string;
 
         // --- STEP 1: U1 Creates Room & Publishes ---
         await test.step("User 1: Create Room, Join, Publish", async () => {
@@ -1920,7 +1920,7 @@ test.describe("StreamTest", () => {
         await connect(page1, u1);
         await connect(page2, u2);
 
-        let roomId: StreamRoomId;
+        let roomId: string;
 
         // --- STEP 1: U1 Publishes AUDIO ONLY ---
         await test.step("Phase 1: Audio Only", async () => {
@@ -2391,7 +2391,7 @@ test.describe("StreamTest", () => {
         await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
 
         const contextId = testData.contextId;
-        let roomId: StreamRoomId;
+        let roomId: string;
 
         // --- STEP 1: Create Room (User 1) ---
         roomId = await page1.evaluate(
@@ -2705,8 +2705,8 @@ test.describe("StreamTest", () => {
         await connectUserToBridge(page1, users.u1, backend.bridgeUrl, testData.solutionId);
         await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
 
-        let sharedRoomId: StreamRoomId;
-        let controlRoomId: StreamRoomId;
+        let sharedRoomId: string;
+        let controlRoomId: string;
 
         // --- STEP 1: U1 creates two rooms ---
         await test.step("Setup Rooms", async () => {
@@ -2956,7 +2956,7 @@ test.describe("StreamTest", () => {
         await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
         await connectUserToBridge(page3, users.u3, backend.bridgeUrl, testData.solutionId);
 
-        let roomId: StreamRoomId;
+        let roomId: string;
 
         // 1. U1 creates the room
         await test.step("Create Room", async () => {
@@ -3172,7 +3172,7 @@ test.describe("StreamTest", () => {
         await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
 
         const contextId = testData.contextId;
-        let roomId: StreamRoomId;
+        let roomId: string;
 
         // --- STEP 1: U1 Creates Room & Publishes ---
         await test.step("User 1: Create Room, Join, Publish", async () => {
@@ -3290,7 +3290,7 @@ test.describe("StreamTest", () => {
         await connectUserToBridge(page2, users.u2, backend.bridgeUrl, testData.solutionId);
 
         const contextId = testData.contextId;
-        let roomId: StreamRoomId;
+        let roomId: string;
 
         // --- STEP 1: U1 Creates Room & Publishes ---
         await test.step("User 1: Create Room, Join, Wait for 'new streams' events", async () => {

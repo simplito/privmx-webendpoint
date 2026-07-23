@@ -1,4 +1,4 @@
-import { StreamHandle } from "../Types.js";
+import { StreamHandle } from "./types/ApiTypes.js";
 import { logger } from "./Logger.js";
 
 /**
