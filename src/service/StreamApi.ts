@@ -121,6 +121,9 @@ export class StreamApi extends BaseApi {
      *   room key; only Stream Room members can decrypt it
      * @param {ContainerPolicy} policies fine-grained access rules overriding the
      *   Context defaults; pass `undefined` to use the defaults
+     * @param {number} emptyRoomTtl grace period (ms) the room stays open after
+     *   the last participant leaves before being closed; `0` closes it
+     *   immediately, and `undefined` uses the server default
      * @returns {string} ID of the new Stream Room - pass to
      *   {@link joinStreamRoom}, {@link getStreamRoom} or {@link updateStreamRoom}
      */
@@ -131,6 +134,7 @@ export class StreamApi extends BaseApi {
         publicMeta: Uint8Array,
         privateMeta: Uint8Array,
         policies?: ContainerPolicy,
+        emptyRoomTtl?: number,
     ): Promise<string> {
         return this.native.createStreamRoom(this.servicePtr, [
             contextId,
@@ -139,6 +143,7 @@ export class StreamApi extends BaseApi {
             publicMeta,
             privateMeta,
             policies,
+            emptyRoomTtl,
         ]);
     }
 
@@ -170,11 +175,12 @@ export class StreamApi extends BaseApi {
      * @param {number} version current Stream Room version, from
      *   `StreamRoom.version` returned by {@link getStreamRoom} - lets the server
      *   reject stale updates
-     * @param {boolean} force `true` skips the `version` check and overwrites any
-     *   concurrent modification
-     * @param {boolean} forceGenerateNewKey when `true`, a fresh room key is
+     * @param {boolean} [force] `true` skips the `version` check and overwrites any
+     *   concurrent modification; defaults to `false`
+     * @param {boolean} [forceGenerateNewKey] when `true`, a fresh room key is
      *   generated and redistributed, so users removed by this update cannot
-     *   decrypt media or data sent afterwards - set it whenever you revoke access
+     *   decrypt media or data sent afterwards - set it whenever you revoke access;
+     *   defaults to `false`
      * @param {ContainerPolicy} policies new access policies; pass `undefined` to
      *   keep the current ones
      * @returns {Promise<void>} resolves when the Stream Room membership and metadata have been replaced
@@ -186,8 +192,8 @@ export class StreamApi extends BaseApi {
         publicMeta: Uint8Array,
         privateMeta: Uint8Array,
         version: number,
-        force: boolean,
-        forceGenerateNewKey: boolean,
+        force?: boolean,
+        forceGenerateNewKey?: boolean,
         policies?: ContainerPolicy,
     ): Promise<void> {
         return this.native.updateStreamRoom(this.servicePtr, [
@@ -197,8 +203,8 @@ export class StreamApi extends BaseApi {
             publicMeta,
             privateMeta,
             version,
-            force,
-            forceGenerateNewKey,
+            force ?? false,
+            forceGenerateNewKey ?? false,
             policies,
         ]);
     }
