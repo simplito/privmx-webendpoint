@@ -134,6 +134,7 @@ export class StreamApi extends BaseApi {
         publicMeta: Uint8Array,
         privateMeta: Uint8Array,
         policies?: ContainerPolicy,
+        emptyRoomTtl?: number,
     ): Promise<string> {
         return this.native.createStreamRoom(this.servicePtr, [
             contextId,
