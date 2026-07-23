@@ -1,5 +1,4 @@
-import { StreamHandle } from "../Types.js";
-import { StreamRoomId, StreamTrack } from "./types/ApiTypes.js";
+import { StreamHandle, StreamRoomId, StreamTrack } from "./types/ApiTypes.js";
 import { PeerConnectionManager, SessionId } from "./PeerConnectionManager.js";
 import { AudioManager } from "./AudioManager.js";
 import { E2eeTransformManager } from "./E2eeTransformManager.js";

@@ -1,6 +1,5 @@
-import { StreamHandle } from "../Types.js";
 import { logger } from "./Logger.js";
-import { StreamRoomId } from "./types/ApiTypes.js";
+import { StreamHandle, StreamRoomId } from "./types/ApiTypes.js";
 
 /**
  * Branded numeric Janus session ID.
