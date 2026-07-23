@@ -20,7 +20,10 @@ if(PRIVMX_BUILD_TYPE STREQUAL "debug")
     set(CMAKE_CXX_FLAGS "-std=c++17 -fexceptions -pthread")
     target_compile_options(endpoint-wasm-module PUBLIC
         -O0 -g
-        -DDEBUG
+        # NOTE: do NOT add -DDEBUG here. The privmx endpoint core logger header
+        # (privmx/utils/logger/Core.hpp) defines `enum class LogLevel { DEBUG = 5, ... }`,
+        # and -DDEBUG (#define DEBUG 1) expands the enumerator to `1 = 5,` -> compile error.
+        # Debug behaviour is driven by -O0 -g / -sASSERTIONS=2 / -sSAFE_HEAP=1 below.
     )
     target_link_options(endpoint-wasm-module PUBLIC
         -L $ENV{SDK_DIR}/upstream/emscripten/cache/sysroot/lib

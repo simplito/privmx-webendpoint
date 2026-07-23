@@ -40,21 +40,21 @@ declare function endpointWasmModule(moduleOverrides?: {
 /**
  * Options accepted by {@link EndpointFactory.setup}.
  *
- * Two ways to point the SDK at its four runtime assets:
+ * Two ways to point the SDK at its three runtime assets:
  * - **Single directory** (simplest): set `assetsBasePath` to a folder that
- *   serves all four files.
+ *   serves all three files.
  * - **Per-asset URLs** (bundler-native): set `wasmModuleUrl` / `wasmUrl` /
- *   `workerUrl` / `rmsProcessorUrl` individually - typically with
+ *   `workerUrl` individually - typically with
  *   `new URL("…", import.meta.url).href` so a bundler (Vite, webpack 5, …)
  *   fingerprints and serves each asset without a manual copy step. Any URL left
  *   unset falls back to `assetsBasePath` + the default filename.
  */
 export interface EndpointSetupOptions {
     /**
-     * URL or path of the directory the WASM assets are served from - the four
+     * URL or path of the directory the WASM assets are served from - the three
      * files copied out of `@simplito/privmx-webendpoint/assets`
      * (`endpoint-wasm-module.js`, `endpoint-wasm-module.wasm`,
-     * `privmx-worker.js`, `rms-processor.js`). Defaults to `/`. Relative paths
+     * `privmx-worker.js`). Defaults to `/`. Relative paths
      * are resolved against `document.baseURI`. A wrong path rejects `setup()`
      * with a load error instead of failing later. Ignored for any asset that
      * has an explicit per-asset URL below.
@@ -79,12 +79,6 @@ export interface EndpointSetupOptions {
      * `new Worker(url)`). Overrides `assetsBasePath` for the streaming worker.
      */
     workerUrl?: string;
-    /**
-     * Absolute URL of the audio worklet `rms-processor.js` (loaded with
-     * `audioWorklet.addModule(url)`). Overrides `assetsBasePath` for audio
-     * level metering.
-     */
-    rmsProcessorUrl?: string;
     /**
      * Number of async-engine worker threads the WASM module spawns (default 4,
      * clamped to a minimum of 2). Each worker holds a view of the shared WASM
@@ -162,7 +156,7 @@ export class EndpointFactory {
      *   per-asset URL, or assets not copied), or when called outside a browser
      *   environment
      * @example
-     * // Simple: all four assets served from one directory.
+     * // Simple: all three assets served from one directory.
      * await EndpointFactory.setup({ assetsBasePath: "/privmx-assets" });
      *
      * // Bundler-native: let the bundler resolve each asset (no manual copy).
@@ -170,7 +164,6 @@ export class EndpointFactory {
      *     wasmModuleUrl: new URL("…/endpoint-wasm-module.js", import.meta.url).href,
      *     wasmUrl: new URL("…/endpoint-wasm-module.wasm", import.meta.url).href,
      *     workerUrl: new URL("…/privmx-worker.js", import.meta.url).href,
-     *     rmsProcessorUrl: new URL("…/rms-processor.js", import.meta.url).href,
      * });
      * const connection = await EndpointFactory.connect(userPrivKey, solutionId, bridgeUrl);
      * const threadApi = await EndpointFactory.createThreadApi(connection);
@@ -219,8 +212,6 @@ export class EndpointFactory {
         this.assets = {
             basePath,
             workerUrl: resolved.workerUrl ?? this.buildAssetUrl(basePath, "privmx-worker.js"),
-            rmsProcessorUrl:
-                resolved.rmsProcessorUrl ?? this.buildAssetUrl(basePath, "rms-processor.js"),
         };
         const glueUrl = wasmModuleUrl ?? this.buildAssetUrl(basePath, "endpoint-wasm-module.js");
 

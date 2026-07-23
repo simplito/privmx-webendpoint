@@ -1,11 +1,17 @@
-import * as EndpointTypes from "../Types.js";
-import { AudioLevelsStats, WebRtcClient } from "../webStreams/WebRtcClient.js";
+import {
+    AudioLevelsStats,
+    ActiveSpeakerDetectorConfig,
+    WebRtcClient,
+} from "../webStreams/WebRtcClient.js";
 import {
     Stream,
     StreamCreateMeta,
+    StreamHandle,
+    StreamRoomId,
     StreamTrack,
     StreamTrackId,
     StreamTrackInit,
+    SubscriberStreamHandle,
 } from "../webStreams/types/ApiTypes.js";
 import { BaseApi } from "./BaseApi.js";
 import {
@@ -17,9 +23,8 @@ import {
     StreamEventType,
     StreamRoom,
     UserWithPubKey,
-    StreamHandle,
-    SubscriberStreamHandle,
     StreamSubscription,
+    StreamSubscriber,
     StreamPublishResult,
     RemoteStreamListener,
 } from "../Types.js";
@@ -82,7 +87,7 @@ export class StreamApi extends BaseApi {
 
     private streams: Map<StreamHandle, Stream> = new Map();
     private streamTracks: Map<StreamTrackId, StreamTrack> = new Map();
-    private subscriberStreams: Map<SubscriberStreamHandle, EndpointTypes.StreamRoomId> = new Map();
+    private subscriberStreams: Map<SubscriberStreamHandle, StreamRoomId> = new Map();
 
     public override destroyRefs(): void {
         this.client.destroy();
@@ -129,9 +134,8 @@ export class StreamApi extends BaseApi {
         publicMeta: Uint8Array,
         privateMeta: Uint8Array,
         policies?: ContainerPolicy,
-        emptyRoomTtl?: number,
-    ): Promise<EndpointTypes.StreamRoomId> {
-        const res = await this.native.createStreamRoom(this.servicePtr, [
+    ): Promise<string> {
+        return this.native.createStreamRoom(this.servicePtr, [
             contextId,
             users,
             managers,
@@ -140,7 +144,6 @@ export class StreamApi extends BaseApi {
             policies,
             emptyRoomTtl,
         ]);
-        return res as EndpointTypes.StreamRoomId;
     }
 
     /**
@@ -181,7 +184,7 @@ export class StreamApi extends BaseApi {
      * @returns {Promise<void>} resolves when the Stream Room membership and metadata have been replaced
      */
     public async updateStreamRoom(
-        streamRoomId: EndpointTypes.StreamRoomId,
+        streamRoomId: string,
         users: UserWithPubKey[],
         managers: UserWithPubKey[],
         publicMeta: Uint8Array,
@@ -246,7 +249,7 @@ export class StreamApi extends BaseApi {
      *   {@link listStreamRooms}
      * @returns {Promise<void>} resolves when the encrypted Event channel for the room has been established
      */
-    public async joinStreamRoom(streamRoomId: EndpointTypes.StreamRoomId): Promise<void> {
+    public async joinStreamRoom(streamRoomId: string): Promise<void> {
         return this.native.joinStreamRoom(this.servicePtr, [streamRoomId]);
     }
 
@@ -265,52 +268,8 @@ export class StreamApi extends BaseApi {
      *   {@link listStreamRooms}
      * @returns {Promise<void>} resolves when the room's Event channel has been torn down
      */
-    public async leaveStreamRoom(streamRoomId: EndpointTypes.StreamRoomId): Promise<void> {
+    public async leaveStreamRoom(streamRoomId: string): Promise<void> {
         return this.native.leaveStreamRoom(this.servicePtr, [streamRoomId]);
-    }
-
-    /**
-     * Enables server-side recording for the Stream Room.
-     *
-     * Instructs the Bridge to record the room's streams; the recordings stay
-     * encrypted, and their decryption keys are retrieved with
-     * {@link getStreamRoomRecordingKeys}.
-     *
-     * Call after {@link joinStreamRoom} when recording is desired; fetch the
-     * keys needed to decrypt the output with {@link getStreamRoomRecordingKeys}.
-     *
-     * @param {string} streamRoomId ID of the Stream Room to record, returned by
-     *   {@link createStreamRoom} or from `StreamRoom.streamRoomId` in
-     *   {@link listStreamRooms}
-     * @returns {Promise<void>} resolves when the Bridge has acknowledged the recording request
-     */
-    public async enableStreamRoomRecording(
-        streamRoomId: EndpointTypes.StreamRoomId,
-    ): Promise<void> {
-        return this.native.enableStreamRoomRecording(this.servicePtr, [streamRoomId]);
-    }
-
-    /**
-     * Gets the encryption keys needed to decrypt the Stream Room's server-side
-     * recordings.
-     *
-     * Fetches the per-recording key material from the Bridge so the encrypted
-     * recordings produced after {@link enableStreamRoomRecording} can be
-     * decrypted client-side.
-     *
-     * Use it after {@link enableStreamRoomRecording} to obtain the keys for
-     * playback or export of the recordings.
-     *
-     * @param {string} streamRoomId ID of the Stream Room whose recording keys
-     *   are requested, returned by {@link createStreamRoom} or from
-     *   `StreamRoom.streamRoomId` in {@link listStreamRooms}
-     * @returns {RecordingEncKey[]} list of recording encryption keys used to
-     *   decrypt the recordings enabled via {@link enableStreamRoomRecording}
-     */
-    public async getStreamRoomRecordingKeys(
-        streamRoomId: EndpointTypes.StreamRoomId,
-    ): Promise<EndpointTypes.RecordingEncKey[]> {
-        return this.native.getStreamRoomRecordingKeys(this.servicePtr, [streamRoomId]);
     }
 
     /**
@@ -329,7 +288,7 @@ export class StreamApi extends BaseApi {
      * @returns {StreamRoom} decrypted Stream Room data - `version` feeds
      *   {@link updateStreamRoom}; `streamRoomId` feeds {@link joinStreamRoom}
      */
-    public async getStreamRoom(streamRoomId: EndpointTypes.StreamRoomId): Promise<StreamRoom> {
+    public async getStreamRoom(streamRoomId: string): Promise<StreamRoom> {
         return this.native.getStreamRoom(this.servicePtr, [streamRoomId]);
     }
 
@@ -350,7 +309,7 @@ export class StreamApi extends BaseApi {
      *   {@link listStreamRooms}
      * @returns {Promise<void>} resolves when the Stream Room has been deleted from the server
      */
-    public async deleteStreamRoom(streamRoomId: EndpointTypes.StreamRoomId): Promise<void> {
+    public async deleteStreamRoom(streamRoomId: string): Promise<void> {
         return this.native.deleteStreamRoom(this.servicePtr, [streamRoomId]);
     }
 
@@ -369,14 +328,19 @@ export class StreamApi extends BaseApi {
      * @param {string} streamRoomId ID of the Stream Room to create the stream
      *   in, returned by {@link createStreamRoom} or from
      *   `StreamRoom.streamRoomId` in {@link listStreamRooms}
-     * @returns {StreamHandle} local stream handle consumed by
+     * @returns {number} local stream handle consumed by
      *   {@link addStreamTrack}, {@link publishStream} and
      *   {@link unpublishStream}
      */
-    public async createStream(streamRoomId: EndpointTypes.StreamRoomId): Promise<StreamHandle> {
+    public async createStream(streamRoomId: string): Promise<number> {
         const meta: StreamCreateMeta = {};
         const handle = await this.native.createStream(this.servicePtr, [streamRoomId]);
-        this.streams.set(handle, { handle, streamRoomId, createStreamMeta: meta, remote: false });
+        this.streams.set(handle, {
+            handle,
+            streamRoomId: streamRoomId as StreamRoomId,
+            createStreamMeta: meta,
+            remote: false,
+        });
         return handle;
     }
 
@@ -397,8 +361,22 @@ export class StreamApi extends BaseApi {
      * @returns {StreamInfo[]} descriptors of currently published streams; pick
      *   targets to subscribe to with {@link createSubscriberStream}
      */
-    public async listStreams(streamRoomId: EndpointTypes.StreamRoomId): Promise<StreamInfo[]> {
+    public async listStreams(streamRoomId: string): Promise<StreamInfo[]> {
         return this.native.listStreams(this.servicePtr, [streamRoomId]);
+    }
+
+    /**
+     * Lists the participants of the given Stream Room, along with the stream
+     * subscriptions each of them currently has and, if they are publishing,
+     * the descriptor of their published stream.
+     *
+     * @param {string} streamRoomId ID of the Stream Room to enumerate,
+     *   returned by {@link createStreamRoom} or from
+     *   `StreamRoom.streamRoomId` in {@link listStreamRooms}
+     * @returns {StreamSubscriber[]} descriptors of the room's participants
+     */
+    public async listStreamRoomParticipants(streamRoomId: string): Promise<StreamSubscriber[]> {
+        return this.native.listStreamRoomParticipants(this.servicePtr, [streamRoomId]);
     }
 
     /**
@@ -414,7 +392,7 @@ export class StreamApi extends BaseApi {
      * {@link publishStream}; pass `createDataChannel` to stage a data channel
      * whose ID is later used with {@link sendData}.
      *
-     * @param {StreamHandle} streamHandle local stream handle returned by
+     * @param {number} streamHandle local stream handle returned by
      *   {@link createStream}
      * @param {StreamTrackInit} meta track/data-channel definition - `track` is
      *   the browser `MediaStreamTrack` to publish and/or `createDataChannel`
@@ -424,11 +402,8 @@ export class StreamApi extends BaseApi {
      * @throws {Error} when the given `streamHandle` does not exist, or the same
      *   browser track is already staged on that handle
      */
-    public async addStreamTrack(
-        streamHandle: StreamHandle,
-        meta: StreamTrackInit,
-    ): Promise<StreamTrackId> {
-        const stream = this.streams.get(streamHandle);
+    public async addStreamTrack(streamHandle: number, meta: StreamTrackInit): Promise<string> {
+        const stream = this.streams.get(streamHandle as StreamHandle);
         if (!stream) {
             throw new Error("[addStreamTrack]: there is no Stream with given Id: " + streamHandle);
         }
@@ -453,7 +428,7 @@ export class StreamApi extends BaseApi {
         const streamTrackId = crypto.randomUUID() as StreamTrackId;
         this.streamTracks.set(streamTrackId, {
             id: streamTrackId,
-            streamHandle,
+            streamHandle: streamHandle as StreamHandle,
             track: meta.track,
             dataChannelMeta: { created: meta.createDataChannel },
             published: false,
@@ -471,17 +446,14 @@ export class StreamApi extends BaseApi {
      * Use it to drop a track from a stream; apply the change with
      * {@link updateStream} for an already-published stream.
      *
-     * @param {StreamHandle} streamHandle local stream handle returned by
+     * @param {number} streamHandle local stream handle returned by
      *   {@link createStream}
      * @param {StreamTrackInit} meta track definition whose `track` matches the
      *   browser `MediaStreamTrack` previously passed to {@link addStreamTrack}
      * @throws {Error} when the given `streamHandle` does not exist
      */
-    public async removeStreamTrack(
-        streamHandle: StreamHandle,
-        meta: StreamTrackInit,
-    ): Promise<void> {
-        if (!this.streams.has(streamHandle)) {
+    public async removeStreamTrack(streamHandle: number, meta: StreamTrackInit): Promise<void> {
+        if (!this.streams.has(streamHandle as StreamHandle)) {
             throw new Error(
                 "[removeStreamTrack]: there is no Stream with given Id: " + streamHandle,
             );
@@ -511,7 +483,7 @@ export class StreamApi extends BaseApi {
      * {@link updateStream}, stop publishing with {@link unpublishStream}, and
      * send data-channel bytes with {@link sendData}.
      *
-     * @param {StreamHandle} streamHandle local stream handle returned by
+     * @param {number} streamHandle local stream handle returned by
      *   {@link createStream}
      * @param {(state: RTCPeerConnectionState) => void} onStreamState optional
      *   callback invoked whenever the underlying `RTCPeerConnection` changes
@@ -521,10 +493,10 @@ export class StreamApi extends BaseApi {
      * @throws {Error} when the given `streamHandle` does not exist
      */
     public async publishStream(
-        streamHandle: StreamHandle,
+        streamHandle: number,
         onStreamState?: (state: RTCPeerConnectionState) => void,
     ): Promise<StreamPublishResult> {
-        const stream = this.streams.get(streamHandle);
+        const stream = this.streams.get(streamHandle as StreamHandle);
         if (!stream) {
             throw new Error("No stream defined to publish");
         }
@@ -546,7 +518,7 @@ export class StreamApi extends BaseApi {
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(turnCredentials);
         await this.client.createPeerConnectionWithLocalStream(
-            streamHandle,
+            streamHandle as StreamHandle,
             stream.streamRoomId,
             stream.localMediaStream,
             dataTracks,
@@ -555,7 +527,9 @@ export class StreamApi extends BaseApi {
         if (onStreamState) {
             this.client
                 .getStreamStateChangeDispatcher()
-                .addOnStateChangeListener({ streamHandle }, (event) => onStreamState(event.state));
+                .addOnStateChangeListener({ streamHandle: streamHandle as StreamHandle }, (event) =>
+                    onStreamState(event.state),
+                );
         }
 
         return this.native.publishStream(this.servicePtr, [streamHandle]);
@@ -573,14 +547,14 @@ export class StreamApi extends BaseApi {
      * Call after staging more {@link addStreamTrack} / {@link removeStreamTrack}
      * changes on a stream already sent with {@link publishStream}.
      *
-     * @param {StreamHandle} streamHandle local stream handle returned by
+     * @param {number} streamHandle local stream handle returned by
      *   {@link createStream} and already published via {@link publishStream}
      * @returns {StreamPublishResult} result of the update operation describing
      *   the renegotiated stream
      * @throws {Error} when the given `streamHandle` does not exist
      */
-    public async updateStream(streamHandle: StreamHandle): Promise<StreamPublishResult> {
-        const stream = this.streams.get(streamHandle);
+    public async updateStream(streamHandle: number): Promise<StreamPublishResult> {
+        const stream = this.streams.get(streamHandle as StreamHandle);
         if (!stream) {
             throw new Error("No stream defined to publish");
         }
@@ -615,12 +589,12 @@ export class StreamApi extends BaseApi {
      * Follows {@link publishStream} when you are done streaming; leave the room
      * afterwards with {@link leaveStreamRoom}.
      *
-     * @param {StreamHandle} streamHandle local stream handle returned by
+     * @param {number} streamHandle local stream handle returned by
      *   {@link createStream} and published via {@link publishStream}
      * @throws {Error} when the given `streamHandle` does not exist
      */
-    public async unpublishStream(streamHandle: StreamHandle): Promise<void> {
-        const stream = this.streams.get(streamHandle);
+    public async unpublishStream(streamHandle: number): Promise<void> {
+        const stream = this.streams.get(streamHandle as StreamHandle);
         if (!stream) {
             throw new Error("No local stream with given id to unpublish");
         }
@@ -634,8 +608,10 @@ export class StreamApi extends BaseApi {
             stream.streamRoomId,
             stream.localMediaStream,
         );
-        this.streams.delete(streamHandle);
-        this.client.getStreamStateChangeDispatcher().removeOnStateChangeListener({ streamHandle });
+        this.streams.delete(streamHandle as StreamHandle);
+        this.client
+            .getStreamStateChangeDispatcher()
+            .removeOnStateChangeListener({ streamHandle: streamHandle as StreamHandle });
     }
 
     /**
@@ -661,22 +637,22 @@ export class StreamApi extends BaseApi {
      * @param {StreamSubscription[]} subscriptions remote streams/tracks to
      *   subscribe to, selected from the descriptors returned by
      *   {@link listStreams}
-     * @returns {SubscriberStreamHandle} handle identifying the new subscriber
+     * @returns {number} handle identifying the new subscriber
      *   stream - pass it to {@link updateSubscriberStream} and
      *   {@link removeSubscriberStream}
      */
     async createSubscriberStream(
-        streamRoomId: EndpointTypes.StreamRoomId,
+        streamRoomId: string,
         subscriptions: StreamSubscription[],
-    ): Promise<SubscriberStreamHandle> {
+    ): Promise<number> {
         const peerCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(peerCredentials);
         const handle = await this.native.createSubscriberStream(this.servicePtr, [
             streamRoomId,
             subscriptions,
         ]);
-        this.subscriberStreams.set(handle, streamRoomId);
-        this.client.initializeSubscriberConnection(streamRoomId);
+        this.subscriberStreams.set(handle, streamRoomId as StreamRoomId);
+        this.client.initializeSubscriberConnection(streamRoomId as StreamRoomId);
         return handle;
     }
 
@@ -693,7 +669,7 @@ export class StreamApi extends BaseApi {
      * (e.g. follow the active speaker); to tear the whole subscriber stream down
      * use {@link removeSubscriberStream}.
      *
-     * @param {SubscriberStreamHandle} subscriberStreamHandle handle returned by
+     * @param {number} subscriberStreamHandle handle returned by
      *   {@link createSubscriberStream}
      * @param {StreamSubscription[]} subscriptionsToAdd remote streams/tracks to
      *   start receiving, selected from the descriptors returned by
@@ -704,7 +680,7 @@ export class StreamApi extends BaseApi {
      * @returns {Promise<void>} resolves when the Bridge has applied the subscription changes
      */
     async updateSubscriberStream(
-        subscriberStreamHandle: SubscriberStreamHandle,
+        subscriberStreamHandle: number,
         subscriptionsToAdd: StreamSubscription[],
         subscriptionsToRemove: StreamSubscription[],
     ): Promise<void> {
@@ -728,13 +704,13 @@ export class StreamApi extends BaseApi {
      * {@link createSubscriberStream}; to change rather than drop the set, prefer
      * {@link updateSubscriberStream}.
      *
-     * @param {SubscriberStreamHandle} subscriberStreamHandle handle returned by
+     * @param {number} subscriberStreamHandle handle returned by
      *   {@link createSubscriberStream}
      * @returns {Promise<void>} resolves once the Bridge has stopped delivering the subscriber stream
      */
-    async removeSubscriberStream(subscriberStreamHandle: SubscriberStreamHandle): Promise<void> {
+    async removeSubscriberStream(subscriberStreamHandle: number): Promise<void> {
         await this.native.removeSubscriberStream(this.servicePtr, [subscriberStreamHandle]);
-        this.subscriberStreams.delete(subscriberStreamHandle);
+        this.subscriberStreams.delete(subscriberStreamHandle as SubscriberStreamHandle);
     }
 
     /**
@@ -832,22 +808,62 @@ export class StreamApi extends BaseApi {
     }
 
     /**
-     * Registers a callback that receives periodic audio-level statistics for
-     * the session's local and remote audio.
+     * Reads the current audio-level statistics for the session's local and
+     * remote audio. Your local mic is measured directly from its track (a
+     * consistent reading in every browser); remote levels come from native
+     * WebRTC statistics, so a remote stream is simply omitted when the browser
+     * or SFU exposes no level for it.
      *
-     * The WebRTC client computes per-stream RMS audio levels (used for active
-     * speaker detection) and forwards them to the callback; the data is derived
-     * locally from the already-decrypted audio.
-     *
-     * Use it to drive speaking indicators or volume meters in the UI; register
-     * it once the session is established via {@link publishStream} or
+     * Pull-based, not a subscription: each call does one fresh read and
+     * returns immediately. Poll it on whatever interval suits your UI (e.g.
+     * every 200-500ms) to drive speaking indicators or volume meters; call it
+     * once the session is established via {@link publishStream} or
      * {@link createSubscriberStream}.
      *
-     * @param {(stats: AudioLevelsStats) => void} onStats callback invoked with
-     *   the current per-stream audio levels each time they are recomputed
+     * Each entry in `levels` is identified by `streamId`: **your own local
+     * microphone is reported under `streamId === -1`**, and each remote
+     * publisher under its own (non-negative) stream ID from {@link listStreams}.
+     * A stream only appears once it has reported a level, and drops out after
+     * prolonged silence - so the local entry is absent in a subscribe-only
+     * session and may briefly disappear between utterances; treat a missing
+     * entry as "not speaking." Per entry, `emaRms` is the smoothed level in
+     * dBFS (roughly -70 when quiet up to ~0 when loud) and `activeUntil` is the
+     * timestamp until which the stream counts as actively speaking (compare it
+     * against `Date.now()`).
+     *
+     * @returns {Promise<AudioLevelsStats>} the current per-stream audio levels;
+     *   `levels[i].streamId === -1` is the local microphone
      */
-    async addAudioLevelStatsListener(onStats: (stats: AudioLevelsStats) => void): Promise<void> {
-        this.client.setAudioLevelCallback(onStats);
+    async readAudioStats(): Promise<AudioLevelsStats> {
+        return this.client.readAudioStats();
+    }
+
+    /**
+     * Tunes the active-speaker detection used by {@link readAudioStats} -
+     * pass any subset of the fields; omitted ones keep their current value.
+     * Takes effect immediately, from the next {@link readAudioStats} call.
+     *
+     * @param {ActiveSpeakerDetectorConfig} config partial tuning overrides
+     * @param {number} [config.rmsEmaAlpha] EMA smoothing factor (0..1) for the
+     *   raw level itself - higher reacts to speech onset faster but is
+     *   noisier; default 0.2
+     * @param {number} [config.noiseEmaAlpha] EMA smoothing factor (0..1) for
+     *   the adaptive background noise floor - should stay much slower than
+     *   `rmsEmaAlpha`; default 0.02
+     * @param {number} [config.thresholdOffset] dB above the noise floor a
+     *   speaker must reach to count as "speaking" - lower is more sensitive;
+     *   default 6
+     * @param {number} [config.holdMs] how long (ms) a speaker stays marked
+     *   active after the last frame that crossed the threshold - keep real
+     *   slack over however often you call {@link readAudioStats}; default 600
+     * @param {number} [config.noiseFloorMin] lower bound (dB) on the adaptive
+     *   noise floor, so it can't sink to the silence value reported for tracks
+     *   with no audio and leave everything reading "active"; raise it if quiet
+     *   tracks still register, lower it if genuinely quiet speech is missed;
+     *   default -70
+     */
+    configureActiveSpeakerDetector(config: Partial<ActiveSpeakerDetectorConfig>): void {
+        this.client.configureActiveSpeakerDetector(config);
     }
 
     /**
@@ -863,15 +879,16 @@ export class StreamApi extends BaseApi {
      * {@link addStreamTrack} and a stream already sent with
      * {@link publishStream}.
      *
-     * @param {StreamTrackId} streamTrackId track ID returned by
+     * @param {string} streamTrackId track ID returned by
      *   {@link addStreamTrack} for a data channel track
      * @param {Uint8Array} data raw bytes to deliver to remote participants
      * @throws {Error} when there is no data channel for the given
      *   `streamTrackId` (track not staged with a data channel, or not yet
      *   published)
      */
-    async sendData(streamTrackId: StreamTrackId, data: Uint8Array): Promise<void> {
-        const dataChannel = this.streamTracks.get(streamTrackId)?.dataChannelMeta.dataChannel;
+    async sendData(streamTrackId: string, data: Uint8Array): Promise<void> {
+        const dataChannel = this.streamTracks.get(streamTrackId as StreamTrackId)?.dataChannelMeta
+            .dataChannel;
         if (!dataChannel) {
             throw new Error(`There is no DataTrack with given streamTrackId: ${streamTrackId}`);
         }

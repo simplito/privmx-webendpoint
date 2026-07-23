@@ -7,6 +7,7 @@ interface QueueItem {
 }
 import { E2eeTransformManager } from "./E2eeTransformManager.js";
 import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry.js";
+import { AudioManager } from "./AudioManager.js";
 import { Queue } from "./Queue.js";
 import { Logger } from "./Logger.js";
 
@@ -25,6 +26,7 @@ export class SubscriberManager {
         private readonly pcm: PeerConnectionManager,
         private readonly e2eeTransformManager: E2eeTransformManager,
         private readonly listenerRegistry: RemoteStreamListenerRegistry,
+        private readonly audioManager: AudioManager,
     ) {
         this.reconfigureQueue = new Queue<QueueItem>();
         this.reconfigureQueue.assignProcessorFunc(async (item) => {
@@ -75,11 +77,17 @@ export class SubscriberManager {
         await this.waitUntilConnected(pc);
 
         this.logger.debug("setupReceiverTransform...");
-        await this.e2eeTransformManager.setupReceiverTransform(receiver, publisherId);
+        await this.e2eeTransformManager.setupReceiverTransform(receiver);
+        if (event.track.kind === "audio") {
+            this.audioManager.watchRemoteReceiver(publisherId, receiver);
+        }
         event.track.addEventListener("ended", () => {
             this.e2eeTransformManager.teardownReceiver(receiver).catch((e) => {
                 this.logger.error("teardownReceiver failed:", e);
             });
+            if (event.track.kind === "audio") {
+                this.audioManager.unwatchRemoteReceiver(publisherId);
+            }
         });
 
         this.listenerRegistry.dispatchTrack(roomId, event);

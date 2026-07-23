@@ -1,5 +1,4 @@
-import { StreamHandle } from "../Types.js";
-import { StreamRoomId, StreamTrack } from "./types/ApiTypes.js";
+import { StreamHandle, StreamRoomId, StreamTrack } from "./types/ApiTypes.js";
 import { PeerConnectionManager, SessionId } from "./PeerConnectionManager.js";
 import { AudioManager } from "./AudioManager.js";
 import { E2eeTransformManager } from "./E2eeTransformManager.js";
@@ -35,11 +34,14 @@ export class PublisherManager {
 
         if (stream && stream.getTracks().length > 0) {
             for (const track of stream.getTracks()) {
-                if (track.kind === "audio") {
-                    await this.audioManager.ensureLocalAudioLevelMeter(track);
-                }
                 const sender = pc.addTrack(track, stream);
-                await this.e2eeTransformManager.setupSenderTransform(sender);
+                if (track.kind === "audio") {
+                    this.audioManager.watchLocalSender(sender);
+                }
+                await this.e2eeTransformManager.setupSenderTransform(
+                    sender,
+                    track.kind as "audio" | "video",
+                );
             }
         }
 
@@ -74,16 +76,19 @@ export class PublisherManager {
         const pc = this.pcm.getOrCreateConnection(streamRoomId, "publisher").pc;
 
         for (const track of tracksToAdd) {
-            if (track.kind === "audio") {
-                await this.audioManager.ensureLocalAudioLevelMeter(track);
-            }
             const sender = pc.addTrack(track, localStream);
-            await this.e2eeTransformManager.setupSenderTransform(sender);
+            if (track.kind === "audio") {
+                this.audioManager.watchLocalSender(sender);
+            }
+            await this.e2eeTransformManager.setupSenderTransform(
+                sender,
+                track.kind as "audio" | "video",
+            );
         }
 
         for (const oldTrack of tracksToRemove) {
             if (oldTrack.kind === "audio") {
-                this.audioManager.stopLocalAudioLevelMeter(oldTrack);
+                this.audioManager.unwatchLocalSender(oldTrack);
             }
             const sender = pc.getSenders().find((s) => s.track === oldTrack);
             if (sender) pc.removeTrack(sender);
@@ -119,7 +124,7 @@ export class PublisherManager {
      */
     stopAndClose(streamRoomId: StreamRoomId, stream: MediaStream): void {
         for (const track of stream.getAudioTracks()) {
-            this.audioManager.stopLocalAudioLevelMeter(track);
+            this.audioManager.unwatchLocalSender(track);
         }
         this.pcm.closePeerConnectionBySessionIfExists(streamRoomId, "publisher");
     }

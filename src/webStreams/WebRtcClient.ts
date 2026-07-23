@@ -1,5 +1,5 @@
-import { Key, TurnCredentials, StreamHandle, RemoteStreamListener } from "../Types.js";
-import { Jsep, StreamRoomId, StreamTrack } from "./types/ApiTypes.js";
+import { Key, TurnCredentials, RemoteStreamListener } from "../Types.js";
+import { Jsep, StreamHandle, StreamRoomId, StreamTrack } from "./types/ApiTypes.js";
 import { ConnectionType, SessionId } from "./PeerConnectionManager.js";
 import { PeerConnectionFactory } from "./PeerConnectionFactory.js";
 import { PublisherManager } from "./PublisherManager.js";
@@ -8,8 +8,7 @@ import { DataChannelSession } from "./DataChannelSession.js";
 import { E2eeWorker } from "./E2eeWorker.js";
 import { KeySyncManager } from "./KeySyncManager.js";
 import { StateChangeDispatcher } from "./EventDispatcher.js";
-import { AudioManager } from "./AudioManager.js";
-import type { AudioLevelFuncCallback } from "./AudioManager.js";
+import { AudioManager, AudioLevelsStats, ActiveSpeakerDetectorConfig } from "./AudioManager.js";
 import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry.js";
 
 export interface StreamsCallbackInterface {
@@ -17,8 +16,7 @@ export interface StreamsCallbackInterface {
     acceptOffer(sessionId: SessionId, sdp: Jsep): Promise<void>;
 }
 
-export type { AudioLevelFuncCallback };
-export type { AudioLevelsStats } from "./AudioManager.js";
+export type { AudioLevelsStats, ActiveSpeakerDetectorConfig };
 
 /**
  * Thin facade that wires all WebRTC sub-systems together and exposes the
@@ -68,11 +66,21 @@ export class WebRtcClient {
     }
 
     /**
-     * Registers a callback that receives periodic audio-level statistics for
-     * all active speakers (local and remote). Replaces any previously registered callback.
+     * Reads the current audio-level statistics for all active speakers
+     * (local and remote) right now. No internal polling - call this as
+     * often as needed.
      */
-    setAudioLevelCallback(func: AudioLevelFuncCallback): void {
-        this.audioManager.setAudioLevelCallback(func);
+    async readAudioStats(): Promise<AudioLevelsStats> {
+        return this.audioManager.readAudioStats();
+    }
+
+    /**
+     * Overrides any subset of the active-speaker detector's tuning
+     * parameters (EMA smoothing, threshold, hold time); omitted fields keep
+     * their current value.
+     */
+    configureActiveSpeakerDetector(config: Partial<ActiveSpeakerDetectorConfig>): void {
+        this.audioManager.configureActiveSpeakerDetector(config);
     }
 
     /**
@@ -228,7 +236,7 @@ export class WebRtcClient {
     }
 
     /**
-     * Terminates the E2EE worker thread and stops all local audio level meters.
+     * Terminates the E2EE worker thread and clears all watched audio senders/receivers.
      * Called automatically by `StreamApi.destroyRefs()` during `Connection.disconnect()`.
      */
     destroy(): void {

@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Jsep } from "../webStreams/types/ApiTypes.js";
+import { Jsep, StreamHandle, SubscriberStreamHandle } from "../webStreams/types/ApiTypes.js";
 import {
     ContainerPolicy,
     PagingList,
@@ -115,11 +115,11 @@ export class StreamApiNative extends BaseNative {
             this.api.lib.StreamApi_listStreamRooms(taskId, ptr, args),
         );
     }
-    async createStream(ptr: number, args: [string]): Promise<Types.StreamHandle> {
+    async createStream(ptr: number, args: [string]): Promise<StreamHandle> {
         // params from api: streamRoomId, streamId
         // params to lib: streamRoomId, streamId, webrtcInterfacePtr
         // const libArgs: [string, number, number] = [...args, this.webRtcInterfacePtr];
-        return this.runAsync<Types.StreamHandle>((taskId) =>
+        return this.runAsync<StreamHandle>((taskId) =>
             this.api.lib.StreamApi_createStream(taskId, ptr, args),
         );
     }
@@ -133,21 +133,6 @@ export class StreamApiNative extends BaseNative {
     async leaveStreamRoom(ptr: number, args: [string]): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.StreamApi_leaveStreamRoom(taskId, ptr, args),
-        );
-    }
-
-    async enableStreamRoomRecording(ptr: number, args: [string]): Promise<void> {
-        return this.runAsync<void>((taskId) =>
-            this.api.lib.StreamApi_enableStreamRoomRecording(taskId, ptr, args),
-        );
-    }
-
-    async getStreamRoomRecordingKeys(
-        ptr: number,
-        args: [string],
-    ): Promise<Types.RecordingEncKey[]> {
-        return this.runAsync<Types.RecordingEncKey[]>((taskId) =>
-            this.api.lib.StreamApi_getStreamRoomRecordingKeys(taskId, ptr, args),
         );
     }
 
@@ -177,11 +162,20 @@ export class StreamApiNative extends BaseNative {
         );
     }
 
+    async listStreamRoomParticipants(
+        ptr: number,
+        args: [string],
+    ): Promise<Types.StreamSubscriber[]> {
+        return this.runAsync<Types.StreamSubscriber[]>((taskId) =>
+            this.api.lib.StreamApi_listStreamRoomParticipants(taskId, ptr, args),
+        );
+    }
+
     async createSubscriberStream(
         ptr: number,
         args: [string, Types.StreamSubscription[]],
-    ): Promise<Types.SubscriberStreamHandle> {
-        return this.runAsync<Types.SubscriberStreamHandle>((taskId) =>
+    ): Promise<SubscriberStreamHandle> {
+        return this.runAsync<SubscriberStreamHandle>((taskId) =>
             this.api.lib.StreamApi_createSubscriberStream(taskId, ptr, args),
         );
     }
