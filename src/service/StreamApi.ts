@@ -121,6 +121,9 @@ export class StreamApi extends BaseApi {
      *   room key; only Stream Room members can decrypt it
      * @param {ContainerPolicy} policies fine-grained access rules overriding the
      *   Context defaults; pass `undefined` to use the defaults
+     * @param {number} emptyRoomTtl grace period (ms) the room stays open after
+     *   the last participant leaves before being closed; `0` closes it
+     *   immediately, and `undefined` uses the server default
      * @returns {string} ID of the new Stream Room - pass to
      *   {@link joinStreamRoom}, {@link getStreamRoom} or {@link updateStreamRoom}
      */
@@ -131,6 +134,7 @@ export class StreamApi extends BaseApi {
         publicMeta: Uint8Array,
         privateMeta: Uint8Array,
         policies?: ContainerPolicy,
+        emptyRoomTtl?: number,
     ): Promise<string> {
         return this.native.createStreamRoom(this.servicePtr, [
             contextId,
@@ -139,6 +143,7 @@ export class StreamApi extends BaseApi {
             publicMeta,
             privateMeta,
             policies,
+            emptyRoomTtl,
         ]);
     }
 

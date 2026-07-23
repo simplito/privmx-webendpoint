@@ -635,6 +635,7 @@ export interface StreamRoom {
     policy: ContainerPolicy;
     statusCode: number;
     state: StreamRoomState;
+    emptyRoomTtl: number;
 }
 
 export interface StreamInfo {
