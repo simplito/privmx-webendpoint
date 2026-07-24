@@ -84,7 +84,7 @@ export class EncryptTransform {
         const codecHeader = new Uint8Array(encodedFrame.data, 0, headerLen);
         const body = new Uint8Array(encodedFrame.data, headerLen);
 
-        const iv = this.ivGenerator.next(); // Prefix ∥ Counter
+        const iv = this.ivGenerator.next();
         const flags = kind === "video" && videoType === "key" ? FRAME_V2_FLAG_KEYFRAME : 0;
         const trailer = serializeFrameV2Trailer(
             iv,

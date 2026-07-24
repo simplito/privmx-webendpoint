@@ -32,7 +32,7 @@ export class FrameIvGenerator {
     private readonly view = new DataView(this.iv.buffer);
     private counter: number;
 
-    /**x
+    /**
      * @param initialCounter - starting counter value; defaults to 0. Primarily
      *                          a test seam for exercising the wrap path without
      *                          2³² iterations.

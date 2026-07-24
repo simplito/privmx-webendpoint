@@ -3,6 +3,8 @@ import { CryptoFacade } from "../crypto/CryptoFacade.js";
 
 const AES_GCM_KEY_LENGTH_BYTES = 32;
 
+const textEncoder = new TextEncoder();
+
 /**
  * Owns the set of AES-256-GCM keys for a single WebRTC session.
  *
@@ -107,26 +109,23 @@ export class KeyStore {
     }
 
     /**
-     * Derives the 1-byte epoch tag for an external key ID (an FNV-1a-style hash
-     * of the JS string, folded to a byte). Deterministic and identical across
-     * peers because they share the same external key IDs, so it needs no
-     * server-assigned epoch number. The decoder resolves the actual key via
-     * {@link resolveInternalKeyIdsByEpoch} and the AEAD tag, so the rare (~1/256)
-     * collision between the ≤2 live keys is handled by trying both candidates.
+     * Derives the 1-byte epoch tag for an external key ID: the sum of its UTF-8
+     * bytes, mod 256.
      *
-     * NOTE: this is implementation-defined, not a portable wire spec - it hashes
-     * UTF-16 code units and folds with an extra XOR, so it is only valid because
-     * media-frame E2EE is JS-only (all peers run this exact function). A non-JS
-     * endpoint that ever needs to compute the epoch must replicate this method
-     * verbatim, not a textbook FNV-1a.
+     * The epoch is only a *hint* for selecting the key - the ≤2 candidate keys
+     * are tried and the AEAD tag decides, so a collision costs at most one extra
+     * decrypt attempt, never correctness. It therefore only has to be
+     * deterministic and identical across peers, and is kept deliberately trivial
+     * so a non-JS endpoint (C/C++, mobile) can reproduce it exactly over the same
+     * UTF-8 bytes:
+     *
+     *   uint8_t epoch = 0; for (uint8_t b : utf8Bytes(keyId)) epoch += b;
      */
     private static epochOf(externalKeyId: string): number {
-        let h = 0x811c9dc5;
-        for (let i = 0; i < externalKeyId.length; i++) {
-            h ^= externalKeyId.charCodeAt(i);
-            h = Math.imul(h, 0x01000193);
-        }
-        return (h ^ (h >>> 8) ^ (h >>> 16) ^ (h >>> 24)) & 0xff;
+        const bytes = textEncoder.encode(externalKeyId);
+        let sum = 0;
+        for (let i = 0; i < bytes.length; i++) sum += bytes[i];
+        return sum & 0xff;
     }
 
     hasKey(externalKeyId: string): boolean {
