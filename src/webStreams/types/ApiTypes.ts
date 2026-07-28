@@ -32,6 +32,16 @@ export type SubscriberStreamHandle = number & { __subscriberStreamHandle: never 
 export interface DataChannelMeta {
     created: boolean;
     dataChannel?: RTCDataChannel;
+    seq: number;
+}
+
+export interface DataChannelMessage {
+    data: Uint8Array;
+    seq: number;
+}
+
+export interface DecryptedDataChannelMessage extends DataChannelMessage {
+    statusCode: number;
 }
 
 export interface StreamTrack {

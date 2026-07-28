@@ -44,10 +44,10 @@ import { StreamApiNative } from "../native/StreamApiNative.js";
  * every media frame is encrypted and decrypted with AES-256-GCM inside a
  * dedicated E2EE Web Worker wired into the `RTCRtpSender`/`RTCRtpReceiver`
  * pipelines, and the unencrypted frame header is used as additional
- * authenticated data. Data-channel messages are likewise AES-256-GCM encrypted
- * into a sequenced wire frame. Stream keys (AES-256-GCM, 32 bytes) are
- * distributed over the encrypted Event channel and synchronized between the
- * main-thread key store and the worker.
+ * authenticated data. Data-channel messages are encrypted and decrypted
+ * natively by `StreamApiLow` into a sequenced wire frame. Media stream keys
+ * (AES-256-GCM, 32 bytes) are distributed over the encrypted Event channel and
+ * synchronized with the worker.
  *
  * Obtain an instance via {@link EndpointFactory.createStreamApi}; do not
  * construct it directly.
@@ -432,7 +432,7 @@ export class StreamApi extends BaseApi {
             id: streamTrackId,
             streamHandle: streamHandle as StreamHandle,
             track: meta.track,
-            dataChannelMeta: { created: meta.createDataChannel },
+            dataChannelMeta: { created: meta.createDataChannel, seq: 1 },
             published: false,
         });
         return streamTrackId;
@@ -872,10 +872,9 @@ export class StreamApi extends BaseApi {
      * Sends binary data to remote participants over a published Stream's
      * WebRTC data channel.
      *
-     * The bytes are encrypted with AES-256-GCM into a wire frame
-     * `[Version|SeqNum|IV|KeyIdLen|KeyId|Ciphertext+Tag]` (the header is used as
-     * additional authenticated data) and sent over the data channel; the
-     * sequence number strictly increases per stream for replay protection.
+     * The bytes are encrypted natively by `StreamApiLow` into a sequenced wire
+     * frame and sent over the data channel; the sequence number strictly
+     * increases per data track for replay protection.
      *
      * Requires a data track staged with `createDataChannel` via
      * {@link addStreamTrack} and a stream already sent with
@@ -889,12 +888,21 @@ export class StreamApi extends BaseApi {
      *   published)
      */
     async sendData(streamTrackId: string, data: Uint8Array): Promise<void> {
-        const dataChannel = this.streamTracks.get(streamTrackId as StreamTrackId)?.dataChannelMeta
-            .dataChannel;
-        if (!dataChannel) {
+        const streamTrack = this.streamTracks.get(streamTrackId as StreamTrackId);
+        const dataChannel = streamTrack?.dataChannelMeta.dataChannel;
+        if (!streamTrack || !dataChannel) {
             throw new Error(`There is no DataTrack with given streamTrackId: ${streamTrackId}`);
         }
-        const frame = await this.client.encryptDataChannelData(data);
+        const streamRoomId = this.streams.get(streamTrack.streamHandle)?.streamRoomId;
+        if (!streamRoomId) {
+            throw new Error(`There is no Stream Room for given streamTrackId: ${streamTrackId}`);
+        }
+
+        const seq = streamTrack.dataChannelMeta.seq++;
+        const frame = await this.native.encryptDataChannelMessage(this.servicePtr, [
+            streamRoomId,
+            { data, seq },
+        ]);
         dataChannel.send(new Uint8Array(frame));
     }
 }

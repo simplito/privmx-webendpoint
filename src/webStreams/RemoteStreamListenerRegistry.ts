@@ -57,8 +57,8 @@ export class RemoteStreamListenerRegistry {
      * Dispatches a decrypted data channel payload to all listeners registered
      * for `roomId` whose `streamId` matches `remoteStreamId`, or is `undefined`.
      *
-     * @param statusCode  `DataChannelCryptorDecryptStatus` value indicating whether
-     *                    decryption succeeded or why it failed.
+     * @param statusCode  native `StreamApiLow::decryptDataChannelMessage` status -
+     *                    `0` on success, non-zero indicating why decryption failed.
      */
     dispatchData(
         roomId: StreamRoomId,

@@ -24,9 +24,6 @@ export const T = {
     StreamApi: "conn:StreamApi",
 
     // WebRTC sub-graph (connection-scoped, one per createStreamApi call)
-    KeyStore: "rtc:KeyStore",
-    DataChannelCryptor: "rtc:DataChannelCryptor",
-    DataChannelSession: "rtc:DataChannelSession",
     StateChangeDispatcher: "rtc:StateChangeDispatcher",
     ListenerRegistry: "rtc:ListenerRegistry",
     E2eeWorker: "rtc:E2eeWorker",
