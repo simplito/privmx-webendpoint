@@ -378,6 +378,10 @@ API_FUNCTION(StreamApi, trickle)
 API_FUNCTION(StreamApi, acceptOfferOnReconfigure)
 API_FUNCTION(StreamApi, setNewOfferOnReconfigure)
 
+API_FUNCTION(StreamApi, registerRemoteDataChannel)
+API_FUNCTION(StreamApi, encryptDataChannelMessage)
+API_FUNCTION(StreamApi, decryptDataChannelMessage)
+
 }  // namespace api
 }  // namespace webendpoint
 }  // namespace privmx

@@ -758,6 +758,10 @@ export interface RemoteStreamListener {
     streamRoomId: string;
     streamId?: number;
     onRemoteStreamTrack?: (event: RTCTrackEvent) => void;
+    /**
+     * @param data decrypted data channel payload; empty when `statusCode` is non-zero
+     * @param statusCode native `StreamApiLow::decryptDataChannelMessage` status - `0` on success
+     */
     onRemoteData?: (data: Uint8Array, statusCode: number) => void;
 }
 
@@ -928,34 +932,3 @@ export type CollectionChangedEventData = {
     items: CollectionItemChange[];
 };
 
-export enum DataChannelCryptorDecryptStatus {
-    /** No error */
-    OK = 0x0000,
-
-    /** Frame too short */
-    FRAME_TOO_SHORT = 0x1001,
-
-    /** Unsupported protocol version */
-    UNSUPPORTED_VERSION = 0x1002,
-
-    /** Invalid IV length */
-    INVALID_IV_LENGTH = 0x1003,
-
-    /** Truncated frame */
-    FRAME_TRUNCATED = 0x1004,
-
-    /** Invalid key ID */
-    INVALID_KEY_ID = 0x1005,
-
-    /** Encryption key not found */
-    KEY_NOT_FOUND = 0x1006,
-
-    /** Invalid encryption key length */
-    INVALID_KEY_LENGTH = 0x1007,
-
-    /** Decryption failed (authentication error) */
-    DECRYPT_AUTH_FAILED = 0x1008,
-
-    /** Invalid data sequence number */
-    INVALID_DATA_SEQUENCE = 0x1009,
-}

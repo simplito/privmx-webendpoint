@@ -77,7 +77,7 @@ export class ConnectionContainer extends Container {}
 /**
  * Per-stream-session scoped container.
  * Created once per `EndpointFactory.createStreamApi()` call inside a
- * ConnectionContainer.  Holds the entire WebRTC sub-graph: KeyStore,
+ * ConnectionContainer.  Holds the entire WebRTC sub-graph:
  * PeerConnectionManager, E2eeWorker, AudioManager, etc.
  * @internal
  */

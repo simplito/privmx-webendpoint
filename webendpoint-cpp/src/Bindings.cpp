@@ -195,4 +195,8 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(StreamApi, trickle)
     BINDING_FUNCTION(StreamApi, acceptOfferOnReconfigure)
     BINDING_FUNCTION(StreamApi, setNewOfferOnReconfigure)
+
+    BINDING_FUNCTION(StreamApi, registerRemoteDataChannel)
+    BINDING_FUNCTION(StreamApi, encryptDataChannelMessage)
+    BINDING_FUNCTION(StreamApi, decryptDataChannelMessage)
 }

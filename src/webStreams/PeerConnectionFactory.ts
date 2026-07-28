@@ -1,10 +1,7 @@
-import { DataChannelCryptorDecryptStatus } from "../Types.js";
-import { StreamHandle, StreamRoomId } from "./types/ApiTypes.js";
 import { TurnCredentials } from "../Types.js";
+import { DecryptedDataChannelMessage, StreamHandle, StreamRoomId } from "./types/ApiTypes.js";
 import { Logger } from "./Logger.js";
 import { StateChangeDispatcher } from "./EventDispatcher.js";
-import { DataChannelCryptorError } from "./DataChannelCryptor.js";
-import { DataChannelSession } from "./DataChannelSession.js";
 import { E2eeTransformManager } from "./E2eeTransformManager.js";
 import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry.js";
 import { RTCConfigurationWithInsertableStreams } from "./types/WebRtcExtensions.js";
@@ -16,8 +13,10 @@ import { RTCConfigurationWithInsertableStreams } from "./types/WebRtcExtensions.
  * - Constructs the `RTCConfiguration` from the current TURN credentials.
  * - Logs ICE/signalling state changes via `Logger`.
  * - Forwards `connectionstatechange` events to `StateChangeDispatcher`.
- * - Decrypts incoming data channel frames and dispatches them via
- *   `RemoteStreamListenerRegistry`.
+ * - Registers newly-opened remote data channels and decrypts incoming frames
+ *   via the native `StreamApiLow` message encryptor (through the injected
+ *   `registerRemoteDataChannel`/`decryptDataChannelMessage` callbacks), then
+ *   dispatches them via `RemoteStreamListenerRegistry`.
  * - Forwards `track` events to a caller-supplied `onRemoteTrack` callback so
  *   the subscriber layer can install E2EE receiver transforms after ICE connects.
  * @internal
@@ -28,7 +27,15 @@ export class PeerConnectionFactory {
 
     constructor(
         private readonly eventsDispatcher: StateChangeDispatcher,
-        private readonly dataChannelSession: DataChannelSession,
+        private readonly registerRemoteDataChannel: (
+            roomId: StreamRoomId,
+            remoteStreamId: string,
+        ) => Promise<void>,
+        private readonly decryptDataChannelMessage: (
+            roomId: StreamRoomId,
+            remoteStreamId: string,
+            encryptedData: Uint8Array,
+        ) => Promise<DecryptedDataChannelMessage>,
         private readonly e2eeTransformManager: E2eeTransformManager,
         private readonly listenerRegistry: RemoteStreamListenerRegistry,
         private readonly onRemoteTrack: (
@@ -99,9 +106,25 @@ export class PeerConnectionFactory {
 
     private wireDataChannel(roomId: StreamRoomId, dc: RTCDataChannel): void {
         dc.binaryType = "arraybuffer";
+        const remoteStreamId = dc.label;
+
+        // Registered synchronously (before any message can be processed) so the
+        // native encryptor's replay-protection state exists by the time the first
+        // frame is decrypted; dc.onmessage is still assigned right away below so
+        // no frames arriving in this tick are missed.
+        const registered = this.registerRemoteDataChannel(roomId, remoteStreamId).catch((e) => {
+            this.logger.error("registerRemoteDataChannel failed:", e);
+            throw e;
+        });
+
         dc.onmessage = async (dataEvent) => {
             this.logger.debug("datachannel message received");
-            const remoteStreamId = Number(dc.label);
+            try {
+                await registered;
+            } catch {
+                return;
+            }
+
             const raw = dataEvent.data;
             const frame: Uint8Array =
                 raw instanceof Uint8Array
@@ -110,26 +133,18 @@ export class PeerConnectionFactory {
                       ? new Uint8Array(raw)
                       : new Uint8Array(raw.buffer);
 
-            let decryptResult: { data: Uint8Array; statusCode: number };
+            let decrypted: DecryptedDataChannelMessage;
             try {
-                const decrypted = await this.dataChannelSession.decrypt(remoteStreamId, frame);
-                decryptResult = {
-                    data: decrypted.data,
-                    statusCode: DataChannelCryptorDecryptStatus.OK,
-                };
+                decrypted = await this.decryptDataChannelMessage(roomId, remoteStreamId, frame);
             } catch (e) {
-                if (e instanceof DataChannelCryptorError) {
-                    decryptResult = { data: new Uint8Array(), statusCode: e.code };
-                } else {
-                    this.logger.error("Unexpected error decrypting data channel frame:", e);
-                    return;
-                }
+                this.logger.error("Unexpected error decrypting data channel frame:", e);
+                return;
             }
             this.listenerRegistry.dispatchData(
                 roomId,
-                remoteStreamId,
-                decryptResult.data,
-                decryptResult.statusCode,
+                Number(remoteStreamId),
+                decrypted.data,
+                decrypted.statusCode,
             );
         };
     }

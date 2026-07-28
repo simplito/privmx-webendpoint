@@ -9,7 +9,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Jsep, StreamHandle, SubscriberStreamHandle } from "../webStreams/types/ApiTypes.js";
+import {
+    DataChannelMessage,
+    DecryptedDataChannelMessage,
+    Jsep,
+    StreamHandle,
+    SubscriberStreamHandle,
+} from "../webStreams/types/ApiTypes.js";
 import {
     ContainerPolicy,
     PagingList,
@@ -263,6 +269,30 @@ export class StreamApiNative extends BaseNative {
     async setNewOfferOnReconfigure(ptr: number, args: [number, Jsep]): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.StreamApi_setNewOfferOnReconfigure(taskId, ptr, args),
+        );
+    }
+
+    async registerRemoteDataChannel(ptr: number, args: [string, string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_registerRemoteDataChannel(taskId, ptr, args),
+        );
+    }
+
+    async encryptDataChannelMessage(
+        ptr: number,
+        args: [string, DataChannelMessage],
+    ): Promise<Uint8Array> {
+        return this.runAsync<Uint8Array>((taskId) =>
+            this.api.lib.StreamApi_encryptDataChannelMessage(taskId, ptr, args),
+        );
+    }
+
+    async decryptDataChannelMessage(
+        ptr: number,
+        args: [string, string, Uint8Array],
+    ): Promise<DecryptedDataChannelMessage> {
+        return this.runAsync<DecryptedDataChannelMessage>((taskId) =>
+            this.api.lib.StreamApi_decryptDataChannelMessage(taskId, ptr, args),
         );
     }
 

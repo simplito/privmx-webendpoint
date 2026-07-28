@@ -1,10 +1,15 @@
 import { Key, TurnCredentials, RemoteStreamListener } from "../Types.js";
-import { Jsep, StreamHandle, StreamRoomId, StreamTrack } from "./types/ApiTypes.js";
+import {
+    DecryptedDataChannelMessage,
+    Jsep,
+    StreamHandle,
+    StreamRoomId,
+    StreamTrack,
+} from "./types/ApiTypes.js";
 import { ConnectionType, SessionId } from "./PeerConnectionManager.js";
 import { PeerConnectionFactory } from "./PeerConnectionFactory.js";
 import { PublisherManager } from "./PublisherManager.js";
 import { SubscriberManager } from "./SubscriberManager.js";
-import { DataChannelSession } from "./DataChannelSession.js";
 import { E2eeWorker } from "./E2eeWorker.js";
 import { KeySyncManager } from "./KeySyncManager.js";
 import { StateChangeDispatcher } from "./EventDispatcher.js";
@@ -14,6 +19,12 @@ import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry.js"
 export interface StreamsCallbackInterface {
     trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void>;
     acceptOffer(sessionId: SessionId, sdp: Jsep): Promise<void>;
+    registerRemoteDataChannel(streamRoomId: StreamRoomId, remoteStreamId: string): Promise<void>;
+    decryptDataChannelMessage(
+        streamRoomId: StreamRoomId,
+        remoteStreamId: string,
+        encryptedData: Uint8Array,
+    ): Promise<DecryptedDataChannelMessage>;
 }
 
 export type { AudioLevelsStats, ActiveSpeakerDetectorConfig };
@@ -26,10 +37,12 @@ export type { AudioLevelsStats, ActiveSpeakerDetectorConfig };
  * Dependency groups:
  *  - `publisher`       - `PublisherManager`: outbound media tracks, SDP offer/answer
  *  - `subscriber`      - `SubscriberManager`: inbound tracks, reconfigure queue
- *  - `dataChannel`     - `DataChannelSession`: encrypted data channel messages
- *  - `keys`            - `KeySyncManager`: keeps main-thread and worker keys in sync
+ *  - `keys`            - `KeySyncManager`: keeps the E2EE worker's media keys in sync
  *  - `eventsDispatcher`- `StateChangeDispatcher`: RTCPeerConnection state change events
  *  - `listenerRegistry`- `RemoteStreamListenerRegistry`: remote stream callbacks
+ *
+ * Data channel messages are encrypted/decrypted natively via `StreamApiLow`
+ * (bound in through {@link bindApiInterface}), not by this class.
  */
 export class WebRtcClient {
     private streamsApiInterface: StreamsCallbackInterface | undefined;
@@ -37,7 +50,6 @@ export class WebRtcClient {
     constructor(
         private readonly publisher: PublisherManager,
         private readonly subscriber: SubscriberManager,
-        private readonly dataChannel: DataChannelSession,
         private readonly keys: KeySyncManager,
         private readonly eventsDispatcher: StateChangeDispatcher,
         private readonly listenerRegistry: RemoteStreamListenerRegistry,
@@ -116,11 +128,33 @@ export class WebRtcClient {
     }
 
     /**
-     * Encrypts `data` using the active session key and returns the wire-format
-     * frame ready to be sent over an `RTCDataChannel`.
+     * Registers a newly-opened remote data channel with the native
+     * `StreamApiLow` message encryptor so it can track inbound sequence
+     * numbers for replay protection. Must be called once before any frame
+     * received on that channel is passed to {@link decryptDataChannelMessage}.
+     * @throws if `bindApiInterface` has not been called yet.
      */
-    async encryptDataChannelData(data: Uint8Array): Promise<Uint8Array> {
-        return this.dataChannel.encrypt(data);
+    async registerRemoteDataChannel(streamRoomId: StreamRoomId, remoteStreamId: string): Promise<void> {
+        if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
+        return this.streamsApiInterface.registerRemoteDataChannel(streamRoomId, remoteStreamId);
+    }
+
+    /**
+     * Decrypts a wire-format frame received from `remoteStreamId` using the
+     * native `StreamApiLow` message encryptor.
+     * @throws if `bindApiInterface` has not been called yet.
+     */
+    async decryptDataChannelMessage(
+        streamRoomId: StreamRoomId,
+        remoteStreamId: string,
+        encryptedData: Uint8Array,
+    ): Promise<DecryptedDataChannelMessage> {
+        if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
+        return this.streamsApiInterface.decryptDataChannelMessage(
+            streamRoomId,
+            remoteStreamId,
+            encryptedData,
+        );
     }
 
     /**

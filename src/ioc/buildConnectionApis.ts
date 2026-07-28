@@ -170,6 +170,14 @@ export function registerConnectionServices(
         webRtcClient.bindApiInterface({
             trickle: (sessionId, candidate) => native.trickle(ptr, [sessionId, candidate]),
             acceptOffer: (sessionId, sdp) => native.acceptOfferOnReconfigure(ptr, [sessionId, sdp]),
+            registerRemoteDataChannel: (streamRoomId, remoteStreamId) =>
+                native.registerRemoteDataChannel(ptr, [streamRoomId, remoteStreamId]),
+            decryptDataChannelMessage: (streamRoomId, remoteStreamId, encryptedData) =>
+                native.decryptDataChannelMessage(ptr, [
+                    streamRoomId,
+                    remoteStreamId,
+                    encryptedData,
+                ]),
         });
 
         await native.create(ptr, []);
