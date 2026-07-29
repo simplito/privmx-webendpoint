@@ -129,6 +129,53 @@ export class CryptoFacade {
     }
 
     /**
+     * Frame-hot-path variant of {@link aeadEncrypt} for the E2EE media worker.
+     *
+     * Same AES-256-GCM operation, but routes to {@link EmCrypto.aeadEncryptFrame},
+     * which skips the general path's per-call argument validation and defensive
+     * input copies. Only call this from the per-frame encoded-transform, where
+     * `iv`/`aad`/`data` are private, non-shared views (never WASM/shared memory).
+     * @param {FacadeKeyRef} key registered key ID or `CryptoKey` for the 256-bit AES-GCM key
+     * @param {Uint8Array} iv 12-byte initialisation vector (nonce)
+     * @param {Uint8Array} aad additional authenticated data - protected but not encrypted
+     * @param {Uint8Array} data plaintext bytes to encrypt
+     * @returns {Promise<ArrayBuffer>} AES-256-GCM ciphertext with the 16-byte authentication tag appended
+     */
+    static async aeadEncryptFrame(
+        key: FacadeKeyRef,
+        iv: Uint8Array,
+        aad: Uint8Array,
+        data: Uint8Array,
+    ): Promise<ArrayBuffer> {
+        CryptoFacade.assertKeyRef(key, "aeadEncryptFrame");
+        return getEmCrypto().aeadEncryptFrame({ key, iv, aad, data });
+    }
+
+    /**
+     * Frame-hot-path variant of {@link aeadDecrypt} for the E2EE media worker.
+     *
+     * Takes ciphertext with the 16-byte GCM tag already appended as one
+     * contiguous buffer (the wire layout) - no split into data+tag, no re-concat.
+     * Routes to {@link EmCrypto.aeadDecryptFrame}, skipping the general path's
+     * validation and defensive copies. Frame transform use only; `iv`/`aad`/
+     * `dataWithTag` must be private, non-shared views (never WASM/shared memory).
+     * @param {FacadeKeyRef} key registered key ID or `CryptoKey` for the 256-bit AES-GCM key
+     * @param {Uint8Array} iv 12-byte initialisation vector (nonce) used during encryption
+     * @param {Uint8Array} aad additional authenticated data that was authenticated but not encrypted
+     * @param {Uint8Array} dataWithTag ciphertext with the 16-byte GCM tag appended
+     * @returns {Promise<ArrayBuffer>} decrypted plaintext bytes after successful tag verification
+     */
+    static async aeadDecryptFrame(
+        key: FacadeKeyRef,
+        iv: Uint8Array,
+        aad: Uint8Array,
+        dataWithTag: Uint8Array,
+    ): Promise<ArrayBuffer> {
+        CryptoFacade.assertKeyRef(key, "aeadDecryptFrame");
+        return getEmCrypto().aeadDecryptFrame({ key, iv, aad, dataWithTag });
+    }
+
+    /**
      * Derive a key using PBKDF2.
      * @param {string | CryptoKey} password source secret - either a plain-text password or an imported `CryptoKey`
      * @param {string} salt hex-encoded salt string to mix into the derivation

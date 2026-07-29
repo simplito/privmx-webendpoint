@@ -545,6 +545,73 @@ export class EmCrypto {
         );
     }
 
+    /**
+     * Frame-hot-path AES-256-GCM encrypt for the E2EE media worker.
+     *
+     * Same operation as {@link aeadEncrypt} but deliberately skips that method's
+     * per-call argument-shape validation ({@link assertArgsValid}) and its
+     * defensive `new Uint8Array(...)` copies of `iv`/`aad`/`data`. It is only
+     * ever called from the per-frame encoded-transform, at audio/video frame
+     * rate, where the inputs are already private, non-shared `Uint8Array` views
+     * that the caller does not mutate during the `await`, and WebCrypto snapshots
+     * its inputs synchronously - so the copies are pure overhead there. This does
+     * NOT run through the WASM bridge's {@link copyWasmBuffers}; never call it
+     * with views over WASM/shared memory.
+     *
+     * `key` must be a registered key ID or `CryptoKey` - never raw key bytes.
+     * @internal
+     */
+    public async aeadEncryptFrame(params: {
+        key: Types.FacadeKeyRef;
+        iv: Uint8Array;
+        aad: Uint8Array;
+        data: Uint8Array;
+    }): Promise<ArrayBuffer> {
+        const key = await this.getOrImportKey(params.key, "AES-GCM", ["encrypt"]);
+        return subtle.encrypt(
+            {
+                name: "AES-GCM",
+                iv: params.iv as unknown as BufferSource,
+                additionalData: params.aad as unknown as BufferSource,
+                tagLength: 128,
+            },
+            key,
+            params.data as unknown as BufferSource,
+        );
+    }
+
+    /**
+     * Frame-hot-path AES-256-GCM decrypt for the E2EE media worker.
+     *
+     * Accepts the ciphertext with the 16-byte GCM tag already appended (the
+     * on-wire layout) as a single contiguous buffer, so the caller neither
+     * splits it into data+tag nor do we re-concatenate it - WebCrypto verifies
+     * the trailing tag itself. Like {@link aeadEncryptFrame}, it skips the
+     * validation and defensive input copies of {@link aeadDecrypt}. Frame
+     * transform use only; never call with views over WASM/shared memory.
+     *
+     * `key` must be a registered key ID or `CryptoKey` - never raw key bytes.
+     * @internal
+     */
+    public async aeadDecryptFrame(params: {
+        key: Types.FacadeKeyRef;
+        iv: Uint8Array;
+        aad: Uint8Array;
+        dataWithTag: Uint8Array;
+    }): Promise<ArrayBuffer> {
+        const key = await this.getOrImportKey(params.key, "AES-GCM", ["decrypt"]);
+        return subtle.decrypt(
+            {
+                name: "AES-GCM",
+                iv: params.iv as unknown as BufferSource,
+                additionalData: params.aad as unknown as BufferSource,
+                tagLength: 128,
+            },
+            key,
+            params.dataWithTag as unknown as BufferSource,
+        );
+    }
+
     public async pbkdf2(params: Types.PBKDF2_PARAMS): Promise<ArrayBuffer> {
         assertArgsValid(params, Types.PBKDF2_PARAMS);
         assertIsString(params.salt);
