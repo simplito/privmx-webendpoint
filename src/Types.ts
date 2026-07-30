@@ -863,13 +863,13 @@ export enum StreamEventType {
     STREAMROOM_CREATE = 0,
     STREAMROOM_UPDATE = 1,
     STREAMROOM_DELETE = 2,
-    STREAM_JOIN = 4,
-    STREAM_LEAVE = 5,
-    STREAM_PUBLISH = 6,
-    STREAM_UNPUBLISH = 7,
-    STREAM_SUBSCRIBE = 8,
-    STREAM_UNSUBSCRIBE = 9,
-    STREAM_UPDATE = 10,
+    STREAM_JOIN = 3,
+    STREAM_LEAVE = 4,
+    STREAM_PUBLISH = 5,
+    STREAM_UNPUBLISH = 6,
+    STREAM_SUBSCRIBE = 7,
+    STREAM_UNSUBSCRIBE = 8,
+    STREAM_UPDATE = 9,
 }
 
 export interface StreamRoomMemberEventData {
