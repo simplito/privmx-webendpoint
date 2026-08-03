@@ -1,0 +1,46 @@
+/*!
+PrivMX Web Endpoint.
+Copyright © 2024 Simplito sp. z o.o.
+
+This file is part of the PrivMX Platform (https://privmx.dev).
+This software is Licensed under the PrivMX Free License.
+
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import { Event } from "../Types.js";
+import { BaseNative } from "./BaseNative.js";
+
+/**
+ * Raw WASM wrapper for the C++ EventQueue - holds and forwards raw pointers.
+ * Use {@link EventQueue} (src/service) instead.
+ * @internal
+ */
+export class EventQueueNative extends BaseNative {
+    async deleteApi(ptr: number): Promise<void> {
+        await this.runAsync<void>((taskId) =>
+            this.api.lib.EventQueue_deleteEventQueue(taskId, ptr),
+        );
+        this.deleteApiRef();
+    }
+    async newEventQueue(): Promise<number> {
+        return this.runAsync<number>((taskId) => this.api.lib.EventQueue_newEventQueue(taskId));
+    }
+    async deleteEventQueue(ptr: number): Promise<void> {
+        await this.runAsync<void>((taskId) =>
+            this.api.lib.EventQueue_deleteEventQueue(taskId, ptr),
+        );
+        this.deleteApiRef();
+    }
+    async waitEvent(ptr: number, args: []): Promise<Event> {
+        return this.runAsync<Event>((taskId) =>
+            this.api.lib.EventQueue_waitEvent(taskId, ptr, args),
+        );
+    }
+    async emitBreakEvent(ptr: number, args: []): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.EventQueue_emitBreakEvent(taskId, ptr, args),
+        );
+    }
+}

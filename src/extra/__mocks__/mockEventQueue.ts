@@ -1,4 +1,4 @@
-import { Types } from "../../index";
+import * as Types from "../../Types.js";
 // import {Channel} from "../../managers";
 
 export class MockEventQueue {
@@ -38,7 +38,7 @@ export class MockEventQueue {
 
     async emitBreakEvent() {
         return new Promise<void>((resolve) => {
-            resolve;
+            resolve();
         });
     }
 }

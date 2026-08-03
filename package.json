@@ -1,9 +1,17 @@
 {
   "name": "@simplito/privmx-webendpoint",
-  "version": "2.8.0-rc2",
+  "version": "2.9.0-dev",
   "description": "PrivMX Web Endpoint library",
   "author": "Simplito",
   "license": "PrivMX Free License",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simplito/privmx-webendpoint.git"
+  },
+  "homepage": "https://github.com/simplito/privmx-webendpoint#readme",
+  "bugs": {
+    "url": "https://github.com/simplito/privmx-webendpoint/issues"
+  },
   "keywords": [
     "privmx",
     "endpoint",
@@ -29,32 +37,47 @@
     "privacy-protection",
     "security"
   ],
-  "type": "commonjs",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./extra": "./dist/extra/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./extra": {
+      "types": "./dist/extra/index.d.ts",
+      "default": "./dist/extra/index.js"
+    },
+    "./assets/*": "./assets/*"
   },
   "scripts": {
     "clean": "rm -rf ./dist",
-    "test": "jest src",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "build": "npm run clean && npm run build:wasm && npm run build:js && scripts/move_wasm_assets",
+    "build:debug": "npm run clean && npm run build:wasm:debug && npm run build:js && scripts/move_wasm_assets",
     "build:wasm": "scripts/pipeline.sh",
-    "build:js": "npm run compile && npm run bundle && npm run build:worker && cp ./dist/assets/* ./assets/ && cp ./dist/bundle/rms-processor.js ./assets/",
-    "build:worker": "webpack --config ./webpack.worker.config.js",
-    "compile": "tsc",
-    "bundle": "webpack",
-    "watch:types": "tsc -w",
-    "test:e2e": "playwright test --project=chromium",
-    "test:e2e:manybrowsers": "playwright test",
-    "lint": "eslint -c eslint.config.mjs .",
-    "format": "prettier --write '{src,tests}/**/*.{ts,tsx,css,md}'",
-    "format:clang": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format -i",
-    "lint:clang-format": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format --dry-run --Werror",
+    "build:wasm:debug": "PRIVMX_BUILD_TYPE=debug scripts/pipeline.sh",
+    "build:js": "npm run compile && npm run bundle && npm run build:worker && cp ./dist/assets/* ./assets/",
+    "build:worker": "vite build --config ./vite.worker.config.ts",
+    "clean:wasm": "scripts/clean_wasm",
+    "compile": "tsc --project tsconfig.build.json",
+    "bundle": "vite build --config ./vite.config.ts",
+    "watch:types": "tsc -w --project tsconfig.build.json",
+    "pretest:e2e": "npm run build-package && mkdir -p tests/pkg && tar -xzf builds/privmx-webendpoint-latest.tgz -C tests/pkg --strip-components=1",
+    "test:e2e": "npm run build-package && playwright test --config tests/playwright.config.ts --project=chromium",
+    "test:e2e:manybrowsers": "playwright test --config tests/playwright.config.ts",
+    "test:example": "playwright test --config tests/playwright.smoke.config.ts",
+    "lint": "oxlint src/",
+    "docs:check": "typedoc --entryPoints src/index.ts --entryPoints src/extra/index.ts --excludeInternal --validation.notDocumented --emit none --treatValidationWarningsAsErrors",
+    "format": "oxfmt src/",
+    "format:check": "oxfmt --check src/",
+    "format:clang": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format-18 -i",
+    "lint:clang-format": "find webendpoint-cpp drivers async-engine -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \\) -print0 | xargs -0 clang-format-18 --dry-run --Werror",
     "prepack": "mkdir -p ./builds",
-    "build-package": "npm pack --pack-destination ./builds",
-    "watch": "webpack serve"
+    "build-package": "npm pack --pack-destination ./builds && cd builds && mv $(ls -t simplito-privmx-webendpoint-*.tgz | head -1) privmx-webendpoint-latest.tgz",
+    "watch": "vite build --config ./vite.config.ts --watch"
   },
   "files": [
     "dist",
@@ -65,46 +88,24 @@
     "build-manifest.sh"
   ],
   "engines": {
-    "node": ">=4"
+    "node": ">=20"
   },
   "devDependencies": {
-    "@babel/core": "^7.26.0",
-    "@babel/preset-env": "^7.26.0",
-    "@eslint/js": "^9.39.2",
     "@playwright/test": "^1.57.0",
-    "@stylistic/eslint-plugin": "^5.6.1",
-    "@types/jest": "^29.5.14",
     "@types/node": "^20.9.0",
-    "@types/webpack": "^5.28.5",
-    "@typescript-eslint/eslint-plugin": "^8.51.0",
-    "@typescript-eslint/parser": "^8.51.0",
-    "assert": "^2.1.0",
-    "babel-jest": "^29.7.0",
-    "buffer": "^6.0.3",
-    "copy-webpack-plugin": "^14.0.0",
-    "crypto-browserify": "^3.3.0",
-    "eslint": "^9.39.2",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-indent-empty-lines": "^1.0.2",
-    "eslint-plugin-prettier": "^5.5.4",
-    "jest": "^29.7.0",
     "mongodb": "^7.0.0",
-    "playwright": "^1.57.0",
-    "prettier": "^3.7.4",
-    "process": "^0.11.10",
-    "stream-browserify": "^3.0.0",
-    "ts-jest": "^29.2.5",
-    "ts-loader": "^9.5.1",
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.60.0",
     "ts-node": "^10.9.1",
     "tslib": "^2.6.2",
+    "typedoc": "^0.28.19",
     "typescript": "5.8",
-    "vite": "^7.3.0",
-    "vm-browserify": "^1.1.2",
-    "webpack": "^5.89.0",
-    "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^5.2.2"
+    "vite": "^8.0.10",
+    "vitest": "^4.1.9"
   },
   "dependencies": {
-    "elliptic": "^6.6.1"
+    "@noble/ciphers": "^2.2.0",
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0"
   }
 }

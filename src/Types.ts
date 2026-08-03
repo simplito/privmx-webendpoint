@@ -9,10 +9,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ExtKey } from "./service/ExtKey";
-import * as StreamsApiTypes from "./webStreams/types/ApiTypes";
+import { ExtKey } from "./service/ExtKey.js";
 
-// export namespace core {
 export type SortOrder = "desc" | "asc";
 
 /**
@@ -184,9 +182,6 @@ export interface ContextCustomEventData {
     statusCode: number;
     schemaVersion: number;
 }
-// }
-
-// export namespace thread {
 
 /**
  * Holds all available information about a Thread.
@@ -267,9 +262,7 @@ export interface ServerMessageInfo {
     createDate: number;
     author: string;
 }
-// }
 
-// export namespace store {
 /**
  * Holds all available information about a Store.
  *
@@ -349,9 +342,7 @@ export interface ServerFileInfo {
     createDate: number;
     author: string;
 }
-// }
 
-// export namespace inbox {
 /**
  * Holds all available information about an Inbox.
  *
@@ -445,9 +436,6 @@ export interface FilesConfig {
     maxFileSize: number;
     maxWholeUploadSize: number;
 }
-// }
-
-// export namespace kvdb {
 
 /**
  * Holds all available information about a KVDB.
@@ -539,7 +527,6 @@ export interface ServerKvdbEntryInfo {
  * @type {DeleteEntriesResult}
  */
 export type DeleteEntriesResult = Map<string, boolean>;
-// }
 
 /**
  * Holds Container policies settings
@@ -623,9 +610,15 @@ export interface ItemPolicy {
     delete?: PolicyEntry;
 }
 
-export type StreamId = StreamsApiTypes.StreamId;
-export type StreamRoomId = StreamsApiTypes.StreamRoomId;
-export type StreamHandle = number & { _streamHandle: never };
+/**
+ * Lifecycle state of a Stream Room.
+ *
+ * @typedef {("created" | "open" | "closed")} StreamRoomState
+ * @property {"created"} created the room exists but has never been opened
+ * @property {"open"} open the room is active and can be joined
+ * @property {"closed"} closed the room has been closed (e.g. auto-closed after the last user left)
+ */
+export type StreamRoomState = "created" | "open" | "closed";
 
 export interface StreamRoom {
     contextId: string;
@@ -641,7 +634,8 @@ export interface StreamRoom {
     privateMeta: Uint8Array;
     policy: ContainerPolicy;
     statusCode: number;
-    closed: boolean;
+    state: StreamRoomState;
+    emptyRoomTtl: number;
 }
 
 export interface StreamInfo {
@@ -667,7 +661,7 @@ export interface TrackInfo {
 export interface StreamPublishResult {
     published: boolean;
     data?: {
-        streamRoomId: StreamRoomId;
+        streamRoomId: string;
         stream: StreamInfo;
         userId: string;
     };
@@ -809,7 +803,6 @@ export interface BridgeIdentity {
     instanceId?: string;
 }
 
-// webrtc interface tmp types
 export interface Key {
     keyId: string;
     key: Uint8Array;
@@ -821,6 +814,12 @@ export interface StreamSubscription {
     streamTrackId?: string;
 }
 
+export interface StreamSubscriber {
+    userId: string;
+    subscriptions: StreamSubscription[];
+    publishedStream?: StreamInfo;
+}
+
 export interface TurnCredentials {
     url: string;
     username: string;
@@ -829,9 +828,13 @@ export interface TurnCredentials {
 }
 
 export interface RemoteStreamListener {
-    streamRoomId: StreamRoomId;
-    streamId?: StreamId;
+    streamRoomId: string;
+    streamId?: number;
     onRemoteStreamTrack?: (event: RTCTrackEvent) => void;
+    /**
+     * @param data decrypted data channel payload; empty when `statusCode` is non-zero
+     * @param statusCode native `StreamApiLow::decryptDataChannelMessage` status - `0` on success
+     */
     onRemoteData?: (data: Uint8Array, statusCode: number) => void;
 }
 
@@ -933,10 +936,55 @@ export enum StreamEventType {
     STREAMROOM_CREATE = 0,
     STREAMROOM_UPDATE = 1,
     STREAMROOM_DELETE = 2,
-    STREAM_JOIN = 4,
-    STREAM_LEAVE = 5,
-    STREAM_PUBLISH = 6,
-    STREAM_UNPUBLISH = 7,
+    STREAM_JOIN = 3,
+    STREAM_LEAVE = 4,
+    STREAM_PUBLISH = 5,
+    STREAM_UNPUBLISH = 6,
+    STREAM_SUBSCRIBE = 7,
+    STREAM_UNSUBSCRIBE = 8,
+    STREAM_UPDATE = 9,
+}
+
+export interface StreamRoomMemberEventData {
+    streamRoomId: string;
+    userId: string;
+}
+
+export interface StreamRoomReofferEventData {
+    streamRoomId: string;
+    jsep?: { type: "offer"; sdp: string };
+}
+
+export interface StreamSubscriptionRef {
+    streamId: number;
+    streamTrackId?: string;
+}
+
+export interface StreamSubscribedEventData {
+    streamRoomId: string;
+    userId: string;
+    subscriptions: StreamSubscriptionRef[];
+}
+
+export interface StreamUpdatedEventData {
+    streamRoomId: string;
+    streamId: number;
+    userId: string;
+    tracksAdded: TrackInfo[];
+    tracksRemoved: TrackInfo[];
+    tracksModified: { before: TrackInfo; after: TrackInfo }[];
+}
+
+export interface StreamPublishedEventData {
+    streamRoomId: string;
+    userId: string;
+    stream: StreamInfo;
+}
+
+export interface StreamUnpublishedEventData {
+    streamRoomId: string;
+    userId: string;
+    streamId: number;
 }
 
 export enum StreamEventSelectorType {
@@ -957,39 +1005,3 @@ export type CollectionChangedEventData = {
     items: CollectionItemChange[];
 };
 
-export interface RecordingEncKey {
-    id: Uint8Array;
-    key: Uint8Array;
-}
-
-export enum DataChannelCryptorDecryptStatus {
-    /** No error */
-    OK = 0x0000,
-
-    /** Frame too short */
-    FRAME_TOO_SHORT = 0x1001,
-
-    /** Unsupported protocol version */
-    UNSUPPORTED_VERSION = 0x1002,
-
-    /** Invalid IV length */
-    INVALID_IV_LENGTH = 0x1003,
-
-    /** Truncated frame */
-    FRAME_TRUNCATED = 0x1004,
-
-    /** Invalid key ID */
-    INVALID_KEY_ID = 0x1005,
-
-    /** Encryption key not found */
-    KEY_NOT_FOUND = 0x1006,
-
-    /** Invalid encryption key length */
-    INVALID_KEY_LENGTH = 0x1007,
-
-    /** Decryption failed (authentication error) */
-    DECRYPT_AUTH_FAILED = 0x1008,
-
-    /** Invalid data sequence number */
-    INVALID_DATA_SEQUENCE = 0x1009,
-}

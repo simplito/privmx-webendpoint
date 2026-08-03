@@ -9,6 +9,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// import {EndpointFactory} from './Main';
-import { EndpointFactory as Endpoint } from "./service/EndpointFactory";
+import { EndpointFactory as Endpoint } from "./service/EndpointFactory.js";
+/**
+ * Vite bundle entry point - exposes {@link EndpointFactory} as the Endpoint
+ * global in dist builds. Import from the package root instead.
+ * @internal
+ */
 export { Endpoint };

@@ -8,19 +8,11 @@ import {
     ThreadApi,
     KvdbApi,
     EventApi,
-} from "../service";
+} from "../service/index.js";
 
-import { PublicConnection } from "./PublicConnection";
-import {
-    ConnectionEventsManager,
-    CustomEventsManager,
-    InboxEventsManager,
-    KvdbEventsManager,
-    StoreEventsManager,
-    ThreadEventsManager,
-    UserEventsManager,
-} from "./managers";
-import { EventManager } from "./events";
+import { logger } from "../webStreams/Logger.js";
+import { PublicConnection } from "./PublicConnection.js";
+import { EventManager } from "../events/EventManager.js";
 
 /**
  * @class PrivmxClient
@@ -48,10 +40,7 @@ import { EventManager } from "./events";
  * await client.disconnect();
  */
 export class PrivmxClient {
-    private static cryptoApi: Promise<CryptoApi> | null = null;
-    private static eventQueue: Promise<EventQueue> | null = null;
     private static isSetup = false;
-    private static eventManager: Promise<EventManager> | null = null;
 
     private threadApi: Promise<ThreadApi> | null = null;
     private storeApi: Promise<StoreApi> | null = null;
@@ -59,16 +48,7 @@ export class PrivmxClient {
     private kvdbApi: Promise<KvdbApi> | null = null;
     private eventApi: Promise<EventApi> | null = null;
 
-    private connectionEventManager: Promise<ConnectionEventsManager> | null = null;
-    private userEventManager: Promise<UserEventsManager> | null = null;
-    private threadEventManager: Promise<ThreadEventsManager> | null = null;
-    private storeEventManager: Promise<StoreEventsManager> | null = null;
-    private inboxEventManager: Promise<InboxEventsManager> | null = null;
-    private customEventsManager: Promise<CustomEventsManager> | null = null;
-    private kvdbEventsManager: Promise<KvdbEventsManager> | null = null;
-
     /**
-     * @constructor
      * @param {Connection} connection - The connection object.
      */
     private constructor(private connection: Connection) {}
@@ -94,57 +74,30 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Crypto API.
-     * @returns {Promise<CryptoApi>}
+     * @returns {Promise<CryptoApi>} A promise resolving to the Crypto API.
      */
     public static async getCryptoApi(): Promise<CryptoApi> {
-        if (this.cryptoApi) {
-            return this.cryptoApi;
-        }
-
         this.checkSetup();
-
-        this.cryptoApi = (async () => {
-            return EndpointFactory.createCryptoApi();
-        })();
-
-        return this.cryptoApi;
+        return EndpointFactory.createCryptoApi();
     }
 
     /**
      * @description Gets the Event Queue.
-     * @returns {Promise<EventQueue>}
+     * @returns {Promise<EventQueue>} A promise resolving to the Event Queue.
      */
     public static async getEventQueue(): Promise<EventQueue> {
-        if (this.eventQueue) {
-            return this.eventQueue;
-        }
-
         this.checkSetup();
-
-        this.eventQueue = (async () => {
-            return EndpointFactory.getEventQueue();
-        })();
-
-        return this.eventQueue;
+        return EndpointFactory.getEventQueue();
     }
 
     /**
-     * @description Gets the Event Manager.
-     * @returns {Promise<EventManager>}
+     * @description Gets the single event manager for this client's connection.
+     *   Subscribe to events of any module through it; build entries with the
+     *   `create*Subscription` helpers.
+     * @returns {Promise<EventManager>} A promise resolving to the event manager.
      */
-    public static async getEventManager(): Promise<EventManager> {
-        if (this.eventManager) {
-            return this.eventManager;
-        }
-
-        this.checkSetup();
-
-        this.eventManager = (async () => {
-            const eventQueue = await PrivmxClient.getEventQueue();
-            return EventManager.startEventLoop(eventQueue);
-        })();
-
-        return await this.eventManager;
+    public getEventManager(): Promise<EventManager> {
+        return this.getConnection().getEventManager();
     }
 
     /**
@@ -152,7 +105,7 @@ export class PrivmxClient {
      * @param {string} privateKey user's private key
      * @param {string} solutionId ID of the Solution
      * @param {string} bridgeUrl the Bridge Server URL
-     * @returns {Promise<PrivmxClient>}
+     * @returns {Promise<PrivmxClient>} A promise resolving to a connected client instance.
      * @throws {Error} If the connection to the bridge fails.
      */
     static async connect(
@@ -192,7 +145,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the connection object.
-     * @returns {Connection}
+     * @returns {Connection} The active connection object.
      * @throws {Error} If there is no active connection.
      */
     public getConnection(): Connection {
@@ -204,7 +157,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Thread API.
-     * @returns {Promise<ThreadApi>}
+     * @returns {Promise<ThreadApi>} A promise resolving to the Thread API.
      */
     public async getThreadApi(): Promise<ThreadApi> {
         if (!this.threadApi) {
@@ -218,7 +171,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Store API.
-     * @returns {Promise<StoreApi>}
+     * @returns {Promise<StoreApi>} A promise resolving to the Store API.
      */
     public async getStoreApi(): Promise<StoreApi> {
         if (!this.storeApi) {
@@ -232,17 +185,13 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Inbox API.
-     * @returns {Promise<InboxApi>}
+     * @returns {Promise<InboxApi>} A promise resolving to the Inbox API.
      */
     public async getInboxApi(): Promise<InboxApi> {
         if (!this.inboxApi) {
             this.inboxApi = (async () => {
                 const connection = this.getConnection();
-                return EndpointFactory.createInboxApi(
-                    connection,
-                    await this.getThreadApi(),
-                    await this.getStoreApi(),
-                );
+                return EndpointFactory.createInboxApi(connection);
             })();
         }
         return this.inboxApi;
@@ -250,7 +199,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Kvdb API.
-     * @returns {Promise<KvdbApi>}
+     * @returns {Promise<KvdbApi>} A promise resolving to the Kvdb API.
      */
     public async getKvdbApi(): Promise<KvdbApi> {
         if (!this.kvdbApi) {
@@ -264,7 +213,7 @@ export class PrivmxClient {
 
     /**
      * @description Gets the Event API.
-     * @returns {Promise<EventApi>}
+     * @returns {Promise<EventApi>} A promise resolving to the Event API.
      */
     public async getEventApi(): Promise<EventApi> {
         if (!this.eventApi) {
@@ -277,123 +226,6 @@ export class PrivmxClient {
     }
 
     /**
-     * @description Gets the Connection Event Manager.
-     * @returns {Promise<ConnectionEventsManager>}
-     */
-    public async getConnectionEventManager(): Promise<ConnectionEventsManager> {
-        if (this.connectionEventManager) {
-            return this.connectionEventManager;
-        }
-
-        this.connectionEventManager = (async () => {
-            const eventManager = await PrivmxClient.getEventManager();
-            const connection = this.getConnection();
-            const connectionId = await connection.getConnectionId();
-            return eventManager.getConnectionEventManager(`${connectionId}`);
-        })();
-
-        return this.connectionEventManager;
-    }
-
-    /**
-     * @description Gets the User Event Manager.
-     * @returns {Promise<UserEventsManager>}
-     */
-    public async getUserEventsManager(): Promise<UserEventsManager> {
-        if (this.userEventManager) {
-            return this.userEventManager;
-        }
-
-        this.userEventManager = (async () => {
-            const eventManager = await PrivmxClient.getEventManager();
-            return eventManager.getUserEventsManager(this.getConnection());
-        })();
-
-        return this.userEventManager;
-    }
-
-    /**
-     * @description Gets the Thread Event Manager.
-     * @returns {Promise<ThreadEventsManager>}
-     */
-    public async getThreadEventManager(): Promise<ThreadEventsManager> {
-        if (this.threadEventManager) {
-            return this.threadEventManager;
-        }
-
-        this.threadEventManager = (async () => {
-            const eventManager = await PrivmxClient.getEventManager();
-            return eventManager.getThreadEventManager(await this.getThreadApi());
-        })();
-
-        return this.threadEventManager;
-    }
-
-    /**
-     * @description Gets the Store Event Manager.
-     * @returns {Promise<StoreEventsManager>}
-     */
-    public async getStoreEventManager(): Promise<StoreEventsManager> {
-        if (this.storeEventManager) {
-            return this.storeEventManager;
-        }
-
-        this.storeEventManager = (async () => {
-            const eventManager = await PrivmxClient.getEventManager();
-            return eventManager.getStoreEventManager(await this.getStoreApi());
-        })();
-
-        return this.storeEventManager;
-    }
-
-    /**
-     * @description Gets the Inbox Event Manager.
-     * @returns {Promise<InboxEventsManager>}
-     */
-    public async getInboxEventManager(): Promise<InboxEventsManager> {
-        if (this.inboxEventManager) {
-            return this.inboxEventManager;
-        }
-
-        this.inboxEventManager = (async () => {
-            const eventManager = await PrivmxClient.getEventManager();
-            return eventManager.getInboxEventManager(await this.getInboxApi());
-        })();
-
-        return this.inboxEventManager;
-    }
-
-    /**
-     * @description Gets the Custom Events Manager.
-     * @returns {Promise<CustomEventsManager>}
-     */
-    public async getCustomEventsManager(): Promise<CustomEventsManager> {
-        if (this.customEventsManager) {
-            return this.customEventsManager;
-        }
-
-        this.customEventsManager = (async () => {
-            const eventManager = await PrivmxClient.getEventManager();
-            return eventManager.getCustomEventsManager(await this.getEventApi());
-        })();
-
-        return this.customEventsManager;
-    }
-
-    public async getKvdbEventsManager(): Promise<KvdbEventsManager> {
-        if (this.kvdbEventsManager) {
-            return this.kvdbEventsManager;
-        }
-
-        this.kvdbEventsManager = (async () => {
-            const eventManager = await PrivmxClient.getEventManager();
-            return eventManager.getKvdbEventManager(await this.getKvdbApi());
-        })();
-
-        return this.kvdbEventsManager;
-    }
-
-    /**
      * @description Disconnects from the PrivMX bridge.
      * @returns {Promise<void>}
      */
@@ -403,15 +235,8 @@ export class PrivmxClient {
             this.threadApi = null;
             this.storeApi = null;
             this.inboxApi = null;
-            this.connectionEventManager = null;
-            this.customEventsManager = null;
-            this.userEventManager = null;
-            this.threadEventManager = null;
-            this.storeEventManager = null;
-            this.inboxEventManager = null;
-            this.kvdbEventsManager = null;
         } catch (e) {
-            console.error("Error during disconnection:", e);
+            logger.error("Error during disconnection:", e);
         }
     }
 }

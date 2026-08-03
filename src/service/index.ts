@@ -1,19 +1,21 @@
-import { EndpointFactory } from "./EndpointFactory";
-import { ThreadApi } from "./ThreadApi";
-import { StoreApi } from "./StoreApi";
-import { InboxApi } from "./InboxApi";
-import { KvdbApi } from "./KvdbApi";
-import { EventApi } from "./EventApi";
-import { CryptoApi } from "./CryptoApi";
-import { StreamApi } from "./StreamApi";
-import { Connection } from "./Connection";
-import { EventQueue } from "./EventQueue";
-import { BaseApi } from "./BaseApi";
-import { ExtKey } from "./ExtKey";
-import { SearchApi } from "./SearchApi";
+import { EndpointFactory } from "./EndpointFactory.js";
+import { ThreadApi } from "./ThreadApi.js";
+import { StoreApi } from "./StoreApi.js";
+import { InboxApi } from "./InboxApi.js";
+import { KvdbApi } from "./KvdbApi.js";
+import { EventApi } from "./EventApi.js";
+import { CryptoApi } from "./CryptoApi.js";
+import { StreamApi } from "./StreamApi.js";
+import { SearchApi } from "./SearchApi.js";
+import { Connection } from "./Connection.js";
+import { EventQueue } from "./EventQueue.js";
+import { BaseApi } from "./BaseApi.js";
+import { ExtKey } from "./ExtKey.js";
+import { setupAuto } from "./setupAuto.js";
 
 export {
     EndpointFactory,
+    setupAuto,
     ThreadApi,
     StoreApi,
     InboxApi,
@@ -27,3 +29,4 @@ export {
     ExtKey,
     EventApi,
 };
+export type { SetupAutoOptions } from "./setupAuto.js";

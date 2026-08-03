@@ -10,95 +10,75 @@ limitations under the License.
 */
 
 import {
-    CurrentPublishersData,
-    Jsep,
+    CloseModel,
     RoomModel,
     SdpWithRoomModel,
     SetAnswerAndSetRemoteDescriptionModel,
-    StreamsUpdatedData,
     UpdateKeysModel,
     WebRtcInterface,
-} from "../service/WebRtcInterface";
-import { ConnectionType } from "./PeerConnectionsManager";
-import { StreamRoomId } from "./types/ApiTypes";
-import { WebRtcClient } from "./WebRtcClient";
-import { SessionId } from "./WebRtcClientTypes";
+    WebRtcMethodCall,
+} from "./WebRtcInterface.js";
+import { ConnectionType, SessionId } from "./PeerConnectionManager.js";
+import { Jsep, StreamRoomId } from "./types/ApiTypes.js";
+import { WebRtcClient } from "./WebRtcClient.js";
+
+type MethodMap = {
+    [K in WebRtcMethodCall["name"]]: (
+        params: Extract<WebRtcMethodCall, { name: K }>["params"],
+    ) => Promise<unknown>;
+};
 
 export class WebRtcInterfaceImpl implements WebRtcInterface {
     constructor(private webRtcClient: WebRtcClient) {}
 
-    private methodsMap: { [K: string]: Function } = {
-        createOfferAndSetLocalDescription: this.createOfferAndSetLocalDescription,
-        createAnswerAndSetDescriptions: this.createAnswerAndSetDescriptions,
-        setAnswerAndSetRemoteDescription: this.setAnswerAndSetRemoteDescription,
-        updateSessionId: this.updateSessionId,
-        close: this.close,
-        updateKeys: this.updateKeys,
+    private methodsMap: MethodMap = {
+        createOfferAndSetLocalDescription: this.createOfferAndSetLocalDescription.bind(this),
+        createAnswerAndSetDescriptions: this.createAnswerAndSetDescriptions.bind(this),
+        setAnswerAndSetRemoteDescription: this.setAnswerAndSetRemoteDescription.bind(this),
+        updateSessionId: (params) =>
+            this.updateSessionId(params.streamRoomId, params.sessionId, params.connectionType),
+        close: this.close.bind(this),
+        closeAll: this.closeAll.bind(this),
+        updateKeys: this.updateKeys.bind(this),
     };
 
     isMainThread() {
         return typeof window !== "undefined";
     }
 
-    getClient(): WebRtcClient {
-        if (!this.webRtcClient) {
-            throw new Error("WebRtcClient not initialized. Aborting...");
-        }
-        return this.webRtcClient;
-    }
-
-    async methodCall(name: string, params: any): Promise<any> {
-        if (this.methodsMap[name]) {
-            const method = this.methodsMap[name];
-            if (typeof method === "function") {
-                return this.methodsMap[name].call(this, params);
-            }
+    async methodCall(name: string, params: unknown): Promise<unknown> {
+        const method = this.methodsMap[name as WebRtcMethodCall["name"]];
+        if (typeof method === "function") {
+            return method(params as never);
         }
         throw new Error(`Method '${name}' is not implemented.`);
     }
 
     async createOfferAndSetLocalDescription(model: RoomModel) {
-        const peerConnection = this.getClient()
-            .getConnectionManager()
-            .getConnectionWithSession(model.roomId, "publisher").pc;
-
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        return offer.sdp; // sdp
+        return this.webRtcClient.createPublisherOffer(model.roomId);
     }
 
     async createAnswerAndSetDescriptions(model: SdpWithRoomModel): Promise<string> {
         const offer: Jsep = { sdp: model.sdp, type: model.type };
-        await this.getClient().onSubscriptionUpdated(model.roomId, offer);
-        return this.webRtcClient.lastProcessedAnswer[model.roomId].sdp;
+        await this.webRtcClient.onSubscriptionUpdated(model.roomId, offer);
+        return this.webRtcClient.getLastProcessedAnswer(model.roomId).sdp;
     }
 
     async setAnswerAndSetRemoteDescription(model: SetAnswerAndSetRemoteDescriptionModel) {
-        const janusSession = this.getClient()
-            .getConnectionManager()
-            .getConnectionWithSession(model.roomId, "publisher");
-        if (!("pc" in janusSession)) {
-            throw new Error(
-                "WebRtcInterfaceImpl: No peerConnection available on setAnswerAndSetRemoteDescription",
-            );
-        }
-        const peerConnection = janusSession.pc;
-        await peerConnection.setRemoteDescription(
-            new RTCSessionDescription({ sdp: model.sdp, type: model.type as RTCSdpType }),
-        );
+        await this.webRtcClient.setPublisherRemoteDescription(model.roomId, model.sdp, model.type);
     }
 
-    async close(roomId: StreamRoomId) {
-        this.getClient()
-            .getConnectionManager()
-            .closePeerConnectionBySessionIfExists(roomId, "subscriber");
-        this.getClient()
-            .getConnectionManager()
-            .closePeerConnectionBySessionIfExists(roomId, "publisher");
+    async close(model: CloseModel) {
+        this.webRtcClient.closeConnection(model.roomId, model.connectionType);
+    }
+
+    async closeAll(roomId: StreamRoomId) {
+        this.webRtcClient.closeConnection(roomId, "subscriber");
+        this.webRtcClient.closeConnection(roomId, "publisher");
     }
 
     async updateKeys(model: UpdateKeysModel) {
-        return this.getClient().updateKeys(model.streamRoomId, model.keys);
+        return this.webRtcClient.updateKeys(model.streamRoomId, model.keys);
     }
 
     async updateSessionId(
@@ -106,8 +86,10 @@ export class WebRtcInterfaceImpl implements WebRtcInterface {
         sessionId: number,
         connectionType: ConnectionType,
     ): Promise<void> {
-        this.getClient()
-            .getConnectionManager()
-            .updateSessionForConnection(streamRoomId, connectionType, sessionId as SessionId);
+        this.webRtcClient.updateConnectionSessionId(
+            streamRoomId,
+            sessionId as SessionId,
+            connectionType,
+        );
     }
 }

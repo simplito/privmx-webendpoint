@@ -1,5 +1,5 @@
-import { InboxApi } from "..";
-import { FileUploader } from "./files";
+import { InboxApi } from "../index.js";
+import { FileUploader } from "./files.js";
 
 /**
  * Represents payload that is sent to an Inbox.
@@ -13,7 +13,7 @@ export interface InboxEntryPayload {
     /**
      * Optional files associated with the entry.
      */
-    files?: Array<{
+    files?: {
         /**
          *Optional, contains confidential data that will be encrypted before being sent to server.
          */
@@ -28,7 +28,7 @@ export interface InboxEntryPayload {
          * Content of the file.
          */
         content: File;
-    }>;
+    }[];
 }
 
 /**

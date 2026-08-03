@@ -3,8 +3,6 @@ import { expect } from "@playwright/test";
 import { testData } from "../datasets/testData";
 import { setupUsers } from "../test-utils";
 import type { Endpoint, StreamApi } from "../../src";
-import { StreamRoomId } from "../../src/webStreams/types/ApiTypes";
-import { StreamHandle } from "../../src/Types";
 import { StreamEventType, StreamEventSelectorType } from "../../src/Types";
 
 interface TestUser {
@@ -21,7 +19,7 @@ declare global {
         streamApi?: StreamApi;
         currentUser?: TestUser;
 
-        myHandle?: StreamHandle;
+        myHandle?: number;
 
         remoteTracksCount?: number;
         trackEnded?: boolean;
@@ -47,19 +45,11 @@ test.describe("StreamTest", () => {
     test.beforeEach(async ({ page }) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-        await page.evaluate(async () => {
-            await window.Endpoint.setup("../../assets");
-        });
     });
 
     const initPage = async (page: any) => {
         await page.goto("/tests/harness/index.html");
         await page.waitForFunction(() => window.wasmReady === true, null, { timeout: 10000 });
-        await page.evaluate(async () => {
-            try {
-                await window.Endpoint.setup("../../assets");
-            } catch {}
-        });
     };
 
     const connectUserToBridge = async (
@@ -111,9 +101,9 @@ test.describe("StreamTest", () => {
         await connectUserToBridge(page3, users.u3, backend.bridgeUrl, testData.solutionId);
 
         const contextId = testData.contextId;
-        let roomId: StreamRoomId;
+        let roomId: string;
         let dataTrackId: string;
-        let streamHandle: StreamHandle;
+        let streamHandle: number;
         const testMessage = "test message";
 
         let resolvePage1: () => void;
@@ -249,12 +239,10 @@ test.describe("StreamTest", () => {
                             const events = w.__eventCollector?.events ?? [];
                             return (
                                 events
-                                    ?.filter((x: any) => x.type === "remoteStreamsChanged")
+                                    ?.filter((x: any) => x.type === "streamPublished")
                                     .some((event: any) =>
-                                        event?.data?.streams?.some((stream: any) =>
-                                            stream?.tracks?.some(
-                                                (track: any) => track?.type === "data",
-                                            ),
+                                        event?.data?.stream?.tracks?.some(
+                                            (track: any) => track?.type === "data",
                                         ),
                                     ) ?? false
                             );
@@ -285,7 +273,7 @@ test.describe("StreamTest", () => {
                             })),
                     );
 
-                    await api.subscribeToRemoteStreams(roomId, streamsWithDataTracks);
+                    await api.createSubscriberStream(roomId, streamsWithDataTracks);
                     api.addRemoteStreamListener({
                         streamRoomId: roomId,
                         onRemoteData: (data, statusCode) => {
@@ -321,7 +309,7 @@ test.describe("StreamTest", () => {
                             })),
                     );
 
-                    await api.subscribeToRemoteStreams(roomId, streamsWithDataTracks);
+                    await api.createSubscriberStream(roomId, streamsWithDataTracks);
                     api.addRemoteStreamListener({
                         streamRoomId: roomId,
                         onRemoteData: (data, statusCode) => {

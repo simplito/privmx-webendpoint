@@ -1,0 +1,91 @@
+/*!
+PrivMX Endpoint.
+Copyright © 2024 Simplito sp. z o.o.
+
+This file is part of the PrivMX Platform (https://privmx.dev).
+This software is Licensed under the PrivMX Free License.
+
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+/**
+ * Asserts that value is a string. Internal crypto-layer validation helper.
+ * @internal
+ */
+export function assertIsString(value: unknown): asserts value is string {
+    if (typeof value !== "string") throw new Error("Not a string");
+}
+
+/**
+ * Asserts that value is an ArrayBuffer. Internal crypto-layer validation
+ * helper.
+ * @internal
+ */
+export function assertIsArrayBuffer(value: unknown): asserts value is ArrayBuffer {
+    if (!(value instanceof ArrayBuffer)) throw new Error("Not a ArrayBuffer");
+}
+
+/**
+ * Asserts that value is a Uint8Array or Int8Array. Internal crypto-layer
+ * validation helper.
+ * @internal
+ */
+export function assertIsUint8Array(value: unknown): asserts value is ArrayBuffer {
+    if (!(value instanceof Uint8Array) && !(value instanceof Int8Array))
+        throw new Error("Not Uint8Array or Int8Array");
+}
+
+/**
+ * Asserts that value is a number. Internal crypto-layer validation helper.
+ * @internal
+ */
+export function assertIsNumber(value: unknown): asserts value is number {
+    if (typeof value !== "number") throw new Error("Not a number");
+}
+
+/**
+ * Asserts that obj contains only the keys defined by argsType. Internal
+ * crypto-layer validation helper.
+ * @internal
+ */
+export function assertArgsValid<T>(obj: any, argsType: new (...args: any[]) => T) {
+    const objKeys = Object.keys(obj);
+    const expected = Object.keys(new argsType());
+    if (!objKeys.every((x) => expected.includes(x))) {
+        throw new Error(
+            "Invalid arguments list\nexpected: " +
+                JSON.stringify(expected) +
+                "\nactual: " +
+                JSON.stringify(objKeys),
+        );
+    }
+}
+
+/**
+ * Asserts that obj's keys match defaultObj and that no value equals its
+ * default. Internal crypto-layer validation helper.
+ * @internal
+ */
+export function assertArgsAndValueValid<T>(actualObj: T, defaultObj: new (...args: any[]) => T) {
+    const objKeys = Object.keys(actualObj);
+    const expected = Object.keys(new defaultObj());
+    if (!objKeys.every((x) => expected.includes(x))) {
+        throw new Error(
+            "Invalid arguments list\nexpected: " +
+                JSON.stringify(expected) +
+                "\nactual: " +
+                JSON.stringify(objKeys),
+        );
+    }
+    const defaultInstance = new defaultObj();
+    for (const p of objKeys) {
+        const actualValue = actualObj[p as keyof typeof actualObj];
+        const defaultValue = defaultInstance[p as keyof typeof actualObj];
+        if (actualValue == defaultValue) {
+            throw new Error(
+                `Invalid argument value of ${defaultObj.name}.${p}: ${(<any>defaultInstance)[p]}`,
+            );
+        }
+    }
+}

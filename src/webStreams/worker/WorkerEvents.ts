@@ -1,14 +1,97 @@
-import { Key } from "../../Types";
+import { Key } from "../../Types.js";
 
-export interface WorkerBaseEvent {
-    operation: string;
+// ---- Inbound messages (main thread → worker) ----
+
+/**
+ * Worker message: install an encrypting transform on an outbound encoded
+ * stream pair.
+ * @internal
+ */
+export interface EncodeEvent {
+    operation: "encode";
+    kind?: "audio" | "video";
+    readableStream: ReadableStream<unknown>;
+    writableStream: WritableStream<unknown>;
 }
 
-export interface InitializeEvent extends WorkerBaseEvent {
-    operation: "initialize";
+/**
+ * Worker message: install a decrypting transform on an inbound encoded stream
+ * pair.
+ * @internal
+ */
+export interface DecodeEvent {
+    operation: "decode";
+    kind?: "audio" | "video";
+    id: string;
+    readableStream: ReadableStream<unknown>;
+    writableStream: WritableStream<unknown>;
 }
 
-export interface SetKeysEvent extends WorkerBaseEvent {
+/**
+ * Worker message: replace the worker-side key set.
+ * @internal
+ */
+export interface SetKeysEvent {
     operation: "setKeys";
     keys: Key[];
 }
+
+/**
+ * Worker message: cancel the decode pipeline for a track.
+ * @internal
+ */
+export interface StopEvent {
+    operation: "stop";
+    id: string;
+}
+
+/**
+ * Union of all messages sent from the main thread to the E2EE worker.
+ * @internal
+ */
+export type WorkerInboundEvent = EncodeEvent | DecodeEvent | SetKeysEvent | StopEvent;
+
+// ---- Outbound messages (worker → main thread) ----
+
+/**
+ * Worker reply: confirms a setKeys message has been applied.
+ * @internal
+ */
+export interface SetKeysAckEvent {
+    operation: "setKeys-ack";
+}
+
+/**
+ * Worker reply: a setKeys message failed to apply (e.g. an invalid key length or
+ * a key-import error). Lets the main thread reject its pending `setKeys` promise
+ * instead of waiting forever for an ack that will never arrive.
+ * @internal
+ */
+export interface SetKeysNackEvent {
+    operation: "setKeys-nack";
+    error?: string;
+}
+
+/**
+ * Worker event: debug payload forwarded to the main thread.
+ * @internal
+ */
+export interface DebugEvent {
+    type: "debug";
+    data: unknown;
+}
+
+/**
+ * Worker event: error payload forwarded to the main thread.
+ * @internal
+ */
+export interface ErrorEvent {
+    type: "error";
+    data: unknown;
+}
+
+/**
+ * Union of all messages sent from the E2EE worker to the main thread.
+ * @internal
+ */
+export type WorkerOutboundEvent = SetKeysAckEvent | SetKeysNackEvent | DebugEvent | ErrorEvent;

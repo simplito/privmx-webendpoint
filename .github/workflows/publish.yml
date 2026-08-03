@@ -1,0 +1,111 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+
+  ci:
+    uses: ./.github/workflows/ci.yml
+    with:
+      run_e2e: false
+
+  publish:
+    name: Publish package
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+
+      - name: Download package tarball
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: package-tarball
+          path: ./builds
+
+      - name: Verify tag matches package.json version
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "Tag: $GITHUB_REF_NAME  ->  $TAG_VERSION"
+          echo "package.json version: $PKG_VERSION"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' does not match package.json version '$PKG_VERSION'."
+            exit 1
+          fi
+
+      - name: Determine registry & dist-tag
+        id: target
+        run: |
+          if [[ "$GITHUB_REF_NAME" == *-dev* ]]; then
+            echo "registry=https://npmregistry.privmx.com/" >> "$GITHUB_OUTPUT"
+            echo "dist_tag=dev" >> "$GITHUB_OUTPUT"
+            echo "provenance=false" >> "$GITHUB_OUTPUT"
+            echo "Dev pre-release -> self-hosted registry, dist-tag 'dev'"
+          elif [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            echo "registry=https://registry.npmjs.org/" >> "$GITHUB_OUTPUT"
+            echo "dist_tag=next" >> "$GITHUB_OUTPUT"
+            echo "provenance=true" >> "$GITHUB_OUTPUT"
+            echo "Pre-release -> npmjs.com, dist-tag 'next'"
+          else
+            echo "registry=https://registry.npmjs.org/" >> "$GITHUB_OUTPUT"
+            echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
+            echo "provenance=true" >> "$GITHUB_OUTPUT"
+            echo "Stable release -> npmjs.com, dist-tag 'latest'"
+          fi
+
+      - name: Publish package
+        env:
+          REGISTRY: ${{ steps.target.outputs.registry }}
+          DIST_TAG: ${{ steps.target.outputs.dist_tag }}
+          PROVENANCE: ${{ steps.target.outputs.provenance }}
+          PRIVMX_NPM_USER: ${{ secrets.PRIVMX_NPM_USER }}
+          PRIVMX_NPM_PASSWORD: ${{ secrets.PRIVMX_NPM_PASSWORD }}
+        run: |
+          # Write .npmrc at the repo root (npm's project config: ./builds has no
+          # package.json, so npm walks up here). For npmjs no token is set (OIDC
+          # handles auth + provenance); for the self-hosted (Verdaccio + htpasswd)
+          # registry we use basic auth (username + base64 password) so there is no
+          # token to expire or invalidate on server restart.
+          if [ "$REGISTRY" = "https://npmregistry.privmx.com/" ]; then
+            if [ -z "$PRIVMX_NPM_USER" ] || [ -z "$PRIVMX_NPM_PASSWORD" ]; then
+              echo "::error::PRIVMX_NPM_USER / PRIVMX_NPM_PASSWORD secret is empty or not set."
+              exit 1
+            fi
+            {
+              echo "registry=${REGISTRY}"
+              echo "//npmregistry.privmx.com/:username=${PRIVMX_NPM_USER}"
+              echo "//npmregistry.privmx.com/:_password=$(printf '%s' "$PRIVMX_NPM_PASSWORD" | base64 -w0)"
+              echo "always-auth=true"
+            } > .npmrc
+          else
+            echo "registry=${REGISTRY}" > .npmrc
+          fi
+
+          echo "Publishing privmx-webendpoint-latest.tgz to $REGISTRY with dist-tag '$DIST_TAG'"
+
+          PROVENANCE_FLAG=""
+          if [ "$PROVENANCE" = "true" ]; then
+            PROVENANCE_FLAG="--provenance"
+          fi
+
+          npm publish ./builds/privmx-webendpoint-latest.tgz \
+            $PROVENANCE_FLAG \
+            --access public \
+            --tag "$DIST_TAG" \
+            --registry "$REGISTRY"

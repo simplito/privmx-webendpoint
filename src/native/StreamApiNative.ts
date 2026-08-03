@@ -1,0 +1,306 @@
+/*!
+PrivMX Web Endpoint.
+Copyright © 2024 Simplito sp. z o.o.
+
+This file is part of the PrivMX Platform (https://privmx.dev).
+This software is Licensed under the PrivMX Free License.
+
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import {
+    DataChannelMessage,
+    DecryptedDataChannelMessage,
+    Jsep,
+    StreamHandle,
+    SubscriberStreamHandle,
+} from "../webStreams/types/ApiTypes.js";
+import {
+    ContainerPolicy,
+    PagingList,
+    PagingQuery,
+    StreamInfo,
+    StreamEventSelectorType,
+    StreamEventType,
+    StreamRoom,
+    TurnCredentials,
+    UserWithPubKey,
+} from "../Types.js";
+import { WebRtcInterfaceImpl } from "../webStreams/WebRtcInterfaceImpl.js";
+import { WindowWithWasmHandler } from "../webStreams/types/WebRtcExtensions.js";
+import { Api } from "./Api.js";
+import { BaseNative } from "./BaseNative.js";
+import * as Types from "../Types.js";
+
+/**
+ * Raw WASM wrapper for the C++ StreamApi - holds and forwards raw pointers.
+ * Use {@link StreamApi} (src/service) instead.
+ * @internal
+ */
+export class StreamApiNative extends BaseNative {
+    protected static bindingId: number = -1;
+    public static getBindingId() {
+        return ++this.bindingId;
+    }
+    public selfPtr: number = -1;
+
+    constructor(
+        api: Api,
+        private readonly webRtcInterfaceImpl: WebRtcInterfaceImpl,
+    ) {
+        super(api);
+    }
+
+    async newApi(connectionPtr: number, eventApiPtr: number): Promise<number> {
+        const bindingId = StreamApiNative.getBindingId();
+        this.registerWebRtcInterfaceHandler(bindingId);
+        this.selfPtr = await this.runAsync<number>((taskId) =>
+            this.api.lib.StreamApi_newStreamApi(taskId, connectionPtr, eventApiPtr, bindingId),
+        );
+        return this.selfPtr;
+    }
+
+    async deleteApi(ptr: number): Promise<void> {
+        await this.runAsync<void>((taskId) => this.api.lib.StreamApi_deleteStreamApi(taskId, ptr));
+        this.deleteApiRef();
+    }
+    async create(ptr: number, args: []): Promise<void> {
+        return this.runAsync<void>((taskId) => this.api.lib.StreamApi_create(taskId, ptr, args));
+    }
+
+    async createStreamRoom(
+        ptr: number,
+        args: [
+            string,
+            UserWithPubKey[],
+            UserWithPubKey[],
+            Uint8Array,
+            Uint8Array,
+            ContainerPolicy | undefined,
+            number | undefined,
+        ],
+    ): Promise<string> {
+        return this.runAsync<string>((taskId) =>
+            this.api.lib.StreamApi_createStreamRoom(taskId, ptr, args),
+        );
+    }
+    async updateStreamRoom(
+        ptr: number,
+        args: [
+            string,
+            UserWithPubKey[],
+            UserWithPubKey[],
+            Uint8Array,
+            Uint8Array,
+            number,
+            boolean,
+            boolean,
+            ContainerPolicy | undefined,
+        ],
+    ): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_updateStreamRoom(taskId, ptr, args),
+        );
+    }
+    async deleteStreamRoom(ptr: number, args: [string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_deleteStreamRoom(taskId, ptr, args),
+        );
+    }
+    async getStreamRoom(ptr: number, args: [string]): Promise<StreamRoom> {
+        return this.runAsync<StreamRoom>((taskId) =>
+            this.api.lib.StreamApi_getStreamRoom(taskId, ptr, args),
+        );
+    }
+    async listStreamRooms(
+        ptr: number,
+        args: [string, PagingQuery],
+    ): Promise<PagingList<StreamRoom>> {
+        return this.runAsync<PagingList<StreamRoom>>((taskId) =>
+            this.api.lib.StreamApi_listStreamRooms(taskId, ptr, args),
+        );
+    }
+    async createStream(ptr: number, args: [string]): Promise<StreamHandle> {
+        // params from api: streamRoomId, streamId
+        // params to lib: streamRoomId, streamId, webrtcInterfacePtr
+        // const libArgs: [string, number, number] = [...args, this.webRtcInterfacePtr];
+        return this.runAsync<StreamHandle>((taskId) =>
+            this.api.lib.StreamApi_createStream(taskId, ptr, args),
+        );
+    }
+
+    async joinStreamRoom(ptr: number, args: [string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_joinStreamRoom(taskId, ptr, args),
+        );
+    }
+
+    async leaveStreamRoom(ptr: number, args: [string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_leaveStreamRoom(taskId, ptr, args),
+        );
+    }
+
+    async publishStream(ptr: number, args: [number]): Promise<Types.StreamPublishResult> {
+        const ret = await this.runAsync<Types.StreamPublishResult>((taskId) =>
+            this.api.lib.StreamApi_publishStream(taskId, ptr, args),
+        );
+        return ret;
+    }
+
+    async updateStream(ptr: number, args: [number]): Promise<Types.StreamPublishResult> {
+        const ret = await this.runAsync<Types.StreamPublishResult>((taskId) =>
+            this.api.lib.StreamApi_updateStream(taskId, ptr, args),
+        );
+        return ret;
+    }
+
+    async removeStream(ptr: number, args: [number]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_removeStream(taskId, ptr, args),
+        );
+    }
+
+    async listStreams(ptr: number, args: [string]): Promise<StreamInfo[]> {
+        return this.runAsync<StreamInfo[]>((taskId) =>
+            this.api.lib.StreamApi_listStreams(taskId, ptr, args),
+        );
+    }
+
+    async listStreamRoomParticipants(
+        ptr: number,
+        args: [string],
+    ): Promise<Types.StreamSubscriber[]> {
+        return this.runAsync<Types.StreamSubscriber[]>((taskId) =>
+            this.api.lib.StreamApi_listStreamRoomParticipants(taskId, ptr, args),
+        );
+    }
+
+    async createSubscriberStream(
+        ptr: number,
+        args: [string, Types.StreamSubscription[]],
+    ): Promise<SubscriberStreamHandle> {
+        return this.runAsync<SubscriberStreamHandle>((taskId) =>
+            this.api.lib.StreamApi_createSubscriberStream(taskId, ptr, args),
+        );
+    }
+
+    async updateSubscriberStream(
+        ptr: number,
+        args: [number, Types.StreamSubscription[], Types.StreamSubscription[]],
+    ): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_updateSubscriberStream(taskId, ptr, args),
+        );
+    }
+
+    async removeSubscriberStream(ptr: number, args: [number]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_removeSubscriberStream(taskId, ptr, args),
+        );
+    }
+
+    async getTurnCredentials(ptr: number, args: []): Promise<TurnCredentials[]> {
+        return this.runAsync<TurnCredentials[]>((taskId) =>
+            this.api.lib.StreamApi_getTurnCredentials(taskId, ptr, args),
+        );
+    }
+    async subscribeFor(ptr: number, args: [string[]]): Promise<string[]> {
+        return this.runAsync<string[]>((taskId) =>
+            this.api.lib.StreamApi_subscribeFor(taskId, ptr, args),
+        );
+    }
+    async unsubscribeFrom(ptr: number, args: [string[]]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_unsubscribeFrom(taskId, ptr, args),
+        );
+    }
+    async buildSubscriptionQuery(
+        ptr: number,
+        args: [StreamEventType, StreamEventSelectorType, string],
+    ): Promise<string> {
+        return this.runAsync<string>((taskId) =>
+            this.api.lib.StreamApi_buildSubscriptionQuery(taskId, ptr, args),
+        );
+    }
+
+    async trickle(ptr: number, args: [number, RTCIceCandidate]): Promise<void> {
+        const [sessionId, candidate] = args;
+        const convertedArgs: [number, string] = [
+            sessionId,
+            StreamApiNative.serializeCandidate(candidate),
+        ];
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_trickle(taskId, ptr, convertedArgs),
+        );
+    }
+
+    /**
+     * Serializes an RTCIceCandidate to the JSON object expected by PrivMX Bridge.
+     * RTCIceCandidate.toJSON() only emits 4 fields; all properties are read directly
+     * from the object (the browser already parses the SDP string into typed fields).
+     */
+    private static serializeCandidate(c: RTCIceCandidate): string {
+        return JSON.stringify({
+            address: c.address,
+            candidate: c.candidate,
+            component: c.component,
+            foundation: c.foundation,
+            port: c.port,
+            priority: c.priority,
+            protocol: c.protocol,
+            relatedAddress: c.relatedAddress,
+            relatedPort: c.relatedPort,
+            sdpMLineIndex: c.sdpMLineIndex,
+            sdpMid: c.sdpMid,
+            tcpType: c.tcpType,
+            type: c.type,
+            usernameFragment: c.usernameFragment,
+        });
+    }
+
+    async acceptOfferOnReconfigure(ptr: number, args: [number, Jsep]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_acceptOfferOnReconfigure(taskId, ptr, args),
+        );
+    }
+
+    async setNewOfferOnReconfigure(ptr: number, args: [number, Jsep]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_setNewOfferOnReconfigure(taskId, ptr, args),
+        );
+    }
+
+    async registerRemoteDataChannel(ptr: number, args: [string, string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_registerRemoteDataChannel(taskId, ptr, args),
+        );
+    }
+
+    async encryptDataChannelMessage(
+        ptr: number,
+        args: [string, DataChannelMessage],
+    ): Promise<Uint8Array> {
+        return this.runAsync<Uint8Array>((taskId) =>
+            this.api.lib.StreamApi_encryptDataChannelMessage(taskId, ptr, args),
+        );
+    }
+
+    async decryptDataChannelMessage(
+        ptr: number,
+        args: [string, string, Uint8Array],
+    ): Promise<DecryptedDataChannelMessage> {
+        return this.runAsync<DecryptedDataChannelMessage>((taskId) =>
+            this.api.lib.StreamApi_decryptDataChannelMessage(taskId, ptr, args),
+        );
+    }
+
+    private registerWebRtcInterfaceHandler(bindingId: number): void {
+        const win = window as unknown as WindowWithWasmHandler;
+        if (!win.webRtcInterfaceToNativeHandler) {
+            win.webRtcInterfaceToNativeHandler = {};
+        }
+        win.webRtcInterfaceToNativeHandler[bindingId] = this.webRtcInterfaceImpl;
+    }
+}
