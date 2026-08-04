@@ -41,9 +41,7 @@ export interface RawCppError {
 export class NativeError extends Error {
     /**
      * Numeric error code, laid out as `(scopeCode << 16) | specificCode`.
-     * Compare against the exported `*ErrorCode` constants. Note that the Kvdb
-     * and Event modules share scope `0x0009` - check {@link scope} when
-     * disambiguating bare numbers.
+     * Compare against the exported `*ErrorCode` constants.
      */
     public readonly code: number;
     /** Module that raised the error - `"Core"`, `"Store"`, `"Thread"`, … */
