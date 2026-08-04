@@ -145,7 +145,7 @@ export const test = base.extend<
     },
     { workerBackend: WorkerBackend } & WorkerOptions
 >({
-    dockerImage: ["simplito/privmx-bridge:latest", { option: true, scope: "worker" }],
+    dockerImage: ["hub.simplito.com/privmx/privmx-bridge:dev", { option: true, scope: "worker" }],
 
     workerBackend: [
         async ({ dockerImage }, use, workerInfo) => {

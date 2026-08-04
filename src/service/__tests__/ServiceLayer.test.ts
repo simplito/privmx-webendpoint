@@ -6,14 +6,17 @@ import type { Mock } from "vitest";
 import { ThreadApi } from "../ThreadApi.js";
 import { StoreApi } from "../StoreApi.js";
 import { CryptoApi } from "../CryptoApi.js";
+import { LockApi } from "../LockApi.js";
 import { EventQueue } from "../EventQueue.js";
 import { Connection } from "../Connection.js";
 import type { ConnectionServices } from "../Connection.js";
 import type { ThreadApiNative } from "../../native/ThreadApiNative.js";
 import type { StoreApiNative } from "../../native/StoreApiNative.js";
 import type { CryptoApiNative } from "../../native/CryptoApiNative.js";
+import type { LockApiNative } from "../../native/LockApiNative.js";
 import type { EventQueueNative } from "../../native/EventQueueNative.js";
 import type { ConnectionNative } from "../../native/ConnectionNative.js";
+import { LockLevel } from "../../Types.js";
 
 const PTR = 42;
 
@@ -103,6 +106,27 @@ describe("CryptoApi argument order", () => {
     it("derivePublicKey forwards (ptr, [privateKey])", async () => {
         await api.derivePublicKey("priv");
         expect(m.derivePublicKey).toHaveBeenCalledWith(PTR, ["priv"]);
+    });
+});
+
+describe("LockApi argument marshalling", () => {
+    const native = nativeMock<LockApiNative>(["lock", "unlock", "checkReservedLock"], "x");
+    const api = new LockApi(native, PTR);
+    const m = native as unknown as Record<string, Mock>;
+
+    it("lock forwards (ptr, [resourceId, uuid, lockLevel])", async () => {
+        await api.lock("res", "uuid-1", LockLevel.EXCLUSIVE);
+        expect(m.lock).toHaveBeenCalledWith(PTR, ["res", "uuid-1", LockLevel.EXCLUSIVE]);
+    });
+
+    it("unlock forwards (ptr, [resourceId, uuid, lockLevel])", async () => {
+        await api.unlock("res", "uuid-1", LockLevel.NONE);
+        expect(m.unlock).toHaveBeenCalledWith(PTR, ["res", "uuid-1", LockLevel.NONE]);
+    });
+
+    it("checkReservedLock forwards (ptr, [resourceId, uuid])", async () => {
+        await api.checkReservedLock("res", "uuid-1");
+        expect(m.checkReservedLock).toHaveBeenCalledWith(PTR, ["res", "uuid-1"]);
     });
 });
 
