@@ -9,15 +9,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ContainerPolicy, IndexMode, PagingList, PagingQuery, SearchIndex, UserWithPubKey, Document } from "../Types";
-import { BaseNative } from "./BaseNative";
+import { ContainerPolicy, IndexMode, PagingList, PagingQuery, SearchIndex, UserWithPubKey, Document } from "../Types.js";
+import { BaseNative } from "./BaseNative.js";
 
 export class SearchApiNative extends BaseNative {
-    async newApi(connectionPtr: number, storeApiPtr: number, kvdbApiPtr: number): Promise<number> {
-        return this.runAsync<number>((taskId)=>this.api.lib.SearchApi_newSearchApi(taskId, connectionPtr, storeApiPtr, kvdbApiPtr));
+    async newApi(connectionPtr: number, storeApiPtr: number, kvdbApiPtr: number, lockApiPtr: number): Promise<number> {
+        return this.runAsync<number>((taskId)=>this.api.lib.SearchApi_newSearchApi(taskId, connectionPtr, storeApiPtr, kvdbApiPtr, lockApiPtr));
     }
     async deleteApi(ptr: number): Promise<void> {
-        this.runAsync<void>((taskId)=>this.api.lib.SearchApi_deleteSearchApi(taskId, ptr));
+        await this.runAsync<void>((taskId)=>this.api.lib.SearchApi_deleteSearchApi(taskId, ptr));
         this.deleteApiRef();
     }
     async create(ptr: number, args: []): Promise<void> {

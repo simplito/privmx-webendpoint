@@ -670,17 +670,23 @@ export interface StreamPublishResult {
 
 // export namespace search {
 /*
-* Defines the mode in which the Search Index operates, specifically regarding 
+* Defines the mode in which the Search Index operates, specifically regarding
 * the storage and retrieval of document content.
-* 
-* WITH_CONTENT - stores the full document content internally. 
-* WITHOUT_CONTENT - The Index only stores metadata and terms necessary for search, 
+*
+* WITH_CONTENT - stores the full document content internally.
+* WITHOUT_CONTENT - The Index only stores metadata and terms necessary for search,
 * but discards the original document content.
+*
+* The numeric values must stay in sync with `search::IndexMode` in the C++ core
+* (UNKNOWN = 0, WITH_CONTENT = 1, WITHOUT_CONTENT = 2) - the core rejects 0 and
+* would otherwise silently interpret a shifted value as a different mode.
 */
 export enum IndexMode
 {
-    WITH_CONTENT,
-    WITHOUT_CONTENT
+    /** IndexMode is UNKNOWN or the data is unreadable (check statusCode) */
+    UNKNOWN = 0,
+    WITH_CONTENT = 1,
+    WITHOUT_CONTENT = 2
 };
 
 /**
@@ -926,6 +932,43 @@ export enum KvdbEventSelectorType {
     CONTEXT_ID = 0,
     KVDB_ID = 1,
     ENTRY_ID = 2,
+}
+
+/**
+ * Level of a lock held on a resource, following the SQLite locking model:
+ * NONE < SHARED < RESERVED < PENDING < EXCLUSIVE.
+ *
+ * @type {LockLevel}
+ */
+export enum LockLevel {
+    NONE = 0,
+    SHARED = 1,
+    RESERVED = 2,
+    PENDING = 3,
+    EXCLUSIVE = 4,
+}
+
+/**
+ * Lowercase name of a {@link LockLevel}, as reported by the WASM core in
+ * `LockOperationResult.currentLevelName`.
+ *
+ * @type {LockLevelName}
+ */
+export type LockLevelName = "none" | "shared" | "reserved" | "pending" | "exclusive";
+
+/**
+ * Holds the result of a lock/unlock operation.
+ *
+ * @type {LockOperationResult}
+ *
+ * @param {boolean} success whether the operation succeeded
+ * @param {LockLevel} currentLevel the lock level in effect after the operation
+ * @param {LockLevelName} currentLevelName human-readable name of `currentLevel`
+ */
+export interface LockOperationResult {
+    success: boolean;
+    currentLevel: LockLevel;
+    currentLevelName: LockLevelName;
 }
 
 export enum EventsEventSelectorType {

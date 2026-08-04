@@ -9,9 +9,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { BaseApi } from "./BaseApi";
-import { SearchApiNative } from "../api/SearchApiNative";
-import { ContainerPolicy, IndexMode, PagingList, PagingQuery, SearchIndex, UserWithPubKey, Document } from "../Types";
+import { BaseApi } from "./BaseApi.js";
+import { SearchApiNative } from "../native/SearchApiNative.js";
+import { ContainerPolicy, IndexMode, PagingList, PagingQuery, SearchIndex, UserWithPubKey, Document } from "../Types.js";
 
 export class SearchApi extends BaseApi {
   constructor(private native: SearchApiNative, ptr: number) {

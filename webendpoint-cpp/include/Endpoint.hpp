@@ -209,7 +209,7 @@ API_FUNCTION_HEADER(StreamApi, registerRemoteDataChannel)
 API_FUNCTION_HEADER(StreamApi, encryptDataChannelMessage)
 API_FUNCTION_HEADER(StreamApi, decryptDataChannelMessage)
 
-void SearchApi_newSearchApi(int taskId, int connectionPtr, int storePtr, int kvdbPtr);
+void SearchApi_newSearchApi(int taskId, int connectionPtr, int storePtr, int kvdbPtr, int lockPtr);
 void SearchApi_deleteSearchApi(int taskId, int ptr);
 API_FUNCTION_HEADER(SearchApi, create)
 API_FUNCTION_HEADER(SearchApi, createSearchIndex)
@@ -226,6 +226,13 @@ API_FUNCTION_HEADER(SearchApi, deleteDocument)
 API_FUNCTION_HEADER(SearchApi, getDocument)
 API_FUNCTION_HEADER(SearchApi, listDocuments)
 API_FUNCTION_HEADER(SearchApi, searchDocuments)
+
+void LockApi_newLockApi(int taskId, int connectionPtr);
+void LockApi_deleteLockApi(int taskId, int ptr);
+API_FUNCTION_HEADER(LockApi, create)
+API_FUNCTION_HEADER(LockApi, lock)
+API_FUNCTION_HEADER(LockApi, unlock)
+API_FUNCTION_HEADER(LockApi, checkReservedLock)
 
 }  // namespace api
 }  // namespace webendpoint
