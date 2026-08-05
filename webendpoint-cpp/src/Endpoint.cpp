@@ -21,9 +21,9 @@ limitations under the License.
 #include <privmx/endpoint/crypto/varinterface/ExtKeyVarInterface.hpp>
 #include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
 #include <privmx/endpoint/inbox/varinterface/InboxApiVarInterface.hpp>
-#include <privmx/endpoint/search/varinterface/SearchApiVarInterface.hpp>
 #include <privmx/endpoint/kvdb/varinterface/KvdbApiVarInterface.hpp>
 #include <privmx/endpoint/lock/varinterface/LockApiVarInterface.hpp>
+#include <privmx/endpoint/search/varinterface/SearchApiVarInterface.hpp>
 #include <privmx/endpoint/store/varinterface/StoreApiVarInterface.hpp>
 #include <privmx/endpoint/thread/varinterface/ThreadApiVarInterface.hpp>
 
@@ -386,19 +386,20 @@ API_FUNCTION(StreamApi, encryptDataChannelMessage)
 API_FUNCTION(StreamApi, decryptDataChannelMessage)
 
 void SearchApi_newSearchApi(int taskId, int connectionPtr, int storeApiPtr, int kvdbApiPtr, int lockApiPtr) {
-    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, storeApiPtr, kvdbApiPtr, lockApiPtr]{
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, storeApiPtr, kvdbApiPtr, lockApiPtr] {
         auto connection = (ConnectionVar*)connectionPtr;
         auto storeApi = (StoreApiVar*)storeApiPtr;
         auto kvdbApi = (KvdbApiVar*)kvdbApiPtr;
         auto lockApi = (LockApiVar*)lockApiPtr;
-        auto searchApi = new SearchApiVar(connection->getApi(), storeApi->getApi(), kvdbApi->getApi(), lockApi->getApi(), core::VarSerializer::Options{.addType=false, .binaryFormat=core::VarSerializer::Options::PSON_BINARYSTRING});
+        auto searchApi =
+            new SearchApiVar(connection->getApi(), storeApi->getApi(), kvdbApi->getApi(), lockApi->getApi(),
+                             core::VarSerializer::Options{
+                                 .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
         return (int)searchApi;
     });
 }
 void SearchApi_deleteSearchApi(int taskId, int ptr) {
-    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr]{
-        delete (SearchApiVar*)ptr;
-    });
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (SearchApiVar*)ptr; });
 }
 API_FUNCTION(SearchApi, create)
 API_FUNCTION(SearchApi, createSearchIndex)
