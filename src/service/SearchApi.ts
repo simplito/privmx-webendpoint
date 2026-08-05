@@ -62,6 +62,7 @@ export class SearchApi extends BaseApi {
      * @param {boolean} force force update (without checking version)
      * @param {boolean} forceGenerateNewKey force to regenerate a key for the Index
      * @param {ContainerPolicy} policies Index's policies
+     * @returns {Promise<void>} resolves when the Index has been updated on the server
    */
   async updateSearchIndex(
     indexId: string,
@@ -91,6 +92,7 @@ export class SearchApi extends BaseApi {
    * Deletes a Search Index by given Index ID.
    * 
    * @param {string} indexId ID of the Index to delete
+   * @returns {Promise<void>} resolves when the searchIndex has been removed from the server
    */
   async deleteSearchIndex(
     indexId: string
@@ -104,7 +106,7 @@ export class SearchApi extends BaseApi {
    * Gets a Search Index by given Index ID.
    * 
    * @param {string} indexId ID of the Index to get
-   * @return {SearchIndex} SearchIndex struct containing info about the Index
+   * @returns {SearchIndex} SearchIndex struct containing info about the Index
    */
   async getSearchIndex(
     indexId: string
@@ -119,7 +121,7 @@ export class SearchApi extends BaseApi {
    * 
    * @param {string} contextId ID of the Context to get the Indexes from
    * @param {PagingQuery} pagingQuery struct with list query parameters
-   * @return {PagingList<SearchIndex>} struct containing a list of Search Indexes
+   * @returns {PagingList<SearchIndex>} struct containing a list of Search Indexes
    */
   async listSearchIndexes(
     contextId: string,
@@ -135,7 +137,7 @@ export class SearchApi extends BaseApi {
    * Opens a Search Index for use and returns a handle.
    * 
    * @param {string} indexId ID of the Index to open
-   * @return {number} Handle to the opened Search Index
+   * @returns {number} Handle to the opened Search Index
    */
   async openSearchIndex(
     indexId: string
@@ -149,6 +151,7 @@ export class SearchApi extends BaseApi {
    * Closes the Search Index associated with the given handle.
    * 
    * @param {number} indexHandle Handle of the Search Index to close
+   * @returns {Promise<void>} resolves when the Search Index is closed
    */
   async closeSearchIndex(
     indexHandle: number
@@ -164,7 +167,7 @@ export class SearchApi extends BaseApi {
     * @param {number} indexHandle Handle of the Index to add the document to
     * @param {string} name name of the document
     * @param {string} content content of the document
-    * @return {number} ID of the newly added document
+    * @returns {number} ID of the newly added document
    */
   async addDocument(
     indexHandle: number,
@@ -183,6 +186,7 @@ export class SearchApi extends BaseApi {
    * 
    * @param {number} indexHandle Handle of the Index containing the document
    * @param {Document} document Document struct with data for update
+   * @returns {Promise<void>} resolves when the document content has been replaced on the server
    */
   async updateDocument(
     indexHandle: number,
@@ -199,6 +203,7 @@ export class SearchApi extends BaseApi {
    * 
    * @param {number} indexHandle Handle of the Index to delete the document from
    * @param {number} documentId ID of the document to delete
+   * @returns {Promise<void>} resolves when the document has been removed from the server
    */
   async deleteDocument(
     indexHandle: number,
@@ -215,7 +220,7 @@ export class SearchApi extends BaseApi {
    * 
    * @param {number} indexHandle Handle of the Index containing the document
    * @param {number} documentId ID of the document to get
-   * @return {Document} Document struct containing the document data
+   * @returns {Document} Document struct containing the document data
    */
   async getDocument(
     indexHandle: number,
@@ -232,7 +237,7 @@ export class SearchApi extends BaseApi {
    * 
    * @param {string} indexHandle Handle of the Index containing documents
    * @param {PagingQuery} pagingQuery struct with list query parameters (can include search terms)
-   * @return struct containing a list of documents
+   * @returns {PagingList<Document>} struct containing a list of documents
    */
   async listDocuments(
     indexHandle: number,
@@ -250,7 +255,7 @@ export class SearchApi extends BaseApi {
    * @param {number} indexHandle Handle of the Index to search
    * @param {string} searchQuery Search query
    * @param {PagingQuery} pagingQuery struct with list query parameters (e.g., search query, pagination
-   * @return {PagingList<Document>} struct containing a list of matching Documents
+   * @returns {PagingList<Document>} struct containing a list of matching Documents
    */
   async searchDocuments(
     indexHandle: number,
