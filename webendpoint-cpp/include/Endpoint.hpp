@@ -205,10 +205,34 @@ API_FUNCTION_HEADER(StreamApi, buildSubscriptionQuery)
 API_FUNCTION_HEADER(StreamApi, trickle)
 API_FUNCTION_HEADER(StreamApi, acceptOfferOnReconfigure)
 API_FUNCTION_HEADER(StreamApi, setNewOfferOnReconfigure)
-
 API_FUNCTION_HEADER(StreamApi, registerRemoteDataChannel)
 API_FUNCTION_HEADER(StreamApi, encryptDataChannelMessage)
 API_FUNCTION_HEADER(StreamApi, decryptDataChannelMessage)
+
+void SearchApi_newSearchApi(int taskId, int connectionPtr, int storePtr, int kvdbPtr, int lockPtr);
+void SearchApi_deleteSearchApi(int taskId, int ptr);
+API_FUNCTION_HEADER(SearchApi, create)
+API_FUNCTION_HEADER(SearchApi, createSearchIndex)
+API_FUNCTION_HEADER(SearchApi, updateSearchIndex)
+API_FUNCTION_HEADER(SearchApi, deleteSearchIndex)
+API_FUNCTION_HEADER(SearchApi, deleteSearchIndex)
+API_FUNCTION_HEADER(SearchApi, getSearchIndex)
+API_FUNCTION_HEADER(SearchApi, listSearchIndexes)
+API_FUNCTION_HEADER(SearchApi, openSearchIndex)
+API_FUNCTION_HEADER(SearchApi, closeSearchIndex)
+API_FUNCTION_HEADER(SearchApi, addDocument)
+API_FUNCTION_HEADER(SearchApi, updateDocument)
+API_FUNCTION_HEADER(SearchApi, deleteDocument)
+API_FUNCTION_HEADER(SearchApi, getDocument)
+API_FUNCTION_HEADER(SearchApi, listDocuments)
+API_FUNCTION_HEADER(SearchApi, searchDocuments)
+
+void LockApi_newLockApi(int taskId, int connectionPtr);
+void LockApi_deleteLockApi(int taskId, int ptr);
+API_FUNCTION_HEADER(LockApi, create)
+API_FUNCTION_HEADER(LockApi, lock)
+API_FUNCTION_HEADER(LockApi, unlock)
+API_FUNCTION_HEADER(LockApi, checkReservedLock)
 
 }  // namespace api
 }  // namespace webendpoint

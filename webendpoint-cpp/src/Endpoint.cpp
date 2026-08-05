@@ -22,6 +22,8 @@ limitations under the License.
 #include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
 #include <privmx/endpoint/inbox/varinterface/InboxApiVarInterface.hpp>
 #include <privmx/endpoint/kvdb/varinterface/KvdbApiVarInterface.hpp>
+#include <privmx/endpoint/lock/varinterface/LockApiVarInterface.hpp>
+#include <privmx/endpoint/search/varinterface/SearchApiVarInterface.hpp>
 #include <privmx/endpoint/store/varinterface/StoreApiVarInterface.hpp>
 #include <privmx/endpoint/thread/varinterface/ThreadApiVarInterface.hpp>
 
@@ -48,6 +50,8 @@ using CryptoApiVar = privmx::endpoint::crypto::CryptoApiVarInterface;
 using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
 using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
 using StreamApiVar = privmx::endpoint::stream::StreamApiLowVarInterface;
+using SearchApiVar = privmx::endpoint::search::SearchApiVarInterface;
+using LockApiVar = privmx::endpoint::lock::LockApiVarInterface;
 
 using UserVerifierInterface = privmx::endpoint::core::UserVerifierInterface;
 using VerificationRequest = privmx::endpoint::core::VerificationRequest;
@@ -377,10 +381,58 @@ API_FUNCTION(StreamApi, buildSubscriptionQuery)
 API_FUNCTION(StreamApi, trickle)
 API_FUNCTION(StreamApi, acceptOfferOnReconfigure)
 API_FUNCTION(StreamApi, setNewOfferOnReconfigure)
-
 API_FUNCTION(StreamApi, registerRemoteDataChannel)
 API_FUNCTION(StreamApi, encryptDataChannelMessage)
 API_FUNCTION(StreamApi, decryptDataChannelMessage)
+
+void SearchApi_newSearchApi(int taskId, int connectionPtr, int storeApiPtr, int kvdbApiPtr, int lockApiPtr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, storeApiPtr, kvdbApiPtr, lockApiPtr] {
+        auto connection = (ConnectionVar*)connectionPtr;
+        auto storeApi = (StoreApiVar*)storeApiPtr;
+        auto kvdbApi = (KvdbApiVar*)kvdbApiPtr;
+        auto lockApi = (LockApiVar*)lockApiPtr;
+        auto searchApi =
+            new SearchApiVar(connection->getApi(), storeApi->getApi(), kvdbApi->getApi(), lockApi->getApi(),
+                             core::VarSerializer::Options{
+                                 .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)searchApi;
+    });
+}
+void SearchApi_deleteSearchApi(int taskId, int ptr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (SearchApiVar*)ptr; });
+}
+API_FUNCTION(SearchApi, create)
+API_FUNCTION(SearchApi, createSearchIndex)
+API_FUNCTION(SearchApi, updateSearchIndex)
+API_FUNCTION(SearchApi, deleteSearchIndex)
+API_FUNCTION(SearchApi, getSearchIndex)
+API_FUNCTION(SearchApi, listSearchIndexes)
+API_FUNCTION(SearchApi, openSearchIndex)
+API_FUNCTION(SearchApi, closeSearchIndex)
+API_FUNCTION(SearchApi, addDocument)
+API_FUNCTION(SearchApi, updateDocument)
+API_FUNCTION(SearchApi, deleteDocument)
+API_FUNCTION(SearchApi, getDocument)
+API_FUNCTION(SearchApi, listDocuments)
+API_FUNCTION(SearchApi, searchDocuments)
+
+void LockApi_newLockApi(int taskId, int connectionPtr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
+        auto connection = (ConnectionVar*)connectionPtr;
+        auto lockApi =
+            new LockApiVar(connection->getApi(),
+                           core::VarSerializer::Options{
+                               .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)lockApi;
+    });
+}
+void LockApi_deleteLockApi(int taskId, int ptr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (LockApiVar*)ptr; });
+}
+API_FUNCTION(LockApi, create)
+API_FUNCTION(LockApi, lock)
+API_FUNCTION(LockApi, unlock)
+API_FUNCTION(LockApi, checkReservedLock)
 
 }  // namespace api
 }  // namespace webendpoint

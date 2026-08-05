@@ -25,6 +25,8 @@ import type { ThreadApi } from "./ThreadApi.js";
 import type { StoreApi } from "./StoreApi.js";
 import type { InboxApi } from "./InboxApi.js";
 import type { KvdbApi } from "./KvdbApi.js";
+import type { LockApi } from "./LockApi.js";
+import type { SearchApi } from "./SearchApi.js";
 import type { EventApi } from "./EventApi.js";
 import type { StreamApi } from "./StreamApi.js";
 import { EventManager, connectionStatusSubscriber } from "../events/EventManager.js";
@@ -42,6 +44,8 @@ export interface ConnectionServices {
     createStoreApi(connection: Connection): Promise<StoreApi>;
     createInboxApi(connection: Connection): Promise<InboxApi>;
     createKvdbApi(connection: Connection): Promise<KvdbApi>;
+    createLockApi(connection: Connection): Promise<LockApi>;
+    createSearchApi(connection: Connection): Promise<SearchApi>;
     createEventApi(connection: Connection): Promise<EventApi>;
     createStreamApi(connection: Connection): Promise<StreamApi>;
     getEventLoop(): Promise<EventLoop>;
@@ -280,6 +284,31 @@ export class Connection extends BaseApi {
      */
     getKvdbApi(): Promise<KvdbApi> {
         return this.services.createKvdbApi(this);
+    }
+
+    /**
+     * Returns the Lock API (distributed resource locking) for this connection.
+     *
+     * Convenience for `EndpointFactory.createLockApi(connection)`; resolves the
+     * same cached per-connection instance.
+     *
+     * @returns {Promise<LockApi>} the per-connection LockApi instance
+     */
+    getLockApi(): Promise<LockApi> {
+        return this.services.createLockApi(this);
+    }
+
+    /**
+     * Returns the Search API (full-text search indexes) for this connection.
+     *
+     * Convenience for `EndpointFactory.createSearchApi(connection)`; resolves
+     * the same cached per-connection instance and builds the StoreApi, KvdbApi
+     * and LockApi it depends on on first use.
+     *
+     * @returns {Promise<SearchApi>} the per-connection SearchApi instance
+     */
+    getSearchApi(): Promise<SearchApi> {
+        return this.services.createSearchApi(this);
     }
 
     /**

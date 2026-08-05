@@ -9,8 +9,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Generated from the privmx-endpoint v2.8.0-rc1 C++ exception headers
-// (dependency_sources/privmx-endpoint-v2.8.0-rc1/endpoint/*/include_pub/**/*Exception.hpp).
+// Generated from the privmx-endpoint v2.9.0-dev C++ exception headers
+// (dependency_sources/privmx-endpoint-v2.9.0-dev/endpoint/*/include_pub/**/*Exception.hpp).
 // Code layout: (scopeCode << 16) | specificCode - e.g. Store scope 0x0004,
 // FileVersionMismatch 0x001f -> 0x4001f. Regenerate when bumping the
 // privmx-endpoint version in build-manifest.sh.
@@ -380,4 +380,62 @@ export const StreamRoomErrorCode = {
     SUBSCRIBER_STREAM_ALREADY_CREATED: 0x80030,
     /** SubscriberStreamHandle not initialized */
     SUBSCRIBER_STREAM_HANDLE_NOT_INITIALIZED: 0x80031,
+} as const;
+
+/**
+ * Error codes raised by the Search module (`NativeError.scope === "Search"`).
+ */
+export const SearchErrorCode = {
+    /** Endpoint not initialized */
+    NOT_INITIALIZED: 0xb0001,
+    /** Invalid Index handle */
+    INVALID_INDEX_HANDLE: 0xb0002,
+    /** Invalid document ID */
+    INVALID_DOCUMENT_ID: 0xb0003,
+    /** Malformed internal file Id */
+    MALFORMED_INTERNAL_FILE_ID: 0xb0004,
+    /** Malformed internal file */
+    MALFORMED_INTERNAL_FILE: 0xb0005,
+    /** Malformed file lock */
+    MALFORMED_FILE_LOCK: 0xb0006,
+    /** Can't register VFS */
+    DATABASE_VFS_REGISTER: 0xb0101,
+    /** Can't open database */
+    DATABASE_OPEN: 0xb0102,
+    /** ATTACH failed */
+    DATABASE_ATTACH: 0xb0103,
+    /** Error preparing INSERT */
+    INSERT_PREPARE: 0xb0201,
+    /** Error executing INSERT */
+    INSERT_EXECUTE: 0xb0202,
+    /** Error preparing UPDATE */
+    UPDATE_PREPARE: 0xb0203,
+    /** Error executing UPDATE */
+    UPDATE_EXECUTE: 0xb0204,
+    /** Error preparing DELETE */
+    DELETE_PREPARE: 0xb0205,
+    /** Error executing DELETE */
+    DELETE_EXECUTE: 0xb0206,
+    /** Error preparing SELECT */
+    SELECT_PREPARE: 0xb0207,
+    /** Error preparing query */
+    QUERY_PREPARE: 0xb0208,
+    /** Error creating table */
+    TABLE_CREATION: 0xb0209,
+    /** Error beginning transaction */
+    TRANSACTION_BEGIN: 0xb0301,
+    /** Error committing transaction */
+    TRANSACTION_COMMIT: 0xb0302,
+    /** Error rolling back transaction */
+    TRANSACTION_ROLLBACK: 0xb0303,
+} as const;
+
+/**
+ * Error codes raised by the Lock module (`NativeError.scope === "Lock"`).
+ */
+export const LockErrorCode = {
+    /** Endpoint not initialized */
+    NOT_INITIALIZED: 0xc0001,
+    /** Invalid lock level value */
+    INVALID_LOCK_LEVEL: 0xc0002,
 } as const;

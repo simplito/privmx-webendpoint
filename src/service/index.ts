@@ -3,9 +3,11 @@ import { ThreadApi } from "./ThreadApi.js";
 import { StoreApi } from "./StoreApi.js";
 import { InboxApi } from "./InboxApi.js";
 import { KvdbApi } from "./KvdbApi.js";
+import { LockApi } from "./LockApi.js";
 import { EventApi } from "./EventApi.js";
 import { CryptoApi } from "./CryptoApi.js";
 import { StreamApi } from "./StreamApi.js";
+import { SearchApi } from "./SearchApi.js";
 import { Connection } from "./Connection.js";
 import { EventQueue } from "./EventQueue.js";
 import { BaseApi } from "./BaseApi.js";
@@ -19,8 +21,10 @@ export {
     StoreApi,
     InboxApi,
     KvdbApi,
+    LockApi,
     CryptoApi,
     StreamApi,
+    SearchApi,
     Connection,
     EventQueue,
     BaseApi,
