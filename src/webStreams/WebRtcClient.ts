@@ -18,8 +18,6 @@ import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry.js"
 
 export interface StreamsCallbackInterface {
     trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void>;
-    acceptOffer(sessionId: SessionId, sdp: Jsep): Promise<void>;
-    registerRemoteDataChannel(streamRoomId: StreamRoomId, remoteStreamId: string): Promise<void>;
     decryptDataChannelMessage(
         streamRoomId: StreamRoomId,
         remoteStreamId: string,
@@ -60,8 +58,8 @@ export class WebRtcClient {
 
     /**
      * Binds the native WASM callback interface used to forward ICE trickle
-     * candidates and SDP accept-offer calls back to the server. Must be called
-     * once before any peer connection is established.
+     * candidates to the server and to decrypt inbound data channel frames.
+     * Must be called once before any peer connection is established.
      */
     bindApiInterface(impl: StreamsCallbackInterface): void {
         this.streamsApiInterface = impl;
@@ -128,20 +126,10 @@ export class WebRtcClient {
     }
 
     /**
-     * Registers a newly-opened remote data channel with the native
-     * `StreamApiLow` message encryptor so it can track inbound sequence
-     * numbers for replay protection. Must be called once before any frame
-     * received on that channel is passed to {@link decryptDataChannelMessage}.
-     * @throws if `bindApiInterface` has not been called yet.
-     */
-    async registerRemoteDataChannel(streamRoomId: StreamRoomId, remoteStreamId: string): Promise<void> {
-        if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
-        return this.streamsApiInterface.registerRemoteDataChannel(streamRoomId, remoteStreamId);
-    }
-
-    /**
      * Decrypts a wire-format frame received from `remoteStreamId` using the
-     * native `StreamApiLow` message encryptor.
+     * native `StreamApiLow` message encryptor. Replay-protection state for a
+     * previously unseen `remoteStreamId` is created natively on the first
+     * decrypted frame - no explicit registration is needed.
      * @throws if `bindApiInterface` has not been called yet.
      */
     async decryptDataChannelMessage(
