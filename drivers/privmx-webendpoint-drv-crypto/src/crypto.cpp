@@ -197,8 +197,31 @@ int privmxDrvCrypto_aeadEncrypt(
     char** out, unsigned int* outlen,
     char** tag, unsigned int* taglen
 ) {
-    // not supported
-    return 1;
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
+        val params = val::object();
+        params.set("data", createUint8Array(data, datalen));
+        params.set("key", createUint8Array(key, 32));
+        params.set("iv", createUint8Array(iv, 12));
+        params.set("aad", createUint8Array(aad, aadlen));
+        
+        performCryptoCall("aeadEncrypt", params.as_handle(), callId);
+    }, CRYPTO_THREAD);
+
+    try {
+        std::string res = extractCryptoResult(future);
+        // In WebCrypto GCM response, the last 16 bytes are the tag.
+        unsigned int res_datalen = res.size() - 16;
+        *out = reinterpret_cast<char*>(malloc(res_datalen));
+        *outlen = res_datalen;
+        memcpy(*out, res.data(), res_datalen);
+
+        *tag = reinterpret_cast<char*>(malloc(16));
+        *taglen = 16;
+        memcpy(*tag, res.data() + res_datalen, 16);
+        return 0;
+    } catch (...) {
+        return 1;
+    }
 }
 
 int privmxDrvCrypto_aesDecrypt(const char* key, const char* iv, const char* data, unsigned int datalen,
@@ -237,8 +260,26 @@ int privmxDrvCrypto_aeadDecrypt(
     const char* config,
     char** out, unsigned int* outlen
 ) {
-    // not supported
-    return 1;
+    auto future = AsyncEngine::getInstance()->callJsAsync([=](int callId) {
+        val params = val::object();
+        params.set("data", createUint8Array(data, datalen));
+        params.set("key", createUint8Array(key, 32));
+        params.set("iv", createUint8Array(iv, 12));
+        params.set("aad", createUint8Array(aad, aadlen));
+        params.set("tag", createUint8Array(tag, taglen));
+        
+        performCryptoCall("aeadDecrypt", params.as_handle(), callId);
+    }, CRYPTO_THREAD);
+
+    try {
+        std::string res = extractCryptoResult(future);
+        *out = reinterpret_cast<char*>(malloc(res.size()));
+        *outlen = res.size();
+        memcpy(*out, res.data(), res.size());
+        return 0;
+    } catch (...) {
+        return 1;
+    }
 }
 
 int privmxDrvCrypto_pbkdf2(const char* pass, unsigned int passlen, const char* salt, unsigned int saltlen, int rounds, unsigned int length, const char* hash, char** out, unsigned int* outlen){

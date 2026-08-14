@@ -9,8 +9,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { BaseApi } from "./BaseApi";
-import { ThreadApiNative } from "../api/ThreadApiNative";
+import { BaseApi } from "./BaseApi.js";
+import { ThreadApiNative } from "../native/ThreadApiNative.js";
 import {
     PagingQuery,
     PagingList,
@@ -20,27 +20,78 @@ import {
     ContainerPolicy,
     ThreadEventType,
     ThreadEventSelectorType,
-} from "../Types";
+} from "../Types.js";
 
+/**
+ * Encrypted messaging API: manages Threads (message containers shared by a
+ * fixed set of users within a Context) and the end-to-end encrypted messages
+ * inside them. Message content is encrypted in the browser before upload -
+ * the Bridge server only ever stores ciphertext (plus the deliberately public
+ * `publicMeta`).
+ *
+ * Obtain an instance via {@link EndpointFactory.createThreadApi}; do not
+ * construct it directly.
+ *
+ * ## Workflow
+ * Messaging: {@link createThread} → {@link sendMessage} →
+ * {@link listMessages} / {@link getMessage}; change membership or metadata
+ * with {@link updateThread}.
+ *
+ * Events: {@link buildSubscriptionQuery} → {@link subscribeFor} → consume via
+ * {@link EventQueue.waitEvent} → {@link unsubscribeFrom}.
+ *
+ * All methods reject with `NativeError` on server/crypto errors and throw
+ * `Error` when the underlying connection has been closed.
+ */
 export class ThreadApi extends BaseApi {
+    /**
+     * Created by EndpointFactory - never constructed by SDK users.
+     * @internal
+     */
     constructor(
-        protected native: ThreadApiNative,
+        private native: ThreadApiNative,
         ptr: number,
     ) {
         super(ptr);
     }
 
     /**
-     * Creates a new Thread in given Context.
+     * Creates a new Thread in the given Context and returns the new Thread's ID.
      *
-     * @param {string} contextId ID of the Context to create the Thread in
-     * @param {UserWithPubKey[]} users array of UserWithPubKey structs which indicates who will have access to the created Thread
-     * @param {UserWithPubKey[]} managers array of UserWithPubKey structs which indicates who will have access (and management rights) to
-     * the created Thread
-     * @param {Uint8Array} publicMeta public (unencrypted) metadata
-     * @param {Uint8Array} privateMeta private (encrypted) metadata
-     * @param {ContainerPolicy} policies Thread's policies
-     * @returns {string} ID of the created Thread
+     * A random 256-bit thread key is generated client-side and encrypted
+     * separately for each listed user with ECIES using their public key - the
+     * server stores only the encrypted per-user key entries and cannot read
+     * the key. `privateMeta` is encrypted client-side with the thread key;
+     * `publicMeta` is stored unencrypted on the server.
+     *
+     * Entry point of the messaging workflow: follow with {@link sendMessage}
+     * and {@link listMessages}. Adjust members or metadata later with
+     * {@link updateThread}.
+     *
+     * @param {string} contextId ID of the Context to create the Thread in,
+     *   from `Context.contextId` returned by {@link Connection.listContexts}
+     * @param {UserWithPubKey[]} users members allowed to read and post in the
+     *   Thread; build the entries from {@link Connection.listContextUsers}
+     * @param {UserWithPubKey[]} managers members who can additionally update
+     *   or delete the Thread; build the entries from
+     *   {@link Connection.listContextUsers}
+     * @param {Uint8Array} publicMeta metadata stored unencrypted on the
+     *   server - readable by the Bridge, so never place secrets here
+     * @param {Uint8Array} privateMeta metadata encrypted client-side with the
+     *   thread key; only Thread members can decrypt it
+     * @param {ContainerPolicy} [policies] fine-grained access rules (who may
+     *   post, update or delete items) overriding the Context defaults
+     * @returns {string} ID of the new Thread - pass to {@link sendMessage},
+     *   {@link listMessages}, {@link getThread} or {@link updateThread}
+     * @throws {NativeError} when the Context does not exist or a listed user
+     *   is not registered in it
+     * @example
+     * const threadId = await threadApi.createThread(
+     *     contextId, users, managers,
+     *     new TextEncoder().encode("{}"),               // publicMeta (server-readable)
+     *     new TextEncoder().encode("project chat"));    // privateMeta (encrypted)
+     * await threadApi.sendMessage(threadId, new Uint8Array(), new Uint8Array(),
+     *     new TextEncoder().encode("Hello!"));
      */
     async createThread(
         contextId: string,
@@ -61,18 +112,42 @@ export class ThreadApi extends BaseApi {
     }
 
     /**
-     * Updates an existing Thread.
+     * Replaces the member lists, metadata and (optionally) the encryption key
+     * of an existing Thread.
      *
-     * @param {string} threadId ID of the Thread to update
-     * @param {UserWithPubKey[]} users array of UserWithPubKey structs which indicates who will have access to the created Thread
-     * @param {UserWithPubKey[]} managers array of UserWithPubKey structs which indicates who will have access (and management rights) to
-     * the created Thread
-     * @param {Uint8Array} publicMeta public (unencrypted) metadata
-     * @param {Uint8Array} privateMeta private (encrypted) metadata
-     * @param {number} version current version of the updated Thread
-     * @param {boolean} force force update (without checking version)
-     * @param {boolean} forceGenerateNewKey force to regenerate a key for the Thread
-     * @param {ContainerPolicy} policies Thread's policies
+     * The thread key list is re-encrypted for the new user set (ECIES on each
+     * user's public key). With `forceGenerateNewKey` a fresh thread key is
+     * generated, so removed users cannot decrypt messages sent after the
+     * update.
+     *
+     * The update is a full replacement, not a diff - fetch the current state
+     * with {@link getThread}, modify it, and pass the Thread's `version` back
+     * so concurrent modifications are detected. Set `forceGenerateNewKey`
+     * whenever you remove users.
+     *
+     * @param {string} threadId ID of the Thread to update, returned by
+     *   {@link createThread} or from `Thread.threadId` in {@link listThreads}
+     * @param {UserWithPubKey[]} users full replacement list of members allowed
+     *   to read and post; users missing from this list lose access
+     * @param {UserWithPubKey[]} managers full replacement list of members with
+     *   management rights (update / delete the Thread)
+     * @param {Uint8Array} publicMeta new metadata stored unencrypted on the
+     *   server - never place secrets here
+     * @param {Uint8Array} privateMeta new metadata encrypted client-side with
+     *   the thread key
+     * @param {number} version current Thread version, from `Thread.version`
+     *   returned by {@link getThread} - lets the server reject stale updates
+     * @param {boolean} force `true` skips the `version` check and overwrites
+     *   any concurrent modification
+     * @param {boolean} forceGenerateNewKey when `true`, a fresh thread key is
+     *   generated by the WASM core and redistributed, so users removed by this
+     *   update cannot decrypt messages sent afterwards - set it whenever you
+     *   revoke access
+     * @param {ContainerPolicy} [policies] new access policies; omit to keep
+     *   the current ones
+     * @returns {Promise<void>} resolves when the Thread has been updated on the server
+     * @throws {NativeError} when the Thread does not exist, the user lacks
+     *   management rights, or `version` does not match the server state
      */
     async updateThread(
         threadId: string,
@@ -99,64 +174,141 @@ export class ThreadApi extends BaseApi {
     }
 
     /**
-     * Deletes a Thread by given Thread ID.
+     * Permanently deletes a Thread together with all its messages.
      *
-     * @param {string} threadId ID of the Thread to delete
+     * The server removes the Thread record, its encrypted per-user key entries
+     * and every stored message ciphertext - there is no undo.
+     *
+     * Requires management rights to the Thread (see the `managers` list of
+     * {@link createThread} / {@link updateThread}). To merely revoke access,
+     * keep the Thread and remove users with {@link updateThread} instead.
+     *
+     * @param {string} threadId ID of the Thread to delete, returned by
+     *   {@link createThread} or from `Thread.threadId` in {@link listThreads}
+     * @returns {Promise<void>} resolves when the Thread and all its messages have been deleted
+     * @throws {NativeError} when the Thread does not exist or the user lacks
+     *   management rights
      */
     async deleteThread(threadId: string): Promise<void> {
         return this.native.deleteThread(this.servicePtr, [threadId]);
     }
 
     /**
-     * Gets a Thread by given Thread ID.
+     * Fetches a single Thread with its metadata, member lists and version.
      *
-     * @param {string} threadId ID of Thread to get
-     * @returns {Thread}  containing info about the Thread
+     * Downloads the Thread record from the Bridge and decrypts `privateMeta`
+     * client-side with the user's copy of the thread key; `publicMeta` arrives
+     * as stored, unencrypted.
+     *
+     * Use it to display Thread details or to obtain the current `version`
+     * required by {@link updateThread}.
+     *
+     * @param {string} threadId ID of the Thread to fetch, returned by
+     *   {@link createThread} or from `Thread.threadId` in {@link listThreads}
+     * @returns {Thread} decrypted Thread data - `version` feeds
+     *   {@link updateThread}; `threadId` feeds {@link sendMessage} and
+     *   {@link listMessages}
+     * @throws {NativeError} when the Thread does not exist or the user is not
+     *   a member of it
      */
     async getThread(threadId: string): Promise<Thread> {
         return this.native.getThread(this.servicePtr, [threadId]);
     }
 
     /**
-     * Gets a list of Threads in given Context.
+     * Lists the Threads of a Context that the user is a member of, one page
+     * at a time.
      *
-     * @param {string} contextId ID of the Context to get the Threads from
-     * @param {PagingQuery} pagingQuery  with list query parameters
-     * @returns {PagingList<Thread>}  containing a list of Threads
+     * Downloads the Thread records from the Bridge and decrypts each
+     * `privateMeta` client-side with the corresponding thread key.
+     *
+     * Typically the first ThreadApi call after connecting - pick a Thread from
+     * the result and read it with {@link listMessages}.
+     *
+     * @param {string} contextId ID of the Context to enumerate, from
+     *   `Context.contextId` returned by {@link Connection.listContexts}
+     * @param {PagingQuery} pagingQuery pagination and sorting; start with
+     *   `{ skip: 0, limit: 100, sortOrder: "desc" }` and page using `skip`
+     *   or `lastId`
+     * @returns {PagingList<Thread>} one page of Threads plus `totalAvailable`;
+     *   use `Thread.threadId` with {@link sendMessage} or {@link listMessages}
      */
     async listThreads(contextId: string, pagingQuery: PagingQuery): Promise<PagingList<Thread>> {
         return this.native.listThreads(this.servicePtr, [contextId, pagingQuery]);
     }
 
     /**
-     * Gets a message by given message ID.
+     * Fetches and decrypts a single message.
      *
-     * @param {string} messageId ID of the message to get
-     * @returns {Message}  containing the message
+     * Downloads the message from the Bridge and decrypts `data` and
+     * `privateMeta` client-side with the thread key; per-field SHA-256
+     * checksums and the author's ECDSA signature protect the content against
+     * tampering, and `Message.authorPubKey` identifies the signer.
+     *
+     * Use it to resolve a single message ID delivered by an event
+     * subscription ({@link subscribeFor}); for bulk reading prefer
+     * {@link listMessages}.
+     *
+     * @param {string} messageId ID of the message, returned by
+     *   {@link sendMessage} or from `Message.info.messageId` in
+     *   {@link listMessages}
+     * @returns {Message} decrypted message - payload in `data`, metadata and
+     *   author info alongside
+     * @throws {NativeError} when the message does not exist or the user is
+     *   not a member of its Thread
      */
     async getMessage(messageId: string): Promise<Message> {
         return this.native.getMessage(this.servicePtr, [messageId]);
     }
 
     /**
-     * Gets a list of messages from a Thread.
+     * Lists the messages of a Thread, one page at a time.
      *
-     * @param {string} threadId ID of the Thread to list messages from
-     * @param {PagingQuery} pagingQuery  with list query parameters
-     * @returns {PagingList<Message>}  containing a list of messages
+     * Downloads the message records from the Bridge and decrypts each
+     * message's `data` and `privateMeta` client-side with the thread key;
+     * signatures and checksums are verified during decryption.
+     *
+     * The standard way to render a conversation - typically called right
+     * after picking a Thread from {@link listThreads}.
+     *
+     * @param {string} threadId ID of the Thread to read, returned by
+     *   {@link createThread} or from `Thread.threadId` in {@link listThreads}
+     * @param {PagingQuery} pagingQuery pagination and sorting; start with
+     *   `{ skip: 0, limit: 100, sortOrder: "desc" }` and page using `skip`
+     *   or `lastId`
+     * @returns {PagingList<Message>} one page of decrypted messages plus
+     *   `totalAvailable`; use `Message.info.messageId` with
+     *   {@link updateMessage} or {@link deleteMessage}
+     * @throws {NativeError} when the Thread does not exist or the user is not
+     *   a member of it
      */
     async listMessages(threadId: string, pagingQuery: PagingQuery): Promise<PagingList<Message>> {
         return this.native.listMessages(this.servicePtr, [threadId, pagingQuery]);
     }
 
     /**
-     * Sends a message in a Thread.
+     * Sends a new message to a Thread and returns the new message's ID.
      *
-     * @param {string} threadId ID of the Thread to send message to
-     * @param {Uint8Array} publicMeta public message metadata
-     * @param {Uint8Array} privateMeta private message metadata
-     * @param {Uint8Array} data content of the message
-     * @returns {string} ID of the new message
+     * `data` and `privateMeta` are encrypted client-side with the thread key
+     * and signed with the sender's private key before upload - the server
+     * stores only ciphertext; `publicMeta` is stored unencrypted.
+     *
+     * Core call of the messaging workflow after {@link createThread}; other
+     * members receive the message via {@link listMessages} or a
+     * {@link subscribeFor} event subscription.
+     *
+     * @param {string} threadId ID of the destination Thread, returned by
+     *   {@link createThread} or from `Thread.threadId` in {@link listThreads}
+     * @param {Uint8Array} publicMeta message metadata stored unencrypted on
+     *   the server - readable by the Bridge, so never place secrets here
+     * @param {Uint8Array} privateMeta message metadata encrypted client-side
+     *   with the thread key; only Thread members can decrypt it
+     * @param {Uint8Array} data message payload, encrypted client-side with
+     *   the thread key before upload
+     * @returns {string} ID of the new message - pass to {@link getMessage},
+     *   {@link updateMessage} or {@link deleteMessage}
+     * @throws {NativeError} when the Thread does not exist or the user is not
+     *   allowed to post in it
      */
     async sendMessage(
         threadId: string,
@@ -168,21 +320,48 @@ export class ThreadApi extends BaseApi {
     }
 
     /**
-     * Deletes a message by given message ID.
+     * Permanently deletes a single message from its Thread.
      *
-     * @param {string} messageId ID of the message to delete
+     * The server removes the message ciphertext and its metadata - there is
+     * no undo.
+     *
+     * Allowed for the message author or users granted the right by the
+     * Thread's policies (see {@link createThread}); to change content instead
+     * of removing it, use {@link updateMessage}.
+     *
+     * @param {string} messageId ID of the message to delete, returned by
+     *   {@link sendMessage} or from `Message.info.messageId` in
+     *   {@link listMessages}
+     * @returns {Promise<void>} resolves when the message has been deleted from the server
+     * @throws {NativeError} when the message does not exist or the user lacks
+     *   the required rights
      */
     async deleteMessage(messageId: string): Promise<void> {
         return this.native.deleteMessage(this.servicePtr, [messageId]);
     }
 
     /**
-     * Update message in a Thread.
+     * Replaces the content and metadata of an existing message.
      *
-     * @param {string} messageId ID of the message to update
-     * @param {Uint8Array} publicMeta public message metadata
-     * @param {Uint8Array} privateMeta private message metadata
-     * @param {Uint8Array} data content of the message
+     * The new `data` and `privateMeta` are encrypted client-side with the
+     * thread key and re-signed before upload, exactly as in
+     * {@link sendMessage}; the previous content is overwritten on the server.
+     *
+     * Use it for edit functionality - the message keeps its ID, so existing
+     * references from {@link listMessages} or events remain valid.
+     *
+     * @param {string} messageId ID of the message to update, returned by
+     *   {@link sendMessage} or from `Message.info.messageId` in
+     *   {@link listMessages}
+     * @param {Uint8Array} publicMeta new message metadata stored unencrypted
+     *   on the server - never place secrets here
+     * @param {Uint8Array} privateMeta new message metadata encrypted
+     *   client-side with the thread key
+     * @param {Uint8Array} data new message payload, encrypted client-side
+     *   with the thread key before upload
+     * @returns {Promise<void>} resolves when the message content has been replaced on the server
+     * @throws {NativeError} when the message does not exist or the user lacks
+     *   the rights to modify it
      */
     async updateMessage(
         messageId: string,
@@ -214,7 +393,7 @@ export class ThreadApi extends BaseApi {
 
     // /**
     //  * Subscribes for events in given Thread.
-    //  * @param {string} threadId ID of the Thread to subscribe
+    //  * @param {string} threadId ID of the Thread to watch, returned by {@link createThread}
     //  */
     // async subscribeForMessageEvents(threadId: string): Promise<void> {
     //   return this.native.subscribeForMessageEvents(this.servicePtr, [threadId]);
@@ -222,7 +401,7 @@ export class ThreadApi extends BaseApi {
 
     // /**
     //  * Unsubscribes from events in given Thread.
-    //  * @param {string} threadId ID of the Thread to unsubscribe
+    //  * @param {string} threadId ID of the watched Thread, returned by {@link createThread}
     //  */
     // async unsubscribeFromMessageEvents(threadId: string): Promise<void> {
     //   return this.native.unsubscribeFromMessageEvents(this.servicePtr, [
@@ -231,28 +410,60 @@ export class ThreadApi extends BaseApi {
     // }
 
     /**
-     * Subscribe for the Thread events on the given subscription query.
+     * Subscribes this connection to Thread events matching the given
+     * subscription queries.
      *
-     * @param {string[]} subscriptionQueries list of queries
-     * @return list of subscriptionIds in maching order to subscriptionQueries
+     * Registers the subscriptions on the Bridge over the connection's event
+     * channel; matching events are then pushed by the server and surface
+     * through {@link EventQueue.waitEvent}.
+     *
+     * Required order: {@link buildSubscriptionQuery} (one query per
+     * event-type/selector pair) → `subscribeFor(queries)` → consume events
+     * from the {@link EventQueue} → {@link unsubscribeFrom} when no longer
+     * needed.
+     *
+     * @param {string[]} subscriptionQueries query strings produced by
+     *   {@link buildSubscriptionQuery}; hand-written strings are not supported
+     * @returns {string[]} subscription IDs, index-aligned with
+     *   `subscriptionQueries` - keep them to {@link unsubscribeFrom} later
      */
     async subscribeFor(subscriptionQueries: string[]): Promise<string[]> {
         return this.native.subscribeFor(this.servicePtr, [subscriptionQueries]);
     }
 
     /**
-     * Unsubscribe from events for the given subscriptionId.
-     * @param {string[]} subscriptionIds list of subscriptionId
+     * Cancels Thread event subscriptions previously created on this
+     * connection, so the server stops pushing the matching events.
+     *
+     * Subscriptions also end implicitly when the connection is closed; call
+     * this only to stop receiving a subset of events while keeping the
+     * connection alive.
+     *
+     * @param {string[]} subscriptionIds IDs returned by {@link subscribeFor};
+     *   unknown IDs cause a `NativeError` rejection
+     * @returns {Promise<void>} resolves when all listed subscriptions have been cancelled
      */
     async unsubscribeFrom(subscriptionIds: string[]): Promise<void> {
         return this.native.unsubscribeFrom(this.servicePtr, [subscriptionIds]);
     }
 
     /**
-     * Generate subscription Query for the Thread events.
-     * @param {EventType} eventType type of event which you listen for
-     * @param {EventSelectorType} selectorType scope on which you listen for events
-     * @param {string} selectorId ID of the selector
+     * Builds a subscription-query string describing one class of Thread
+     * events (e.g. "all message events in Thread X").
+     *
+     * The query is assembled locally by the WASM core in the server's
+     * expected format - nothing is sent yet; pass the result to
+     * {@link subscribeFor} to activate it.
+     *
+     * @param {ThreadEventType} eventType which Thread event class to listen
+     *   for (Thread create/update/delete, message events, …)
+     * @param {ThreadEventSelectorType} selectorType what `selectorId` refers
+     *   to (e.g. a whole Context or a single Thread), narrowing the event
+     *   scope
+     * @param {string} selectorId ID of the selected scope - a Thread ID
+     *   returned by {@link createThread} or a Context ID from
+     *   {@link Connection.listContexts}, depending on `selectorType`
+     * @returns {string} query string consumed by {@link subscribeFor}
      */
     async buildSubscriptionQuery(
         eventType: ThreadEventType,

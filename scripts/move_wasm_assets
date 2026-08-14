@@ -8,6 +8,5 @@ source "$SCRIPT_PATH/config.sh"
 echo "Adding assets to npm. Assets dir: $NPM_ASSETS_DIR"
 mkdir -p $NPM_ASSETS_DIR
 
-cp "$PRIVMX_WEBENDPOINT_DRV_CONTEXT_SRC/dist/driver-web-context.js" "$NPM_ASSETS_DIR"
 cp "$PRIVMX_WEBENDPOINT_API_SRC/build-emscripten/endpoint-wasm-module.js" "$NPM_ASSETS_DIR"
 cp "$PRIVMX_WEBENDPOINT_API_SRC/build-emscripten/endpoint-wasm-module.wasm" "$NPM_ASSETS_DIR"

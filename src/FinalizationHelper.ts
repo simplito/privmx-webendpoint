@@ -1,11 +1,14 @@
-import { ApiStatic } from "./api/ApiStatic";
-import { ExtKeyNative } from "./api/ExtKeyNative";
-
 interface NativeObjInfo {
     ptr: number;
     onFree: () => Promise<void>;
 }
 
+/**
+ * GC-driven cleanup helper - frees native WASM pointers via a
+ * FinalizationRegistry when their JS wrappers are collected. Not part of the public
+ * API.
+ * @internal
+ */
 export class FinalizationHelper {
     private static instance: FinalizationHelper;
     private static wasmLib: any;
@@ -29,7 +32,6 @@ export class FinalizationHelper {
 
     private constructor(private wasmLib: any) {
         this.finalizationRegistry = new FinalizationRegistry((onCleanup) => {
-            const api = ApiStatic.getInstance();
             this.finalizationQueue.push(onCleanup.onFree);
             this.scheduleCleanup();
         });

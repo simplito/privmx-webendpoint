@@ -11,6 +11,9 @@ limitations under the License.
 
 #include "AsyncEngine.hpp"
 
+static constexpr size_t WORKER_COUNT_MIN = 2;
+static constexpr size_t WORKER_COUNT_DEFAULT = 4;
+
 #include <Poco/JSON/Object.h>
 #include <Pson/pson.h>
 #include <emscripten/eventloop.h>
@@ -46,6 +49,13 @@ namespace privmx {
             const value = Emval.toValue(valueHandle);
             setTimeout(()=>callback(value), 0);
         });
+
+        // Reads window.__privmxWorkerCount (set by TypeScript before module init).
+        // Returns 0 when the global is absent or not a positive integer.
+        EM_JS(int, readWorkerCountFromJs, (), {
+            const v = (typeof window !== 'undefined') && window.__privmxWorkerCount;
+            return (typeof v === 'number' && v > 0) ? (v | 0) : 0;
+        });
     }
 }
 
@@ -63,7 +73,10 @@ AsyncEngine* AsyncEngine::getInstance() {
 }
 
 AsyncEngine::AsyncEngine() {
-    _pool = std::make_unique<WorkerPool>(4);
+    int requested = readWorkerCountFromJs();
+    size_t numWorkers =
+        (static_cast<size_t>(requested) >= WORKER_COUNT_MIN) ? static_cast<size_t>(requested) : WORKER_COUNT_DEFAULT;
+    _pool = std::make_unique<WorkerPool>(numWorkers);
     _taskManagerThread = std::thread([=] { emscripten_runtime_keepalive_push(); });
 }
 

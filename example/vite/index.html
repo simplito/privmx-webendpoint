@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>PrivMX Web Endpoint - Vite example</title>
+        <style>
+            body {
+                font-family: system-ui, sans-serif;
+                max-width: 680px;
+                margin: 2rem auto;
+                padding: 0 1rem;
+                line-height: 1.5;
+            }
+            h1 {
+                font-size: 1.4rem;
+            }
+            button {
+                padding: 0.5rem 0.9rem;
+                cursor: pointer;
+            }
+            input {
+                padding: 0.5rem;
+                box-sizing: border-box;
+            }
+            #log {
+                background: #f4f4f5;
+                border-radius: 6px;
+                padding: 0.75rem;
+                white-space: pre-wrap;
+                font-family: ui-monospace, monospace;
+                font-size: 0.85rem;
+                min-height: 5rem;
+            }
+            .row {
+                display: flex;
+                gap: 0.5rem;
+                align-items: center;
+                margin: 0.75rem 0;
+            }
+            .muted {
+                color: #71717a;
+                font-size: 0.85rem;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>PrivMX Web Endpoint - Vite example</h1>
+        <p class="muted">
+            Your private key is generated <strong>in the browser</strong> and never leaves it. Only the
+            public key is sent to the demo backend, which uses the Bridge management API key
+            (server-side) to register you in the Context. Then a Thread message is sent end-to-end
+            encrypted.
+        </p>
+
+        <div class="row">
+            <label for="userId">User ID:</label>
+            <input id="userId" value="alice" />
+            <button id="run">Generate key → register → send message</button>
+        </div>
+
+        <div class="row">
+            <input id="message" style="flex: 1" value="Hello, E2EE world!" />
+        </div>
+
+        <pre id="log">Ready. Configure .env.local (server-side Bridge API key), then click the button.</pre>
+
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>

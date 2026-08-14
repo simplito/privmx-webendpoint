@@ -1,12 +1,23 @@
 <!DOCTYPE html>
 <html>
 <body>
-    <script src="../../dist/bundle/privmx-endpoint-web.js"></script>
+    <script src="../pkg/dist/bundle/privmx-endpoint-web.js"></script>
 
     <script>
         const lib = window.PrivmxWebEndpoint;
         window.Endpoint = lib.Endpoint;
-        window.wasmReady = true;
+        const params = new URLSearchParams(location.search);
+        const workerCount = params.has("workerCount") ? Number(params.get("workerCount")) : undefined;
+        const setupOptions = workerCount !== undefined
+            ? { assetsBasePath: "../pkg/assets", workerCount }
+            : "../pkg/assets";
+        window.Endpoint.setup(setupOptions).then(() => {
+            console.log("SETUP OPTIONS", setupOptions)
+            // Worker threads spawn asynchronously after setup() resolves; let them
+            // come up before the first WASM task to avoid stalls under CI load.
+            const settleMs = 200 + (workerCount ?? 4) * 20;
+            setTimeout(() => { window.wasmReady = true; }, settleMs);
+        });
     </script>
 </body>
 </html>

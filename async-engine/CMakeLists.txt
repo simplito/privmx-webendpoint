@@ -34,11 +34,27 @@ Threads::Threads
     Pson
 )
 
-target_compile_options(asyncengine PUBLIC 
-    -O3
-    -pthread
-    -fexceptions # Ensure exceptions are enabled for async logic
-)
+# ---------------------------------------------------------------------------
+# Build variant: release (default) or debug
+# ---------------------------------------------------------------------------
+set(PRIVMX_BUILD_TYPE "release" CACHE STRING "Build variant: release or debug")
+
+if(PRIVMX_BUILD_TYPE STREQUAL "debug")
+    message(STATUS "Building asyncengine: DEBUG")
+    target_compile_options(asyncengine PUBLIC
+        -O0 -g
+        -pthread
+        -fexceptions
+        -DDEBUG
+    )
+else()
+    message(STATUS "Building asyncengine: RELEASE")
+    target_compile_options(asyncengine PUBLIC
+        -O3
+        -pthread
+        -fexceptions
+    )
+endif()
 
 target_link_options(asyncengine PUBLIC
     -L $ENV{SDK_DIR}/upstream/emscripten/cache/sysroot/lib
