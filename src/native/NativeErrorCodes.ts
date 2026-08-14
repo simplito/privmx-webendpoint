@@ -9,12 +9,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Generated from the privmx-endpoint v2.8.0-rc1 C++ exception headers
-// (dependency_sources/privmx-endpoint-v2.8.0-rc1/endpoint/*/include_pub/**/*Exception.hpp).
-// Code layout: (scopeCode << 16) | specificCode - e.g. Store scope 0x0004,
-// FileVersionMismatch 0x001f -> 0x4001f. Regenerate when bumping the
-// privmx-endpoint version in build-manifest.sh.
-
 /*
  * Numeric error codes carried by `NativeError.code`, grouped by the module
  * (`NativeError.scope`) that raised them.

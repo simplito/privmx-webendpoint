@@ -203,10 +203,8 @@ API_FUNCTION_HEADER(StreamApi, subscribeFor)
 API_FUNCTION_HEADER(StreamApi, unsubscribeFrom)
 API_FUNCTION_HEADER(StreamApi, buildSubscriptionQuery)
 API_FUNCTION_HEADER(StreamApi, trickle)
-API_FUNCTION_HEADER(StreamApi, acceptOfferOnReconfigure)
 API_FUNCTION_HEADER(StreamApi, setNewOfferOnReconfigure)
 
-API_FUNCTION_HEADER(StreamApi, registerRemoteDataChannel)
 API_FUNCTION_HEADER(StreamApi, encryptDataChannelMessage)
 API_FUNCTION_HEADER(StreamApi, decryptDataChannelMessage)
 

@@ -30,14 +30,10 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
     const audioManager = await c.resolve<AudioManager>(T.AudioManager);
     const e2eeWorker = await c.resolve<E2eeWorker>(T.E2eeWorker);
 
-    // registerRemoteDataChannel/decryptDataChannelMessage/onRemoteTrack fire during a
-    // live call; WebRtcClient/SubscriberManager resolved lazily to break the cycle.
+    // decryptDataChannelMessage/onRemoteTrack fire during a live call;
+    // WebRtcClient/SubscriberManager resolved lazily to break the cycle.
     const pcFactory = new PeerConnectionFactory(
         dispatcher,
-        (roomId, remoteStreamId) =>
-            c
-                .resolve<WebRtcClient>(T.WebRtcClient)
-                .then((client) => client.registerRemoteDataChannel(roomId, remoteStreamId)),
         (roomId, remoteStreamId, encryptedData) =>
             c
                 .resolve<WebRtcClient>(T.WebRtcClient)
