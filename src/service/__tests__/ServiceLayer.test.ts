@@ -32,12 +32,20 @@ describe("ThreadApi argument marshalling", () => {
     const api = new ThreadApi(native, PTR);
     const m = native as unknown as Record<string, Mock>;
 
-    it("createThread forwards (ptr, [contextId, users, managers, publicMeta, privateMeta, policies])", async () => {
+    it("createThread forwards (ptr, [contextId, users, managers, publicMeta, privateMeta, policies, groups])", async () => {
         const users = [{ userId: "u", pubKey: "p" }];
         const pub = new Uint8Array([1]);
         const priv = new Uint8Array([2]);
         await api.createThread("ctx", users, users, pub, priv);
-        expect(m.createThread).toHaveBeenCalledWith(PTR, ["ctx", users, users, pub, priv, undefined]);
+        expect(m.createThread).toHaveBeenCalledWith(PTR, [
+            "ctx",
+            users,
+            users,
+            pub,
+            priv,
+            undefined,
+            [],
+        ]);
     });
 
     it("sendMessage forwards (ptr, [threadId, publicMeta, privateMeta, data])", async () => {
@@ -155,8 +163,8 @@ describe("BaseApi invalidation (shared by every API)", () => {
         const native = nativeMock<ThreadApiNative>(["listThreads"]);
         const api = new ThreadApi(native, PTR);
         api.destroyRefs();
-        await expect(api.listThreads("ctx", { skip: 0, limit: 1, sortOrder: "desc" })).rejects.toThrow(
-            /no longer valid/,
-        );
+        await expect(
+            api.listThreads("ctx", { skip: 0, limit: 1, sortOrder: "desc" }),
+        ).rejects.toThrow(/no longer valid/);
     });
 });

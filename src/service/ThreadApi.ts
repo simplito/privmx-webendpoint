@@ -18,6 +18,7 @@ import {
     Thread,
     Message,
     ContainerPolicy,
+    GroupGrantWithKey,
     ThreadEventType,
     ThreadEventSelectorType,
 } from "../Types.js";
@@ -81,6 +82,9 @@ export class ThreadApi extends BaseApi {
      *   thread key; only Thread members can decrypt it
      * @param {ContainerPolicy} [policies] fine-grained access rules (who may
      *   post, update or delete items) overriding the Context defaults
+     * @param {GroupGrantWithKey[]} [groups] Groups granted access to the Thread
+     *   in addition to `users`/`managers`; take `groupPubKey`/`groupEpoch` from
+     *   {@link GroupApi.getGroup}
      * @returns {string} ID of the new Thread - pass to {@link sendMessage},
      *   {@link listMessages}, {@link getThread} or {@link updateThread}
      * @throws {NativeError} when the Context does not exist or a listed user
@@ -100,6 +104,7 @@ export class ThreadApi extends BaseApi {
         publicMeta: Uint8Array,
         privateMeta: Uint8Array,
         policies?: ContainerPolicy,
+        groups: GroupGrantWithKey[] = [],
     ): Promise<string> {
         return this.native.createThread(this.servicePtr, [
             contextId,
@@ -108,6 +113,7 @@ export class ThreadApi extends BaseApi {
             publicMeta,
             privateMeta,
             policies,
+            groups,
         ]);
     }
 
@@ -145,6 +151,8 @@ export class ThreadApi extends BaseApi {
      *   revoke access
      * @param {ContainerPolicy} [policies] new access policies; omit to keep
      *   the current ones
+     * @param {GroupGrantWithKey[]} [groups] full replacement list of Groups
+     *   granted access; Groups missing from this list lose access
      * @returns {Promise<void>} resolves when the Thread has been updated on the server
      * @throws {NativeError} when the Thread does not exist, the user lacks
      *   management rights, or `version` does not match the server state
@@ -159,6 +167,7 @@ export class ThreadApi extends BaseApi {
         force: boolean,
         forceGenerateNewKey: boolean,
         policies?: ContainerPolicy,
+        groups: GroupGrantWithKey[] = [],
     ): Promise<void> {
         return this.native.updateThread(this.servicePtr, [
             threadId,
@@ -170,6 +179,47 @@ export class ThreadApi extends BaseApi {
             force,
             forceGenerateNewKey,
             policies,
+            groups,
+        ]);
+    }
+
+    /**
+     * Re-wraps the Thread's key for its current members and grantee Groups,
+     * without changing its data or membership.
+     *
+     * Needed after a member is removed from a Group granted access to this
+     * Thread: that Group's key epoch advances, `Thread.staleGroups` names it,
+     * and members of the stale Group cannot read content written under the
+     * current key until this call re-wraps it to the Group's current epoch.
+     *
+     * @param {string} threadId ID of the Thread to re-key, from
+     *   `Thread.threadId`
+     * @param {UserWithPubKey[]} users current member list
+     * @param {UserWithPubKey[]} managers current manager list
+     * @param {number} version current Thread version, from `Thread.version`
+     *   returned by {@link getThread}
+     * @param {boolean} force `true` skips the `version` check
+     * @param {GroupGrantWithKey[]} [groups] grantee Groups with their *current*
+     *   `groupPubKey`/`groupEpoch`, from {@link GroupApi.getGroup}
+     * @returns {Promise<void>} resolves when the Thread's key has been re-wrapped
+     * @throws {NativeError} when the Thread does not exist or the user is not
+     *   allowed to rotate its keys
+     */
+    async rotateThreadKeys(
+        threadId: string,
+        users: UserWithPubKey[],
+        managers: UserWithPubKey[],
+        version: number,
+        force: boolean,
+        groups: GroupGrantWithKey[] = [],
+    ): Promise<void> {
+        return this.native.rotateThreadKeys(this.servicePtr, [
+            threadId,
+            users,
+            managers,
+            version,
+            force,
+            groups,
         ]);
     }
 

@@ -12,6 +12,7 @@ export type Channel =
     | `store/${string}/files`
     | "thread"
     | `thread/${string}/messages`
+    | "group"
     | `connection/${string}`
     | "context/userAdded"
     | "context/userRemoved"
@@ -112,6 +113,19 @@ export type KvdbCallbackPayload = {
 };
 
 /**
+ * Maps each Group event type to the shape of its event `data` payload.
+ *
+ * A Group event deliberately carries no Group state - `version`/`keyVersion`
+ * are enough to decide whether the change matters; call `GroupApi.getGroup`
+ * when it does.
+ */
+export type GroupCallbackPayload = {
+    [Types.GroupEventType.GROUP_CREATE]: Types.GroupChangedEventData;
+    [Types.GroupEventType.GROUP_UPDATE]: Types.GroupChangedEventData;
+    [Types.GroupEventType.GROUP_DELETE]: Types.GroupDeletedEventData;
+};
+
+/**
  * Maps each user (Context membership) event type to its event `data` payload.
  */
 export type UserEventCallbackPayload = {
@@ -189,6 +203,14 @@ export interface KvdbSubscription {
     id: string;
     callbacks: EventCallback[];
 }
+/** A Group-events subscription built by {@link createGroupSubscription}. */
+export interface GroupSubscription {
+    module: "group";
+    type: Types.GroupEventType;
+    selector: Types.GroupEventSelectorType;
+    id: string;
+    callbacks: EventCallback[];
+}
 /** A custom-events subscription built by {@link createEventSubscription}. */
 export interface CustomEventSubscription {
     module: "event";
@@ -225,6 +247,7 @@ export type EventSubscription =
     | StoreSubscription
     | InboxSubscription
     | KvdbSubscription
+    | GroupSubscription
     | CustomEventSubscription
     | UserEventSubscription
     | ConnectionStatusSubscription;
@@ -326,6 +349,31 @@ export function createInboxSubscription<
 }): InboxSubscription {
     return {
         module: "inbox",
+        type: s.type,
+        selector: s.selector,
+        id: s.id,
+        callbacks: s.callbacks.map(toEventCallback),
+    };
+}
+
+/**
+ * Builds a typed Group subscription. Each callback receives a
+ * {@link GenericEvent} whose `data` matches the chosen event `type`.
+ *
+ * @param {object} s subscription descriptor (`type`, `selector`, `id`, `callbacks`)
+ * @returns {GroupSubscription} a subscription for {@link EventManager.subscribe}
+ */
+export function createGroupSubscription<
+    T extends Types.GroupEventType,
+    S extends Types.GroupEventSelectorType,
+>(s: {
+    type: T;
+    selector: S;
+    id: string;
+    callbacks: ((arg: GenericEvent<GroupCallbackPayload[T]>) => void)[];
+}): GroupSubscription {
+    return {
+        module: "group",
         type: s.type,
         selector: s.selector,
         id: s.id,

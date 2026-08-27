@@ -18,6 +18,7 @@ import {
 } from "../webStreams/types/ApiTypes.js";
 import {
     ContainerPolicy,
+    GroupGrantWithKey,
     PagingList,
     PagingQuery,
     StreamInfo,
@@ -52,11 +53,17 @@ export class StreamApiNative extends BaseNative {
         super(api);
     }
 
-    async newApi(connectionPtr: number, eventApiPtr: number): Promise<number> {
+    async newApi(connectionPtr: number, eventApiPtr: number, groupApiPtr: number): Promise<number> {
         const bindingId = StreamApiNative.getBindingId();
         this.registerWebRtcInterfaceHandler(bindingId);
         this.selfPtr = await this.runAsync<number>((taskId) =>
-            this.api.lib.StreamApi_newStreamApi(taskId, connectionPtr, eventApiPtr, bindingId),
+            this.api.lib.StreamApi_newStreamApi(
+                taskId,
+                connectionPtr,
+                eventApiPtr,
+                bindingId,
+                groupApiPtr,
+            ),
         );
         return this.selfPtr;
     }
@@ -79,6 +86,7 @@ export class StreamApiNative extends BaseNative {
             Uint8Array,
             ContainerPolicy | undefined,
             number | undefined,
+            GroupGrantWithKey[],
         ],
     ): Promise<string> {
         return this.runAsync<string>((taskId) =>
@@ -97,10 +105,19 @@ export class StreamApiNative extends BaseNative {
             boolean,
             boolean,
             ContainerPolicy | undefined,
+            GroupGrantWithKey[],
         ],
     ): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.StreamApi_updateStreamRoom(taskId, ptr, args),
+        );
+    }
+    async rotateStreamRoomKeys(
+        ptr: number,
+        args: [string, UserWithPubKey[], UserWithPubKey[], number, boolean, GroupGrantWithKey[]],
+    ): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_rotateStreamRoomKeys(taskId, ptr, args),
         );
     }
     async deleteStreamRoom(ptr: number, args: [string]): Promise<void> {

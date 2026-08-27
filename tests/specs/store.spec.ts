@@ -1106,6 +1106,8 @@ test.describe("StoreTest", () => {
 
         expect(result.store.users).toHaveLength(2); // User 2 is technically listed
         expect(result.u2Access).toBe(false); // But cannot access due to policy
-        expect(result.store.policy).toEqual(result.ownerPolicy);
+        // toMatchObject, not toEqual: the serialized policy also carries the entries this
+        // test leaves unset (e.g. forwardSecrecy: null), and gains more as the Endpoint adds them.
+        expect(result.store.policy).toMatchObject(result.ownerPolicy);
     });
 });

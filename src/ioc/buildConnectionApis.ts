@@ -2,6 +2,7 @@ import { Api } from "../native/Api.js";
 import { CryptoApiNative } from "../native/CryptoApiNative.js";
 import { EventApiNative } from "../native/EventApiNative.js";
 import { EventQueueNative } from "../native/EventQueueNative.js";
+import { GroupApiNative } from "../native/GroupApiNative.js";
 import { InboxApiNative } from "../native/InboxApiNative.js";
 import { KvdbApiNative } from "../native/KvdbApiNative.js";
 import { StoreApiNative } from "../native/StoreApiNative.js";
@@ -12,6 +13,7 @@ import { Connection } from "../service/Connection.js";
 import { CryptoApi } from "../service/CryptoApi.js";
 import { EventApi } from "../service/EventApi.js";
 import { EventQueue } from "../service/EventQueue.js";
+import { GroupApi } from "../service/GroupApi.js";
 import { InboxApi } from "../service/InboxApi.js";
 import { KvdbApi } from "../service/KvdbApi.js";
 import { StoreApi } from "../service/StoreApi.js";
@@ -69,6 +71,8 @@ export function registerGlobalServices(
  *
  * Dependency graph (resolved lazily to allow any creation order):
  *
+ *   GroupApi ──► every container API below (shared, so they share one group key cache)
+ *
  *   ThreadApi  ──┐
  *   StoreApi   ──┼──► InboxApi
  *   EventApi   ──┼──► StreamApi (also needs WebRTC sub-graph)
@@ -85,13 +89,26 @@ export function registerConnectionServices(
 ): void {
     registerAssetUrls(c, assets);
 
+    c.registerSingleton(T.GroupApi, async (c) => {
+        const conn = await c.resolve<Connection>(T.ConnectionPtr);
+        if (conn.hasApi("groups")) {
+            throw new Error("GroupApi already registered for given connection.");
+        }
+        const native = new GroupApiNative(api);
+        const ptr = await native.newApi(conn.servicePtr);
+        await native.create(ptr, []);
+        conn.registerApi("groups", ptr, native);
+        return new GroupApi(native, ptr);
+    });
+
     c.registerSingleton(T.ThreadApi, async (c) => {
         const conn = await c.resolve<Connection>(T.ConnectionPtr);
         if (conn.hasApi("threads")) {
             throw new Error("ThreadApi already registered for given connection.");
         }
+        const groupApi = await c.resolve<GroupApi>(T.GroupApi);
         const native = new ThreadApiNative(api);
-        const ptr = await native.newApi(conn.servicePtr);
+        const ptr = await native.newApi(conn.servicePtr, groupApi.servicePtr);
         await native.create(ptr, []);
         conn.registerApi("threads", ptr, native);
         return new ThreadApi(native, ptr);
@@ -102,8 +119,9 @@ export function registerConnectionServices(
         if (conn.hasApi("stores")) {
             throw new Error("StoreApi already registered for given connection.");
         }
+        const groupApi = await c.resolve<GroupApi>(T.GroupApi);
         const native = new StoreApiNative(api);
-        const ptr = await native.newApi(conn.servicePtr);
+        const ptr = await native.newApi(conn.servicePtr, groupApi.servicePtr);
         conn.registerApi("stores", ptr, native);
         await native.create(ptr, []);
         return new StoreApi(native, ptr);
@@ -114,8 +132,9 @@ export function registerConnectionServices(
         if (conn.hasApi("kvdbs")) {
             throw new Error("KvdbApi already registered for given connection.");
         }
+        const groupApi = await c.resolve<GroupApi>(T.GroupApi);
         const native = new KvdbApiNative(api);
-        const ptr = await native.newApi(conn.servicePtr);
+        const ptr = await native.newApi(conn.servicePtr, groupApi.servicePtr);
         await native.create(ptr, []);
         conn.registerApi("kvdbs", ptr, native);
         return new KvdbApi(native, ptr);
@@ -141,8 +160,14 @@ export function registerConnectionServices(
         }
         const threadApi = await c.resolve<ThreadApi>(T.ThreadApi);
         const storeApi = await c.resolve<StoreApi>(T.StoreApi);
+        const groupApi = await c.resolve<GroupApi>(T.GroupApi);
         const native = new InboxApiNative(api);
-        const ptr = await native.newApi(conn.servicePtr, threadApi.servicePtr, storeApi.servicePtr);
+        const ptr = await native.newApi(
+            conn.servicePtr,
+            threadApi.servicePtr,
+            storeApi.servicePtr,
+            groupApi.servicePtr,
+        );
         await native.create(ptr, []);
         conn.registerApi("inboxes", ptr, native);
         return new InboxApi(native, ptr);
@@ -155,6 +180,7 @@ export function registerConnectionServices(
             throw new Error("StreamApi already registered for given connection.");
         }
         const eventApi = await c.resolve<EventApi>(T.EventApi);
+        const groupApi = await c.resolve<GroupApi>(T.GroupApi);
 
         // Isolated WebRTC sub-graph per StreamApi.
         const rtc = new WebRtcContainer();
@@ -165,7 +191,7 @@ export function registerConnectionServices(
         const webRtcClient = await rtc.resolve<WebRtcClient>(T.WebRtcClient);
         const webRtcInterfaceImpl = new WebRtcInterfaceImpl(webRtcClient);
         const native = new StreamApiNative(api, webRtcInterfaceImpl);
-        const ptr = await native.newApi(conn.servicePtr, eventApi.servicePtr);
+        const ptr = await native.newApi(conn.servicePtr, eventApi.servicePtr, groupApi.servicePtr);
 
         webRtcClient.bindApiInterface({
             trickle: (sessionId, candidate) => native.trickle(ptr, [sessionId, candidate]),

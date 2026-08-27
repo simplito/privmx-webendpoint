@@ -15,6 +15,7 @@ import type { ThreadApi } from "./ThreadApi.js";
 import type { StoreApi } from "./StoreApi.js";
 import type { InboxApi } from "./InboxApi.js";
 import type { KvdbApi } from "./KvdbApi.js";
+import type { GroupApi } from "./GroupApi.js";
 import type { EventApi } from "./EventApi.js";
 import type { StreamApi } from "./StreamApi.js";
 import type { CryptoApi } from "./CryptoApi.js";
@@ -68,6 +69,16 @@ export function createInboxApi(connection: Connection): Promise<InboxApi> {
  */
 export function createKvdbApi(connection: Connection): Promise<KvdbApi> {
     return EndpointFactory.createKvdbApi(connection);
+}
+
+/**
+ * Returns the Group API (Groups granted access to containers as a unit) for the
+ * given connection.
+ * @param {Connection} connection connection returned by {@link EndpointFactory.connect}
+ * @returns {Promise<GroupApi>} the per-connection GroupApi instance
+ */
+export function createGroupApi(connection: Connection): Promise<GroupApi> {
+    return EndpointFactory.createGroupApi(connection);
 }
 
 /**

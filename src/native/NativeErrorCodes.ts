@@ -86,6 +86,10 @@ export const CoreErrorCode = {
     ENCRYPTION_KEY_VALIDATION: 0x10027,
     /** Incorrect key id format */
     INCORRECT_KEY_ID_FORMAT: 0x10028,
+    /** Cannot resolve current key of a container's grantee group */
+    UNRESOLVED_GROUP_GRANTEE: 0x10029,
+    /** Container's key is stale, re-key it (rotate*Keys) before modifying its items */
+    STALE_KEY_REKEY_REQUIRED: 0x1002a,
 } as const;
 
 /**
@@ -290,6 +294,46 @@ export const KvdbErrorCode = {
     KVDB_DATA_INTEGRITY: 0xa0011,
     /** Failed kvdb entry data integrity check */
     KVDB_ENTRY_DATA_INTEGRITY: 0xa0012,
+} as const;
+
+/**
+ * Error codes raised by the Group module (`NativeError.scope === "Group"`).
+ */
+export const GroupErrorCode = {
+    /** Endpoint not initialized */
+    NOT_INITIALIZED: 0xb0001,
+    /** Cannot extract GroupCreatedEvent */
+    CANNOT_EXTRACT_GROUP_CREATED_EVENT: 0xb0002,
+    /** Cannot extract GroupUpdatedEvent */
+    CANNOT_EXTRACT_GROUP_UPDATED_EVENT: 0xb0003,
+    /** Cannot extract GroupDeletedEvent */
+    CANNOT_EXTRACT_GROUP_DELETED_EVENT: 0xb0004,
+    /** Already subscribed */
+    ALREADY_SUBSCRIBED: 0xb0005,
+    /** Cannot unsubscribe if not subscribed */
+    NOT_SUBSCRIBED: 0xb0006,
+    /** Invalid version of encrypted group data */
+    INVALID_ENCRYPTED_GROUP_DATA_VERSION: 0xb0007,
+    /** Unknown Group format */
+    UNKNOWN_GROUP_FORMAT: 0xb0008,
+    /** Group public data mismatch */
+    GROUP_PUBLIC_DATA_MISMATCH: 0xb0009,
+    /** Failed group data integrity check */
+    GROUP_DATA_INTEGRITY: 0xb000a,
+    /** Group version chain link broken (G1) */
+    GROUP_CHAIN_BROKEN: 0xb000b,
+    /** Group version signer was not an authorized manager (G2) */
+    GROUP_UNAUTHORIZED_SIGNER: 0xb000c,
+    /** Group membership in signed data does not match bridge-served fields */
+    GROUP_MEMBERSHIP_MISMATCH: 0xb000d,
+    /** Invalid subscriptionQuery */
+    INVALID_SUBSCRIPTION_QUERY: 0xb000e,
+    /** Concurrent group key rotation: another manager won and one auto-retry did not resolve it */
+    ROTATED_ALREADY: 0xb000f,
+    /** Group history diverged from a previously verified state (version or keyVersion regressed) */
+    GROUP_HISTORY_FORK: 0xb0010,
+    /** Rotation aborted: the epoch ladder rung set for the new epoch would be incomplete */
+    INCOMPLETE_EPOCH_LADDER: 0xb0011,
 } as const;
 
 /**

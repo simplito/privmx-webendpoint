@@ -16,6 +16,7 @@ import {
     Thread,
     Message,
     ContainerPolicy,
+    GroupGrantWithKey,
     ThreadEventSelectorType,
     ThreadEventType,
 } from "../Types.js";
@@ -27,9 +28,9 @@ import { BaseNative } from "./BaseNative.js";
  * @internal
  */
 export class ThreadApiNative extends BaseNative {
-    async newApi(connectionPtr: number): Promise<number> {
+    async newApi(connectionPtr: number, groupApiPtr: number): Promise<number> {
         return this.runAsync<number>((taskId) =>
-            this.api.lib.ThreadApi_newThreadApi(taskId, connectionPtr),
+            this.api.lib.ThreadApi_newThreadApi(taskId, connectionPtr, groupApiPtr),
         );
     }
     async deleteApi(ptr: number): Promise<void> {
@@ -48,6 +49,7 @@ export class ThreadApiNative extends BaseNative {
             Uint8Array,
             Uint8Array,
             ContainerPolicy | undefined,
+            GroupGrantWithKey[],
         ],
     ): Promise<string> {
         return this.runAsync<string>((taskId) =>
@@ -66,10 +68,19 @@ export class ThreadApiNative extends BaseNative {
             boolean,
             boolean,
             ContainerPolicy | undefined,
+            GroupGrantWithKey[],
         ],
     ): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.ThreadApi_updateThread(taskId, ptr, args),
+        );
+    }
+    async rotateThreadKeys(
+        ptr: number,
+        args: [string, UserWithPubKey[], UserWithPubKey[], number, boolean, GroupGrantWithKey[]],
+    ): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.ThreadApi_rotateThreadKeys(taskId, ptr, args),
         );
     }
     async deleteThread(ptr: number, args: [string]): Promise<void> {

@@ -16,6 +16,7 @@ export const T = {
 
     // Connection scope (one container per Connection instance)
     ConnectionPtr: "conn:ConnectionPtr",
+    GroupApi: "conn:GroupApi",
     ThreadApi: "conn:ThreadApi",
     StoreApi: "conn:StoreApi",
     KvdbApi: "conn:KvdbApi",

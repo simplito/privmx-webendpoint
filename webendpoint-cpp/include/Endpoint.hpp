@@ -46,7 +46,23 @@ void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int inte
 void Connection_deleteUserVerifierInterface(int taskId, int ptr);
 emscripten::val callVerifierOnJS(emscripten::val& name, emscripten::val& params);
 
-void ThreadApi_newThreadApi(int taskId, int connectionPtr);
+void GroupApi_newGroupApi(int taskId, int connectionPtr);
+void GroupApi_deleteGroupApi(int taskId, int ptr);
+API_FUNCTION_HEADER(GroupApi, create)
+API_FUNCTION_HEADER(GroupApi, createGroupWithKeyTree)
+API_FUNCTION_HEADER(GroupApi, addGroupMember)
+API_FUNCTION_HEADER(GroupApi, removeGroupMember)
+API_FUNCTION_HEADER(GroupApi, updateGroup)
+API_FUNCTION_HEADER(GroupApi, deleteGroup)
+API_FUNCTION_HEADER(GroupApi, getGroup)
+API_FUNCTION_HEADER(GroupApi, listGroups)
+API_FUNCTION_HEADER(GroupApi, subscribeFor)
+API_FUNCTION_HEADER(GroupApi, unsubscribeFrom)
+API_FUNCTION_HEADER(GroupApi, buildSubscriptionQuery)
+
+// groupApiPtr: pointer to a created GroupApi so the module can grant/resolve group
+// access, or 0 for a group-unaware instance.
+void ThreadApi_newThreadApi(int taskId, int connectionPtr, int groupApiPtr);
 void ThreadApi_deleteThreadApi(int taskId, int ptr);
 API_FUNCTION_HEADER(ThreadApi, create)
 API_FUNCTION_HEADER(ThreadApi, createThread)
@@ -59,11 +75,12 @@ API_FUNCTION_HEADER(ThreadApi, listMessages)
 API_FUNCTION_HEADER(ThreadApi, sendMessage)
 API_FUNCTION_HEADER(ThreadApi, deleteMessage)
 API_FUNCTION_HEADER(ThreadApi, updateMessage)
+API_FUNCTION_HEADER(ThreadApi, rotateThreadKeys)
 API_FUNCTION_HEADER(ThreadApi, subscribeFor)
 API_FUNCTION_HEADER(ThreadApi, unsubscribeFrom)
 API_FUNCTION_HEADER(ThreadApi, buildSubscriptionQuery)
 
-void StoreApi_newStoreApi(int taskId, int connectionPtr);
+void StoreApi_newStoreApi(int taskId, int connectionPtr, int groupApiPtr);
 void StoreApi_deleteStoreApi(int taskId, int ptr);
 API_FUNCTION_HEADER(StoreApi, create)
 API_FUNCTION_HEADER(StoreApi, createStore)
@@ -83,11 +100,12 @@ API_FUNCTION_HEADER(StoreApi, readFromFile)
 API_FUNCTION_HEADER(StoreApi, seekInFile)
 API_FUNCTION_HEADER(StoreApi, closeFile)
 API_FUNCTION_HEADER(StoreApi, syncFile)
+API_FUNCTION_HEADER(StoreApi, rotateStoreKeys)
 API_FUNCTION_HEADER(StoreApi, subscribeFor)
 API_FUNCTION_HEADER(StoreApi, unsubscribeFrom)
 API_FUNCTION_HEADER(StoreApi, buildSubscriptionQuery)
 
-void InboxApi_newInboxApi(int taskId, int connectionPtr, int threadApiPtr, int storeApiPtr);
+void InboxApi_newInboxApi(int taskId, int connectionPtr, int threadApiPtr, int storeApiPtr, int groupApiPtr);
 void InboxApi_deleteInboxApi(int taskId, int ptr);
 API_FUNCTION_HEADER(InboxApi, create)
 API_FUNCTION_HEADER(InboxApi, createInbox)
@@ -107,11 +125,12 @@ API_FUNCTION_HEADER(InboxApi, openFile)
 API_FUNCTION_HEADER(InboxApi, readFromFile)
 API_FUNCTION_HEADER(InboxApi, seekInFile)
 API_FUNCTION_HEADER(InboxApi, closeFile)
+API_FUNCTION_HEADER(InboxApi, rotateInboxKeys)
 API_FUNCTION_HEADER(InboxApi, subscribeFor)
 API_FUNCTION_HEADER(InboxApi, unsubscribeFrom)
 API_FUNCTION_HEADER(InboxApi, buildSubscriptionQuery)
 
-void KvdbApi_newKvdbApi(int taskId, int connectionPtr);
+void KvdbApi_newKvdbApi(int taskId, int connectionPtr, int groupApiPtr);
 void KvdbApi_deleteKvdbApi(int taskId, int ptr);
 API_FUNCTION_HEADER(KvdbApi, create)
 API_FUNCTION_HEADER(KvdbApi, createKvdb)
@@ -126,6 +145,7 @@ API_FUNCTION_HEADER(KvdbApi, listEntries)
 API_FUNCTION_HEADER(KvdbApi, setEntry)
 API_FUNCTION_HEADER(KvdbApi, deleteEntry)
 API_FUNCTION_HEADER(KvdbApi, deleteEntries)
+API_FUNCTION_HEADER(KvdbApi, rotateKvdbKeys)
 API_FUNCTION_HEADER(KvdbApi, subscribeFor)
 API_FUNCTION_HEADER(KvdbApi, unsubscribeFrom)
 API_FUNCTION_HEADER(KvdbApi, buildSubscriptionQuery)
@@ -177,7 +197,7 @@ API_FUNCTION_HEADER(ExtKey, isPrivate)
 
 // void StreamApi_newWebRtcInterface(int taskId, int apiPtr);
 // void StreamApi_deleteWebRtcInterface(int taskId, int ptr);
-void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr, int interfaceBindId);
+void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr, int interfaceBindId, int groupApiPtr);
 void StreamApi_deleteStreamApi(int taskId, int ptr);
 API_FUNCTION_HEADER(StreamApi, create)
 API_FUNCTION_HEADER(StreamApi, createStreamRoom)
@@ -197,6 +217,8 @@ API_FUNCTION_HEADER(StreamApi, leaveStreamRoom)
 API_FUNCTION_HEADER(StreamApi, createSubscriberStream)
 API_FUNCTION_HEADER(StreamApi, updateSubscriberStream)
 API_FUNCTION_HEADER(StreamApi, removeSubscriberStream)
+
+API_FUNCTION_HEADER(StreamApi, rotateStreamRoomKeys)
 
 API_FUNCTION_HEADER(StreamApi, getTurnCredentials)
 API_FUNCTION_HEADER(StreamApi, subscribeFor)

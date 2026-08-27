@@ -17,6 +17,7 @@ import {
     UserWithPubKey,
     Kvdb,
     ContainerPolicy,
+    GroupGrantWithKey,
     KvdbEntry,
     DeleteEntriesResult,
     KvdbEventSelectorType,
@@ -82,6 +83,9 @@ export class KvdbApi extends BaseApi {
      *   only by KVDB members, the server sees ciphertext
      * @param {ContainerPolicy} [policies] access policy overrides for the new
      *   KVDB; omit to inherit the Context defaults
+     * @param {GroupGrantWithKey[]} [groups] Groups granted access to the KVDB
+     *   in addition to `users`/`managers`; take `groupPubKey`/`groupEpoch` from
+     *   {@link GroupApi.getGroup}
      * @returns {string} ID of the created KVDB - pass it to {@link setEntry},
      *   {@link getEntry}, {@link listEntries} and {@link updateKvdb}
      * @throws {NativeError} when the Context does not exist or the user lacks
@@ -103,6 +107,7 @@ export class KvdbApi extends BaseApi {
         publicMeta: Uint8Array,
         privateMeta: Uint8Array,
         policies?: ContainerPolicy,
+        groups: GroupGrantWithKey[] = [],
     ): Promise<string> {
         return this.native.createKvdb(this.servicePtr, [
             contextId,
@@ -111,6 +116,7 @@ export class KvdbApi extends BaseApi {
             publicMeta,
             privateMeta,
             policies,
+            groups,
         ]);
     }
 
@@ -146,6 +152,8 @@ export class KvdbApi extends BaseApi {
      *   whenever you revoke access
      * @param {ContainerPolicy} [policies] new access policy overrides; omit to
      *   keep the current policy
+     * @param {GroupGrantWithKey[]} [groups] full replacement list of Groups
+     *   granted access; Groups missing from this list lose access
      * @returns {Promise<void>} resolves when the KVDB membership and metadata have been replaced
      * @throws {NativeError} when `version` does not match the server state
      *   (and `force` is `false`) or the user is not a manager
@@ -160,6 +168,7 @@ export class KvdbApi extends BaseApi {
         force: boolean,
         forceGenerateNewKey: boolean,
         policies?: ContainerPolicy,
+        groups: GroupGrantWithKey[] = [],
     ): Promise<void> {
         return this.native.updateKvdb(this.servicePtr, [
             kvdbId,
@@ -171,6 +180,46 @@ export class KvdbApi extends BaseApi {
             force,
             forceGenerateNewKey,
             policies,
+            groups,
+        ]);
+    }
+
+    /**
+     * Re-wraps the KVDB's key for its current members and grantee Groups,
+     * without changing its data or membership.
+     *
+     * Needed after a member is removed from a Group granted access to this
+     * KVDB: that Group's key epoch advances, `Kvdb.staleGroups` names it, and
+     * members of the stale Group cannot read entries written under the current
+     * key until this call re-wraps it to the Group's current epoch.
+     *
+     * @param {string} kvdbId ID of the KVDB to re-key, from `Kvdb.kvdbId`
+     * @param {UserWithPubKey[]} users current member list
+     * @param {UserWithPubKey[]} managers current manager list
+     * @param {number} version current KVDB version, from `Kvdb.version`
+     *   returned by {@link getKvdb}
+     * @param {boolean} force `true` skips the `version` check
+     * @param {GroupGrantWithKey[]} [groups] grantee Groups with their *current*
+     *   `groupPubKey`/`groupEpoch`, from {@link GroupApi.getGroup}
+     * @returns {Promise<void>} resolves when the KVDB's key has been re-wrapped
+     * @throws {NativeError} when the KVDB does not exist or the user is not
+     *   allowed to rotate its keys
+     */
+    async rotateKvdbKeys(
+        kvdbId: string,
+        users: UserWithPubKey[],
+        managers: UserWithPubKey[],
+        version: number,
+        force: boolean,
+        groups: GroupGrantWithKey[] = [],
+    ): Promise<void> {
+        return this.native.rotateKvdbKeys(this.servicePtr, [
+            kvdbId,
+            users,
+            managers,
+            version,
+            force,
+            groups,
         ]);
     }
 

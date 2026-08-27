@@ -16,6 +16,7 @@ import {
     Store,
     File,
     ContainerPolicy,
+    GroupGrantWithKey,
     StoreEventSelectorType,
     StoreEventType,
 } from "../Types.js";
@@ -27,9 +28,9 @@ import { BaseNative } from "./BaseNative.js";
  * @internal
  */
 export class StoreApiNative extends BaseNative {
-    async newApi(connectionPtr: number): Promise<number> {
+    async newApi(connectionPtr: number, groupApiPtr: number): Promise<number> {
         return this.runAsync<number>((taskId) =>
-            this.api.lib.StoreApi_newStoreApi(taskId, connectionPtr),
+            this.api.lib.StoreApi_newStoreApi(taskId, connectionPtr, groupApiPtr),
         );
     }
     async deleteApi(ptr: number): Promise<void> {
@@ -48,6 +49,7 @@ export class StoreApiNative extends BaseNative {
             Uint8Array,
             Uint8Array,
             ContainerPolicy | undefined,
+            GroupGrantWithKey[],
         ],
     ): Promise<string> {
         return this.runAsync<string>((taskId) =>
@@ -66,10 +68,19 @@ export class StoreApiNative extends BaseNative {
             boolean,
             boolean,
             ContainerPolicy | undefined,
+            GroupGrantWithKey[],
         ],
     ): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.StoreApi_updateStore(taskId, ptr, args),
+        );
+    }
+    async rotateStoreKeys(
+        ptr: number,
+        args: [string, UserWithPubKey[], UserWithPubKey[], number, boolean, GroupGrantWithKey[]],
+    ): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StoreApi_rotateStoreKeys(taskId, ptr, args),
         );
     }
     async deleteStore(ptr: number, args: [string]): Promise<void> {

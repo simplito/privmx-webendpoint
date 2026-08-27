@@ -16,6 +16,7 @@ import {
 import { BaseApi } from "./BaseApi.js";
 import {
     ContainerPolicy,
+    GroupGrantWithKey,
     PagingList,
     PagingQuery,
     StreamInfo,
@@ -124,6 +125,9 @@ export class StreamApi extends BaseApi {
      * @param {number} emptyRoomTtl grace period (ms) the room stays open after
      *   the last participant leaves before being closed; `0` closes it
      *   immediately, and `undefined` uses the server default
+     * @param {GroupGrantWithKey[]} [groups] Groups granted access to the Stream
+     *   Room in addition to `users`/`managers`; take `groupPubKey`/`groupEpoch`
+     *   from {@link GroupApi.getGroup}
      * @returns {string} ID of the new Stream Room - pass to
      *   {@link joinStreamRoom}, {@link getStreamRoom} or {@link updateStreamRoom}
      */
@@ -135,6 +139,7 @@ export class StreamApi extends BaseApi {
         privateMeta: Uint8Array,
         policies?: ContainerPolicy,
         emptyRoomTtl?: number,
+        groups: GroupGrantWithKey[] = [],
     ): Promise<string> {
         return this.native.createStreamRoom(this.servicePtr, [
             contextId,
@@ -144,6 +149,7 @@ export class StreamApi extends BaseApi {
             privateMeta,
             policies,
             emptyRoomTtl,
+            groups,
         ]);
     }
 
@@ -183,6 +189,8 @@ export class StreamApi extends BaseApi {
      *   defaults to `false`
      * @param {ContainerPolicy} policies new access policies; pass `undefined` to
      *   keep the current ones
+     * @param {GroupGrantWithKey[]} [groups] full replacement list of Groups
+     *   granted access; Groups missing from this list lose access
      * @returns {Promise<void>} resolves when the Stream Room membership and metadata have been replaced
      */
     public async updateStreamRoom(
@@ -195,6 +203,7 @@ export class StreamApi extends BaseApi {
         force?: boolean,
         forceGenerateNewKey?: boolean,
         policies?: ContainerPolicy,
+        groups: GroupGrantWithKey[] = [],
     ): Promise<void> {
         return this.native.updateStreamRoom(this.servicePtr, [
             streamRoomId,
@@ -206,6 +215,45 @@ export class StreamApi extends BaseApi {
             force ?? false,
             forceGenerateNewKey ?? false,
             policies,
+            groups,
+        ]);
+    }
+
+    /**
+     * Re-wraps the Stream Room's key for its current members and grantee
+     * Groups, without changing its data or membership.
+     *
+     * Needed after a member is removed from a Group granted access to this
+     * Stream Room: that Group's key epoch advances, `StreamRoom.staleGroups`
+     * names it, and members of the stale Group cannot decrypt media sent under
+     * the current key until this call re-wraps it to the Group's current epoch.
+     *
+     * @param {string} streamRoomId ID of the Stream Room to re-key, from
+     *   `StreamRoom.streamRoomId`
+     * @param {UserWithPubKey[]} users current member list
+     * @param {UserWithPubKey[]} managers current manager list
+     * @param {number} version current Stream Room version, from
+     *   `StreamRoom.version` returned by {@link getStreamRoom}
+     * @param {boolean} [force] `true` skips the `version` check; defaults to `false`
+     * @param {GroupGrantWithKey[]} [groups] grantee Groups with their *current*
+     *   `groupPubKey`/`groupEpoch`, from {@link GroupApi.getGroup}
+     * @returns {Promise<void>} resolves when the Stream Room's key has been re-wrapped
+     */
+    public async rotateStreamRoomKeys(
+        streamRoomId: string,
+        users: UserWithPubKey[],
+        managers: UserWithPubKey[],
+        version: number,
+        force?: boolean,
+        groups: GroupGrantWithKey[] = [],
+    ): Promise<void> {
+        return this.native.rotateStreamRoomKeys(this.servicePtr, [
+            streamRoomId,
+            users,
+            managers,
+            version,
+            force ?? false,
+            groups,
         ]);
     }
 

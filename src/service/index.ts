@@ -3,6 +3,7 @@ import { ThreadApi } from "./ThreadApi.js";
 import { StoreApi } from "./StoreApi.js";
 import { InboxApi } from "./InboxApi.js";
 import { KvdbApi } from "./KvdbApi.js";
+import { GroupApi } from "./GroupApi.js";
 import { EventApi } from "./EventApi.js";
 import { CryptoApi } from "./CryptoApi.js";
 import { StreamApi } from "./StreamApi.js";
@@ -19,6 +20,7 @@ export {
     StoreApi,
     InboxApi,
     KvdbApi,
+    GroupApi,
     CryptoApi,
     StreamApi,
     Connection,

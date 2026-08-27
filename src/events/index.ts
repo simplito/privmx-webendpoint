@@ -16,6 +16,7 @@ export {
     createStoreSubscription,
     createKvdbSubscription,
     createInboxSubscription,
+    createGroupSubscription,
     createEventSubscription,
     createConnectionSubscription,
     createUserEventSubscription,
@@ -33,6 +34,7 @@ export type {
     StoreSubscription,
     InboxSubscription,
     KvdbSubscription,
+    GroupSubscription,
     CustomEventSubscription,
     UserEventSubscription,
     ConnectionStatusSubscription,
@@ -40,6 +42,7 @@ export type {
     StoreCallbackPayload,
     InboxCallbackPayload,
     KvdbCallbackPayload,
+    GroupCallbackPayload,
     UserEventCallbackPayload,
     EventsCallbackPayload,
 } from "./subscriptions.js";

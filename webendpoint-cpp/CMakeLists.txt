@@ -13,7 +13,7 @@ add_executable(endpoint-wasm-module main.cpp ${SRC_FILES})
 target_include_directories(endpoint-wasm-module PUBLIC ${PROJECT_SOURCE_DIR}/include)
 find_package(Threads REQUIRED)
 find_package(Poco REQUIRED COMPONENTS Foundation JSON)
-target_link_libraries(endpoint-wasm-module secp256k1 Threads::Threads Poco::Foundation Poco::JSON Pson gmp privmx privmxendpointcore privmxendpointcrypto privmxendpointthread privmxendpointstore privmxendpointinbox privmxendpointkvdb privmxendpointevent embind privmxdrvcrypto privmxdrvecc privmxdrvnet privmxendpointstream asyncengine)
+target_link_libraries(endpoint-wasm-module secp256k1 Threads::Threads Poco::Foundation Poco::JSON Pson gmp privmx privmxendpointcore privmxendpointcrypto privmxendpointgroup privmxendpointthread privmxendpointstore privmxendpointinbox privmxendpointkvdb privmxendpointevent embind privmxdrvcrypto privmxdrvecc privmxdrvnet privmxendpointstream asyncengine)
 
 if(PRIVMX_BUILD_TYPE STREQUAL "debug")
     message(STATUS "Building endpoint-wasm-module: DEBUG")

@@ -78,8 +78,8 @@ You bootstrap through **`Endpoint`** (the `EndpointFactory` static facade) -
 `setup` / `setupAuto`, `connect` / `connectPublic` - then create the per-feature
 APIs straight off the connection: `connection.getThreadApi()`,
 `getStoreApi()`, `getInboxApi()`, `getKvdbApi()`, `getStreamApi()`,
-`getEventManager()`. (`Endpoint.createThreadApi(connection)` does the same thing
-if you prefer the static form.)
+`getGroupApi()`, `getEventManager()`. (`Endpoint.createThreadApi(connection)`
+does the same thing if you prefer the static form.)
 
 ---
 
@@ -92,6 +92,7 @@ if you prefer the static form.)
 | **Inbox** | One-way submissions from anyone, incl. anonymous guests (contact forms) | `InboxApi` |
 | **KVDB** | Encrypted key-value records | `KvdbApi` |
 | **Stream** | Real-time E2EE WebRTC audio/video | `StreamApi` |
+| **Group** | A set of Context users granted access to containers as a unit | `GroupApi` |
 | **Events** | Server-pushed change notifications | `EventQueue` / event managers |
 
 A few terms you'll meet immediately:
@@ -399,8 +400,9 @@ await events.unsubscribe(ids);
 
 Build each entry with the typed `create*Subscription` helper for the module you
 want (`createThreadSubscription`, `createStoreSubscription`,
-`createInboxSubscription`, `createKvdbSubscription`, `createEventSubscription`,
-`createUserEventSubscription`, `createConnectionSubscription`). `PrivmxClient`
+`createInboxSubscription`, `createKvdbSubscription`, `createGroupSubscription`,
+`createEventSubscription`, `createUserEventSubscription`,
+`createConnectionSubscription`). `PrivmxClient`
 exposes the same single `getEventManager()` - see the [example](example/vite) and
 the API reference.
 
@@ -426,7 +428,7 @@ try {
 `NativeError` carries `code` (number), `scope` (`"Core"`, `"Store"`, …) and
 `fullMessage`. Code constants are exported per scope: `CoreErrorCode`,
 `ConnectionErrorCode`, `ThreadErrorCode`, `StoreErrorCode`, `InboxErrorCode`,
-`KvdbErrorCode`, `EventErrorCode`, `StreamRoomErrorCode`.
+`KvdbErrorCode`, `GroupErrorCode`, `EventErrorCode`, `StreamRoomErrorCode`.
 
 ---
 

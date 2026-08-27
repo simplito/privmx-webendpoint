@@ -221,6 +221,8 @@ export interface Thread {
     policy: ContainerPolicy;
     messagesCount: number;
     statusCode: number;
+    groups: GroupGrant[];
+    staleGroups: string[];
 }
 
 /**
@@ -301,6 +303,8 @@ export interface Store {
     policy: ContainerPolicy;
     filesCount: number;
     statusCode: number;
+    groups: GroupGrant[];
+    staleGroups: string[];
 }
 
 /**
@@ -379,6 +383,8 @@ export interface Inbox {
     filesConfig?: FilesConfig;
     policy: ContainerWithoutItemPolicy;
     statusCode: number;
+    groups: GroupGrant[];
+    staleGroups: string[];
 }
 /**
  * Holds Inbox' public information
@@ -476,6 +482,8 @@ export interface Kvdb {
     entries: number;
     statusCode: number;
     schemaVersion: number;
+    groups: GroupGrant[];
+    staleGroups: string[];
 }
 
 /**
@@ -529,6 +537,140 @@ export interface ServerKvdbEntryInfo {
 export type DeleteEntriesResult = Map<string, boolean>;
 
 /**
+ * A group granted access to a container, as reported on the container itself.
+ *
+ * @type {GroupGrant}
+ *
+ * @param {string} groupId ID of the group
+ * @param {string} role role held by the group in the container ("user" or "manager")
+ */
+export interface GroupGrant {
+    groupId: string;
+    role: string;
+}
+
+/**
+ * A group grant carrying the group's verified public key - what you pass when
+ * granting a group access to a container (`createThread`, `updateStore`,
+ * `rotateKvdbKeys`, …). Take `groupPubKey` and `groupEpoch` from the
+ * {@link Group} / {@link GroupSummary} you got from {@link GroupApi}.
+ *
+ * @type {GroupGrantWithKey}
+ *
+ * @param {string} groupId ID of the group
+ * @param {string} role role held by the group in the container ("user" or "manager")
+ * @param {string} groupPubKey verified group identity public key (base58-DER encoded)
+ * @param {number} groupEpoch epoch at which `groupPubKey` was verified (= `Group.keyVersion`)
+ */
+export interface GroupGrantWithKey {
+    groupId: string;
+    role: string;
+    groupPubKey: string;
+    groupEpoch: number;
+}
+
+/**
+ * Holds all available information about a Group.
+ *
+ * @type {Group}
+ *
+ * @param {string} contextId ID of the Context
+ * @param {string} groupId ID of the Group
+ * @param {string} groupPubKey Group identity public key (base58-DER encoded)
+ * @param {number} createDate Group creation timestamp
+ * @param {string} creator ID of user who created the Group
+ * @param {number} lastModificationDate Group last modification timestamp
+ * @param {string} lastModifier ID of the user who last modified the Group
+ * @param {string[]} users list of users (their IDs) with access to the Group
+ * @param {string[]} managers list of users (their IDs) with management rights
+ * @param {number} version version number (changes on updates)
+ * @param {Uint8Array} publicMeta Group's public metadata
+ * @param {Uint8Array} privateMeta Group's private metadata
+ * @param {ContainerPolicy} policy Group's policies
+ * @param {number} statusCode status code of retrieval and verification of the Group
+ * @param {number} schemaVersion version of the Group data structure
+ * @param {number} keyVersion epoch counter of the Group identity keypair, incremented on every member removal
+ * @param {string} type optional type tag
+ */
+export interface Group {
+    contextId: string;
+    groupId: string;
+    groupPubKey: string;
+    createDate: number;
+    creator: string;
+    lastModificationDate: number;
+    lastModifier: string;
+    users: string[];
+    managers: string[];
+    version: number;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    policy: ContainerPolicy;
+    statusCode: number;
+    schemaVersion: number;
+    keyVersion: number;
+    type?: string;
+}
+
+/**
+ * What a Group listing serves: identity, roster, epoch and policies. A page
+ * deliberately carries no `publicMeta`/`privateMeta`, `schemaVersion` or
+ * `statusCode` - nothing was decrypted or verified. Call `getGroup` for those.
+ *
+ * @type {GroupSummary}
+ */
+export interface GroupSummary {
+    contextId: string;
+    groupId: string;
+    groupPubKey: string;
+    createDate: number;
+    creator: string;
+    lastModificationDate: number;
+    lastModifier: string;
+    users: string[];
+    managers: string[];
+    version: number;
+    policy: ContainerPolicy;
+    keyVersion: number;
+    type?: string;
+}
+
+/**
+ * Payload of a Group created/updated event. It deliberately carries no Group
+ * state - `version` and `keyVersion` are enough to decide whether the change
+ * matters; call `getGroup` when it does.
+ *
+ * @type {GroupChangedEventData}
+ *
+ * @param {string} groupId ID of the Group
+ * @param {string} contextId ID of the Context
+ * @param {number} version Group version after the change
+ * @param {number} keyVersion Group key epoch after the change
+ * @param {string} changeKind which operation changed the Group: "created", "updated",
+ *   "keyRotated", "memberAdded", "memberRemoved", "eraCut" or "archivePruned"
+ */
+export interface GroupChangedEventData {
+    groupId: string;
+    contextId: string;
+    version: number;
+    keyVersion: number;
+    changeKind: string;
+}
+
+/**
+ * Payload of a Group deleted event.
+ *
+ * @type {GroupDeletedEventData}
+ *
+ * @param {string} groupId ID of the Group
+ * @param {string} contextId ID of the Context
+ */
+export interface GroupDeletedEventData {
+    groupId: string;
+    contextId: string;
+}
+
+/**
  * Holds Container policies settings
  *
  * @type {ContainerWithoutItemPolicy}
@@ -539,6 +681,7 @@ export type DeleteEntriesResult = Map<string, boolean>;
  * @param {PolicyEntry} updatePolicy determine who can update the policy of a container
  * @param {PolicyBooleanEntry} updaterCanBeRemovedFromManagers determine whether the updater can be removed from the list of managers
  * @param {PolicyBooleanEntry} ownerCanBeRemovedFromManagers determine whether the owner can be removed from the list of managers
+ * @param {PolicyBooleanEntry} forwardSecrecy enforce forward secrecy: block writes when group grants are stale after a group key rotation
  */
 export interface ContainerWithoutItemPolicy {
     get?: PolicyEntry;
@@ -547,6 +690,7 @@ export interface ContainerWithoutItemPolicy {
     updatePolicy?: PolicyEntry;
     updaterCanBeRemovedFromManagers?: PolicyBooleanEntry;
     ownerCanBeRemovedFromManagers?: PolicyBooleanEntry;
+    forwardSecrecy?: PolicyBooleanEntry;
 }
 
 /**
@@ -636,6 +780,8 @@ export interface StreamRoom {
     statusCode: number;
     state: StreamRoomState;
     emptyRoomTtl: number;
+    groups: GroupGrant[];
+    staleGroups: string[];
 }
 
 export interface StreamInfo {
@@ -859,6 +1005,17 @@ export enum EventsEventSelectorType {
     CONTEXT_ID = 0,
 }
 
+export enum GroupEventType {
+    GROUP_CREATE = 0,
+    GROUP_UPDATE = 1,
+    GROUP_DELETE = 2,
+}
+
+export enum GroupEventSelectorType {
+    CONTEXT_ID = 0,
+    GROUP_ID = 1,
+}
+
 export enum StreamEventType {
     STREAMROOM_CREATE = 0,
     STREAMROOM_UPDATE = 1,
@@ -931,4 +1088,3 @@ export type CollectionChangedEventData = {
     affectedItemsCount: number;
     items: CollectionItemChange[];
 };
-
