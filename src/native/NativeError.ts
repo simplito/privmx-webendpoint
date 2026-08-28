@@ -8,7 +8,7 @@ export interface RawCppError {
     code: number;
     /** C++ exception class name, e.g. `"StoreFileVersionMismatchException"`. */
     name: string;
-    /** Module that raised the error: `"Core"`, `"Connection"`, `"Thread"`, `"Store"`, `"Inbox"`, `"Kvdb"`, `"Event"` or `"StreamRoom"`. */
+    /** Module that raised the error: `"Core"`, `"Connection"`, `"Thread"`, `"Store"`, `"Inbox"`, `"Kvdb"`, `"Event"`, `"StreamRoom"`, `"Lock"` or `"Search"`. */
     scope: string;
     /** Human-readable, situation-specific description (may be empty). */
     description: string;

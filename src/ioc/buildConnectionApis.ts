@@ -4,6 +4,8 @@ import { EventApiNative } from "../native/EventApiNative.js";
 import { EventQueueNative } from "../native/EventQueueNative.js";
 import { InboxApiNative } from "../native/InboxApiNative.js";
 import { KvdbApiNative } from "../native/KvdbApiNative.js";
+import { LockApiNative } from "../native/LockApiNative.js";
+import { SearchApiNative } from "../native/SearchApiNative.js";
 import { StoreApiNative } from "../native/StoreApiNative.js";
 import { StreamApiNative } from "../native/StreamApiNative.js";
 import { ThreadApiNative } from "../native/ThreadApiNative.js";
@@ -14,6 +16,8 @@ import { EventApi } from "../service/EventApi.js";
 import { EventQueue } from "../service/EventQueue.js";
 import { InboxApi } from "../service/InboxApi.js";
 import { KvdbApi } from "../service/KvdbApi.js";
+import { LockApi } from "../service/LockApi.js";
+import { SearchApi } from "../service/SearchApi.js";
 import { StoreApi } from "../service/StoreApi.js";
 import { StreamApi } from "../service/StreamApi.js";
 import { ThreadApi } from "../service/ThreadApi.js";
@@ -69,10 +73,12 @@ export function registerGlobalServices(
  *
  * Dependency graph (resolved lazily to allow any creation order):
  *
- *   ThreadApi  ──┐
- *   StoreApi   ──┼──► InboxApi
+ *   ThreadApi  ──┬──► InboxApi
+ *   StoreApi   ──┤
  *   EventApi   ──┼──► StreamApi (also needs WebRTC sub-graph)
- *   KvdbApi       │
+ *   KvdbApi    ──┤
+ *   LockApi    ──┴──► SearchApi (needs StoreApi + KvdbApi + LockApi)
+ *                 │
  *                 └── (connection instance shared via T.ConnectionPtr)
  *
  * Call once per Connection, after registering T.ConnectionPtr.
@@ -121,6 +127,18 @@ export function registerConnectionServices(
         return new KvdbApi(native, ptr);
     });
 
+    c.registerSingleton(T.LockApi, async (c) => {
+        const conn = await c.resolve<Connection>(T.ConnectionPtr);
+        if (conn.hasApi("locks")) {
+            throw new Error("LockApi already registered for given connection.");
+        }
+        const native = new LockApiNative(api);
+        const ptr = await native.newApi(conn.servicePtr);
+        await native.create(ptr, []);
+        conn.registerApi("locks", ptr, native);
+        return new LockApi(native, ptr);
+    });
+
     c.registerSingleton(T.EventApi, async (c) => {
         const conn = await c.resolve<Connection>(T.ConnectionPtr);
         if (conn.hasApi("events")) {
@@ -146,6 +164,29 @@ export function registerConnectionServices(
         await native.create(ptr, []);
         conn.registerApi("inboxes", ptr, native);
         return new InboxApi(native, ptr);
+    });
+
+    // SearchApi depends on StoreApi + KvdbApi + LockApi - resolved lazily from
+    // this same container.
+    c.registerSingleton(T.SearchApi, async (c) => {
+        const conn = await c.resolve<Connection>(T.ConnectionPtr);
+        if (conn.hasApi("searches")) {
+            throw new Error("SearchApi already registered for given connection.");
+        }
+        const storeApi = await c.resolve<StoreApi>(T.StoreApi);
+        const kvdbApi = await c.resolve<KvdbApi>(T.KvdbApi);
+        const lockApi = await c.resolve<LockApi>(T.LockApi);
+        const native = new SearchApiNative(api);
+        const ptr = await native.newApi(
+            conn.servicePtr,
+            storeApi.servicePtr,
+            kvdbApi.servicePtr,
+            lockApi.servicePtr,
+        );
+        await native.create(ptr, []);
+        const searchApi = new SearchApi(native, ptr);
+        conn.registerApi("searches", ptr, native, searchApi);
+        return searchApi;
     });
 
     // StreamApi depends on EventApi + a fresh WebRTC sub-graph.

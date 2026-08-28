@@ -77,7 +77,7 @@ device**. The Bridge is effectively zero-knowledge about your plaintext.
 You bootstrap through **`Endpoint`** (the `EndpointFactory` static facade) -
 `setup` / `setupAuto`, `connect` / `connectPublic` - then create the per-feature
 APIs straight off the connection: `connection.getThreadApi()`,
-`getStoreApi()`, `getInboxApi()`, `getKvdbApi()`, `getStreamApi()`,
+`getStoreApi()`, `getInboxApi()`, `getKvdbApi()`, `getLockApi()`, `getStreamApi()`,
 `getEventManager()`. (`Endpoint.createThreadApi(connection)` does the same thing
 if you prefer the static form.)
 
@@ -91,6 +91,7 @@ if you prefer the static form.)
 | **Store** | Encrypted file storage (chunked upload/download) | `StoreApi` |
 | **Inbox** | One-way submissions from anyone, incl. anonymous guests (contact forms) | `InboxApi` |
 | **KVDB** | Encrypted key-value records | `KvdbApi` |
+| **Lock** | Distributed locking of arbitrary resources | `LockApi` |
 | **Stream** | Real-time E2EE WebRTC audio/video | `StreamApi` |
 | **Events** | Server-pushed change notifications | `EventQueue` / event managers |
 
@@ -426,7 +427,7 @@ try {
 `NativeError` carries `code` (number), `scope` (`"Core"`, `"Store"`, …) and
 `fullMessage`. Code constants are exported per scope: `CoreErrorCode`,
 `ConnectionErrorCode`, `ThreadErrorCode`, `StoreErrorCode`, `InboxErrorCode`,
-`KvdbErrorCode`, `EventErrorCode`, `StreamRoomErrorCode`.
+`KvdbErrorCode`, `LockErrorCode`, `EventErrorCode`, `StreamRoomErrorCode`.
 
 ---
 
