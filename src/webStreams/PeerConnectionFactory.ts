@@ -13,10 +13,10 @@ import { RTCConfigurationWithInsertableStreams } from "./types/WebRtcExtensions.
  * - Constructs the `RTCConfiguration` from the current TURN credentials.
  * - Logs ICE/signalling state changes via `Logger`.
  * - Forwards `connectionstatechange` events to `StateChangeDispatcher`.
- * - Registers newly-opened remote data channels and decrypts incoming frames
- *   via the native `StreamApiLow` message encryptor (through the injected
- *   `registerRemoteDataChannel`/`decryptDataChannelMessage` callbacks), then
- *   dispatches them via `RemoteStreamListenerRegistry`.
+ * - Decrypts frames incoming on remote data channels via the native
+ *   `StreamApiLow` message encryptor (through the injected
+ *   `decryptDataChannelMessage` callback), then dispatches them via
+ *   `RemoteStreamListenerRegistry`.
  * - Forwards `track` events to a caller-supplied `onRemoteTrack` callback so
  *   the subscriber layer can install E2EE receiver transforms after ICE connects.
  * @internal
@@ -27,10 +27,6 @@ export class PeerConnectionFactory {
 
     constructor(
         private readonly eventsDispatcher: StateChangeDispatcher,
-        private readonly registerRemoteDataChannel: (
-            roomId: StreamRoomId,
-            remoteStreamId: string,
-        ) => Promise<void>,
         private readonly decryptDataChannelMessage: (
             roomId: StreamRoomId,
             remoteStreamId: string,
@@ -108,22 +104,10 @@ export class PeerConnectionFactory {
         dc.binaryType = "arraybuffer";
         const remoteStreamId = dc.label;
 
-        // Registered synchronously (before any message can be processed) so the
-        // native encryptor's replay-protection state exists by the time the first
-        // frame is decrypted; dc.onmessage is still assigned right away below so
-        // no frames arriving in this tick are missed.
-        const registered = this.registerRemoteDataChannel(roomId, remoteStreamId).catch((e) => {
-            this.logger.error("registerRemoteDataChannel failed:", e);
-            throw e;
-        });
-
+        // No registration step: the native encryptor creates the channel's
+        // replay-protection state lazily, on the first frame it decrypts.
         dc.onmessage = async (dataEvent) => {
             this.logger.debug("datachannel message received");
-            try {
-                await registered;
-            } catch {
-                return;
-            }
 
             const raw = dataEvent.data;
             const frame: Uint8Array =
