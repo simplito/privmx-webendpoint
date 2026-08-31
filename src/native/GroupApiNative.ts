@@ -39,7 +39,7 @@ export class GroupApiNative extends BaseNative {
     async create(ptr: number, args: []): Promise<void> {
         return this.runAsync<void>((taskId) => this.api.lib.GroupApi_create(taskId, ptr, args));
     }
-    async createGroupWithKeyTree(
+    async createGroup(
         ptr: number,
         args: [
             string,
@@ -51,7 +51,7 @@ export class GroupApiNative extends BaseNative {
         ],
     ): Promise<string> {
         return this.runAsync<string>((taskId) =>
-            this.api.lib.GroupApi_createGroupWithKeyTree(taskId, ptr, args),
+            this.api.lib.GroupApi_createGroup(taskId, ptr, args),
         );
     }
     async addGroupMember(

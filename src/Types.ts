@@ -873,6 +873,8 @@ export interface SearchIndex
     mode: IndexMode;
     statusCode: number;
     schemaVersion: number;
+    groups: GroupGrant[];
+    staleGroups: string[];
 }
 
 /**

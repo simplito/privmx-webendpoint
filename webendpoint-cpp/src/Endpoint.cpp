@@ -139,7 +139,7 @@ void GroupApi_deleteGroupApi(int taskId, int ptr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (GroupApiVar*)ptr; });
 }
 API_FUNCTION(GroupApi, create)
-API_FUNCTION(GroupApi, createGroupWithKeyTree)
+API_FUNCTION(GroupApi, createGroup)
 API_FUNCTION(GroupApi, addGroupMember)
 API_FUNCTION(GroupApi, removeGroupMember)
 API_FUNCTION(GroupApi, updateGroup)

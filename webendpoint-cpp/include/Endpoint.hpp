@@ -49,7 +49,7 @@ emscripten::val callVerifierOnJS(emscripten::val& name, emscripten::val& params)
 void GroupApi_newGroupApi(int taskId, int connectionPtr);
 void GroupApi_deleteGroupApi(int taskId, int ptr);
 API_FUNCTION_HEADER(GroupApi, create)
-API_FUNCTION_HEADER(GroupApi, createGroupWithKeyTree)
+API_FUNCTION_HEADER(GroupApi, createGroup)
 API_FUNCTION_HEADER(GroupApi, addGroupMember)
 API_FUNCTION_HEADER(GroupApi, removeGroupMember)
 API_FUNCTION_HEADER(GroupApi, updateGroup)

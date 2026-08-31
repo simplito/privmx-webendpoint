@@ -11,7 +11,7 @@ limitations under the License.
 
 import { BaseApi } from "./BaseApi.js";
 import { SearchApiNative } from "../native/SearchApiNative.js";
-import { ContainerPolicy, IndexMode, PagingList, PagingQuery, SearchIndex, UserWithPubKey, Document } from "../Types.js";
+import { ContainerPolicy, GroupGrantWithKey, IndexMode, PagingList, PagingQuery, SearchIndex, UserWithPubKey, Document } from "../Types.js";
 
 export class SearchApi extends BaseApi {
   constructor(private native: SearchApiNative, ptr: number) {
@@ -28,6 +28,9 @@ export class SearchApi extends BaseApi {
     * @param {Uint8Array} privateMeta private (encrypted) metadata
     * @param {IndexMode} mode The operating mode of the Index, defining how document content is handled.
     * @param {ContainerPolicy} policies Index's policies
+    * @param {GroupGrantWithKey[]} [groups] Groups granted access to the Index in
+    *   addition to `users`/`managers`; take `groupPubKey`/`groupEpoch` from
+    *   {@link GroupApi.getGroup}
     * @returns {string} ID of the created Search Index
    */
   async createSearchIndex(
@@ -37,7 +40,8 @@ export class SearchApi extends BaseApi {
     publicMeta: Uint8Array,
     privateMeta: Uint8Array,
     mode: IndexMode,
-    policies?: ContainerPolicy
+    policies?: ContainerPolicy,
+    groups: GroupGrantWithKey[] = []
   ): Promise<string> {
     return this.native.createSearchIndex(this.servicePtr, [
         contextId,
@@ -46,7 +50,8 @@ export class SearchApi extends BaseApi {
         publicMeta,
         privateMeta,
         mode,
-        policies
+        policies,
+        groups
     ]);
   }
 
@@ -62,6 +67,8 @@ export class SearchApi extends BaseApi {
      * @param {boolean} force force update (without checking version)
      * @param {boolean} forceGenerateNewKey force to regenerate a key for the Index
      * @param {ContainerPolicy} policies Index's policies
+     * @param {GroupGrantWithKey[]} [groups] full replacement list of Groups
+     *   granted access; Groups missing from this list lose access
      * @returns {Promise<void>} resolves when the Index has been updated on the server
    */
   async updateSearchIndex(
@@ -73,7 +80,8 @@ export class SearchApi extends BaseApi {
     version: number,
     force: boolean,
     forceGenerateNewKey: boolean,
-    policies: ContainerPolicy
+    policies?: ContainerPolicy,
+    groups: GroupGrantWithKey[] = []
   ): Promise<void> {
     return this.native.updateSearchIndex(this.servicePtr, [
         indexId,
@@ -84,7 +92,8 @@ export class SearchApi extends BaseApi {
         version,
         force,
         forceGenerateNewKey,
-        policies
+        policies,
+        groups
     ]);
   }
 

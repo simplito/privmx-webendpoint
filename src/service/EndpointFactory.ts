@@ -660,7 +660,7 @@ export class EndpointFactory {
      * connection is built on top of this same instance, so they all share one
      * group key cache.
      *
-     * Use it to create Groups (`createGroupWithKeyTree`), change their
+     * Use it to create Groups (`createGroup`), change their
      * membership (`addGroupMember` / `removeGroupMember`) and read the
      * `groupPubKey`/`keyVersion` a container grant needs.
      *

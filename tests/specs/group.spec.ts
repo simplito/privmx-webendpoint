@@ -41,7 +41,7 @@ test.describe("GroupTest", () => {
             const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
             const groupApi = await Endpoint.createGroupApi(connection);
 
-            const groupId = await groupApi.createGroupWithKeyTree(
+            const groupId = await groupApi.createGroup(
                 contextId,
                 [u1Obj, u2Obj],
                 [u1Obj],
@@ -105,19 +105,19 @@ test.describe("GroupTest", () => {
 
             // Invalid contextId
             await expectError(() =>
-                groupApi.createGroupWithKeyTree("invalid_id", [u1Obj], [u1Obj], pub, priv),
+                groupApi.createGroup("invalid_id", [u1Obj], [u1Obj], pub, priv),
             );
             // User pubKey does not match the userId
             await expectError(() =>
-                groupApi.createGroupWithKeyTree(contextId, [mismatched], [u1Obj], pub, priv),
+                groupApi.createGroup(contextId, [mismatched], [u1Obj], pub, priv),
             );
             // Manager pubKey does not match the userId
             await expectError(() =>
-                groupApi.createGroupWithKeyTree(contextId, [u1Obj], [mismatched], pub, priv),
+                groupApi.createGroup(contextId, [u1Obj], [mismatched], pub, priv),
             );
             // No managers
             await expectError(() =>
-                groupApi.createGroupWithKeyTree(contextId, [u1Obj], [], pub, priv),
+                groupApi.createGroup(contextId, [u1Obj], [], pub, priv),
             );
         }, args);
     });
@@ -139,14 +139,14 @@ test.describe("GroupTest", () => {
             const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
             const groupApi = await Endpoint.createGroupApi(connection);
 
-            const g1 = await groupApi.createGroupWithKeyTree(
+            const g1 = await groupApi.createGroup(
                 contextId,
                 [u1Obj],
                 [u1Obj],
                 enc.encode("p1"),
                 enc.encode("p1"),
             );
-            const g2 = await groupApi.createGroupWithKeyTree(
+            const g2 = await groupApi.createGroup(
                 contextId,
                 [u1Obj],
                 [u1Obj],
@@ -219,7 +219,7 @@ test.describe("GroupTest", () => {
             const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
             const groupApi = await Endpoint.createGroupApi(connection);
 
-            const groupId = await groupApi.createGroupWithKeyTree(
+            const groupId = await groupApi.createGroup(
                 contextId,
                 [u1Obj],
                 [u1Obj],
@@ -327,7 +327,7 @@ test.describe("GroupTest", () => {
             const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
             const groupApi = await Endpoint.createGroupApi(connection);
 
-            const groupId = await groupApi.createGroupWithKeyTree(
+            const groupId = await groupApi.createGroup(
                 contextId,
                 [u1Obj],
                 [u1Obj],
@@ -374,7 +374,7 @@ test.describe("GroupTest", () => {
 
             const conn1 = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
             const groupApi1 = await Endpoint.createGroupApi(conn1);
-            const groupId = await groupApi1.createGroupWithKeyTree(
+            const groupId = await groupApi1.createGroup(
                 contextId,
                 [u1Obj, u2Obj],
                 [u1Obj],
@@ -425,7 +425,7 @@ test.describe("GroupTest", () => {
 
             const conn1 = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
             const groupApi1 = await Endpoint.createGroupApi(conn1);
-            const groupId = await groupApi1.createGroupWithKeyTree(
+            const groupId = await groupApi1.createGroup(
                 contextId,
                 [u1Obj, u2Obj],
                 [u1Obj],
@@ -488,7 +488,7 @@ test.describe("GroupTest", () => {
 
             const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
             const groupApi = await Endpoint.createGroupApi(connection);
-            const groupId = await groupApi.createGroupWithKeyTree(
+            const groupId = await groupApi.createGroup(
                 contextId,
                 [u1Obj, u2Obj, u3Obj],
                 [u1Obj],
@@ -555,7 +555,7 @@ test.describe("ContainersUsingGroupsTest", () => {
             const threadApi = await Endpoint.createThreadApi(connection);
 
             const mkGroup = async (meta: string) => {
-                const id = await groupApi.createGroupWithKeyTree(
+                const id = await groupApi.createGroup(
                     contextId,
                     [u1Obj],
                     [u1Obj],
@@ -659,7 +659,7 @@ test.describe("ContainersUsingGroupsTest", () => {
             const groupApi1 = await Endpoint.createGroupApi(conn1);
             const threadApi1 = await Endpoint.createThreadApi(conn1);
 
-            const groupId = await groupApi1.createGroupWithKeyTree(
+            const groupId = await groupApi1.createGroup(
                 contextId,
                 [u1Obj, u2Obj],
                 [u1Obj],
@@ -790,7 +790,7 @@ test.describe("ContainersUsingGroupsTest", () => {
             const groupApi1 = await Endpoint.createGroupApi(conn1);
             const threadApi1 = await Endpoint.createThreadApi(conn1);
 
-            const groupId = await groupApi1.createGroupWithKeyTree(
+            const groupId = await groupApi1.createGroup(
                 contextId,
                 [u1Obj, u2Obj],
                 [u1Obj],
@@ -906,7 +906,7 @@ test.describe("ContainersUsingGroupsTest", () => {
             const groupApi1 = await Endpoint.createGroupApi(conn1);
             const threadApi1 = await Endpoint.createThreadApi(conn1);
 
-            const groupId = await groupApi1.createGroupWithKeyTree(
+            const groupId = await groupApi1.createGroup(
                 contextId,
                 [u1Obj, u2Obj, u3Obj],
                 [u1Obj],
@@ -1000,7 +1000,7 @@ test.describe("ContainersUsingGroupsTest", () => {
             const groupApi = await Endpoint.createGroupApi(connection);
             const threadApi = await Endpoint.createThreadApi(connection);
 
-            const groupId = await groupApi.createGroupWithKeyTree(
+            const groupId = await groupApi.createGroup(
                 contextId,
                 [u1Obj],
                 [u1Obj],
@@ -1082,7 +1082,7 @@ test.describe("ContainersUsingGroupsTest", () => {
             const kvdbApi = await Endpoint.createKvdbApi(connection);
             const inboxApi = await Endpoint.createInboxApi(connection);
 
-            const groupId = await groupApi.createGroupWithKeyTree(
+            const groupId = await groupApi.createGroup(
                 contextId,
                 [u1Obj],
                 [u1Obj],

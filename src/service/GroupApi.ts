@@ -36,7 +36,7 @@ import {
  * construct it directly.
  *
  * ## Workflow
- * {@link createGroupWithKeyTree} → {@link getGroup} (for `groupPubKey` and
+ * {@link createGroup} → {@link getGroup} (for `groupPubKey` and
  * `keyVersion`) → grant it to a container by passing a `GroupGrantWithKey` to
  * e.g. `ThreadApi.createThread`. Change membership with
  * {@link addGroupMember} / {@link removeGroupMember}; after a removal the
@@ -84,7 +84,7 @@ export class GroupApi extends BaseApi {
      * @throws {NativeError} when the Context does not exist or a listed user is
      *   not registered in it
      */
-    async createGroupWithKeyTree(
+    async createGroup(
         contextId: string,
         users: UserWithPubKey[],
         managers: UserWithPubKey[],
@@ -92,7 +92,7 @@ export class GroupApi extends BaseApi {
         privateMeta: Uint8Array,
         policies?: ContainerPolicy,
     ): Promise<string> {
-        return this.native.createGroupWithKeyTree(this.servicePtr, [
+        return this.native.createGroup(this.servicePtr, [
             contextId,
             users,
             managers,
@@ -110,7 +110,7 @@ export class GroupApi extends BaseApi {
      * nobody else re-keys anything.
      *
      * @param {string} groupId ID of the Group, returned by
-     *   {@link createGroupWithKeyTree}
+     *   {@link createGroup}
      * @param {UserWithPubKey} newMember the member to add, with their public key
      * @param {boolean} asManager whether the new member joins as a manager
      * @param {UserWithPubKey[]} users full member list *after* the addition
@@ -151,7 +151,7 @@ export class GroupApi extends BaseApi {
      * superseded epoch until they are (see `Thread.staleGroups` and friends).
      *
      * @param {string} groupId ID of the Group, returned by
-     *   {@link createGroupWithKeyTree}
+     *   {@link createGroup}
      * @param {string} userId ID of the member to remove
      * @param {UserWithPubKey[]} users member list that *remains*, without the
      *   removed member

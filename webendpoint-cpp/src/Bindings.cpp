@@ -40,7 +40,7 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(GroupApi, newGroupApi)
     BINDING_FUNCTION(GroupApi, deleteGroupApi)
     BINDING_FUNCTION(GroupApi, create)
-    BINDING_FUNCTION(GroupApi, createGroupWithKeyTree)
+    BINDING_FUNCTION(GroupApi, createGroup)
     BINDING_FUNCTION(GroupApi, addGroupMember)
     BINDING_FUNCTION(GroupApi, removeGroupMember)
     BINDING_FUNCTION(GroupApi, updateGroup)
