@@ -21,9 +21,11 @@ import { EventQueue } from "./EventQueue.js";
 import { GroupApi } from "./GroupApi.js";
 import { InboxApi } from "./InboxApi.js";
 import { KvdbApi } from "./KvdbApi.js";
+import { LockApi } from "./LockApi.js";
 import { StoreApi } from "./StoreApi.js";
 import { StreamApi } from "./StreamApi.js";
 import { ThreadApi } from "./ThreadApi.js";
+import { SearchApi } from "./SearchApi.js";
 import { GlobalContainer, ConnectionContainer } from "../ioc/Container.js";
 import { T, ResolvedAssetUrls } from "../ioc/Tokens.js";
 import { registerGlobalServices, registerConnectionServices } from "../ioc/buildConnectionApis.js";
@@ -126,6 +128,8 @@ export class EndpointFactory {
         createStoreApi: (c) => EndpointFactory.createStoreApi(c),
         createInboxApi: (c) => EndpointFactory.createInboxApi(c),
         createKvdbApi: (c) => EndpointFactory.createKvdbApi(c),
+        createLockApi: (c) => EndpointFactory.createLockApi(c),
+        createSearchApi: (c) => EndpointFactory.createSearchApi(c),
         createEventApi: (c) => EndpointFactory.createEventApi(c),
         createStreamApi: (c) => EndpointFactory.createStreamApi(c),
         createGroupApi: (c) => EndpointFactory.createGroupApi(c),
@@ -576,6 +580,25 @@ export class EndpointFactory {
     }
 
     /**
+     * Returns the Lock API (distributed resource locking) for the given
+     * connection.
+     *
+     * Resolved from the connection's container - the first call instantiates
+     * the WASM-side LockApi object, subsequent calls return the same cached
+     * instance; no server round-trip happens here.
+     *
+     * Use it to coordinate exclusive access to a resource shared across
+     * connections: `lock`, `unlock`, `checkReservedLock`.
+     *
+     * @param {Connection} connection connection returned by {@link connect};
+     *   the API stops working (throws) after `connection.disconnect()`
+     * @returns {LockApi} the per-connection LockApi instance
+     */
+    static async createLockApi(connection: Connection): Promise<LockApi> {
+        return this.getConnectionContainer(connection).resolve<LockApi>(T.LockApi);
+    }
+
+    /**
      * Returns the Event API (custom encrypted Context events) for the given
      * connection.
      *
@@ -647,5 +670,25 @@ export class EndpointFactory {
      */
     static async createGroupApi(connection: Connection): Promise<GroupApi> {
         return this.getConnectionContainer(connection).resolve<GroupApi>(T.GroupApi);
+    }
+
+    /**
+     * Returns the Search API (full-text search indexes) for the given
+     * connection.
+     *
+     * Resolved from the connection's container - the first call instantiates
+     * the WASM-side SearchApi object together with the StoreApi, KvdbApi and
+     * LockApi instances it builds on, subsequent calls return the same cached
+     * instance; no server round-trip happens here.
+     *
+     * Use it for indexed search: `createSearchIndex`, `openSearchIndex`,
+     * `addDocument`, `searchDocuments`.
+     *
+     * @param {Connection} connection connection returned by {@link connect};
+     *   the API stops working (throws) after `connection.disconnect()`
+     * @returns {SearchApi} the per-connection SearchApi instance
+     */
+    static async createSearchApi(connection: Connection): Promise<SearchApi> {
+        return this.getConnectionContainer(connection).resolve<SearchApi>(T.SearchApi);
     }
 }

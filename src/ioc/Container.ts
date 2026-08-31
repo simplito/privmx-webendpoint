@@ -68,8 +68,8 @@ export class GlobalContainer extends Container {}
 /**
  * Per-connection scoped container.
  * Created once per `EndpointFactory.connect()` / `connectPublic()` call.
- * Holds ThreadApi, StoreApi, KvdbApi, EventApi, InboxApi, StreamApi - all
- * tied to a single authenticated Connection instance.
+ * Holds ThreadApi, StoreApi, KvdbApi, LockApi, EventApi, InboxApi, SearchApi,
+ * StreamApi - all tied to a single authenticated Connection instance.
  * @internal
  */
 export class ConnectionContainer extends Container {}

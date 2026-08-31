@@ -20,8 +20,10 @@ export const T = {
     ThreadApi: "conn:ThreadApi",
     StoreApi: "conn:StoreApi",
     KvdbApi: "conn:KvdbApi",
+    LockApi: "conn:LockApi",
     EventApi: "conn:EventApi",
     InboxApi: "conn:InboxApi",
+    SearchApi: "conn:SearchApi",
     StreamApi: "conn:StreamApi",
 
     // WebRTC sub-graph (connection-scoped, one per createStreamApi call)
