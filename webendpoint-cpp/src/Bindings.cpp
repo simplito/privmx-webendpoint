@@ -222,6 +222,7 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(SearchApi, create)
     BINDING_FUNCTION(SearchApi, createSearchIndex)
     BINDING_FUNCTION(SearchApi, updateSearchIndex)
+    BINDING_FUNCTION(SearchApi, rotateSearchIndexKeys)
     BINDING_FUNCTION(SearchApi, deleteSearchIndex)
     BINDING_FUNCTION(SearchApi, getSearchIndex)
     BINDING_FUNCTION(SearchApi, listSearchIndexes)

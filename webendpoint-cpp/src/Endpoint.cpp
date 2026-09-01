@@ -450,6 +450,7 @@ void SearchApi_deleteSearchApi(int taskId, int ptr) {
 API_FUNCTION(SearchApi, create)
 API_FUNCTION(SearchApi, createSearchIndex)
 API_FUNCTION(SearchApi, updateSearchIndex)
+API_FUNCTION(SearchApi, rotateSearchIndexKeys)
 API_FUNCTION(SearchApi, deleteSearchIndex)
 API_FUNCTION(SearchApi, getSearchIndex)
 API_FUNCTION(SearchApi, listSearchIndexes)

@@ -234,6 +234,7 @@ void SearchApi_deleteSearchApi(int taskId, int ptr);
 API_FUNCTION_HEADER(SearchApi, create)
 API_FUNCTION_HEADER(SearchApi, createSearchIndex)
 API_FUNCTION_HEADER(SearchApi, updateSearchIndex)
+API_FUNCTION_HEADER(SearchApi, rotateSearchIndexKeys)
 API_FUNCTION_HEADER(SearchApi, deleteSearchIndex)
 API_FUNCTION_HEADER(SearchApi, deleteSearchIndex)
 API_FUNCTION_HEADER(SearchApi, getSearchIndex)

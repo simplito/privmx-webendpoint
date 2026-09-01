@@ -29,6 +29,9 @@ export class SearchApiNative extends BaseNative {
     async updateSearchIndex(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, number, boolean, boolean, ContainerPolicy|undefined, GroupGrantWithKey[]]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.SearchApi_updateSearchIndex(taskId, ptr, args));
     }
+    async rotateSearchIndexKeys(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], number, boolean, GroupGrantWithKey[]]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.SearchApi_rotateSearchIndexKeys(taskId, ptr, args));
+    }
     async deleteSearchIndex(ptr: number, args: [string]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.SearchApi_deleteSearchIndex(taskId, ptr, args));
     }
