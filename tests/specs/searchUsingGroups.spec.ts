@@ -741,14 +741,7 @@ test.describe("SearchUsingGroupsTest", () => {
                 await searchApi1.addDocument(seed, "doc-1", "epoch one document");
                 await searchApi1.closeSearchIndex(seed);
 
-                await groupApi1.removeGroupMember(
-                    group.groupId,
-                    users.u3.id,
-                    [gk.u(users.u1), gk.u(users.u2)],
-                    [gk.u(users.u1)],
-                    gk.enc("idx_grp_removed_pub"),
-                    gk.enc("idx_grp_removed_priv"),
-                );
+                await groupApi1.removeGroupMembers(group.groupId, [users.u3.id]);
                 const rotatedGroup = await groupApi1.getGroup(group.groupId);
 
                 // Nothing may write to the Index between the removal and this

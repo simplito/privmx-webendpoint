@@ -402,8 +402,8 @@ await events.unsubscribe(ids);
 Build each entry with the typed `create*Subscription` helper for the module you
 want (`createThreadSubscription`, `createStoreSubscription`,
 `createInboxSubscription`, `createKvdbSubscription`, `createGroupSubscription`,
-`createEventSubscription`, `createUserEventSubscription`,
-`createConnectionSubscription`). `PrivmxClient`
+`createGroupCustomEventSubscription`, `createEventSubscription`,
+`createUserEventSubscription`, `createConnectionSubscription`). `PrivmxClient`
 exposes the same single `getEventManager()` - see the [example](example/vite) and
 the API reference.
 

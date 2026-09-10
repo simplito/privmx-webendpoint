@@ -637,17 +637,11 @@ test.describe("StreamRoomUsingGroupsTest", () => {
                 const roomBefore = await streamApi3.getStreamRoom(streamRoomId);
                 await conn3.disconnect();
 
-                // Seat user_3's leaf in the key tree - updateGroup would only re-wrap
-                // the group's own metadata key.
-                await groupApi1.addGroupMember(
-                    group2.groupId,
-                    gk.u(users.u3),
-                    false,
-                    [gk.u(users.u1), gk.u(users.u2), gk.u(users.u3)],
-                    [gk.u(users.u1)],
-                    group2.publicMeta,
-                    group2.privateMeta,
-                );
+                // Seat user_3's leaf in the key tree. A metadata write would not:
+                // the planes are separate calls, and neither touches the roster.
+                await groupApi1.addGroupMembers(group2.groupId, [
+                    { user: gk.u(users.u3), role: "user" },
+                ]);
 
                 const conn3b = await window.Endpoint.connect(
                     users.u3.privKey,
@@ -989,14 +983,7 @@ test.describe("StreamRoomUsingGroupsTest", () => {
                     gk.grants([group]),
                 );
 
-                await groupApi1.removeGroupMember(
-                    group.groupId,
-                    users.u3.id,
-                    [gk.u(users.u1), gk.u(users.u2)],
-                    [gk.u(users.u1)],
-                    gk.enc("grp_removed_pub"),
-                    gk.enc("grp_removed_priv"),
-                );
+                await groupApi1.removeGroupMembers(group.groupId, [users.u3.id]);
                 const rotatedGroup = await groupApi1.getGroup(group.groupId);
                 const stale = await streamApi1.getStreamRoom(streamRoomId);
 

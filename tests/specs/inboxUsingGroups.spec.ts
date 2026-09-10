@@ -737,15 +737,9 @@ test.describe("InboxUsingGroupsTest", () => {
                 const inboxBefore = await inboxApi3.getInbox(inboxId);
                 await conn3.disconnect();
 
-                await groupApi1.addGroupMember(
-                    group2.groupId,
-                    gk.u(users.u3),
-                    false,
-                    [gk.u(users.u1), gk.u(users.u2), gk.u(users.u3)],
-                    [gk.u(users.u1)],
-                    group2.publicMeta,
-                    group2.privateMeta,
-                );
+                await groupApi1.addGroupMembers(group2.groupId, [
+                    { user: gk.u(users.u3), role: "user" },
+                ]);
 
                 const conn3b = await window.Endpoint.connect(
                     users.u3.privKey,
@@ -1137,14 +1131,7 @@ test.describe("InboxUsingGroupsTest", () => {
                 });
                 const oldEpochEntryId = ownerList.readItems[0].entryId;
 
-                await groupApi1.removeGroupMember(
-                    group.groupId,
-                    users.u3.id,
-                    [gk.u(users.u1), gk.u(users.u2)],
-                    [gk.u(users.u1)],
-                    gk.enc("grp_removed_pub"),
-                    gk.enc("grp_removed_priv"),
-                );
+                await groupApi1.removeGroupMembers(group.groupId, [users.u3.id]);
                 const rotatedGroup = await groupApi1.getGroup(group.groupId);
                 const stale = await inboxApi1.getInbox(inboxId);
 

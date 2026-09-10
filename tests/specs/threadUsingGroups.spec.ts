@@ -857,17 +857,11 @@ test.describe("ThreadUsingGroupsTest", () => {
                 const messageBefore = await threadApi3.getMessage(messageId);
                 await conn3.disconnect();
 
-                // Seat user_3's leaf in the key tree. `updateGroup` only re-wraps the
-                // group's own metadata key - it never touches tree leaf state.
-                await groupApi1.addGroupMember(
-                    group2.groupId,
-                    gk.u(users.u3),
-                    false,
-                    [gk.u(users.u1), gk.u(users.u2), gk.u(users.u3)],
-                    [gk.u(users.u1)],
-                    group2.publicMeta,
-                    group2.privateMeta,
-                );
+                // Seat user_3's leaf in the key tree. A metadata write would not:
+                // updateGroupPublicMeta/PrivateMeta never touch tree leaf state.
+                await groupApi1.addGroupMembers(group2.groupId, [
+                    { user: gk.u(users.u3), role: "user" },
+                ]);
 
                 const conn3b = await window.Endpoint.connect(
                     users.u3.privKey,
@@ -949,14 +943,7 @@ test.describe("ThreadUsingGroupsTest", () => {
                 const created = await threadApi1.getThread(threadId);
 
                 // Removing a member advances the group from epoch 1 to 2. The thread is untouched.
-                await groupApi1.removeGroupMember(
-                    group.groupId,
-                    users.u3.id,
-                    [gk.u(users.u1), gk.u(users.u2)],
-                    [gk.u(users.u1)],
-                    gk.enc("grp_removed_pub"),
-                    gk.enc("grp_removed_priv"),
-                );
+                await groupApi1.removeGroupMembers(group.groupId, [users.u3.id]);
                 const rotatedGroup = await groupApi1.getGroup(group.groupId);
 
                 // Force the thread's own key to rotate while re-granting the group at
@@ -2185,14 +2172,7 @@ test.describe("ThreadUsingGroupsTest", () => {
 
                 // Removing a member advances the group's epoch and leaves the thread's
                 // current key wrapped to the epoch before it.
-                await groupApi1.removeGroupMember(
-                    sharedGroup.groupId,
-                    users.u3.id,
-                    [gk.u(users.u1), gk.u(users.u2)],
-                    [gk.u(users.u1)],
-                    gk.enc("stale_group_pub_2"),
-                    gk.enc("stale_group_priv_2"),
-                );
+                await groupApi1.removeGroupMembers(sharedGroup.groupId, [users.u3.id]);
                 const stale = await threadApi1.getThread(threadId);
 
                 // Again with no `groups`: the current epoch and its public key are
@@ -2269,14 +2249,7 @@ test.describe("ThreadUsingGroupsTest", () => {
                     undefined,
                     gk.grants([sharedGroup]),
                 );
-                await groupApi1.removeGroupMember(
-                    sharedGroup.groupId,
-                    users.u3.id,
-                    [gk.u(users.u1), gk.u(users.u2)],
-                    [gk.u(users.u1)],
-                    gk.enc("auto_rotate_group_pub_2"),
-                    gk.enc("auto_rotate_group_priv_2"),
-                );
+                await groupApi1.removeGroupMembers(sharedGroup.groupId, [users.u3.id]);
                 const stale = await threadApi1.getThread(threadId);
 
                 const messageId = await threadApi1.sendMessage(
@@ -2373,14 +2346,7 @@ test.describe("ThreadUsingGroupsTest", () => {
                     undefined,
                     gk.grants([sharedGroup]),
                 );
-                await groupApi1.removeGroupMember(
-                    sharedGroup.groupId,
-                    users.u3.id,
-                    [gk.u(users.u1), gk.u(users.u2)],
-                    [gk.u(users.u1)],
-                    gk.enc("concurrent_group_pub_2"),
-                    gk.enc("concurrent_group_priv_2"),
-                );
+                await groupApi1.removeGroupMembers(sharedGroup.groupId, [users.u3.id]);
 
                 // A second, independent connection as user_2, kept alive throughout.
                 const conn2 = await window.Endpoint.connect(
@@ -2504,14 +2470,7 @@ test.describe("ThreadUsingGroupsTest", () => {
                     managerRotatesOnly,
                     gk.grants([sharedGroup]),
                 );
-                await groupApi1.removeGroupMember(
-                    sharedGroup.groupId,
-                    users.u3.id,
-                    [gk.u(users.u1), gk.u(users.u2)],
-                    [gk.u(users.u1)],
-                    gk.enc("denied_group_pub_2"),
-                    gk.enc("denied_group_priv_2"),
-                );
+                await groupApi1.removeGroupMembers(sharedGroup.groupId, [users.u3.id]);
                 const stale = await threadApi1.getThread(threadId);
 
                 // user_2 is a thread user but not a manager.

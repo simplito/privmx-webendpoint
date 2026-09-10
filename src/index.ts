@@ -54,6 +54,7 @@ export {
     createKvdbSubscription,
     createInboxSubscription,
     createGroupSubscription,
+    createGroupCustomEventSubscription,
     createEventSubscription,
     createConnectionSubscription,
     createUserEventSubscription,
@@ -71,6 +72,7 @@ export type {
     InboxSubscription,
     KvdbSubscription,
     GroupSubscription,
+    GroupCustomEventSubscription,
     CustomEventSubscription,
     UserEventSubscription,
     ConnectionStatusSubscription,
@@ -79,6 +81,7 @@ export type {
     InboxCallbackPayload,
     KvdbCallbackPayload,
     GroupCallbackPayload,
+    GroupCustomCallbackPayload,
     UserEventCallbackPayload,
     EventsCallbackPayload,
 } from "./events/index.js";

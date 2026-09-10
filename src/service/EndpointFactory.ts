@@ -661,7 +661,8 @@ export class EndpointFactory {
      * group key cache.
      *
      * Use it to create Groups (`createGroup`), change their
-     * membership (`addGroupMember` / `removeGroupMember`) and read the
+     * membership (`addGroupMembers` / `removeGroupMembers`), seal content for a
+     * Group (`encrypt` / `beginFileEncryption`) and read the
      * `groupPubKey`/`keyVersion` a container grant needs.
      *
      * @param {Connection} connection connection returned by {@link connect};

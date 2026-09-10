@@ -18,6 +18,7 @@ import {
     UserInfo,
     ConnectionEventType,
     ConnectionEventSelectorType,
+    GroupEventSelectorType,
 } from "../Types.js";
 import { BaseNative } from "../native/BaseNative.js";
 import { UserVerifierInterface } from "./UserVerifierInterface.js";
@@ -381,6 +382,23 @@ export class Connection extends BaseApi {
                             return this.getKvdbApi();
                         case "group":
                             return this.getGroupApi();
+                        case "groupCustom":
+                            // Same GroupApi, but the query is built from a channel name
+                            // instead of a GroupEventType - hence its own module.
+                            return this.getGroupApi().then((api) => ({
+                                subscribeFor: (queries: string[]) => api.subscribeFor(queries),
+                                unsubscribeFrom: (ids: string[]) => api.unsubscribeFrom(ids),
+                                buildSubscriptionQuery: (
+                                    channelName: string,
+                                    selectorType: GroupEventSelectorType,
+                                    selectorId: string,
+                                ) =>
+                                    api.buildCustomEventSubscriptionQuery(
+                                        channelName,
+                                        selectorType,
+                                        selectorId,
+                                    ),
+                            }));
                         case "event":
                             return this.getEventApi();
                         case "user":

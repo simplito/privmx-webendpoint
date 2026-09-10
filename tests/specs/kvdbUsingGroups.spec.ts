@@ -844,15 +844,9 @@ test.describe("KvdbUsingGroupsTest", () => {
                 const entryBefore = await kvdbApi3.getEntry(kvdbId, "entry_key");
                 await conn3.disconnect();
 
-                await groupApi1.addGroupMember(
-                    group2.groupId,
-                    gk.u(users.u3),
-                    false,
-                    [gk.u(users.u1), gk.u(users.u2), gk.u(users.u3)],
-                    [gk.u(users.u1)],
-                    group2.publicMeta,
-                    group2.privateMeta,
-                );
+                await groupApi1.addGroupMembers(group2.groupId, [
+                    { user: gk.u(users.u3), role: "user" },
+                ]);
 
                 const conn3b = await window.Endpoint.connect(
                     users.u3.privKey,
@@ -1256,14 +1250,7 @@ test.describe("KvdbUsingGroupsTest", () => {
                     0,
                 );
 
-                await groupApi1.removeGroupMember(
-                    group.groupId,
-                    users.u3.id,
-                    [gk.u(users.u1), gk.u(users.u2)],
-                    [gk.u(users.u1)],
-                    gk.enc("grp_removed_pub"),
-                    gk.enc("grp_removed_priv"),
-                );
+                await groupApi1.removeGroupMembers(group.groupId, [users.u3.id]);
                 const rotatedGroup = await groupApi1.getGroup(group.groupId);
                 const stale = await kvdbApi1.getKvdb(kvdbId);
 
@@ -1341,14 +1328,7 @@ test.describe("KvdbUsingGroupsTest", () => {
                     undefined,
                     gk.grants([group]),
                 );
-                await groupApi1.removeGroupMember(
-                    group.groupId,
-                    users.u3.id,
-                    [gk.u(users.u1), gk.u(users.u2)],
-                    [gk.u(users.u1)],
-                    gk.enc("auto_grp_removed_pub"),
-                    gk.enc("auto_grp_removed_priv"),
-                );
+                await groupApi1.removeGroupMembers(group.groupId, [users.u3.id]);
                 const stale = await kvdbApi1.getKvdb(kvdbId);
 
                 await kvdbApi1.setEntry(

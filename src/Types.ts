@@ -572,6 +572,11 @@ export interface GroupGrantWithKey {
 /**
  * Holds all available information about a Group.
  *
+ * `users` and `managers` are two separate lists, not a roster and a subset of
+ * it: a member seated as a manager is listed in `managers` alone, so the
+ * Group's full roster is the *union* of the two. A manager has read access
+ * either way.
+ *
  * @type {Group}
  *
  * @param {string} contextId ID of the Context
@@ -581,9 +586,12 @@ export interface GroupGrantWithKey {
  * @param {string} creator ID of user who created the Group
  * @param {number} lastModificationDate Group last modification timestamp
  * @param {string} lastModifier ID of the user who last modified the Group
- * @param {string[]} users list of users (their IDs) with access to the Group
+ * @param {string[]} users list of users (their IDs) with access to the Group, excluding
+ *   those listed in `managers`
  * @param {string[]} managers list of users (their IDs) with management rights
- * @param {number} version version number (changes on updates)
+ * @param {number} publicMetaVersion public-metadata version; moves only on `updateGroupPublicMeta`
+ * @param {number} privateMetaVersion private-metadata version; moves only on `updateGroupPrivateMeta`
+ * @param {number} rosterVersion roster version; moves only on `addGroupMembers`/`removeGroupMembers`
  * @param {Uint8Array} publicMeta Group's public metadata
  * @param {Uint8Array} privateMeta Group's private metadata
  * @param {ContainerPolicy} policy Group's policies
@@ -602,7 +610,9 @@ export interface Group {
     lastModifier: string;
     users: string[];
     managers: string[];
-    version: number;
+    publicMetaVersion: number;
+    privateMetaVersion: number;
+    rosterVersion: number;
     publicMeta: Uint8Array;
     privateMeta: Uint8Array;
     policy: ContainerPolicy;
@@ -613,9 +623,79 @@ export interface Group {
 }
 
 /**
+ * One member to seat in a Group, and the role they take. Passed to
+ * {@link GroupApi.addGroupMembers}.
+ *
+ * The role travels per member rather than per call, so seating a manager and a
+ * user together stays one delta over the union of their key-tree paths.
+ *
+ * @type {GroupMemberToAdd}
+ *
+ * @param {UserWithPubKey} user the member, with their public key
+ * @param {string} role role they take: "user" or "manager"
+ */
+export interface GroupMemberToAdd {
+    user: UserWithPubKey;
+    role: string;
+}
+
+/**
+ * Which of a Group's keys sealed an envelope, and therefore what its author
+ * field is worth.
+ */
+export enum EnvelopeType {
+    /** Sealed with the Group's symmetric data key by a member, and signed by them. */
+    ENVELOPE_FROM_MEMBER = 1,
+    /** Sealed to the Group's identity public key by an outsider using a throwaway keypair. Unattributable. */
+    ENVELOPE_ANONYMOUS = 2,
+}
+
+/**
+ * The plaintext of an envelope, together with what could be established about
+ * who wrote it. Returned by {@link GroupApi.decrypt}.
+ *
+ * @type {DecryptedEnvelope}
+ *
+ * @param {Uint8Array} data decrypted content
+ * @param {string} groupId ID of the Group the envelope was sealed for; authenticated
+ * @param {string} authorPubKey verified author public key (base58-DER encoded), EMPTY when
+ *   `type` is `ENVELOPE_ANONYMOUS` - branch on `type`, not on this field being non-empty
+ * @param {EnvelopeType} type which of the Group's keys sealed this envelope
+ */
+export interface DecryptedEnvelope {
+    data: Uint8Array;
+    groupId: string;
+    authorPubKey: string;
+    type: EnvelopeType;
+}
+
+/**
+ * What could be established about a sealed file, once all of it has been
+ * received. Returned by {@link GroupApi.finishFileDecryption}.
+ *
+ * @type {DecryptedFileInfo}
+ *
+ * @param {string} groupId ID of the Group the file was sealed for
+ * @param {string} authorPubKey verified author public key (base58-DER encoded), EMPTY when
+ *   `type` is `ENVELOPE_ANONYMOUS`
+ * @param {EnvelopeType} type whether the file came from a member or an anonymous outsider
+ * @param {boolean} complete whether the whole file was verified to be present; `false` once
+ *   {@link GroupApi.seekInEncryptedFile} has been used on the handle
+ */
+export interface DecryptedFileInfo {
+    groupId: string;
+    authorPubKey: string;
+    type: EnvelopeType;
+    complete: boolean;
+}
+
+/**
  * What a Group listing serves: identity, roster, epoch and policies. A page
  * deliberately carries no `publicMeta`/`privateMeta`, `schemaVersion` or
  * `statusCode` - nothing was decrypted or verified. Call `getGroup` for those.
+ *
+ * As on {@link Group}, `users` and `managers` are separate lists and the full
+ * roster is their union.
  *
  * @type {GroupSummary}
  */
@@ -629,7 +709,9 @@ export interface GroupSummary {
     lastModifier: string;
     users: string[];
     managers: string[];
-    version: number;
+    publicMetaVersion: number;
+    privateMetaVersion: number;
+    rosterVersion: number;
     policy: ContainerPolicy;
     keyVersion: number;
     type?: string;
@@ -637,24 +719,55 @@ export interface GroupSummary {
 
 /**
  * Payload of a Group created/updated event. It deliberately carries no Group
- * state - `version` and `keyVersion` are enough to decide whether the change
- * matters; call `getGroup` when it does.
+ * state - the four counters are enough to decide whether the change matters,
+ * and which plane moved; call `getGroup` when it does.
  *
  * @type {GroupChangedEventData}
  *
  * @param {string} groupId ID of the Group
  * @param {string} contextId ID of the Context
- * @param {number} version Group version after the change
+ * @param {number} publicMetaVersion public-metadata version after the change
+ * @param {number} privateMetaVersion private-metadata version after the change
+ * @param {number} rosterVersion roster version after the change
  * @param {number} keyVersion Group key epoch after the change
- * @param {string} changeKind which operation changed the Group: "created", "updated",
- *   "keyRotated", "memberAdded", "memberRemoved", "eraCut" or "archivePruned"
+ * @param {string} changeKind which operation changed the Group: "created",
+ *   "publicMetaUpdated", "privateMetaUpdated", "policyUpdated", "keyRotated",
+ *   "memberAdded", "memberRemoved", "eraCut" or "archivePruned"
  */
 export interface GroupChangedEventData {
     groupId: string;
     contextId: string;
-    version: number;
+    publicMetaVersion: number;
+    privateMetaVersion: number;
+    rosterVersion: number;
     keyVersion: number;
     changeKind: string;
+}
+
+/**
+ * Payload of a Group custom notification sent with
+ * {@link GroupApi.sendCustomEvent}. The payload arrives sealed with the Group's
+ * own key and is opened before the event is delivered.
+ *
+ * @type {GroupCustomEventData}
+ *
+ * @param {string} groupId ID of the Group
+ * @param {string} channelName name of the channel the notification was sent on
+ * @param {string} userId ID of the sender as the Bridge reported it - NOT authenticated,
+ *   see `authorPubKey`
+ * @param {string} authorPubKey verified sender public key (base58-DER encoded); EMPTY when
+ *   `statusCode` is non-zero
+ * @param {Uint8Array} payload decrypted payload; EMPTY when `statusCode` is non-zero
+ * @param {number} statusCode `0` when the payload was opened, otherwise the error that
+ *   stopped it (key could not be resolved, or the payload did not verify)
+ */
+export interface GroupCustomEventData {
+    groupId: string;
+    channelName: string;
+    userId: string;
+    authorPubKey: string;
+    payload: Uint8Array;
+    statusCode: number;
 }
 
 /**
@@ -813,33 +926,31 @@ export interface StreamPublishResult {
     };
 }
 
-
 // export namespace search {
 /*
-* Defines the mode in which the Search Index operates, specifically regarding
-* the storage and retrieval of document content.
-*
-* WITH_CONTENT - stores the full document content internally.
-* WITHOUT_CONTENT - The Index only stores metadata and terms necessary for search,
-* but discards the original document content.
-*
-* The numeric values must stay in sync with `search::IndexMode` in the C++ core
-* (UNKNOWN = 0, WITH_CONTENT = 1, WITHOUT_CONTENT = 2) - the core rejects 0 and
-* would otherwise silently interpret a shifted value as a different mode.
-*/
-export enum IndexMode
-{
+ * Defines the mode in which the Search Index operates, specifically regarding
+ * the storage and retrieval of document content.
+ *
+ * WITH_CONTENT - stores the full document content internally.
+ * WITHOUT_CONTENT - The Index only stores metadata and terms necessary for search,
+ * but discards the original document content.
+ *
+ * The numeric values must stay in sync with `search::IndexMode` in the C++ core
+ * (UNKNOWN = 0, WITH_CONTENT = 1, WITHOUT_CONTENT = 2) - the core rejects 0 and
+ * would otherwise silently interpret a shifted value as a different mode.
+ */
+export enum IndexMode {
     /** IndexMode is UNKNOWN or the data is unreadable (check statusCode) */
     UNKNOWN = 0,
     WITH_CONTENT = 1,
-    WITHOUT_CONTENT = 2
-};
+    WITHOUT_CONTENT = 2,
+}
 
 /**
  * Holds all available information about a Search Index.
- * 
+ *
  * @type {SearchIndex}
- * 
+ *
  * @param {string} contextId ID of the Context
  * @param {string} indexId ID of the Search Index
  * @param {number} createDate Index creation timestamp
@@ -856,8 +967,7 @@ export enum IndexMode
  * @param {number} statusCode status code of retrieval and decryption of the Thread
  * @param {number} schemaVersion Version of the Search Index data structure and how it is encoded/encrypted
  */
-export interface SearchIndex
-{
+export interface SearchIndex {
     contextId: string;
     indexId: string;
     createDate: number;
@@ -879,19 +989,18 @@ export interface SearchIndex
 
 /**
  * An interface representing a document for indexing.
- * 
+ *
  * @type {Document}
- * 
+ *
  * @param {number} documentId Document ID
  * @param {string} name Document name
  * @param {string} content Document content
  */
-export interface Document
-{
-    documentId: number,
-    name: string,
-    content: string
-};
+export interface Document {
+    documentId: number;
+    name: string;
+    content: string;
+}
 // }
 
 /**
