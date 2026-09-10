@@ -247,6 +247,9 @@ API_FUNCTION_HEADER(SearchApi, deleteDocument)
 API_FUNCTION_HEADER(SearchApi, getDocument)
 API_FUNCTION_HEADER(SearchApi, listDocuments)
 API_FUNCTION_HEADER(SearchApi, searchDocuments)
+API_FUNCTION_HEADER(SearchApi, beginTransaction)
+API_FUNCTION_HEADER(SearchApi, commit)
+API_FUNCTION_HEADER(SearchApi, rollback)
 
 void LockApi_newLockApi(int taskId, int connectionPtr);
 void LockApi_deleteLockApi(int taskId, int ptr);

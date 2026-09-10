@@ -234,6 +234,9 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(SearchApi, getDocument)
     BINDING_FUNCTION(SearchApi, listDocuments)
     BINDING_FUNCTION(SearchApi, searchDocuments)
+    BINDING_FUNCTION(SearchApi, beginTransaction)
+    BINDING_FUNCTION(SearchApi, commit)
+    BINDING_FUNCTION(SearchApi, rollback)
 
     BINDING_FUNCTION(LockApi, newLockApi)
     BINDING_FUNCTION(LockApi, deleteLockApi)

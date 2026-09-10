@@ -65,4 +65,13 @@ export class SearchApiNative extends BaseNative {
     async searchDocuments(ptr: number, args: [number, string, PagingQuery]): Promise<PagingList<Document>> {
         return this.runAsync<PagingList<Document>>((taskId)=>this.api.lib.SearchApi_searchDocuments(taskId, ptr, args));
     }
+    async beginTransaction(ptr: number, args: [number]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.SearchApi_beginTransaction(taskId, ptr, args));
+    }
+    async commit(ptr: number, args: [number]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.SearchApi_commit(taskId, ptr, args));
+    }
+    async rollback(ptr: number, args: [number]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.SearchApi_rollback(taskId, ptr, args));
+    }
 }
