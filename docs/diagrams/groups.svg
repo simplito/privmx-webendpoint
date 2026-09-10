@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 872 292" width="872" height="292" role="img" aria-label="Members belong to one Group. The Group is granted to a Thread, a Store, a Search Index and a Stream Room, so you edit membership in one place. A removal gives the Group a new key version and the next write to a container picks it up.">
+  <style>
+    .paper  { fill: #fbfbfb; }
+    .chip   { fill: #f2f2f2; stroke: #b4b4b4; stroke-width: 1; }
+    .store  { fill: #ffffff; stroke: #8a8a8a; stroke-width: 1; }
+    .focal  { fill: #f0f0f0; stroke: #333333; stroke-width: 1.6; }
+    .name   { fill: #1f1f1f; font: 600 12px Arial, Helvetica, sans-serif; }
+    .sub    { fill: #6b6b6b; font: 400 9px Consolas, "Liberation Mono", Menlo, monospace; }
+    .eyebrow{ fill: #9a9a9a; font: 400 7px Consolas, "Liberation Mono", Menlo, monospace; letter-spacing: 0.16em; }
+    .arrow  { fill: none; stroke: #8a8a8a; stroke-width: 1.2; }
+    .alabel { fill: #4a4a4a; font: 400 8px Consolas, "Liberation Mono", Menlo, monospace; letter-spacing: 0.06em; }
+    .note   { fill: #4a4a4a; font: 400 11px Arial, Helvetica, sans-serif; }
+    .head   { fill: #8a8a8a; }
+    @media (prefers-color-scheme: dark) {
+      .paper { fill: #161616; }
+      .chip  { fill: #232323; stroke: #575757; }
+      .store { fill: #202020; stroke: #6f6f6f; }
+      .focal { fill: #2c2c2c; stroke: #d6d6d6; }
+      .name  { fill: #ededed; }
+      .sub   { fill: #a6a6a6; }
+      .eyebrow { fill: #7d7d7d; }
+      .arrow { stroke: #8f8f8f; }
+      .alabel, .note { fill: #bdbdbd; }
+      .head  { fill: #8f8f8f; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path class="head" d="M0,0 L8,4 L0,8 z"/>
+    </marker>
+  </defs>
+
+  <rect class="paper" x="0" y="0" width="872" height="292" rx="8"/>
+
+  <text class="eyebrow" x="32" y="40">PEOPLE</text>
+  <text class="eyebrow" x="240" y="40">ONE LIST TO EDIT</text>
+  <text class="eyebrow" x="636" y="40">WHAT THEY CAN OPEN</text>
+
+  <path class="arrow" d="M176,76 H200 Q208,76 208,84 V124 Q208,132 216,132"/>
+  <path class="arrow" d="M176,132 H208"/>
+  <path class="arrow" d="M176,188 H200 Q208,188 208,180 V140 Q208,132 216,132"/>
+  <line class="arrow" x1="208" y1="132" x2="236" y2="132" marker-end="url(#a)"/>
+
+  <path class="arrow" d="M400,132 H436 Q444,132 444,124 V72 Q444,64 452,64 H632" marker-end="url(#a)"/>
+  <path class="arrow" d="M400,132 H436 Q444,132 444,124 V116 Q444,108 452,108 H632" marker-end="url(#a)"/>
+  <path class="arrow" d="M400,132 H436 Q444,132 444,140 V148 Q444,156 452,156 H632" marker-end="url(#a)"/>
+  <path class="arrow" d="M400,132 H436 Q444,132 444,140 V192 Q444,200 452,200 H632" marker-end="url(#a)"/>
+  <rect class="paper" x="498" y="120" width="68" height="12" rx="2"/>
+  <text class="alabel" x="532" y="129" text-anchor="middle">ONE GRANT</text>
+
+  <rect class="chip" x="32" y="60" width="144" height="32" rx="6"/>
+  <text class="name" x="104" y="80" text-anchor="middle">Alice</text>
+  <rect class="chip" x="32" y="116" width="144" height="32" rx="6"/>
+  <text class="name" x="104" y="136" text-anchor="middle">Bob</text>
+  <rect class="chip" x="32" y="172" width="144" height="32" rx="6"/>
+  <text class="name" x="104" y="192" text-anchor="middle">Dana</text>
+
+  <rect class="focal" x="240" y="96" width="160" height="72" rx="8"/>
+  <text class="name" x="320" y="126" text-anchor="middle">Group</text>
+  <text class="sub"  x="320" y="144" text-anchor="middle">one key, one roster</text>
+
+  <rect class="store" x="632" y="48" width="208" height="32" rx="6"/>
+  <text class="name" x="648" y="68">Thread</text>
+  <text class="sub"  x="824" y="68" text-anchor="end">messages</text>
+
+  <rect class="store" x="632" y="92" width="208" height="32" rx="6"/>
+  <text class="name" x="648" y="112">Store</text>
+  <text class="sub"  x="824" y="112" text-anchor="end">files</text>
+
+  <rect class="store" x="632" y="140" width="208" height="32" rx="6"/>
+  <text class="name" x="648" y="160">Search Index</text>
+  <text class="sub"  x="824" y="160" text-anchor="end">full-text</text>
+
+  <rect class="store" x="632" y="184" width="208" height="32" rx="6"/>
+  <text class="name" x="648" y="204">Stream Room</text>
+  <text class="sub"  x="824" y="204" text-anchor="end">audio / video</text>
+
+  <text class="note" x="32" y="248">Add or remove somebody in the Group. Every box on the right follows.</text>
+  <text class="sub"  x="32" y="268">A removal gives the Group a new key version. The next write to a container picks it up on its own.</text>
+</svg>

@@ -40,9 +40,33 @@ cp .env.example .env.local
 npm run dev
 ```
 
+### Local Bridge in one command (contributors)
+
+From the repo root, `scripts/example_bridge` starts a throwaway Bridge (reusing
+the e2e Mongo and seed data: solution, context and API key) and writes this
+example's `.env.local` for you:
+
+```bash
+scripts/example_bridge        # → http://localhost:9111, writes .env.local
+scripts/example_bridge stop
+```
+
+A bare Bridge sends **no CORS headers**, so the browser cannot call it
+cross-origin. The generated `.env.local` therefore leaves
+`VITE_PRIVMX_BRIDGE_URL` empty (= this page's own origin) and sets
+`PRIVMX_BRIDGE_PROXY`, which makes the dev server forward `/api` to the Bridge -
+including the WebSocket upgrade the core opens on that same path for events. In
+production the Bridge sits behind a reverse proxy that adds CORS, and you set
+`VITE_PRIVMX_BRIDGE_URL` to its URL instead.
+
 Open the printed URL, enter a user ID, and click **Generate key → register →
 send message**. The log shows the key generated in-browser, the user registered,
 and an encrypted message round-trip.
+
+## Second demo: searchable group chat
+
+`example/group-chat` builds a chat on **GroupApi** + **SearchApi**, with Alice
+and Bob side by side on one page. It uses the same local Bridge - see its README.
 
 ## Notes
 

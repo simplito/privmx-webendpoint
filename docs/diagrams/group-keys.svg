@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 872 428" width="872" height="428" role="img" aria-label="Sequence: the sender asks the Bridge for the group key, seals the data and puts the sealed bytes in storage of its own. The reader takes those bytes back, asks the Bridge for the same key, and opens them. The Bridge holds keys and membership but never the data.">
+  <style>
+    .paper  { fill: #fbfbfb; }
+    .actor  { fill: #ffffff; stroke: #8a8a8a; stroke-width: 1; }
+    .focal  { fill: #f0f0f0; stroke: #333333; stroke-width: 1.6; }
+    .life   { stroke: #c8c8c8; stroke-width: 1; stroke-dasharray: 3 4; }
+    .bar    { fill: #eeeeee; stroke: #9a9a9a; stroke-width: 0.8; }
+    .name   { fill: #1f1f1f; font: 600 12px Arial, Helvetica, sans-serif; }
+    .sub    { fill: #6b6b6b; font: 400 9px Consolas, "Liberation Mono", Menlo, monospace; }
+    .eyebrow{ fill: #9a9a9a; font: 400 7px Consolas, "Liberation Mono", Menlo, monospace; letter-spacing: 0.16em; }
+    .msg    { fill: none; stroke: #7a7a7a; stroke-width: 1.2; }
+    .ret    { fill: none; stroke: #7a7a7a; stroke-width: 1; stroke-dasharray: 4 3; }
+    .mlabel { fill: #2b2b2b; font: 400 10px Consolas, "Liberation Mono", Menlo, monospace; }
+    .note   { fill: #6b6b6b; font: 400 10px Arial, Helvetica, sans-serif; }
+    .head   { fill: #7a7a7a; }
+    @media (prefers-color-scheme: dark) {
+      .paper { fill: #161616; }
+      .actor { fill: #202020; stroke: #6f6f6f; }
+      .focal { fill: #2c2c2c; stroke: #d6d6d6; }
+      .life  { stroke: #4f4f4f; }
+      .bar   { fill: #2a2a2a; stroke: #6f6f6f; }
+      .name  { fill: #ededed; }
+      .sub, .note { fill: #a6a6a6; }
+      .eyebrow { fill: #7d7d7d; }
+      .msg, .ret { stroke: #9a9a9a; }
+      .mlabel { fill: #dcdcdc; }
+      .head  { fill: #9a9a9a; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path class="head" d="M0,0 L8,4 L0,8 z"/>
+    </marker>
+  </defs>
+
+  <rect class="paper" x="0" y="0" width="872" height="428" rx="8"/>
+
+  <!-- actors -->
+  <rect class="focal" x="32" y="28" width="160" height="44" rx="6"/>
+  <text class="name" x="112" y="47" text-anchor="middle">Sender</text>
+  <text class="sub"  x="112" y="62" text-anchor="middle">a group member</text>
+
+  <rect class="actor" x="280" y="28" width="176" height="44" rx="6"/>
+  <text class="name" x="368" y="47" text-anchor="middle">PrivMX Bridge</text>
+  <text class="sub"  x="368" y="62" text-anchor="middle">keys + membership</text>
+
+  <rect class="actor" x="536" y="28" width="160" height="44" rx="6"/>
+  <text class="name" x="616" y="47" text-anchor="middle">Your storage</text>
+  <text class="sub"  x="616" y="62" text-anchor="middle">any shape you like</text>
+
+  <rect class="focal" x="760" y="28" width="88" height="44" rx="6"/>
+  <text class="name" x="804" y="47" text-anchor="middle">Reader</text>
+  <text class="sub"  x="804" y="62" text-anchor="middle">a member</text>
+
+  <!-- lifelines -->
+  <line class="life" x1="112" y1="72" x2="112" y2="376"/>
+  <line class="life" x1="368" y1="72" x2="368" y2="376"/>
+  <line class="life" x1="616" y1="72" x2="616" y2="376"/>
+  <line class="life" x1="804" y1="72" x2="804" y2="376"/>
+
+  <rect class="bar" x="108" y="104" width="8" height="80" rx="2"/>
+  <rect class="bar" x="800" y="252" width="8" height="92" rx="2"/>
+
+  <text class="eyebrow" x="32" y="96">SENDING</text>
+
+  <!-- sender asks for the key -->
+  <line class="msg" x1="120" y1="120" x2="364" y2="120" marker-end="url(#a)"/>
+  <text class="mlabel" x="128" y="115">which key does this group use?</text>
+  <line class="ret" x1="364" y1="144" x2="120" y2="144" marker-end="url(#a)"/>
+  <text class="mlabel" x="128" y="139">the key, wrapped to your own</text>
+
+  <!-- seal and store -->
+  <line class="msg" x1="120" y1="176" x2="612" y2="176" marker-end="url(#a)"/>
+  <text class="mlabel" x="128" y="171">put(key, groups.encrypt(groupId, bytes))</text>
+  <text class="note" x="128" y="192">sealed and signed before it leaves the device</text>
+
+  <text class="eyebrow" x="32" y="236">RECEIVING</text>
+
+  <!-- reader fetches the bytes -->
+  <line class="msg" x1="796" y1="268" x2="620" y2="268" marker-end="url(#a)"/>
+  <text class="mlabel" x="788" y="263" text-anchor="end">get(key)</text>
+  <line class="ret" x1="620" y1="292" x2="796" y2="292" marker-end="url(#a)"/>
+  <text class="mlabel" x="788" y="287" text-anchor="end">bytes the store cannot read</text>
+
+  <!-- reader resolves the key -->
+  <line class="msg" x1="796" y1="316" x2="372" y2="316" marker-end="url(#a)"/>
+  <text class="mlabel" x="788" y="311" text-anchor="end">the key for the version on the envelope</text>
+  <line class="ret" x1="372" y1="340" x2="796" y2="340" marker-end="url(#a)"/>
+  <text class="mlabel" x="788" y="335" text-anchor="end">granted, while you are still a member</text>
+
+  <text class="note" x="32" y="366">groups.decrypt(envelope) then gives the reader the data and, for a member's envelope, a checked author.</text>
+  <text class="note" x="32" y="404">The Bridge answers key questions and tracks who belongs. Your storage holds bytes. Neither one can read the data.</text>
+</svg>

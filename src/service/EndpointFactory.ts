@@ -128,7 +128,6 @@ export class EndpointFactory {
         createStoreApi: (c) => EndpointFactory.createStoreApi(c),
         createInboxApi: (c) => EndpointFactory.createInboxApi(c),
         createKvdbApi: (c) => EndpointFactory.createKvdbApi(c),
-        createLockApi: (c) => EndpointFactory.createLockApi(c),
         createSearchApi: (c) => EndpointFactory.createSearchApi(c),
         createEventApi: (c) => EndpointFactory.createEventApi(c),
         createStreamApi: (c) => EndpointFactory.createStreamApi(c),
@@ -580,19 +579,14 @@ export class EndpointFactory {
     }
 
     /**
-     * Returns the Lock API (distributed resource locking) for the given
-     * connection.
+     * Resolves the locking service the Search API is built on.
      *
-     * Resolved from the connection's container - the first call instantiates
-     * the WASM-side LockApi object, subsequent calls return the same cached
-     * instance; no server round-trip happens here.
+     * Not part of the public surface: distributed locks exist here to serialise
+     * writes to a Search Index, and are reached through {@link createSearchApi}.
      *
-     * Use it to coordinate exclusive access to a resource shared across
-     * connections: `lock`, `unlock`, `checkReservedLock`.
-     *
-     * @param {Connection} connection connection returned by {@link connect};
-     *   the API stops working (throws) after `connection.disconnect()`
+     * @param {Connection} connection connection returned by {@link connect}
      * @returns {LockApi} the per-connection LockApi instance
+     * @internal
      */
     static async createLockApi(connection: Connection): Promise<LockApi> {
         return this.getConnectionContainer(connection).resolve<LockApi>(T.LockApi);
@@ -679,7 +673,7 @@ export class EndpointFactory {
      *
      * Resolved from the connection's container - the first call instantiates
      * the WASM-side SearchApi object together with the StoreApi, KvdbApi and
-     * LockApi instances it builds on, subsequent calls return the same cached
+     * locking instances it builds on, subsequent calls return the same cached
      * instance; no server round-trip happens here.
      *
      * Use it for indexed search: `createSearchIndex`, `openSearchIndex`,

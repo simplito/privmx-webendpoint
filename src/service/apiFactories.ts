@@ -16,7 +16,6 @@ import type { StoreApi } from "./StoreApi.js";
 import type { InboxApi } from "./InboxApi.js";
 import type { KvdbApi } from "./KvdbApi.js";
 import type { GroupApi } from "./GroupApi.js";
-import type { LockApi } from "./LockApi.js";
 import type { SearchApi } from "./SearchApi.js";
 import type { EventApi } from "./EventApi.js";
 import type { StreamApi } from "./StreamApi.js";
@@ -82,15 +81,6 @@ export function createKvdbApi(connection: Connection): Promise<KvdbApi> {
 export function createGroupApi(connection: Connection): Promise<GroupApi> {
     return EndpointFactory.createGroupApi(connection);
 }
-/**
- * Returns the Lock API (distributed resource locking) for the given connection.
- * @param {Connection} connection connection returned by {@link EndpointFactory.connect}
- * @returns {Promise<LockApi>} the per-connection LockApi instance
- */
-export function createLockApi(connection: Connection): Promise<LockApi> {
-    return EndpointFactory.createLockApi(connection);
-}
-
 /**
  * Returns the Search API (full-text search indexes) for the given connection.
  * @param {Connection} connection connection returned by {@link EndpointFactory.connect}

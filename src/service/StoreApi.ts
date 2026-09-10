@@ -10,6 +10,16 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi.js";
+import {
+    fileReadable,
+    fileWritable,
+    openFileHandle,
+    saveFileToDisk,
+    uploadFile,
+    type FileLike,
+    type StoreFileHandle,
+    type StoreFileWriter,
+} from "./fileStreams.js";
 import { StoreApiNative } from "../native/StoreApiNative.js";
 import {
     PagingQuery,
@@ -186,10 +196,13 @@ export class StoreApi extends BaseApi {
      * Re-wraps the Store's key for its current members and grantee Groups,
      * without changing its data or membership.
      *
-     * Needed after a member is removed from a Group granted access to this
-     * Store: that Group's key epoch advances, `Store.staleGroups` names it, and
-     * members of the stale Group cannot read content written under the current
-     * key until this call re-wraps it to the Group's current epoch.
+     * Use it after a member leaves a Group granted access to this Store. That
+     * Group's key epoch advances and `staleGroups` names it until the Store
+     * carries the new one.
+     *
+     * The next write re-keys it on its own, so this call is for getting there
+     * first, or for the case where a write reports that its automatic re-key
+     * was refused.
      *
      * @param {string} storeId ID of the Store to re-key, from `Store.storeId`
      * @param {UserWithPubKey[]} users current member list
@@ -716,5 +729,120 @@ export class StoreApi extends BaseApi {
             selectorType,
             selectorId,
         ]);
+    }
+
+    // --- files, as streams ------------------------------------------------
+
+    /**
+     * Uploads a file - a browser `File`, a `Blob`, anything with `size` and
+     * `stream()` - and returns its ID, in one call.
+     *
+     * The high-level counterpart of {@link createFile} → {@link writeToFile} →
+     * {@link closeFile}. The transfer is one pipeline, so a slow connection
+     * throttles the reader instead of piling chunks up in memory, and aborting
+     * through `signal` deletes the partial upload rather than leaving a
+     * truncated file behind.
+     *
+     * @param {object} opts `storeId` and the `file`; optional `publicMeta`
+     *   (unencrypted!), `privateMeta`, `onProgress` (bytes sent so far) and
+     *   `signal`
+     * @returns {Promise<string>} ID of the committed file
+     * @example
+     * const fileId = await store.uploadFile({
+     *     storeId, file, onProgress: (sent) => setPct(sent / file.size),
+     * });
+     */
+    uploadFile(opts: {
+        storeId: string;
+        file: FileLike;
+        publicMeta?: Uint8Array;
+        privateMeta?: Uint8Array;
+        onProgress?: (bytesSoFar: number) => void;
+        signal?: AbortSignal;
+    }): Promise<string> {
+        return uploadFile(this, opts);
+    }
+
+    /**
+     * Downloads a file and lets the user save it.
+     *
+     * Where the File System Access API is available the bytes stream straight
+     * to the chosen file and never all sit in memory; elsewhere they are
+     * collected into a `Blob` and offered through an object URL.
+     *
+     * @param {string} fileId ID of the file to download
+     * @param {object} [opts] `name` for the saved file, and a `signal` to abort
+     * @returns {Promise<void>} resolves when the file has been written or offered
+     */
+    saveFileToDisk(
+        fileId: string,
+        opts: { name?: string; signal?: AbortSignal } = {},
+    ): Promise<void> {
+        return saveFileToDisk(this, fileId, opts);
+    }
+
+    /**
+     * Reads a file as a stream.
+     *
+     * The high-level counterpart of {@link openFile} → {@link readFromFile} →
+     * {@link closeFile}: the handle is opened on first pull and closed when the
+     * stream ends, is cancelled or errors, so there is none to leak.
+     *
+     * @param {string} fileId ID of the file to read
+     * @param {object} [opts] `from` - offset to start at; `length` - stop after
+     *   this many bytes; `chunkSize` - bytes per read, default 1 MiB
+     * @returns {ReadableStream<Uint8Array>} the decrypted content
+     * @example
+     * const head = await new Response(
+     *     store.fileReadable(fileId, { length: 64 }),
+     * ).text();
+     */
+    fileReadable(
+        fileId: string,
+        opts: { from?: number; length?: number; chunkSize?: number } = {},
+    ): ReadableStream<Uint8Array> {
+        return fileReadable(this, fileId, opts);
+    }
+
+    /**
+     * Creates a file and returns a stream to write it into.
+     *
+     * Committed when the stream closes - that is when `fileId` resolves and the
+     * file becomes visible to other members. Aborting deletes whatever was
+     * committed on the way out and rejects `fileId`.
+     *
+     * @param {object} opts `storeId`, total `size` in bytes, and optional
+     *   `publicMeta` (unencrypted!) / `privateMeta`
+     * @returns {StoreFileWriter} sink to pipe into, and the ID the commit
+     *   produced
+     * @example
+     * const { stream, fileId } = store.fileWritable({ storeId, size: file.size });
+     * await file.stream().pipeTo(stream, { signal });
+     */
+    fileWritable(opts: {
+        storeId: string;
+        size: number;
+        publicMeta?: Uint8Array;
+        privateMeta?: Uint8Array;
+    }): StoreFileWriter {
+        return fileWritable(this, opts);
+    }
+
+    /**
+     * Opens a file and hands back a handle that closes itself.
+     *
+     * On a runtime with `Symbol.asyncDispose` the handle is disposable, so
+     * `await using` releases it on the way out of the scope - including on a
+     * throw. Elsewhere, call `close()`.
+     *
+     * @param {string} fileId ID of the file to open
+     * @returns {Promise<StoreFileHandle>} the open handle
+     * @example
+     * await using f = await store.openFileHandle(fileId);
+     * await f.seek(1 << 20);
+     * const head = await f.read(64);
+     */
+    openFileHandle(fileId: string): Promise<StoreFileHandle> {
+        return openFileHandle(this, fileId);
     }
 }

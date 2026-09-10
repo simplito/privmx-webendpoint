@@ -188,10 +188,12 @@ export class KvdbApi extends BaseApi {
      * Re-wraps the KVDB's key for its current members and grantee Groups,
      * without changing its data or membership.
      *
-     * Needed after a member is removed from a Group granted access to this
-     * KVDB: that Group's key epoch advances, `Kvdb.staleGroups` names it, and
-     * members of the stale Group cannot read entries written under the current
-     * key until this call re-wraps it to the Group's current epoch.
+     * Use it after a member leaves a Group granted access to this KVDB. That
+     * Group's key epoch advances and `Kvdb.staleGroups` names it until the KVDB
+     * carries the new one.     *
+     * The next write re-keys it on its own, so this call is for getting there
+     * first, or for the case where a write reports that its automatic re-key
+     * was refused.
      *
      * @param {string} kvdbId ID of the KVDB to re-key, from `Kvdb.kvdbId`
      * @param {UserWithPubKey[]} users current member list

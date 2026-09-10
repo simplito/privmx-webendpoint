@@ -73,6 +73,7 @@ else
 fi
 
 cd "$PRIVMX_ENDPOINT_DIR"
+
 mkdir -p build-emscripten && cd build-emscripten
 
 if [ ! -f CMakeCache.txt ] || [ ! -f Makefile ]; then

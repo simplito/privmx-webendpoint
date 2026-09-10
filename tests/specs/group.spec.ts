@@ -566,6 +566,152 @@ test.describe("GroupTest", () => {
         expect(result.after.rosterVersion).toEqual(2);
     });
 
+    test("The group public key changes with every epoch", async ({ page, backend, cli }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const enc = new TextEncoder();
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+            const u3Obj = { userId: users.u3.id, pubKey: users.u3.pubKey };
+
+            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const groupApi = await Endpoint.createGroupApi(connection);
+            const groupId = await groupApi.createGroup(
+                contextId,
+                [u1Obj, u2Obj],
+                [u1Obj],
+                enc.encode("pubkey_public"),
+                enc.encode("pubkey_private"),
+            );
+            const snap = async () => {
+                const g = await groupApi.getGroup(groupId);
+                return { keyVersion: g.keyVersion, groupPubKey: g.groupPubKey };
+            };
+
+            const created = await snap();
+            await groupApi.addGroupMembers(groupId, [{ user: u3Obj, role: "user" }]);
+            const added = await snap();
+            await groupApi.removeGroupMembers(groupId, [users.u3.id]);
+            const removedOne = await snap();
+            await groupApi.removeGroupMembers(groupId, [users.u2.id]);
+            const removedTwo = await snap();
+
+            return { created, added, removedOne, removedTwo };
+        }, args);
+
+        const { created, added, removedOne, removedTwo } = result;
+
+        // Adding a member moves neither the epoch nor the identity key: the
+        // newcomer is wrapped into the tree the group already has.
+        expect(added.keyVersion).toEqual(created.keyVersion);
+        expect(added.groupPubKey).toEqual(created.groupPubKey);
+
+        // Each removal mints an epoch, and with it a new identity key. The key
+        // a link carries is therefore only good for the epoch it came from.
+        expect(removedOne.keyVersion).toEqual(created.keyVersion + 1);
+        expect(removedOne.groupPubKey).not.toEqual(created.groupPubKey);
+
+        expect(removedTwo.keyVersion).toEqual(created.keyVersion + 2);
+        expect(removedTwo.groupPubKey).not.toEqual(removedOne.groupPubKey);
+        expect(removedTwo.groupPubKey).not.toEqual(created.groupPubKey);
+
+        // One key per epoch: four snapshots across three epochs, three keys.
+        const keys = [created, added, removedOne, removedTwo].map((s) => s.groupPubKey);
+        expect(new Set(keys).size).toEqual(3);
+    });
+
+    test("An envelope sealed to a superseded group key", async ({ page, backend, cli }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const enc = new TextEncoder();
+            const dec = new TextDecoder();
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const u2Obj = { userId: users.u2.id, pubKey: users.u2.pubKey };
+
+            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const groupApi = await Endpoint.createGroupApi(connection);
+            const groupId = await groupApi.createGroup(
+                contextId,
+                [u1Obj, u2Obj],
+                [u1Obj],
+                enc.encode("anon_public"),
+                enc.encode("anon_private"),
+            );
+            const before = await groupApi.getGroup(groupId);
+
+            // An outsider with nothing but the link seals one envelope now.
+            const guest = await Endpoint.connectPublic(solutionId, bridgeUrl);
+            const guestGroups = await Endpoint.createGroupApi(guest);
+            const sealedBefore = await guestGroups.encryptAnonymously(
+                groupId,
+                before.groupPubKey,
+                enc.encode("sent before the rotation"),
+            );
+
+            // u2 leaves, which mints a new epoch and a new identity key.
+            await groupApi.removeGroupMembers(groupId, [users.u2.id]);
+            const after = await groupApi.getGroup(groupId);
+
+            // The outsider's link is stale now, and they seal another envelope with it.
+            const sealedStale = await guestGroups.encryptAnonymously(
+                groupId,
+                before.groupPubKey,
+                enc.encode("sent with the old key"),
+            );
+
+            const open = async (api: typeof groupApi, envelope: Uint8Array) => {
+                try {
+                    const opened = await api.decrypt(envelope);
+                    return { ok: true, text: dec.decode(opened.data), error: "" };
+                } catch (e) {
+                    return { ok: false, text: "", error: (e as Error).message.trim() };
+                }
+            };
+
+            // The member who left, on a session opened after the removal.
+            const exConn = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
+            const exGroupApi = await Endpoint.createGroupApi(exConn);
+
+            return {
+                keyChanged: after.groupPubKey !== before.groupPubKey,
+                memberOpensOld: await open(groupApi, sealedBefore),
+                memberOpensStale: await open(groupApi, sealedStale),
+                removedMemberOpensStale: await open(exGroupApi, sealedStale),
+            };
+        }, args);
+
+        expect(result.keyChanged).toBe(true);
+
+        // A member keeps reading envelopes addressed to superseded keys, so a
+        // link published before a removal does not stop working.
+        expect(result.memberOpensOld.ok).toBe(true);
+        expect(result.memberOpensOld.text).toEqual("sent before the rotation");
+        expect(result.memberOpensStale.ok).toBe(true);
+        expect(result.memberOpensStale.text).toEqual("sent with the old key");
+
+        // The member who left cannot, even though the envelope is addressed to
+        // the key that existed while they were still in. Key resolution runs
+        // against current membership, not against the epoch on the envelope.
+        expect(result.removedMemberOpensStale.ok).toBe(false);
+        expect(result.removedMemberOpensStale.error).toMatch(/Access denied/i);
+    });
+
     test("Removing several members at once advances the epoch once", async ({
         page,
         backend,

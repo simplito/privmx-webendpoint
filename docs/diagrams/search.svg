@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 872 424" width="872" height="424" role="img" aria-label="Sequence: open the index, begin a transaction, add documents, commit to write the changed fragments back to the Bridge, then search on the device. The client reads only the fragments a query needs.">
+  <style>
+    .paper  { fill: #fbfbfb; }
+    .actor  { fill: #ffffff; stroke: #8a8a8a; stroke-width: 1; }
+    .focal  { fill: #f0f0f0; stroke: #333333; stroke-width: 1.6; }
+    .life   { stroke: #c8c8c8; stroke-width: 1; stroke-dasharray: 3 4; }
+    .bar    { fill: #eeeeee; stroke: #9a9a9a; stroke-width: 0.8; }
+    .frame  { fill: none; stroke: #c8c8c8; stroke-width: 1; }
+    .name   { fill: #1f1f1f; font: 600 12px Arial, Helvetica, sans-serif; }
+    .sub    { fill: #6b6b6b; font: 400 9px Consolas, "Liberation Mono", Menlo, monospace; }
+    .eyebrow{ fill: #9a9a9a; font: 400 7px Consolas, "Liberation Mono", Menlo, monospace; letter-spacing: 0.16em; }
+    .msg    { fill: none; stroke: #7a7a7a; stroke-width: 1.2; }
+    .ret    { fill: none; stroke: #7a7a7a; stroke-width: 1; stroke-dasharray: 4 3; }
+    .mlabel { fill: #2b2b2b; font: 400 10px Consolas, "Liberation Mono", Menlo, monospace; }
+    .note   { fill: #6b6b6b; font: 400 10px Arial, Helvetica, sans-serif; }
+    .head   { fill: #7a7a7a; }
+    @media (prefers-color-scheme: dark) {
+      .paper { fill: #161616; }
+      .actor { fill: #202020; stroke: #6f6f6f; }
+      .focal { fill: #2c2c2c; stroke: #d6d6d6; }
+      .life  { stroke: #4f4f4f; }
+      .bar   { fill: #2a2a2a; stroke: #6f6f6f; }
+      .frame { stroke: #4f4f4f; }
+      .name  { fill: #ededed; }
+      .sub, .note { fill: #a6a6a6; }
+      .eyebrow { fill: #7d7d7d; }
+      .msg, .ret { stroke: #9a9a9a; }
+      .mlabel { fill: #dcdcdc; }
+      .head  { fill: #9a9a9a; }
+    }
+  </style>
+  <defs>
+    <marker id="a" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
+      <path class="head" d="M0,0 L8,4 L0,8 z"/>
+    </marker>
+  </defs>
+
+  <rect class="paper" x="0" y="0" width="872" height="424" rx="8"/>
+
+  <!-- actors -->
+  <rect class="actor" x="48" y="28" width="168" height="44" rx="6"/>
+  <text class="name" x="132" y="47" text-anchor="middle">Your app</text>
+  <text class="sub"  x="132" y="62" text-anchor="middle">SearchApi</text>
+
+  <rect class="focal" x="352" y="28" width="168" height="44" rx="6"/>
+  <text class="name" x="436" y="47" text-anchor="middle">Open index</text>
+  <text class="sub"  x="436" y="62" text-anchor="middle">open in the browser</text>
+
+  <rect class="actor" x="672" y="28" width="152" height="44" rx="6"/>
+  <text class="name" x="748" y="47" text-anchor="middle">PrivMX Bridge</text>
+  <text class="sub"  x="748" y="62" text-anchor="middle">holds the index, sealed</text>
+
+  <!-- lifelines -->
+  <line class="life" x1="132" y1="72" x2="132" y2="384"/>
+  <line class="life" x1="436" y1="72" x2="436" y2="384"/>
+  <line class="life" x1="748" y1="72" x2="748" y2="384"/>
+
+  <!-- activation bar on the index -->
+  <rect class="bar" x="432" y="104" width="8" height="244" rx="2"/>
+
+  <!-- open -->
+  <line class="msg" x1="132" y1="104" x2="428" y2="104" marker-end="url(#a)"/>
+  <text class="mlabel" x="140" y="99">openSearchIndex(indexId)</text>
+  <line class="msg" x1="444" y1="128" x2="744" y2="128" marker-end="url(#a)"/>
+  <text class="mlabel" x="452" y="123">read the fragments it needs</text>
+  <line class="ret" x1="744" y1="152" x2="444" y2="152" marker-end="url(#a)"/>
+  <text class="mlabel" x="452" y="147">those bytes, still sealed</text>
+
+  <!-- open a transaction, then write into it -->
+  <line class="msg" x1="132" y1="180" x2="428" y2="180" marker-end="url(#a)"/>
+  <text class="mlabel" x="140" y="175">beginTransaction(handle)</text>
+
+  <rect class="frame" x="96" y="200" width="376" height="56" rx="4"/>
+  <rect class="paper" x="104" y="194" width="76" height="12" rx="2"/>
+  <text class="eyebrow" x="108" y="203">FOR EACH DOC</text>
+  <line class="msg" x1="132" y1="232" x2="428" y2="232" marker-end="url(#a)"/>
+  <text class="mlabel" x="140" y="227">addDocument(handle, name, text)</text>
+  <text class="note" x="140" y="248">changes stay in the browser</text>
+
+  <!-- commit -->
+  <line class="msg" x1="132" y1="280" x2="428" y2="280" marker-end="url(#a)"/>
+  <text class="mlabel" x="140" y="275">commit(handle)</text>
+  <line class="msg" x1="444" y1="304" x2="744" y2="304" marker-end="url(#a)"/>
+  <text class="mlabel" x="452" y="299">write back only what changed</text>
+
+  <!-- search -->
+  <line class="msg" x1="132" y1="336" x2="428" y2="336" marker-end="url(#a)"/>
+  <text class="mlabel" x="140" y="331">searchDocuments(handle, "invoice")</text>
+  <line class="ret" x1="428" y1="360" x2="136" y2="360" marker-end="url(#a)"/>
+  <text class="mlabel" x="140" y="355">hits, without asking the server</text>
+
+  <text class="note" x="48" y="400">Without a transaction each write commits on its own. Opening an index downloads nothing whole: your app reads the parts a query touches.</text>
+</svg>

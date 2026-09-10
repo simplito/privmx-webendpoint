@@ -28,6 +28,11 @@ import { LockLevel, LockOperationResult } from "../Types.js";
  *
  * All methods reject with `NativeError` on server/crypto errors and throw
  * `Error` when the underlying connection has been closed.
+ *
+ * Not part of the public API: locking exists to serialise writes to a Search
+ * Index and is reached through `SearchApi`, which owns it.
+ *
+ * @internal
  */
 export class LockApi extends BaseApi {
     /**

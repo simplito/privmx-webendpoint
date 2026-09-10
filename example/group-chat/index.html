@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>PrivMX - searchable group chat</title>
+        <style>
+            :root {
+                --line: #e4e4e7;
+                --muted: #71717a;
+                --bg: #fafafa;
+                --ok: #16a34a;
+                --warn: #b45309;
+                --off: #a1a1aa;
+            }
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                font-family: system-ui, sans-serif;
+                max-width: 1080px;
+                margin: 1.5rem auto;
+                padding: 0 1rem;
+                line-height: 1.5;
+                color: #18181b;
+            }
+            h1 {
+                font-size: 1.35rem;
+                margin: 0 0 0.25rem;
+            }
+            h2 {
+                font-size: 1rem;
+                margin: 0;
+            }
+            p.lede {
+                color: var(--muted);
+                font-size: 0.9rem;
+                margin: 0 0 1rem;
+            }
+            button {
+                padding: 0.45rem 0.8rem;
+                cursor: pointer;
+                border: 1px solid var(--line);
+                border-radius: 6px;
+                background: #fff;
+                font: inherit;
+            }
+            button:disabled {
+                opacity: 0.45;
+                cursor: not-allowed;
+            }
+            button.primary {
+                background: #18181b;
+                color: #fff;
+                border-color: #18181b;
+            }
+            input {
+                padding: 0.45rem;
+                border: 1px solid var(--line);
+                border-radius: 6px;
+                font: inherit;
+                min-width: 0;
+            }
+
+            /* Step banner: the single instruction the viewer should act on. */
+            #step {
+                background: #eff6ff;
+                border: 1px solid #bfdbfe;
+                border-radius: 8px;
+                padding: 0.6rem 0.8rem;
+                margin-bottom: 1rem;
+                font-size: 0.9rem;
+                display: flex;
+                gap: 0.75rem;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+            }
+            #roomState {
+                font-family: ui-monospace, monospace;
+                font-size: 0.78rem;
+                color: var(--muted);
+            }
+
+            .panes {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 1rem;
+            }
+            @media (max-width: 720px) {
+                .panes {
+                    grid-template-columns: 1fr;
+                }
+            }
+            .pane {
+                border: 1px solid var(--line);
+                border-radius: 10px;
+                padding: 0.8rem;
+                background: #fff;
+                display: flex;
+                flex-direction: column;
+                gap: 0.55rem;
+            }
+            .pane header {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                justify-content: space-between;
+            }
+            .status {
+                font-size: 0.8rem;
+                color: var(--muted);
+                display: flex;
+                align-items: center;
+                gap: 0.35rem;
+            }
+            .dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                background: var(--off);
+                flex: none;
+            }
+            .dot.on {
+                background: var(--ok);
+            }
+            .dot.warn {
+                background: var(--warn);
+            }
+            .chat {
+                background: var(--bg);
+                border-radius: 8px;
+                padding: 0.6rem;
+                height: 14rem;
+                overflow-y: auto;
+                font-size: 0.87rem;
+            }
+            .chat:empty::after {
+                content: "No messages yet.";
+                color: var(--muted);
+            }
+            .msg {
+                margin: 0.15rem 0;
+                word-break: break-word;
+            }
+            .msg.mine b {
+                color: #1d4ed8;
+            }
+            .msg.hit {
+                background: #fef9c3;
+                border-radius: 4px;
+            }
+            .row {
+                display: flex;
+                gap: 0.4rem;
+            }
+            .row input {
+                flex: 1;
+            }
+            .hint {
+                font-size: 0.78rem;
+                color: var(--muted);
+                min-height: 1.1rem;
+            }
+            .manager {
+                border-top: 1px dashed var(--line);
+                padding-top: 0.5rem;
+                display: flex;
+                gap: 0.4rem;
+                align-items: center;
+                flex-wrap: wrap;
+            }
+            .tag {
+                font-size: 0.7rem;
+                background: #f4f4f5;
+                border: 1px solid var(--line);
+                border-radius: 999px;
+                padding: 0.05rem 0.45rem;
+                color: var(--muted);
+            }
+            #log {
+                margin-top: 1rem;
+                background: #18181b;
+                color: #e4e4e7;
+                border-radius: 8px;
+                padding: 0.7rem;
+                white-space: pre-wrap;
+                font-family: ui-monospace, monospace;
+                font-size: 0.76rem;
+                max-height: 14rem;
+                overflow-y: auto;
+            }
+            details summary {
+                cursor: pointer;
+                font-size: 0.85rem;
+                color: var(--muted);
+            }
+        </style>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
+</html>

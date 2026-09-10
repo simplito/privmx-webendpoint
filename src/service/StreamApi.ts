@@ -223,10 +223,12 @@ export class StreamApi extends BaseApi {
      * Re-wraps the Stream Room's key for its current members and grantee
      * Groups, without changing its data or membership.
      *
-     * Needed after a member is removed from a Group granted access to this
-     * Stream Room: that Group's key epoch advances, `StreamRoom.staleGroups`
-     * names it, and members of the stale Group cannot decrypt media sent under
-     * the current key until this call re-wraps it to the Group's current epoch.
+     * Use it after a member leaves a Group granted access to this Stream Room.
+     * That Group's key epoch advances and `StreamRoom.staleGroups` names it
+     * until the room carries the new one.     *
+     * The next write re-keys it on its own, so this call is for getting there
+     * first, or for the case where a write reports that its automatic re-key
+     * was refused.
      *
      * @param {string} streamRoomId ID of the Stream Room to re-key, from
      *   `StreamRoom.streamRoomId`
