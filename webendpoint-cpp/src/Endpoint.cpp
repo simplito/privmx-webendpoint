@@ -413,6 +413,9 @@ API_FUNCTION(SearchApi, deleteDocument)
 API_FUNCTION(SearchApi, getDocument)
 API_FUNCTION(SearchApi, listDocuments)
 API_FUNCTION(SearchApi, searchDocuments)
+API_FUNCTION(SearchApi, beginTransaction)
+API_FUNCTION(SearchApi, commit)
+API_FUNCTION(SearchApi, rollback)
 
 void LockApi_newLockApi(int taskId, int connectionPtr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {

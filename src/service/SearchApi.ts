@@ -268,4 +268,46 @@ export class SearchApi extends BaseApi {
         pagingQuery
      ]);
   };
+
+  /**
+   * Begins a SQLite transaction on the Search Index.
+   *
+   * @param {number} indexHandle Handle of the Index to begin the transaction on
+   * @returns {Promise<void>} resolves when the transaction has begun
+   */
+  async beginTransaction(
+    indexHandle: number
+  ): Promise<void> {
+     return this.native.beginTransaction(this.servicePtr, [
+        indexHandle
+     ]);
+  };
+
+  /**
+   * Commits the active transaction on the Search Index.
+   *
+   * @param {number} indexHandle Handle of the Index to commit the transaction on
+   * @returns {Promise<void>} resolves when the transaction has been committed
+   */
+  async commit(
+    indexHandle: number
+  ): Promise<void> {
+     return this.native.commit(this.servicePtr, [
+        indexHandle
+     ]);
+  };
+
+  /**
+   * Rolls back the active transaction on the Search Index.
+   *
+   * @param {number} indexHandle Handle of the Index to roll back the transaction on
+   * @returns {Promise<void>} resolves when the transaction has been rolled back
+   */
+  async rollback(
+    indexHandle: number
+  ): Promise<void> {
+     return this.native.rollback(this.servicePtr, [
+        indexHandle
+     ]);
+  };
 }
