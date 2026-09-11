@@ -19,6 +19,7 @@ import {
     ConnectionEventType,
     ConnectionEventSelectorType,
     GroupEventSelectorType,
+    UserWithPubKey,
 } from "../Types.js";
 import { BaseNative } from "../native/BaseNative.js";
 import { UserVerifierInterface } from "./UserVerifierInterface.js";
@@ -26,7 +27,6 @@ import type { ThreadApi } from "./ThreadApi.js";
 import type { StoreApi } from "./StoreApi.js";
 import type { InboxApi } from "./InboxApi.js";
 import type { KvdbApi } from "./KvdbApi.js";
-import type { LockApi } from "./LockApi.js";
 import type { SearchApi } from "./SearchApi.js";
 import type { EventApi } from "./EventApi.js";
 import type { StreamApi } from "./StreamApi.js";
@@ -46,7 +46,6 @@ export interface ConnectionServices {
     createStoreApi(connection: Connection): Promise<StoreApi>;
     createInboxApi(connection: Connection): Promise<InboxApi>;
     createKvdbApi(connection: Connection): Promise<KvdbApi>;
-    createLockApi(connection: Connection): Promise<LockApi>;
     createSearchApi(connection: Connection): Promise<SearchApi>;
     createEventApi(connection: Connection): Promise<EventApi>;
     createStreamApi(connection: Connection): Promise<StreamApi>;
@@ -240,6 +239,51 @@ export class Connection extends BaseApi {
     }
 
     /**
+     * Looks up Context users by id and returns them with their public keys.
+     *
+     * `Thread.users`, `Store.users` and the rest are lists of ids, while
+     * `update*` and `rotate*Keys` want `UserWithPubKey`. This does the lookup
+     * and the paging, so you stop writing that loop.
+     *
+     * Order follows `userIds`, so the result lines up with what you asked for.
+     * A missing id throws rather than dropping out of the list: a silently
+     * shorter roster would revoke somebody by accident.
+     *
+     * @param {string} contextId ID of the Context to look in
+     * @param {string[]} [userIds] ids to resolve; omit to get everyone in the
+     *   Context
+     * @returns {Promise<UserWithPubKey[]>} the users, with their public keys
+     * @throws {Error} when an id is not registered in the Context
+     * @example
+     * const thread = await threads.getThread(threadId);
+     * await threads.updateThread(
+     *     threadId,
+     *     await connection.resolveUsers(contextId, thread.users),
+     *     await connection.resolveUsers(contextId, thread.managers),
+     *     thread.publicMeta, thread.privateMeta, thread.version, false, false,
+     * );
+     */
+    async resolveUsers(contextId: string, userIds?: string[]): Promise<UserWithPubKey[]> {
+        const found = new Map<string, UserWithPubKey>();
+        for (let skip = 0; ; skip += 100) {
+            const page = await this.listContextUsers(contextId, {
+                skip,
+                limit: 100,
+                sortOrder: "asc",
+            });
+            for (const info of page.readItems) found.set(info.user.userId, info.user);
+            if (found.size >= page.totalAvailable || page.readItems.length === 0) break;
+        }
+        if (!userIds) return [...found.values()];
+
+        return userIds.map((id) => {
+            const user = found.get(id);
+            if (!user) throw new Error(`user "${id}" is not registered in context ${contextId}`);
+            return user;
+        });
+    }
+
+    /**
      * Returns the Thread API (encrypted messaging) for this connection.
      *
      * Convenience for `EndpointFactory.createThreadApi(connection)` - both
@@ -290,23 +334,11 @@ export class Connection extends BaseApi {
     }
 
     /**
-     * Returns the Lock API (distributed resource locking) for this connection.
-     *
-     * Convenience for `EndpointFactory.createLockApi(connection)`; resolves the
-     * same cached per-connection instance.
-     *
-     * @returns {Promise<LockApi>} the per-connection LockApi instance
-     */
-    getLockApi(): Promise<LockApi> {
-        return this.services.createLockApi(this);
-    }
-
-    /**
      * Returns the Search API (full-text search indexes) for this connection.
      *
      * Convenience for `EndpointFactory.createSearchApi(connection)`; resolves
      * the same cached per-connection instance and builds the StoreApi, KvdbApi
-     * and LockApi it depends on on first use.
+     * and locking it depends on on first use.
      *
      * @returns {Promise<SearchApi>} the per-connection SearchApi instance
      */

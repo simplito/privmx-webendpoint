@@ -62,7 +62,11 @@ else
 fi
 
 echo "Running Make..."
-emmake make -j20
+# Only the two artifacts installed below. The default `all` target also builds
+# `so` and `tcl`, and if a host TCL is installed (e.g. homebrew tcl-tk) configure
+# sets HAVE_TCL=1 and the tcl shell link feeds the host libtcl*.dylib to wasm-ld,
+# which fails with "unknown file type".
+emmake make -j20 lib sqlite3.h
 
 # ---------------------------------------------------------
 # Manual install step (SQLite-specific, OS-independent)

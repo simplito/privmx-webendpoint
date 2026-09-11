@@ -2,6 +2,7 @@
  * Represents a stream reader for reading a file in chunks.
  */
 import { InboxApi, StoreApi } from "../index.js";
+import { saveFileToDisk } from "../service/fileStreams.js";
 
 export const FILE_DEFAULT_CHUNK_SIZE = 1_048_576;
 
@@ -108,6 +109,8 @@ export class StreamReader {
 interface FileContainerApi {
     writeToFile: (chunk: Uint8Array) => Promise<void>;
     closeFile: () => Promise<string>;
+    /** Absent for Inbox uploads, which are committed by sending the entry. */
+    deleteFile?: (fileId: string) => Promise<void>;
 }
 
 export class FileUploader {
@@ -162,6 +165,9 @@ export class FileUploader {
             },
             writeToFile(chunk) {
                 return storeApi.writeToFile(handle, chunk);
+            },
+            deleteFile(fileId) {
+                return storeApi.deleteFile(fileId);
             },
         });
         return streamer;
@@ -244,13 +250,18 @@ export class FileUploader {
     }
 
     /**
-     * Aborts the uploading process, closes the file handle, and deletes the uploaded part of the file.
+     * Aborts the upload and discards whatever was written.
      *
-     * @returns {Promise<void>} A promise that resolves when the file handle is closed and the uploaded part is deleted.
+     * Closing a write handle *commits* it, so the partial file is deleted
+     * afterwards - otherwise a cancelled upload would leave a truncated file
+     * visible to every member of the container.
+     *
+     * @returns {Promise<void>} A promise that resolves once the partial upload is gone.
      */
 
     public async abort(): Promise<void> {
-        await this._api.closeFile();
+        const partial = await this._api.closeFile().catch(() => "");
+        if (partial) await this._api.deleteFile?.(partial).catch(() => {});
     }
 
     /**
@@ -265,7 +276,11 @@ export class FileUploader {
 }
 
 /**
- * Downloads a file from the server.
+ * Downloads a file from the server and lets the user save it.
+ *
+ * Thin wrapper over {@link saveFileToDisk} in `extra/streams`, which streams
+ * straight to the chosen file where the File System Access API is available.
+ * Prefer that one in new code - it also takes an `AbortSignal`.
  *
  * @param {StoreApi|InboxApi} api - The API instance used for file operations.
  * @param {string} fileId - The ID of the file to download.
@@ -277,36 +292,5 @@ export async function downloadFile(
     fileId: string,
     targetFileName?: string,
 ): Promise<void> {
-    const filename = targetFileName || fileId;
-    const apiReader = await StreamReader.readFile(api, fileId);
-
-    if ("showSaveFilePicker" in window && window.isSecureContext) {
-        //@ts-ignore
-        const systemHandle = (await window.showSaveFilePicker({
-            id: 0,
-            suggestedName: filename,
-            startIn: "downloads",
-        })) as FileSystemFileHandle;
-
-        const accessHandle = await systemHandle.createWritable();
-
-        for await (const [file] of apiReader) {
-            await accessHandle.write(file);
-        }
-        await accessHandle.close();
-    } else {
-        const fileBuffer = await apiReader.getFileContent();
-
-        const anchor = document.createElement("a");
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            if (!e.target) return;
-            anchor.href = e.target.result as string;
-            anchor.download = filename;
-            anchor.click();
-        };
-
-        reader.readAsDataURL(new Blob([fileBuffer]));
-    }
+    return saveFileToDisk(api, fileId, { name: targetFileName });
 }

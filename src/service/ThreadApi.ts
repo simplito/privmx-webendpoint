@@ -187,10 +187,13 @@ export class ThreadApi extends BaseApi {
      * Re-wraps the Thread's key for its current members and grantee Groups,
      * without changing its data or membership.
      *
-     * Needed after a member is removed from a Group granted access to this
-     * Thread: that Group's key epoch advances, `Thread.staleGroups` names it,
-     * and members of the stale Group cannot read content written under the
-     * current key until this call re-wraps it to the Group's current epoch.
+     * Use it after a member leaves a Group granted access to this Thread. That
+     * Group's key epoch advances and `Thread.staleGroups` names it until the
+     * Thread carries the new one.
+     *
+     * The next message re-keys the Thread on its own, so this call is for
+     * getting there first, or for the case where a write reports that its
+     * automatic re-key was refused.
      *
      * @param {string} threadId ID of the Thread to re-key, from
      *   `Thread.threadId`

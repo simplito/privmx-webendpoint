@@ -11,11 +11,20 @@ limitations under the License.
 
 import { BaseApi } from "./BaseApi.js";
 import { GroupApiNative } from "../native/GroupApiNative.js";
+import { groupGrant } from "./groupGrant.js";
+import {
+    openGroupFile,
+    sealGroupFile,
+    sealGroupFileAnonymously,
+    type GroupFileReader,
+    type GroupFileSealer,
+} from "./fileStreams.js";
 import {
     PagingQuery,
     PagingList,
     UserWithPubKey,
     Group,
+    GroupGrantWithKey,
     GroupSummary,
     GroupMemberToAdd,
     ContainerPolicy,
@@ -26,37 +35,139 @@ import {
 } from "../Types.js";
 
 /**
- * Group API: manages Groups - named sets of Context users that can be granted
- * access to containers (Threads, Stores, KVDBs, Inboxes, Stream Rooms) as a
- * unit, instead of listing every member on every container.
+ * Groups: who your app shares things with.
  *
- * Key distribution is backed by a hidden key tree, so removing a member costs
- * work proportional to the logarithm of the group size, and adding one does not
- * advance the Group's key epoch (no container the Group can read has to be
- * re-keyed).
+ * A Group is a named set of Context users with a key of its own. Grant the
+ * Group to a Thread, Store, KVDB, Inbox, Search Index or Stream Room and
+ * membership stops being a property of each container: you edit the Group, and
+ * every container it was granted to follows. That is the difference between
+ * "add Dana to the project" and "add Dana to eleven containers, and remember
+ * the twelfth next week".
  *
- * Obtain an instance via {@link EndpointFactory.createGroupApi}; do not
- * construct it directly.
+ * A Group is also an encryption target in its own right - see *Working without
+ * a container* below - so you can use one long before you decide which module
+ * fits your data.
  *
- * ## Workflow
- * {@link createGroup} → {@link getGroup} (for `groupPubKey` and
- * `keyVersion`) → grant it to a container by passing a `GroupGrantWithKey` to
- * e.g. `ThreadApi.createThread`. Change membership with
- * {@link addGroupMembers} / {@link removeGroupMembers}; after a removal the
- * Group's epoch advances and every granted container must be re-keyed with its
- * `rotate*Keys` method.
+ * Get one from a connection: `await connection.getGroupApi()` (or
+ * {@link EndpointFactory.createGroupApi}). Never construct it directly.
  *
- * ## Sealing content for a Group
- * A Group is also a standalone encryption target: {@link encrypt} /
- * {@link decrypt} for a value, {@link beginFileEncryption} and friends for a
- * file of any size, {@link encryptAnonymously} to seal for a Group you are not
- * a member of. None of it touches your storage - the envelope and the
- * ciphertext are handed back for you to keep wherever you like.
+ * ## Grant a Group instead of a user list
  *
- * Events: {@link buildSubscriptionQuery} (or
- * {@link buildCustomEventSubscriptionQuery} for notifications sent with
- * {@link sendCustomEvent}) → {@link subscribeFor} → consume via
- * {@link EventQueue.waitEvent} → {@link unsubscribeFrom}.
+ * Create the Group, read back its verified key, then hand that to any container
+ * as a `GroupGrantWithKey`. The container's own `users`/`managers` lists stay
+ * available for one-off guests; the Group covers everyone else.
+ *
+ * ```ts
+ * const groups = await connection.getGroupApi();
+ * const threads = await connection.getThreadApi();
+ *
+ * const groupId = await groups.createGroup(
+ *     contextId,
+ *     [alice, bob],                                  // UserWithPubKey[]
+ *     [alice],                                       // managers
+ *     new TextEncoder().encode(JSON.stringify({ name: "Design" })),
+ *     new Uint8Array(),
+ * );
+ *
+ * // `groupPubKey` + `keyVersion` are what a container verifies the grant against.
+ * const group = await groups.getGroup(groupId);
+ * const grant = {
+ *     groupId,
+ *     role: "user",
+ *     groupPubKey: group.groupPubKey,
+ *     groupEpoch: group.keyVersion,
+ * };
+ *
+ * const threadId = await threads.createThread(
+ *     contextId, [alice], [alice], publicMeta, privateMeta, undefined, [grant],
+ * );
+ * ```
+ *
+ * ## Changing membership
+ *
+ * {@link addGroupMembers} is cheap and invisible to your containers: the epoch
+ * does not move, so nothing has to be re-keyed and the newcomer can read what
+ * was written before they arrived.
+ *
+ * {@link removeGroupMembers} advances the epoch, which is what cuts the leaver
+ * off. Containers granted to the Group then hold a key wrapped to the old epoch
+ * and list the Group in `staleGroups`.
+ *
+ * You do not have to re-key them yourself. The next write to a container
+ * re-keys it and retries the write, so a chat that keeps chatting repairs
+ * itself. Call `rotate*Keys` when you want the container current before anyone
+ * writes, or when a write comes back saying the automatic re-key was refused,
+ * which happens when that container's `rotateKeys` policy does not let the
+ * writer do it.
+ *
+ * Remove people in one batch rather than one call per person: the epoch moves
+ * once either way.
+ *
+ * A removal also changes the Group's identity key. `removeGroupMembers` mints a
+ * new `keyVersion` and a new `groupPubKey` together, and it is the only call
+ * that does: {@link addGroupMembers}, {@link updateGroupPublicMeta},
+ * {@link updateGroupPrivateMeta} and {@link updateGroupPolicy} leave both
+ * alone, while {@link createGroup} mints the first. Anything that copied
+ * `groupPubKey` - a grant, a link an outsider seals with - is holding a
+ * superseded key afterwards, so re-read it from {@link getGroup} or let
+ * {@link grantFor} do it.
+ *
+ * ```ts
+ * await groups.removeGroupMembers(groupId, ["bob", "carol"]); // one epoch bump
+ *
+ * // Nothing else is required. The next sendMessage re-keys the Thread on the
+ * // way through. To re-key on the spot instead:
+ * const thread = await threads.getThread(threadId);
+ * const g = await groups.getGroup(groupId);                   // current epoch key
+ * // `thread.users` holds ids, while rotate*Keys re-wraps to public keys -
+ * // resolve them from `connection.listContextUsers` or your own roster.
+ * await threads.rotateThreadKeys(
+ *     threadId, withKeys(thread.users), withKeys(thread.managers), thread.version, false,
+ *     [{ groupId, role: "user", groupPubKey: g.groupPubKey, groupEpoch: g.keyVersion }],
+ * );
+ * ```
+ *
+ * ## Working without a container
+ *
+ * {@link encrypt} seals a value for the Group and signs it, so a reader learns
+ * who wrote it; {@link decrypt} reports which of the two kinds it got, and that
+ * - not a non-empty author field - is what to branch on.
+ * {@link encryptAnonymously} needs only the Group's ID and public key, works
+ * without membership and without a server call, and is unattributable by
+ * construction. {@link beginFileEncryption} and friends do the same for a file
+ * of any size, in chunks, with ranged reads via {@link seekInEncryptedFile}.
+ *
+ * Nothing here touches storage: you get an envelope and, for files, ciphertext,
+ * and you keep them wherever you like - your bucket, your database, a file the
+ * user downloads. Neither reveals anything to whoever holds it.
+ *
+ * ```ts
+ * const sealed = await groups.encrypt(groupId, new TextEncoder().encode("ship it"));
+ * await myBucket.put(key, sealed);                    // your storage, your rules
+ *
+ * const opened = await groups.decrypt(await myBucket.get(key));
+ * if (opened.type === Types.EnvelopeType.ENVELOPE_FROM_MEMBER) {
+ *     console.log("signed by", opened.authorPubKey);
+ * }
+ * ```
+ *
+ * ## Live notifications
+ *
+ * {@link sendCustomEvent} fans a small sealed payload out to the Group's
+ * members - one request however large the Group - and is the right tool for
+ * "someone is typing", "a new object landed". It is a notification, not a
+ * record: whoever is offline misses it. Subscribe with
+ * {@link buildCustomEventSubscriptionQuery} → {@link subscribeFor}, or use the
+ * `createGroupCustomEventSubscription` helper with an event manager. Group
+ * lifecycle events (created / updated / deleted) come from
+ * {@link buildSubscriptionQuery} the same way.
+ *
+ * ## Cost, in one line
+ *
+ * Adding members is a single delta over their shared key-tree paths, and
+ * removing one costs work proportional to the *logarithm* of the Group size -
+ * so Groups of thousands are a normal thing to build on, and a removal does not
+ * become slower as the Group grows.
  *
  * All methods reject with `NativeError` on server/crypto errors and throw
  * `Error` when the underlying connection has been closed.
@@ -127,6 +238,13 @@ export class GroupApi extends BaseApi {
      * through untouched: seating a member is not a metadata edit, which is what
      * {@link updateGroupPublicMeta} / {@link updateGroupPrivateMeta} are for.
      *
+     * ```ts
+     * await groups.addGroupMembers(groupId, [
+     *     { user: { userId: "dana", pubKey: danaPubKey }, role: "user" },
+     *     { user: { userId: "erin", pubKey: erinPubKey }, role: "manager" },
+     * ]);
+     * ```
+     *
      * @param {string} groupId ID of the Group, returned by {@link createGroup}
      * @param {GroupMemberToAdd[]} newMembers members to add, each with their
      *   public key and the role they take ("user" or "manager")
@@ -144,10 +262,16 @@ export class GroupApi extends BaseApi {
      * This is why the batch exists: removing members one at a time advances the
      * epoch per member, so every container the Group can read goes stale once
      * per removal. A batch costs one epoch and one metadata re-wrap however many
-     * members leave. Containers the Group can read must be re-keyed afterwards
-     * with their `rotate*Keys` method; the Bridge refuses new content written
-     * under the superseded epoch until they are (see `Thread.staleGroups` and
-     * friends).
+     * members leave.
+     *
+     * The new epoch comes with a new `groupPubKey`, so anything that copied the
+     * old one is holding a superseded key.
+     *
+     * Containers granted to the Group list it in `staleGroups` until they carry
+     * the new epoch. The next write to a container re-keys it and goes through,
+     * so this call needs no follow-up. `rotate*Keys` is there for when you want
+     * a container current before anyone writes, or when a write reports that
+     * the automatic re-key was refused.
      *
      * Incremental - only the leavers are named; the roster that remains is
      * derived from the Group's own verified history, and metadata carries
@@ -267,6 +391,33 @@ export class GroupApi extends BaseApi {
      */
     async getGroup(groupId: string): Promise<Group> {
         return this.native.getGroup(this.servicePtr, [groupId]);
+    }
+
+    /**
+     * Reads the Group and returns the grant that gives it access to a
+     * container, in one call.
+     *
+     * Saves the two steps every container creation otherwise repeats: fetch the
+     * Group for its current key, then copy four fields into a grant. Reach for
+     * {@link groupGrant} instead when you already hold the Group and want no
+     * round trip.
+     *
+     * @param {string} groupId ID of the Group to grant
+     * @param {"user" | "manager"} [role] what the Group may do in the
+     *   container: read and write as a user, or also change the container as a
+     *   manager. Defaults to `"user"`
+     * @returns {GroupGrantWithKey} the grant to pass in a container's `groups`
+     *   list
+     * @throws {NativeError} when the Group does not exist or the user cannot
+     *   read it
+     * @example
+     * const grant = await groups.grantFor(groupId);
+     * const threadId = await threads.createThread(
+     *     contextId, [me], [me], publicMeta, privateMeta, undefined, [grant],
+     * );
+     */
+    async grantFor(groupId: string, role: "user" | "manager" = "user"): Promise<GroupGrantWithKey> {
+        return groupGrant(await this.getGroup(groupId), role);
     }
 
     /**
@@ -606,6 +757,29 @@ export class GroupApi extends BaseApi {
      * the time misses it. Anything that has to survive belongs in a Store or a
      * Thread.
      *
+     * Sending, and receiving on the other side:
+     *
+     * ```ts
+     * await groups.sendCustomEvent(groupId, "presence", enc(JSON.stringify({ typing: true })));
+     *
+     * // recipients, once per connection
+     * const events = await connection.getEventManager();
+     * await events.subscribe([
+     *     createGroupCustomEventSubscription({
+     *         channel: "presence",
+     *         selector: Types.GroupEventSelectorType.GROUP_ID,
+     *         id: groupId,
+     *         callbacks: [
+     *             (e) => {
+     *                 if (e.data.statusCode !== 0) return;   // could not be opened
+     *                 const { typing } = JSON.parse(dec(e.data.payload));
+     *                 showTyping(e.data.authorPubKey, typing); // verified sender
+     *             },
+     *         ],
+     *     }),
+     * ]);
+     * ```
+     *
      * @param {string} groupId ID of the Group to notify
      * @param {string} channelName name of the channel, chosen by you; recipients
      *   subscribe to it with {@link buildCustomEventSubscriptionQuery}. Must not
@@ -685,6 +859,100 @@ export class GroupApi extends BaseApi {
             selectorType,
             selectorId,
         ]);
+    }
+
+    // --- files, as streams ------------------------------------------------
+
+    /**
+     * Seals a file for this Group as a `TransformStream`: plaintext in,
+     * ciphertext out, envelope on the side.
+     *
+     * The high-level counterpart of {@link beginFileEncryption} /
+     * {@link encryptFileChunk} / {@link finishFileEncryption} - same core, but
+     * the chunking, the ordering and the backpressure are the stream's problem
+     * rather than yours. A slow sink throttles the reader, so a file larger than
+     * memory still goes through.
+     *
+     * This signs the file as you. To seal one without saying who sent it, use
+     * {@link sealFileAnonymously}.
+     *
+     * Keep both outputs. The ciphertext is the file; the envelope is the header
+     * naming the Group, the key version, the author and the size, and without it
+     * nobody opens the ciphertext - not even a member of the Group.
+     *
+     * @param {object} opts `groupId` and the plaintext `size` in bytes
+     * @returns {GroupFileSealer} a `TransformStream` whose `envelope` resolves
+     *   once the stream has closed
+     * @throws {NativeError} when the Group does not exist or you are not a
+     *   member of it
+     * @example
+     * const sealer = groups.sealFile({ groupId, size: file.size });
+     * await file.stream().pipeThrough(sealer).pipeTo(myBucket.writable(key));
+     * await myBucket.put(`${key}.envelope`, await sealer.envelope);
+     */
+    sealFile(opts: { groupId: string; size: number }): GroupFileSealer {
+        return sealGroupFile(this, opts);
+    }
+
+    /**
+     * Seals a file for a Group without saying who sent it.
+     *
+     * The file counterpart of {@link encryptAnonymously}, and driven exactly
+     * like {@link sealFile}. It needs public information only - the Group's ID
+     * and its `groupPubKey` - so it works without membership and makes no
+     * server call. A throwaway keypair per call is what makes the result
+     * unattributable, and it is also why you cannot read back what you sealed.
+     *
+     * Nothing about it is attributable, so nothing about it is authorised or
+     * metered either: if you accept these from the open internet, bound the size
+     * and the volume in your own transport.
+     *
+     * @param {object} opts `groupId`, the Group's `groupPubKey` (base58-DER, from
+     *   `Group.groupPubKey`), and the plaintext `size` in bytes
+     * @returns {GroupFileSealer} a `TransformStream` whose `envelope` resolves
+     *   once the stream has closed
+     * @throws {NativeError} when `groupPubKey` is not a valid public key
+     * @example
+     * const sealer = groups.sealFileAnonymously({ groupId, groupPubKey, size: file.size });
+     * await file.stream().pipeThrough(sealer).pipeTo(anywhere);
+     */
+    sealFileAnonymously(opts: {
+        groupId: string;
+        groupPubKey: string;
+        size: number;
+    }): GroupFileSealer {
+        return sealGroupFileAnonymously(this, opts);
+    }
+
+    /**
+     * Opens a file sealed for this Group: ciphertext in, plaintext out.
+     *
+     * The high-level counterpart of {@link beginFileDecryption} /
+     * {@link decryptFileChunk} / {@link finishFileDecryption}, including the
+     * 4 MiB feed limit, which it applies for you.
+     *
+     * Feed the whole ciphertext and `info.complete` tells you whether the file
+     * arrived whole - the one question only a start-to-end read can answer. Pass
+     * `from` to read a range instead: fetch from the returned
+     * `ciphertextOffset` and the output starts exactly at the plaintext byte you
+     * asked for. Fetch only the range you need; that, not the `length` trim, is
+     * what makes a ranged read cheap.
+     *
+     * @param {Uint8Array} envelope the envelope kept alongside the ciphertext
+     * @param {object} [opts] `from` - plaintext offset to start at; `length` -
+     *   trim the output to this many bytes
+     * @returns {Promise<GroupFileReader>} the stream, where to feed it from, and
+     *   what the file turned out to be
+     * @example
+     * const r = await groups.openFile(envelope);
+     * const blob = await new Response(ciphertext.pipeThrough(r.stream)).blob();
+     * if (!(await r.info).complete) throw new Error("the file was cut short");
+     */
+    openFile(
+        envelope: Uint8Array,
+        opts: { from?: number; length?: number } = {},
+    ): Promise<GroupFileReader> {
+        return openGroupFile(this, envelope, opts);
     }
 
     /**

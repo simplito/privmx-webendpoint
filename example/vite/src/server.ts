@@ -32,14 +32,17 @@ type ServerConfig = { [K in keyof typeof cfg]: string };
 
 function requireConfig(): ServerConfig {
     const missing = Object.entries(cfg)
-        .filter(([, v]) => !v)
+        // bridgeUrl is optional: left empty, everything goes to this page's own
+        // origin, which the dev server proxies to the Bridge (PRIVMX_BRIDGE_PROXY
+        // in vite.config.ts). Set it to reach a Bridge that serves CORS itself.
+        .filter(([k, v]) => !v && k !== "bridgeUrl")
         .map(([k]) => `VITE_PRIVMX_${k.replace(/([A-Z])/g, "_$1").toUpperCase()}`);
     if (missing.length) {
         throw new Error(
             `Backend not configured - set ${missing.join(", ")} in .env.local and restart \`npm run dev\`.`,
         );
     }
-    return cfg as ServerConfig;
+    return { ...cfg, bridgeUrl: cfg.bridgeUrl || location.origin } as ServerConfig;
 }
 
 let rpcId = 1;

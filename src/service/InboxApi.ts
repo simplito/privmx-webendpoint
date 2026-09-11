@@ -10,6 +10,7 @@ limitations under the License.
 */
 
 import { BaseApi } from "./BaseApi.js";
+import { fileReadable, saveFileToDisk } from "./fileStreams.js";
 import { InboxApiNative } from "../native/InboxApiNative.js";
 import {
     PagingQuery,
@@ -191,11 +192,15 @@ export class InboxApi extends BaseApi {
      * Re-wraps the Inbox's key for its current members and grantee Groups,
      * without changing its data or membership.
      *
-     * Needed after a member is removed from a Group granted access to this
-     * Inbox: that Group's key epoch advances, `Inbox.staleGroups` names it, and
-     * members of the stale Group cannot read entries written under the current
-     * key until this call re-wraps it to the Group's current epoch. An Inbox
-     * re-keys its inner Thread and Store alongside itself.
+     * Use it after a member leaves a Group granted access to this Inbox. That
+     * Group's key epoch advances and `Inbox.staleGroups` names it until the
+     * Inbox carries the new one. An Inbox re-keys its inner Thread and Store
+     * alongside itself.
+     *
+     * An Inbox needs this call more than the other containers do. A submission
+     * arrives from someone who may not be named on the Inbox at all, so it
+     * cannot re-key on the way through the way a member's write does. Until a
+     * member re-keys, submissions fail with a stale-key error.
      *
      * @param {string} inboxId ID of the Inbox to re-key, from `Inbox.inboxId`
      * @param {UserWithPubKey[]} users current member list
@@ -667,5 +672,40 @@ export class InboxApi extends BaseApi {
             selectorType,
             selectorId,
         ]);
+    }
+
+    // --- files, as streams ------------------------------------------------
+
+    /**
+     * Reads an entry's attachment as a stream.
+     *
+     * The high-level counterpart of {@link openFile} → {@link readFromFile} →
+     * {@link closeFile}; the handle is closed for you when the stream ends, is
+     * cancelled or errors.
+     *
+     * @param {string} fileId ID of the file, from an entry's `files`
+     * @param {object} [opts] `length` - stop after this many bytes;
+     *   `chunkSize` - bytes per read, default 1 MiB
+     * @returns {ReadableStream<Uint8Array>} the decrypted content
+     */
+    fileReadable(
+        fileId: string,
+        opts: { length?: number; chunkSize?: number } = {},
+    ): ReadableStream<Uint8Array> {
+        return fileReadable(this, fileId, opts);
+    }
+
+    /**
+     * Downloads an attachment and lets the user save it.
+     *
+     * @param {string} fileId ID of the file to download
+     * @param {object} [opts] `name` for the saved file, and a `signal` to abort
+     * @returns {Promise<void>} resolves when the file has been written or offered
+     */
+    saveFileToDisk(
+        fileId: string,
+        opts: { name?: string; signal?: AbortSignal } = {},
+    ): Promise<void> {
+        return saveFileToDisk(this, fileId, opts);
     }
 }

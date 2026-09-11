@@ -13,7 +13,70 @@ import { BaseApi } from "./BaseApi.js";
 import { SearchApiNative } from "../native/SearchApiNative.js";
 import { ContainerPolicy, GroupGrantWithKey, IndexMode, PagingList, PagingQuery, SearchIndex, UserWithPubKey, Document } from "../Types.js";
 
+/**
+ * Full-text search over end-to-end encrypted documents.
+ *
+ * A server holding ciphertext cannot run your query. A Search Index keeps the
+ * index where the plaintext already is. The Bridge stores it encrypted, your app
+ * opens it in the browser and changes it as documents come and go, and queries
+ * are answered on the device.
+ *
+ * Opening an Index downloads nothing. The engine reads the fragments a query
+ * needs, at byte offsets, and writes back the parts it changed, so an Index far
+ * larger than memory still works.
+ *
+ * An Index is a container like any other: same `users` and `managers`, same
+ * `groups` grant, same `staleGroups`. After a Group loses a member the next
+ * write re-keys the Index by itself, and {@link rotateSearchIndexKeys} is there
+ * for when you want it current sooner. Get one from a connection:
+ * `await connection.getSearchApi()`.
+ *
+ * ## Workflow
+ *
+ * {@link createSearchIndex} once, then per session
+ * {@link openSearchIndex} → {@link addDocument} / {@link searchDocuments} →
+ * {@link closeSearchIndex}.
+ *
+ * ```ts
+ * const handle = await search.openSearchIndex(indexId);
+ * await search.addDocument(handle, messageId, "the invoice was rewritten");
+ *
+ * const hits = await search.searchDocuments(handle, "invoice", pagingQuery);
+ * // hits.readItems[].name is what you indexed under - a message id, a file id…
+ *
+ * await search.closeSearchIndex(handle);
+ * ```
+ *
+ * `IndexMode.WITH_CONTENT` keeps the text inside the Index so results can carry
+ * it; `WITHOUT_CONTENT` keeps only what is needed to match, for when the content
+ * already lives in a Thread or Store and `name` is the pointer to it.
+ *
+ * ## Commit as few times as you can
+ *
+ * Each commit writes the changed fragments and syncs them, so a commit per
+ * document costs a round of network writes per document. Batch them:
+ *
+ * ```ts
+ * await search.beginTransaction(handle);
+ * for (const m of batch) await search.addDocument(handle, m.id, m.text);
+ * await search.commit(handle);      // one upload; {@link rollback} discards instead
+ * ```
+ *
+ * A document is findable by other members only once the commit lands.
+ *
+ * ## One open handle per Index
+ *
+ * Two open handles on the same Index leave it empty for whoever holds the older
+ * one. Close the previous handle before opening another.
+ *
+ * All methods reject with `NativeError` on server/crypto errors and throw
+ * `Error` when the underlying connection has been closed.
+ */
 export class SearchApi extends BaseApi {
+  /**
+   * Created by EndpointFactory - never constructed by SDK users.
+   * @internal
+   */
   constructor(private native: SearchApiNative, ptr: number) {
     super(ptr);
   }
@@ -98,32 +161,26 @@ export class SearchApi extends BaseApi {
   }
 
   /**
-   * Re-encrypts the Search Index keys for all current members without changing
-   * data, membership or policy. Unlike {@link updateSearchIndex} this can be
-   * called by any Index member (not just managers) while the default
-   * `rotateKeys` policy of "user" is in effect.
+   * Re-wraps the Index's key for its current members and grantee Groups, without
+   * changing its data or membership.
    *
-   * Both containers backing the Index are re-keyed, each against its own
-   * current version, so a half that was already re-keyed on its own (see
-   * `SearchIndex.staleGroups`) does not fail the call.
+   * Use it after a member leaves a Group granted access to this Index. That
+   * Group's key epoch advances and `SearchIndex.staleGroups` names it until the
+   * Index carries the new one.
    *
-   * The keys are re-wrapped to every one of the Index's grantee Groups at that
-   * Group's current epoch, whether or not the caller names it in `groups`: the
-   * grantee list comes from the Index itself, and any epoch public key missing
-   * from `groups` is read from the Bridge. A caller who belongs to none of the
-   * Index's grantee Groups, and cannot supply their epoch keys in `groups`
-   * either, gets an unresolved-group-grantee error naming the Group it could
-   * not resolve.
+   * The next write re-keys it on its own, so this call is for getting there
+   * first, or for the case where a write reports that its automatic re-key was
+   * refused.
    *
    * @param {string} indexId ID of the Index to re-key
-   * @param {UserWithPubKey[]} users current Index users with their public keys
-   * @param {UserWithPubKey[]} managers current Index managers with their public keys
-   * @param {number} version current Index version (optimistic lock guard)
-   * @param {boolean} force skip the version check when true
-   * @param {GroupGrantWithKey[]} [groups] epoch public keys of grantee Groups
-   *   the caller has verified itself; optional, and Groups the Index does not
-   *   grant are ignored - a re-key changes no grants
-   * @returns {Promise<void>} resolves when the Index's keys have been rotated on the server
+   * @param {UserWithPubKey[]} users current member list
+   * @param {UserWithPubKey[]} managers current manager list
+   * @param {number} version current Index version, from `SearchIndex.version`
+   * @param {boolean} force `true` skips the `version` check
+   * @param {GroupGrantWithKey[]} [groups] grantee Groups with their *current*
+   *   `groupPubKey`/`groupEpoch`, from {@link GroupApi.getGroup}; omit to read
+   *   them from the Index itself
+   * @returns {Promise<void>} resolves when the Index's key has been re-wrapped
    */
   async rotateSearchIndexKeys(
     indexId: string,
@@ -325,7 +382,7 @@ export class SearchApi extends BaseApi {
   };
 
   /**
-   * Begins a SQLite transaction on the Search Index.
+   * Opens a transaction on the Search Index.
    *
    * @param {number} indexHandle Handle of the Index to begin the transaction on
    * @returns {Promise<void>} resolves when the transaction has begun
@@ -339,7 +396,7 @@ export class SearchApi extends BaseApi {
   };
 
   /**
-   * Commits the active transaction on the Search Index.
+   * Commits the open transaction, writing the changed fragments back.
    *
    * @param {number} indexHandle Handle of the Index to commit the transaction on
    * @returns {Promise<void>} resolves when the transaction has been committed

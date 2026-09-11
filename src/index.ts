@@ -31,7 +31,6 @@ import {
     InboxApi,
     KvdbApi,
     GroupApi,
-    LockApi,
     Connection,
     CryptoApi,
     BaseApi,
@@ -86,6 +85,21 @@ export type {
     EventsCallbackPayload,
 } from "./events/index.js";
 
+// Small helpers that need no API instance: data shaping you would otherwise
+// write again in every project.
+export { groupGrant } from "./service/groupGrant.js";
+export { serializeObject, deserializeObject, strToUint8, uint8ToStr } from "./extra/utils.js";
+
+// Stream pieces that belong to no single API: drop them into any pipeline.
+export { progressStream, takeStream, DEFAULT_CHUNK_SIZE } from "./service/fileStreams.js";
+export type {
+    FileLike,
+    GroupFileReader,
+    GroupFileSealer,
+    StoreFileHandle,
+    StoreFileWriter,
+} from "./service/fileStreams.js";
+
 export {
     EndpointFactory as Endpoint,
     setupAuto,
@@ -98,7 +112,6 @@ export {
     InboxApi,
     KvdbApi,
     GroupApi,
-    LockApi,
     CryptoApi,
     StreamApi,
     SearchApi,
