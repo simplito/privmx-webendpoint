@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PRIVMX_ENDPOINT="feat/group-api"
+PRIVMX_ENDPOINT="f30ddd047ea10027bb2f34d42239311f70cc8b85"
 PSON_CPP="v1.0.7"
 GMP="6.3.0"
 POCO="1.10.1"
