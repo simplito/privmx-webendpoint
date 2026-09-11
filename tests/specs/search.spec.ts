@@ -251,19 +251,18 @@ test.describe("SearchTest", () => {
                 sameAsFactory: searchApi === (await Endpoint.createSearchApi(connection)),
                 stableAcrossCalls: searchApi === (await connection.getSearchApi()),
                 // The dependencies SearchApi pulled from the container are the
-                // same instances the caller resolves directly.
+                // same instances the caller resolves directly. LockApi is
+                // internal - it has no accessor on Connection, so it is not
+                // checked here.
                 sharesStoreApi:
                     (await Endpoint.createStoreApi(connection)) ===
                     (await connection.getStoreApi()),
-                sharesLockApi:
-                    (await Endpoint.createLockApi(connection)) === (await connection.getLockApi()),
             };
         }, args);
 
         expect(identities.sameAsFactory).toBe(true);
         expect(identities.stableAcrossCalls).toBe(true);
         expect(identities.sharesStoreApi).toBe(true);
-        expect(identities.sharesLockApi).toBe(true);
     });
     // Regression for: a container re-key used to break write handles that were
     // already open, and the failure surfaced as a bogus "disk I/O error" while
@@ -374,9 +373,7 @@ test.describe("SearchTest", () => {
                 );
 
                 // Removing a member advances the group epoch, leaving the index stale.
-                await groupApi.removeGroupMember(
-                    groupId, users.u2.id, [u1Obj], [u1Obj], group.publicMeta, group.privateMeta,
-                );
+                await groupApi.removeGroupMembers(groupId, [users.u2.id]);
                 const stale = await searchApi.getSearchIndex(indexId);
 
                 await searchApi.rotateSearchIndexKeys(indexId, [u1Obj], [u1Obj], stale.version, false);
@@ -446,9 +443,7 @@ test.describe("SearchTest", () => {
                 await searchApi.closeSearchIndex(firstHandle);
 
                 // Bump the epoch and deliberately do NOT re-key anything.
-                await groupApi.removeGroupMember(
-                    groupId, users.u2.id, [u1Obj], [u1Obj], group.publicMeta, group.privateMeta,
-                );
+                await groupApi.removeGroupMembers(groupId, [users.u2.id]);
                 const stale = await searchApi.getSearchIndex(indexId);
 
                 // Opening for writing must succeed and leave the index usable.

@@ -534,7 +534,9 @@ test.describe("LockTest", () => {
         }
     });
 
-    test("connection.getLockApi() resolves the same cached instance as the factory", async ({
+    // LockApi is internal (no accessor on Connection), so caching is checked
+    // through the factory alone.
+    test("Endpoint.createLockApi() resolves the same cached instance per connection", async ({
         page,
         backend,
         cli,
@@ -549,15 +551,13 @@ test.describe("LockTest", () => {
         const identities = await page.evaluate(async ({ bridgeUrl, solutionId, users }) => {
             const Endpoint = window.Endpoint;
             const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
-            const lockApi = await connection.getLockApi();
+            const lockApi = await Endpoint.createLockApi(connection);
 
             return {
-                sameAsFactory: lockApi === (await Endpoint.createLockApi(connection)),
-                stableAcrossCalls: lockApi === (await connection.getLockApi()),
+                stableAcrossCalls: lockApi === (await Endpoint.createLockApi(connection)),
             };
         }, args);
 
-        expect(identities.sameAsFactory).toBe(true);
         expect(identities.stableAcrossCalls).toBe(true);
     });
 
