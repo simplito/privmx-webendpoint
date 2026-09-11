@@ -18,6 +18,7 @@ import {
     UserInfo,
     ConnectionEventType,
     ConnectionEventSelectorType,
+    GroupEventSelectorType,
 } from "../Types.js";
 import { BaseNative } from "../native/BaseNative.js";
 import { UserVerifierInterface } from "./UserVerifierInterface.js";
@@ -29,6 +30,7 @@ import type { LockApi } from "./LockApi.js";
 import type { SearchApi } from "./SearchApi.js";
 import type { EventApi } from "./EventApi.js";
 import type { StreamApi } from "./StreamApi.js";
+import type { GroupApi } from "./GroupApi.js";
 import { EventManager, connectionStatusSubscriber } from "../events/EventManager.js";
 import type { EventLoop } from "../events/EventLoop.js";
 
@@ -48,6 +50,7 @@ export interface ConnectionServices {
     createSearchApi(connection: Connection): Promise<SearchApi>;
     createEventApi(connection: Connection): Promise<EventApi>;
     createStreamApi(connection: Connection): Promise<StreamApi>;
+    createGroupApi(connection: Connection): Promise<GroupApi>;
     getEventLoop(): Promise<EventLoop>;
 }
 
@@ -337,6 +340,20 @@ export class Connection extends BaseApi {
     }
 
     /**
+     * Returns the Group API (Groups granted access to containers as a unit) for
+     * this connection.
+     *
+     * Convenience for `EndpointFactory.createGroupApi(connection)`; resolves the
+     * same cached per-connection instance that every container API of this
+     * connection is built on.
+     *
+     * @returns {Promise<GroupApi>} the per-connection GroupApi instance
+     */
+    getGroupApi(): Promise<GroupApi> {
+        return this.services.createGroupApi(this);
+    }
+
+    /**
      * Returns the single {@link EventManager} for this connection. Subscribe to
      * events of any module (Threads, Stores, Inboxes, KVDBs, custom events, user
      * and connection-state) through it - build entries with the typed
@@ -363,6 +380,25 @@ export class Connection extends BaseApi {
                             return this.getInboxApi();
                         case "kvdb":
                             return this.getKvdbApi();
+                        case "group":
+                            return this.getGroupApi();
+                        case "groupCustom":
+                            // Same GroupApi, but the query is built from a channel name
+                            // instead of a GroupEventType - hence its own module.
+                            return this.getGroupApi().then((api) => ({
+                                subscribeFor: (queries: string[]) => api.subscribeFor(queries),
+                                unsubscribeFrom: (ids: string[]) => api.unsubscribeFrom(ids),
+                                buildSubscriptionQuery: (
+                                    channelName: string,
+                                    selectorType: GroupEventSelectorType,
+                                    selectorId: string,
+                                ) =>
+                                    api.buildCustomEventSubscriptionQuery(
+                                        channelName,
+                                        selectorType,
+                                        selectorId,
+                                    ),
+                            }));
                         case "event":
                             return this.getEventApi();
                         case "user":
@@ -440,7 +476,6 @@ export class Connection extends BaseApi {
     setUserVerifier(verifier: UserVerifierInterface): Promise<void> {
         return this.native.setUserVerifier(this.servicePtr, [this.servicePtr, verifier]);
     }
-
 
     private async freeApis() {
         for (const apiId in this.apisRefs) {

@@ -18,6 +18,7 @@ import {
     InboxEntry,
     FilesConfig,
     ContainerWithoutItemPolicy,
+    GroupGrantWithKey,
     InboxEventType,
     InboxEventSelectorType,
 } from "../Types.js";
@@ -33,9 +34,16 @@ export class InboxApiNative extends BaseNative {
         connectionPtr: number,
         threadApiPtr: number,
         storeApiPtr: number,
+        groupApiPtr: number,
     ): Promise<number> {
         return this.runAsync<number>((taskId) =>
-            this.api.lib.InboxApi_newInboxApi(taskId, connectionPtr, threadApiPtr, storeApiPtr),
+            this.api.lib.InboxApi_newInboxApi(
+                taskId,
+                connectionPtr,
+                threadApiPtr,
+                storeApiPtr,
+                groupApiPtr,
+            ),
         );
     }
     async deleteApi(ptr: number): Promise<void> {
@@ -55,6 +63,7 @@ export class InboxApiNative extends BaseNative {
             Uint8Array,
             FilesConfig | undefined,
             ContainerWithoutItemPolicy | undefined,
+            GroupGrantWithKey[],
         ],
     ): Promise<string> {
         return this.runAsync<string>((taskId) =>
@@ -74,10 +83,19 @@ export class InboxApiNative extends BaseNative {
             boolean,
             boolean,
             ContainerWithoutItemPolicy | undefined,
+            GroupGrantWithKey[],
         ],
     ): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.InboxApi_updateInbox(taskId, ptr, args),
+        );
+    }
+    async rotateInboxKeys(
+        ptr: number,
+        args: [string, UserWithPubKey[], UserWithPubKey[], number, boolean, GroupGrantWithKey[]],
+    ): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.InboxApi_rotateInboxKeys(taskId, ptr, args),
         );
     }
     async getInbox(ptr: number, args: [string]): Promise<Inbox> {

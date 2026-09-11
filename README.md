@@ -77,8 +77,8 @@ device**. The Bridge is effectively zero-knowledge about your plaintext.
 You bootstrap through **`Endpoint`** (the `EndpointFactory` static facade) -
 `setup` / `setupAuto`, `connect` / `connectPublic` - then create the per-feature
 APIs straight off the connection: `connection.getThreadApi()`,
-`getStoreApi()`, `getInboxApi()`, `getKvdbApi()`, `getLockApi()`, `getStreamApi()`,
-`getEventManager()`. (`Endpoint.createThreadApi(connection)` does the same thing
+`getStoreApi()`, `getInboxApi()`, `getKvdbApi()`, `getLockApi()`, `getSearchApi()`, `getStreamApi()`,
+`getGroupApi()`, `getEventManager()`. (`Endpoint.createThreadApi(connection)` does the same thing
 if you prefer the static form.)
 
 ---
@@ -93,6 +93,7 @@ if you prefer the static form.)
 | **KVDB** | Encrypted key-value records | `KvdbApi` |
 | **Lock** | Distributed locking of arbitrary resources | `LockApi` |
 | **Stream** | Real-time E2EE WebRTC audio/video | `StreamApi` |
+| **Group** | A set of Context users granted access to containers as a unit | `GroupApi` |
 | **Events** | Server-pushed change notifications | `EventQueue` / event managers |
 
 A few terms you'll meet immediately:
@@ -400,7 +401,8 @@ await events.unsubscribe(ids);
 
 Build each entry with the typed `create*Subscription` helper for the module you
 want (`createThreadSubscription`, `createStoreSubscription`,
-`createInboxSubscription`, `createKvdbSubscription`, `createEventSubscription`,
+`createInboxSubscription`, `createKvdbSubscription`, `createGroupSubscription`,
+`createGroupCustomEventSubscription`, `createEventSubscription`,
 `createUserEventSubscription`, `createConnectionSubscription`). `PrivmxClient`
 exposes the same single `getEventManager()` - see the [example](example/vite) and
 the API reference.
@@ -427,7 +429,8 @@ try {
 `NativeError` carries `code` (number), `scope` (`"Core"`, `"Store"`, …) and
 `fullMessage`. Code constants are exported per scope: `CoreErrorCode`,
 `ConnectionErrorCode`, `ThreadErrorCode`, `StoreErrorCode`, `InboxErrorCode`,
-`KvdbErrorCode`, `LockErrorCode`, `EventErrorCode`, `StreamRoomErrorCode`.
+`KvdbErrorCode`, `LockErrorCode`, `SearchErrorCode`, `GroupErrorCode`, 
+`EventErrorCode`, `StreamRoomErrorCode`.
 
 ---
 

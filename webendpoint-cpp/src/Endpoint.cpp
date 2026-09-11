@@ -14,12 +14,14 @@ limitations under the License.
 #include <emscripten/proxying.h>
 #include <emscripten/threading.h>
 
+#include <optional>
 #include <privmx/endpoint/core/UserVerifierInterface.hpp>
 #include <privmx/endpoint/core/varinterface/ConnectionVarInterface.hpp>
 #include <privmx/endpoint/core/varinterface/EventQueueVarInterface.hpp>
 #include <privmx/endpoint/crypto/varinterface/CryptoApiVarInterface.hpp>
 #include <privmx/endpoint/crypto/varinterface/ExtKeyVarInterface.hpp>
 #include <privmx/endpoint/event/varinterface/EventApiVarInterface.hpp>
+#include <privmx/endpoint/group/varinterface/GroupApiVarInterface.hpp>
 #include <privmx/endpoint/inbox/varinterface/InboxApiVarInterface.hpp>
 #include <privmx/endpoint/kvdb/varinterface/KvdbApiVarInterface.hpp>
 #include <privmx/endpoint/lock/varinterface/LockApiVarInterface.hpp>
@@ -46,6 +48,7 @@ using ThreadApiVar = privmx::endpoint::thread::ThreadApiVarInterface;
 using StoreApiVar = privmx::endpoint::store::StoreApiVarInterface;
 using InboxApiVar = privmx::endpoint::inbox::InboxApiVarInterface;
 using KvdbApiVar = privmx::endpoint::kvdb::KvdbApiVarInterface;
+using GroupApiVar = privmx::endpoint::group::GroupApiVarInterface;
 using CryptoApiVar = privmx::endpoint::crypto::CryptoApiVarInterface;
 using EventApiVar = privmx::endpoint::event::EventApiVarInterface;
 using ExtKeyVar = privmx::endpoint::crypto::ExtKeyVarInterface;
@@ -62,6 +65,15 @@ namespace api {
 
 void setResultsCallback(emscripten::val callback) {
     AsyncEngine::getInstance()->setResultsCallback(callback);
+}
+
+// A container module is group-aware only when handed a GroupApi that has already been
+// created; ptr 0 keeps it group-unaware (as when the C++ API is built without one).
+static std::optional<group::GroupApi> groupApiOf(int groupApiPtr) {
+    if (groupApiPtr == 0) {
+        return std::nullopt;
+    }
+    return ((GroupApiVar*)groupApiPtr)->getApi();
 }
 
 void EventQueue_newEventQueue(int taskId) {
@@ -113,13 +125,54 @@ void Connection_deleteUserVerifierInterface(int taskId, int ptr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (UserVerifierHolder*)ptr; });
 }
 
-void ThreadApi_newThreadApi(int taskId, int connectionPtr) {
+void GroupApi_newGroupApi(int taskId, int connectionPtr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
+        auto connection = (ConnectionVar*)connectionPtr;
+        auto groupApi =
+            new GroupApiVar(connection->getApi(),
+                            core::VarSerializer::Options{
+                                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+        return (int)groupApi;
+    });
+}
+void GroupApi_deleteGroupApi(int taskId, int ptr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (GroupApiVar*)ptr; });
+}
+API_FUNCTION(GroupApi, create)
+API_FUNCTION(GroupApi, createGroup)
+API_FUNCTION(GroupApi, addGroupMembers)
+API_FUNCTION(GroupApi, removeGroupMembers)
+API_FUNCTION(GroupApi, updateGroupPublicMeta)
+API_FUNCTION(GroupApi, updateGroupPrivateMeta)
+API_FUNCTION(GroupApi, updateGroupPolicy)
+API_FUNCTION(GroupApi, deleteGroup)
+API_FUNCTION(GroupApi, getGroup)
+API_FUNCTION(GroupApi, listGroups)
+API_FUNCTION(GroupApi, encrypt)
+API_FUNCTION(GroupApi, encryptAnonymously)
+API_FUNCTION(GroupApi, decrypt)
+API_FUNCTION(GroupApi, beginFileEncryption)
+API_FUNCTION(GroupApi, beginFileEncryptionAnonymously)
+API_FUNCTION(GroupApi, encryptFileChunk)
+API_FUNCTION(GroupApi, finishFileEncryption)
+API_FUNCTION(GroupApi, beginFileDecryption)
+API_FUNCTION(GroupApi, decryptFileChunk)
+API_FUNCTION(GroupApi, seekInEncryptedFile)
+API_FUNCTION(GroupApi, finishFileDecryption)
+API_FUNCTION(GroupApi, sendCustomEvent)
+API_FUNCTION(GroupApi, subscribeFor)
+API_FUNCTION(GroupApi, unsubscribeFrom)
+API_FUNCTION(GroupApi, buildSubscriptionQuery)
+API_FUNCTION(GroupApi, buildCustomEventSubscriptionQuery)
+
+void ThreadApi_newThreadApi(int taskId, int connectionPtr, int groupApiPtr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, groupApiPtr] {
         auto connection = (ConnectionVar*)connectionPtr;
         auto threadApi =
             new ThreadApiVar(connection->getApi(),
                              core::VarSerializer::Options{
-                                 .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+                                 .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING},
+                             groupApiOf(groupApiPtr));
         return (int)threadApi;
     });
 }
@@ -137,17 +190,19 @@ API_FUNCTION(ThreadApi, listMessages)
 API_FUNCTION(ThreadApi, sendMessage)
 API_FUNCTION(ThreadApi, deleteMessage)
 API_FUNCTION(ThreadApi, updateMessage)
+API_FUNCTION(ThreadApi, rotateThreadKeys)
 API_FUNCTION(ThreadApi, subscribeFor)
 API_FUNCTION(ThreadApi, unsubscribeFrom)
 API_FUNCTION(ThreadApi, buildSubscriptionQuery)
 
-void StoreApi_newStoreApi(int taskId, int connectionPtr) {
-    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
+void StoreApi_newStoreApi(int taskId, int connectionPtr, int groupApiPtr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, groupApiPtr] {
         auto connection = (ConnectionVar*)connectionPtr;
         auto threadApi =
             new StoreApiVar(connection->getApi(),
                             core::VarSerializer::Options{
-                                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+                                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING},
+                            groupApiOf(groupApiPtr));
         return (int)threadApi;
     });
 }
@@ -172,19 +227,21 @@ API_FUNCTION(StoreApi, readFromFile)
 API_FUNCTION(StoreApi, seekInFile)
 API_FUNCTION(StoreApi, closeFile)
 API_FUNCTION(StoreApi, syncFile)
+API_FUNCTION(StoreApi, rotateStoreKeys)
 API_FUNCTION(StoreApi, subscribeFor)
 API_FUNCTION(StoreApi, unsubscribeFrom)
 API_FUNCTION(StoreApi, buildSubscriptionQuery)
 
-void InboxApi_newInboxApi(int taskId, int connectionPtr, int threadApiPtr, int storeApiPtr) {
-    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, threadApiPtr, storeApiPtr] {
+void InboxApi_newInboxApi(int taskId, int connectionPtr, int threadApiPtr, int storeApiPtr, int groupApiPtr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, threadApiPtr, storeApiPtr, groupApiPtr] {
         auto connection = (ConnectionVar*)connectionPtr;
         auto threadApi = (ThreadApiVar*)threadApiPtr;
         auto storeApi = (StoreApiVar*)storeApiPtr;
         auto inboxApi =
             new InboxApiVar(connection->getApi(), threadApi->getApi(), storeApi->getApi(),
                             core::VarSerializer::Options{
-                                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+                                .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING},
+                            groupApiOf(groupApiPtr));
         return (int)inboxApi;
     });
 }
@@ -209,17 +266,19 @@ API_FUNCTION(InboxApi, openFile)
 API_FUNCTION(InboxApi, readFromFile)
 API_FUNCTION(InboxApi, seekInFile)
 API_FUNCTION(InboxApi, closeFile)
+API_FUNCTION(InboxApi, rotateInboxKeys)
 API_FUNCTION(InboxApi, subscribeFor)
 API_FUNCTION(InboxApi, unsubscribeFrom)
 API_FUNCTION(InboxApi, buildSubscriptionQuery)
 
-void KvdbApi_newKvdbApi(int taskId, int connectionPtr) {
-    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr] {
+void KvdbApi_newKvdbApi(int taskId, int connectionPtr, int groupApiPtr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, groupApiPtr] {
         auto connection = (ConnectionVar*)connectionPtr;
         auto kvdbApi =
             new KvdbApiVar(connection->getApi(),
                            core::VarSerializer::Options{
-                               .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING});
+                               .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING},
+                           groupApiOf(groupApiPtr));
         return (int)kvdbApi;
     });
 }
@@ -239,6 +298,7 @@ API_FUNCTION(KvdbApi, listEntries)
 API_FUNCTION(KvdbApi, setEntry)
 API_FUNCTION(KvdbApi, deleteEntry)
 API_FUNCTION(KvdbApi, deleteEntries)
+API_FUNCTION(KvdbApi, rotateKvdbKeys)
 API_FUNCTION(KvdbApi, subscribeFor)
 API_FUNCTION(KvdbApi, unsubscribeFrom)
 API_FUNCTION(KvdbApi, buildSubscriptionQuery)
@@ -334,16 +394,17 @@ API_FUNCTION(EventApi, subscribeFor)
 API_FUNCTION(EventApi, unsubscribeFrom)
 API_FUNCTION(EventApi, buildSubscriptionQuery)
 
-void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr, int webRtcInterfaceBindId) {
-    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, webRtcInterfaceBindId] {
+void StreamApi_newStreamApi(int taskId, int connectionPtr, int eventsPtr, int webRtcInterfaceBindId, int groupApiPtr) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, webRtcInterfaceBindId, groupApiPtr] {
         auto connection = (ConnectionVar*)connectionPtr;
 
         // StreamApiLowVarInterface no longer takes an EventApi; it owns its own
-        // subscriptions internally. Construct with (connection, serializer) only.
+        // subscriptions internally. Construct with (connection, serializer, groupApi).
         auto streamsApi =
             new StreamApiVar(connection->getApi(),
                              core::VarSerializer{core::VarSerializer::Options{
-                                 .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING}});
+                                 .addType = false, .binaryFormat = core::VarSerializer::Options::PSON_BINARYSTRING}},
+                             groupApiOf(groupApiPtr));
 
         auto webRtcInterface = std::make_shared<stream::WebRtcInterfaceImpl>(webRtcInterfaceBindId);
         streamsApi->setWebRtcInterface(webRtcInterface);
@@ -374,6 +435,8 @@ API_FUNCTION(StreamApi, createSubscriberStream)
 API_FUNCTION(StreamApi, updateSubscriberStream)
 API_FUNCTION(StreamApi, removeSubscriberStream)
 
+API_FUNCTION(StreamApi, rotateStreamRoomKeys)
+
 API_FUNCTION(StreamApi, getTurnCredentials)
 API_FUNCTION(StreamApi, subscribeFor)
 API_FUNCTION(StreamApi, unsubscribeFrom)
@@ -402,6 +465,7 @@ void SearchApi_deleteSearchApi(int taskId, int ptr) {
 API_FUNCTION(SearchApi, create)
 API_FUNCTION(SearchApi, createSearchIndex)
 API_FUNCTION(SearchApi, updateSearchIndex)
+API_FUNCTION(SearchApi, rotateSearchIndexKeys)
 API_FUNCTION(SearchApi, deleteSearchIndex)
 API_FUNCTION(SearchApi, getSearchIndex)
 API_FUNCTION(SearchApi, listSearchIndexes)

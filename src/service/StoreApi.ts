@@ -18,6 +18,7 @@ import {
     Store,
     File,
     ContainerPolicy,
+    GroupGrantWithKey,
     StoreEventSelectorType,
     StoreEventType,
 } from "../Types.js";
@@ -87,6 +88,9 @@ export class StoreApi extends BaseApi {
      *   container key; only Store members can decrypt it
      * @param {ContainerPolicy} [policies] fine-grained access rules (who may
      *   create, update or delete files) overriding the Context defaults
+     * @param {GroupGrantWithKey[]} [groups] Groups granted access to the Store
+     *   in addition to `users`/`managers`; take `groupPubKey`/`groupEpoch` from
+     *   {@link GroupApi.getGroup}
      * @returns {string} ID of the new Store - pass to {@link createFile},
      *   {@link listFiles}, {@link getStore} or {@link updateStore}
      * @throws {NativeError} when the Context does not exist or a listed user
@@ -99,6 +103,7 @@ export class StoreApi extends BaseApi {
         publicMeta: Uint8Array,
         privateMeta: Uint8Array,
         policies?: ContainerPolicy,
+        groups: GroupGrantWithKey[] = [],
     ): Promise<string> {
         return this.native.createStore(this.servicePtr, [
             contextId,
@@ -107,6 +112,7 @@ export class StoreApi extends BaseApi {
             publicMeta,
             privateMeta,
             policies,
+            groups,
         ]);
     }
 
@@ -144,6 +150,8 @@ export class StoreApi extends BaseApi {
      *   you revoke access
      * @param {ContainerPolicy} [policies] new access policies; omit to keep
      *   the current ones
+     * @param {GroupGrantWithKey[]} [groups] full replacement list of Groups
+     *   granted access; Groups missing from this list lose access
      * @returns {Promise<void>} resolves when the Store membership and metadata have been replaced
      * @throws {NativeError} when the Store does not exist, the user lacks
      *   management rights, or `version` does not match the server state
@@ -158,6 +166,7 @@ export class StoreApi extends BaseApi {
         force: boolean,
         forceGenerateNewKey: boolean,
         policies?: ContainerPolicy,
+        groups: GroupGrantWithKey[] = [],
     ): Promise<void> {
         return this.native.updateStore(this.servicePtr, [
             storeId,
@@ -169,6 +178,46 @@ export class StoreApi extends BaseApi {
             force,
             forceGenerateNewKey,
             policies,
+            groups,
+        ]);
+    }
+
+    /**
+     * Re-wraps the Store's key for its current members and grantee Groups,
+     * without changing its data or membership.
+     *
+     * Needed after a member is removed from a Group granted access to this
+     * Store: that Group's key epoch advances, `Store.staleGroups` names it, and
+     * members of the stale Group cannot read content written under the current
+     * key until this call re-wraps it to the Group's current epoch.
+     *
+     * @param {string} storeId ID of the Store to re-key, from `Store.storeId`
+     * @param {UserWithPubKey[]} users current member list
+     * @param {UserWithPubKey[]} managers current manager list
+     * @param {number} version current Store version, from `Store.version`
+     *   returned by {@link getStore}
+     * @param {boolean} force `true` skips the `version` check
+     * @param {GroupGrantWithKey[]} [groups] grantee Groups with their *current*
+     *   `groupPubKey`/`groupEpoch`, from {@link GroupApi.getGroup}
+     * @returns {Promise<void>} resolves when the Store's key has been re-wrapped
+     * @throws {NativeError} when the Store does not exist or the user is not
+     *   allowed to rotate its keys
+     */
+    async rotateStoreKeys(
+        storeId: string,
+        users: UserWithPubKey[],
+        managers: UserWithPubKey[],
+        version: number,
+        force: boolean,
+        groups: GroupGrantWithKey[] = [],
+    ): Promise<void> {
+        return this.native.rotateStoreKeys(this.servicePtr, [
+            storeId,
+            users,
+            managers,
+            version,
+            force,
+            groups,
         ]);
     }
 

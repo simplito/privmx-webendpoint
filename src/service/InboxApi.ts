@@ -20,6 +20,7 @@ import {
     InboxEntry,
     FilesConfig,
     ContainerWithoutItemPolicy,
+    GroupGrantWithKey,
     InboxEventType,
     InboxEventSelectorType,
 } from "../Types.js";
@@ -87,6 +88,9 @@ export class InboxApi extends BaseApi {
      *   and size); omit to accept the server defaults
      * @param {ContainerWithoutItemPolicy} [policies] access policy overrides
      *   for the new Inbox; omit to inherit the Context defaults
+     * @param {GroupGrantWithKey[]} [groups] Groups granted access to the Inbox
+     *   in addition to `users`/`managers`; take `groupPubKey`/`groupEpoch` from
+     *   {@link GroupApi.getGroup}
      * @returns {string} ID of the created Inbox - share it with submitters and
      *   pass it to {@link prepareEntry}, {@link getInbox} or {@link listEntries}
      * @throws {NativeError} when the Context does not exist or the user lacks
@@ -100,6 +104,7 @@ export class InboxApi extends BaseApi {
         privateMeta: Uint8Array,
         filesConfig?: FilesConfig,
         policies?: ContainerWithoutItemPolicy,
+        groups: GroupGrantWithKey[] = [],
     ): Promise<string> {
         return this.native.createInbox(this.servicePtr, [
             contextId,
@@ -109,6 +114,7 @@ export class InboxApi extends BaseApi {
             privateMeta,
             filesConfig,
             policies,
+            groups,
         ]);
     }
 
@@ -147,6 +153,8 @@ export class InboxApi extends BaseApi {
      *   whenever you revoke access
      * @param {ContainerWithoutItemPolicy} [policies] new access policy
      *   overrides; omit to keep the current policy
+     * @param {GroupGrantWithKey[]} [groups] full replacement list of Groups
+     *   granted access; Groups missing from this list lose access
      * @returns {Promise<void>} resolves when the Inbox membership and metadata have been replaced
      * @throws {NativeError} when `version` does not match the server state
      *   (and `force` is `false`) or the user is not a manager
@@ -162,6 +170,7 @@ export class InboxApi extends BaseApi {
         force: boolean,
         forceGenerateNewKey: boolean,
         policies?: ContainerWithoutItemPolicy,
+        groups: GroupGrantWithKey[] = [],
     ): Promise<void> {
         return this.native.updateInbox(this.servicePtr, [
             inboxId,
@@ -174,6 +183,47 @@ export class InboxApi extends BaseApi {
             force,
             forceGenerateNewKey,
             policies,
+            groups,
+        ]);
+    }
+
+    /**
+     * Re-wraps the Inbox's key for its current members and grantee Groups,
+     * without changing its data or membership.
+     *
+     * Needed after a member is removed from a Group granted access to this
+     * Inbox: that Group's key epoch advances, `Inbox.staleGroups` names it, and
+     * members of the stale Group cannot read entries written under the current
+     * key until this call re-wraps it to the Group's current epoch. An Inbox
+     * re-keys its inner Thread and Store alongside itself.
+     *
+     * @param {string} inboxId ID of the Inbox to re-key, from `Inbox.inboxId`
+     * @param {UserWithPubKey[]} users current member list
+     * @param {UserWithPubKey[]} managers current manager list
+     * @param {number} version current Inbox version, from `Inbox.version`
+     *   returned by {@link getInbox}
+     * @param {boolean} force `true` skips the `version` check
+     * @param {GroupGrantWithKey[]} [groups] grantee Groups with their *current*
+     *   `groupPubKey`/`groupEpoch`, from {@link GroupApi.getGroup}
+     * @returns {Promise<void>} resolves when the Inbox's key has been re-wrapped
+     * @throws {NativeError} when the Inbox does not exist or the user is not
+     *   allowed to rotate its keys
+     */
+    async rotateInboxKeys(
+        inboxId: string,
+        users: UserWithPubKey[],
+        managers: UserWithPubKey[],
+        version: number,
+        force: boolean,
+        groups: GroupGrantWithKey[] = [],
+    ): Promise<void> {
+        return this.native.rotateInboxKeys(this.servicePtr, [
+            inboxId,
+            users,
+            managers,
+            version,
+            force,
+            groups,
         ]);
     }
 

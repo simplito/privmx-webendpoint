@@ -18,6 +18,7 @@ import type { ConnectionServices } from "./Connection.js";
 import { CryptoApi } from "./CryptoApi.js";
 import { EventApi } from "./EventApi.js";
 import { EventQueue } from "./EventQueue.js";
+import { GroupApi } from "./GroupApi.js";
 import { InboxApi } from "./InboxApi.js";
 import { KvdbApi } from "./KvdbApi.js";
 import { LockApi } from "./LockApi.js";
@@ -131,6 +132,7 @@ export class EndpointFactory {
         createSearchApi: (c) => EndpointFactory.createSearchApi(c),
         createEventApi: (c) => EndpointFactory.createEventApi(c),
         createStreamApi: (c) => EndpointFactory.createStreamApi(c),
+        createGroupApi: (c) => EndpointFactory.createGroupApi(c),
         getEventLoop: () => EndpointFactory.getEventLoop(),
     };
 
@@ -646,6 +648,29 @@ export class EndpointFactory {
     static async createStreamApi(connection: Connection, _eventApi?: EventApi): Promise<StreamApi>;
     static async createStreamApi(connection: Connection, _eventApi?: EventApi): Promise<StreamApi> {
         return this.getConnectionContainer(connection).resolve<StreamApi>(T.StreamApi);
+    }
+
+    /**
+     * Returns the Group API (Groups of Context users that can be granted access
+     * to containers as a unit) for the given connection.
+     *
+     * Resolved from the connection's container - the first call instantiates the
+     * WASM-side GroupApi object, subsequent calls return the same cached
+     * instance; no server round-trip happens here. Every container API of this
+     * connection is built on top of this same instance, so they all share one
+     * group key cache.
+     *
+     * Use it to create Groups (`createGroup`), change their
+     * membership (`addGroupMembers` / `removeGroupMembers`), seal content for a
+     * Group (`encrypt` / `beginFileEncryption`) and read the
+     * `groupPubKey`/`keyVersion` a container grant needs.
+     *
+     * @param {Connection} connection connection returned by {@link connect};
+     *   the API stops working (throws) after `connection.disconnect()`
+     * @returns {GroupApi} the per-connection GroupApi instance
+     */
+    static async createGroupApi(connection: Connection): Promise<GroupApi> {
+        return this.getConnectionContainer(connection).resolve<GroupApi>(T.GroupApi);
     }
 
     /**

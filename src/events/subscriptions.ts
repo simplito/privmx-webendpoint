@@ -12,6 +12,7 @@ export type Channel =
     | `store/${string}/files`
     | "thread"
     | `thread/${string}/messages`
+    | "group"
     | `connection/${string}`
     | "context/userAdded"
     | "context/userRemoved"
@@ -112,6 +113,25 @@ export type KvdbCallbackPayload = {
 };
 
 /**
+ * Maps each Group event type to the shape of its event `data` payload.
+ *
+ * A Group event deliberately carries no Group state - the version counters and
+ * `keyVersion` are enough to decide whether the change matters, and which plane
+ * moved; call `GroupApi.getGroup` when it does.
+ */
+export type GroupCallbackPayload = {
+    [Types.GroupEventType.GROUP_CREATE]: Types.GroupChangedEventData;
+    [Types.GroupEventType.GROUP_UPDATE]: Types.GroupChangedEventData;
+    [Types.GroupEventType.GROUP_DELETE]: Types.GroupDeletedEventData;
+};
+
+/**
+ * The `data` payload shape of a Group custom notification sent with
+ * `GroupApi.sendCustomEvent`.
+ */
+export type GroupCustomCallbackPayload = Types.GroupCustomEventData;
+
+/**
  * Maps each user (Context membership) event type to its event `data` payload.
  */
 export type UserEventCallbackPayload = {
@@ -189,6 +209,28 @@ export interface KvdbSubscription {
     id: string;
     callbacks: EventCallback[];
 }
+/** A Group-events subscription built by {@link createGroupSubscription}. */
+export interface GroupSubscription {
+    module: "group";
+    type: Types.GroupEventType;
+    selector: Types.GroupEventSelectorType;
+    id: string;
+    callbacks: EventCallback[];
+}
+/**
+ * A Group custom-notification subscription built by
+ * {@link createGroupCustomEventSubscription}. Separate from
+ * {@link GroupSubscription} because it selects a channel name rather than a
+ * Group event type.
+ */
+export interface GroupCustomEventSubscription {
+    module: "groupCustom";
+    /** Custom event channel name, as the sender passed it. */
+    type: string;
+    selector: Types.GroupEventSelectorType;
+    id: string;
+    callbacks: EventCallback[];
+}
 /** A custom-events subscription built by {@link createEventSubscription}. */
 export interface CustomEventSubscription {
     module: "event";
@@ -225,6 +267,8 @@ export type EventSubscription =
     | StoreSubscription
     | InboxSubscription
     | KvdbSubscription
+    | GroupSubscription
+    | GroupCustomEventSubscription
     | CustomEventSubscription
     | UserEventSubscription
     | ConnectionStatusSubscription;
@@ -327,6 +371,53 @@ export function createInboxSubscription<
     return {
         module: "inbox",
         type: s.type,
+        selector: s.selector,
+        id: s.id,
+        callbacks: s.callbacks.map(toEventCallback),
+    };
+}
+
+/**
+ * Builds a typed Group subscription. Each callback receives a
+ * {@link GenericEvent} whose `data` matches the chosen event `type`.
+ *
+ * @param {object} s subscription descriptor (`type`, `selector`, `id`, `callbacks`)
+ * @returns {GroupSubscription} a subscription for {@link EventManager.subscribe}
+ */
+export function createGroupSubscription<
+    T extends Types.GroupEventType,
+    S extends Types.GroupEventSelectorType,
+>(s: {
+    type: T;
+    selector: S;
+    id: string;
+    callbacks: ((arg: GenericEvent<GroupCallbackPayload[T]>) => void)[];
+}): GroupSubscription {
+    return {
+        module: "group",
+        type: s.type,
+        selector: s.selector,
+        id: s.id,
+        callbacks: s.callbacks.map(toEventCallback),
+    };
+}
+
+/**
+ * Builds a typed subscription for the Group custom notifications sent with
+ * `GroupApi.sendCustomEvent` on a given channel.
+ *
+ * @param {object} s subscription descriptor (`channel`, `selector`, `id`, `callbacks`)
+ * @returns {GroupCustomEventSubscription} a subscription for {@link EventManager.subscribe}
+ */
+export function createGroupCustomEventSubscription(s: {
+    channel: string;
+    selector: Types.GroupEventSelectorType;
+    id: string;
+    callbacks: ((arg: GenericEvent<GroupCustomCallbackPayload>) => void)[];
+}): GroupCustomEventSubscription {
+    return {
+        module: "groupCustom",
+        type: s.channel,
         selector: s.selector,
         id: s.id,
         callbacks: s.callbacks.map(toEventCallback),

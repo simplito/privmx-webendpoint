@@ -9,7 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ContainerPolicy, IndexMode, PagingList, PagingQuery, SearchIndex, UserWithPubKey, Document } from "../Types.js";
+import { ContainerPolicy, GroupGrantWithKey, IndexMode, PagingList, PagingQuery, SearchIndex, UserWithPubKey, Document } from "../Types.js";
 import { BaseNative } from "./BaseNative.js";
 
 export class SearchApiNative extends BaseNative {
@@ -23,11 +23,14 @@ export class SearchApiNative extends BaseNative {
     async create(ptr: number, args: []): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.SearchApi_create(taskId, ptr, args));
     }
-    async createSearchIndex(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, IndexMode, ContainerPolicy|undefined]): Promise<string> {
+    async createSearchIndex(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, IndexMode, ContainerPolicy|undefined, GroupGrantWithKey[]]): Promise<string> {
         return this.runAsync<string>((taskId)=>this.api.lib.SearchApi_createSearchIndex(taskId, ptr, args));
     }
-    async updateSearchIndex(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, number, boolean, boolean, ContainerPolicy|undefined]): Promise<void> {
+    async updateSearchIndex(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], Uint8Array, Uint8Array, number, boolean, boolean, ContainerPolicy|undefined, GroupGrantWithKey[]]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.SearchApi_updateSearchIndex(taskId, ptr, args));
+    }
+    async rotateSearchIndexKeys(ptr: number, args: [string, UserWithPubKey[], UserWithPubKey[], number, boolean, GroupGrantWithKey[]]): Promise<void> {
+        return this.runAsync<void>((taskId)=>this.api.lib.SearchApi_rotateSearchIndexKeys(taskId, ptr, args));
     }
     async deleteSearchIndex(ptr: number, args: [string]): Promise<void> {
         return this.runAsync<void>((taskId)=>this.api.lib.SearchApi_deleteSearchIndex(taskId, ptr, args));

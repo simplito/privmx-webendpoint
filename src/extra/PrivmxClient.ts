@@ -8,6 +8,7 @@ import {
     ThreadApi,
     KvdbApi,
     EventApi,
+    GroupApi,
 } from "../service/index.js";
 
 import { logger } from "../webStreams/Logger.js";
@@ -47,6 +48,7 @@ export class PrivmxClient {
     private inboxApi: Promise<InboxApi> | null = null;
     private kvdbApi: Promise<KvdbApi> | null = null;
     private eventApi: Promise<EventApi> | null = null;
+    private groupApi: Promise<GroupApi> | null = null;
 
     /**
      * @param {Connection} connection - The connection object.
@@ -223,6 +225,20 @@ export class PrivmxClient {
             })();
         }
         return this.eventApi;
+    }
+
+    /**
+     * @description Gets the Group API.
+     * @returns {Promise<GroupApi>} A promise resolving to the Group API.
+     */
+    public async getGroupApi(): Promise<GroupApi> {
+        if (!this.groupApi) {
+            this.groupApi = (async () => {
+                const connection = this.getConnection();
+                return EndpointFactory.createGroupApi(connection);
+            })();
+        }
+        return this.groupApi;
     }
 
     /**

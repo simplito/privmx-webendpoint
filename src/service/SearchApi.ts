@@ -11,7 +11,7 @@ limitations under the License.
 
 import { BaseApi } from "./BaseApi.js";
 import { SearchApiNative } from "../native/SearchApiNative.js";
-import { ContainerPolicy, IndexMode, PagingList, PagingQuery, SearchIndex, UserWithPubKey, Document } from "../Types.js";
+import { ContainerPolicy, GroupGrantWithKey, IndexMode, PagingList, PagingQuery, SearchIndex, UserWithPubKey, Document } from "../Types.js";
 
 export class SearchApi extends BaseApi {
   constructor(private native: SearchApiNative, ptr: number) {
@@ -28,6 +28,9 @@ export class SearchApi extends BaseApi {
     * @param {Uint8Array} privateMeta private (encrypted) metadata
     * @param {IndexMode} mode The operating mode of the Index, defining how document content is handled.
     * @param {ContainerPolicy} policies Index's policies
+    * @param {GroupGrantWithKey[]} [groups] Groups granted access to the Index in
+    *   addition to `users`/`managers`; take `groupPubKey`/`groupEpoch` from
+    *   {@link GroupApi.getGroup}
     * @returns {string} ID of the created Search Index
    */
   async createSearchIndex(
@@ -37,7 +40,8 @@ export class SearchApi extends BaseApi {
     publicMeta: Uint8Array,
     privateMeta: Uint8Array,
     mode: IndexMode,
-    policies?: ContainerPolicy
+    policies?: ContainerPolicy,
+    groups: GroupGrantWithKey[] = []
   ): Promise<string> {
     return this.native.createSearchIndex(this.servicePtr, [
         contextId,
@@ -46,7 +50,8 @@ export class SearchApi extends BaseApi {
         publicMeta,
         privateMeta,
         mode,
-        policies
+        policies,
+        groups
     ]);
   }
 
@@ -62,6 +67,8 @@ export class SearchApi extends BaseApi {
      * @param {boolean} force force update (without checking version)
      * @param {boolean} forceGenerateNewKey force to regenerate a key for the Index
      * @param {ContainerPolicy} policies Index's policies
+     * @param {GroupGrantWithKey[]} [groups] full replacement list of Groups
+     *   granted access; Groups missing from this list lose access
      * @returns {Promise<void>} resolves when the Index has been updated on the server
    */
   async updateSearchIndex(
@@ -73,7 +80,8 @@ export class SearchApi extends BaseApi {
     version: number,
     force: boolean,
     forceGenerateNewKey: boolean,
-    policies: ContainerPolicy
+    policies?: ContainerPolicy,
+    groups: GroupGrantWithKey[] = []
   ): Promise<void> {
     return this.native.updateSearchIndex(this.servicePtr, [
         indexId,
@@ -84,7 +92,54 @@ export class SearchApi extends BaseApi {
         version,
         force,
         forceGenerateNewKey,
-        policies
+        policies,
+        groups
+    ]);
+  }
+
+  /**
+   * Re-encrypts the Search Index keys for all current members without changing
+   * data, membership or policy. Unlike {@link updateSearchIndex} this can be
+   * called by any Index member (not just managers) while the default
+   * `rotateKeys` policy of "user" is in effect.
+   *
+   * Both containers backing the Index are re-keyed, each against its own
+   * current version, so a half that was already re-keyed on its own (see
+   * `SearchIndex.staleGroups`) does not fail the call.
+   *
+   * The keys are re-wrapped to every one of the Index's grantee Groups at that
+   * Group's current epoch, whether or not the caller names it in `groups`: the
+   * grantee list comes from the Index itself, and any epoch public key missing
+   * from `groups` is read from the Bridge. A caller who belongs to none of the
+   * Index's grantee Groups, and cannot supply their epoch keys in `groups`
+   * either, gets an unresolved-group-grantee error naming the Group it could
+   * not resolve.
+   *
+   * @param {string} indexId ID of the Index to re-key
+   * @param {UserWithPubKey[]} users current Index users with their public keys
+   * @param {UserWithPubKey[]} managers current Index managers with their public keys
+   * @param {number} version current Index version (optimistic lock guard)
+   * @param {boolean} force skip the version check when true
+   * @param {GroupGrantWithKey[]} [groups] epoch public keys of grantee Groups
+   *   the caller has verified itself; optional, and Groups the Index does not
+   *   grant are ignored - a re-key changes no grants
+   * @returns {Promise<void>} resolves when the Index's keys have been rotated on the server
+   */
+  async rotateSearchIndexKeys(
+    indexId: string,
+    users: UserWithPubKey[],
+    managers: UserWithPubKey[],
+    version: number,
+    force: boolean,
+    groups: GroupGrantWithKey[] = []
+  ): Promise<void> {
+    return this.native.rotateSearchIndexKeys(this.servicePtr, [
+        indexId,
+        users,
+        managers,
+        version,
+        force,
+        groups
     ]);
   }
 
