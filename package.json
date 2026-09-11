@@ -1,6 +1,6 @@
 {
   "name": "@simplito/privmx-webendpoint",
-  "version": "2.9.0-dev",
+  "version": "2.9.0-preview",
   "description": "PrivMX Web Endpoint library",
   "author": "Simplito",
   "license": "PrivMX Free License",
