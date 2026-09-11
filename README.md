@@ -10,7 +10,7 @@
 
 **[Getting Started](https://docs.privmx.dev/docs/latest/js/introduction)** ·
 **[API Reference](https://docs.privmx.dev/docs/latest/reference/webendpoint/api-reference/connection)** ·
-**[PrivMX Bridge docs](https://docs.privmx.dev)**
+**[PrivMX Bridge docs](https://docs.privmx.dev/docs/latest/start/privmx-bridge)**
 
 This SDK connects your browser app to a **PrivMX Bridge**. Your app encrypts and
 decrypts everything on the device. The Bridge only ever holds ciphertext.
@@ -18,8 +18,8 @@ decrypts everything on the device. The Bridge only ever holds ciphertext.
 Two ideas carry the whole library:
 
 - **A Group is who you share with.** It is a list of people with a key of its own.
-  You can encrypt data for a Group, and you can give a Group access to anything
-  below.
+  You can encrypt data for a Group directly, or give the Group access to a
+  container.
 - **A container is what you share.** Threads, Stores, Inboxes, KVDBs, Search
   Indexes and Stream Rooms come ready to use. Pick the one that fits your data
   and give it to a Group.
@@ -44,7 +44,8 @@ const opened = await groups.decrypt(sealed);         // you also learn who wrote
 
 **You need** a browser page with cross-origin isolation (see
 [Before you start](#before-you-start)) and a running
-[PrivMX Bridge](https://docs.privmx.dev). This SDK runs in browsers only.
+[PrivMX Bridge](https://docs.privmx.dev/docs/latest/start/privmx-bridge). This
+SDK runs in browsers only.
 
 ---
 
@@ -98,7 +99,37 @@ Two words you will meet right away:
   is the workspace holding your users, Groups and containers.
 - **`publicMeta` and `privateMeta`.** Most objects carry two metadata blobs. The
   server can read `publicMeta`, so keep secrets out of it. Your app encrypts
-  `privateMeta`, and payloads are always encrypted.
+  `privateMeta`, and payloads are always encrypted. Both are raw `Uint8Array`,
+  and the usual thing to put in them is a JSON string, so the SDK ships
+  `serializeObject` / `deserializeObject` for exactly that (see
+  [Small helpers](#small-helpers)).
+
+### Listing, paging and filtering
+
+Every `list*` call takes the same `PagingQuery`: `skip`, `limit` (100 max),
+`sortOrder`, and optionally `sortBy`, `lastId` and `queryAsJson`. Prefer `lastId`
+over `skip` on long lists, because it does not shift when somebody writes while
+you page.
+
+`queryAsJson` filters **on `publicMeta` only** - it is the one part of an object
+the server can read, so it is the one part it can filter on. Decide what belongs
+there when you design the object, not when you need the query:
+
+```ts
+const page = await threads.listMessages(threadId, {
+    skip: 0, limit: 50, sortOrder: "desc",
+    queryAsJson: JSON.stringify({
+        kind: "invoice",                        // a field of your publicMeta
+        "meta.amount": { $gt: 1000 },           // dot notation for nested fields
+        "#creator": "alice",                    // built-in fields take a #
+    }),
+});
+```
+
+`$gt`/`$gte`/`$lt`/`$lte`/`$eq`/`$ne`, `$in`/`$nin`, `$startsWith`/`$endsWith`/
+`$contains` and `$and`/`$or`/`$nor` are available. The full list, the built-in
+`#` fields and the cursor rules are in
+[Queries and pagination](https://docs.privmx.dev/docs/latest/start/pagination).
 
 ---
 
@@ -108,10 +139,22 @@ Two words you will meet right away:
 npm install @simplito/privmx-webendpoint
 ```
 
-You also need a running **PrivMX Bridge**. See the
-[Bridge documentation](https://docs.privmx.dev). It gives you a Bridge URL, a
-Solution ID, a Context ID, and a **management API key** (`apiKeyId` and
-`apiKeySecret`) that stays on **your** server.
+You also need a running **PrivMX Bridge**. The quickest way to get one is the
+Dockerised CLI, which pulls the images and generates the keys and a Context for
+you:
+
+```bash
+git clone https://github.com/simplito/privmx-bridge-docker
+cd privmx-bridge-docker
+./setup.sh
+```
+
+It prints a Bridge URL, a Solution ID, a Context ID, and a **management API key**
+(`apiKeyId` and `apiKeySecret`) that stays on **your** server. The full
+walkthrough, including the Streams module and a non-Docker install, is in
+[Bridge installation](https://docs.privmx.dev/docs/latest/start/installation);
+[What is PrivMX Bridge](https://docs.privmx.dev/docs/latest/start/privmx-bridge)
+explains what it does.
 
 ---
 
@@ -226,31 +269,21 @@ leaver out:
 await groups.removeGroupMembers(groupId, ["bob", "carol"]);   // one bump for both
 ```
 
-The key version moves once per call however many people leave, so take them out
-in one call.
+The key version moves once per call, not once per person, so remove everybody in
+one call. Three things follow from a removal:
 
-> **A removal changes the Group's public key.** `removeGroupMembers` mints a new
-> key version and a new `groupPubKey` together, so anything holding the old one
-> is holding a superseded key. It is the only call that does this:
-> `addGroupMembers`, `updateGroupPublicMeta`, `updateGroupPrivateMeta` and
-> `updateGroupPolicy` leave both alone, and `createGroup` mints the first.
->
-> Old keys keep working for the people who should have them. Members open
-> envelopes addressed to superseded keys, and so does a sender still using an
-> old link. Somebody you removed does not, even for those envelopes: the Bridge
-> answers key questions against current membership. Re-read the current key with
-> `getGroup`, or let `grantFor` do it for you.
+- **The Group's public key changes.** `removeGroupMembers` is the only call that
+  does this, so read `groupPubKey` again with `getGroup` (or let `grantFor` do
+  it) before you hand out a new grant or link.
+- **Containers repair themselves.** They list the Group in `staleGroups` until
+  the next write re-keys them. Nothing to re-key by hand.
+- **Open sessions are not cut off.** A member who is still connected keeps
+  reading with the key their session already holds, a fresh session does not.
+  Close the session too if you need the live case shut.
 
-You do not have to re-key anything by hand. Containers you gave to the Group
-list it in `staleGroups` until they catch up, and the next write to a container
-re-keys it and goes through. A chat that keeps chatting repairs itself.
-
-Envelopes have no container to re-key. A member who is still connected keeps
-reading what their session already holds a key for. A fresh session gets turned
-away. Close the session if you need the live case shut too.
-
-The cost of a removal grows with the *logarithm* of the Group size, so Groups of
-a few thousand people are fine.
+Removal cost grows with the *logarithm* of the Group size, so Groups of a few
+thousand people are fine. For which key versions stay readable and for whom, see
+the [API reference](https://docs.privmx.dev/docs/latest/reference/webendpoint/api-reference/connection).
 
 ### 3. Encrypt something for a Group
 
@@ -262,7 +295,8 @@ const sealed = await groups.encrypt(groupId, new TextEncoder().encode("ship it")
 await myBucket.put(key, sealed);                    // your storage sees ciphertext
 ```
 
-Opening it tells you what the signature is worth:
+`decrypt` gives you the plaintext back together with the envelope's metadata,
+including who sealed it:
 
 ```ts
 import { Types } from "@simplito/privmx-webendpoint";

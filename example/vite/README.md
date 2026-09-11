@@ -26,7 +26,7 @@ browser: generate keypair ──pubKey──▶ registerUser()  ──API key─
 
 - A running **PrivMX Bridge** with a **management API key** and an existing
   **Context** (create them in the Bridge admin panel / CLI - see the
-  [Bridge docs](https://docs.privmx.dev)).
+  [Bridge installation](https://docs.privmx.dev/docs/latest/start/installation)).
 - Node.js 20+.
 
 ## Run it
