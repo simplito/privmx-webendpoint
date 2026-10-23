@@ -1468,6 +1468,59 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
+    test("updateStream: repeated additions on one handle", async ({ page, backend, cli }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const streamApi = await Endpoint.createStreamApi(
+                connection,
+                await Endpoint.createEventApi(connection),
+            );
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const sId = await streamApi.createStreamRoom(
+                contextId,
+                [u1Obj],
+                [u1Obj],
+                new TextEncoder().encode("p"),
+                new TextEncoder().encode("p"),
+            );
+
+            await streamApi.joinStreamRoom(sId);
+            const handle = await streamApi.createStream(sId);
+            const first = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            const second = await navigator.mediaDevices.getUserMedia({ video: true });
+
+            await streamApi.addStreamTrack(handle, { track: first.getAudioTracks()[0] });
+            await streamApi.publishStream(handle);
+
+            await streamApi.addStreamTrack(handle, { track: first.getVideoTracks()[0] });
+            await streamApi.updateStream(handle);
+
+            // The second update used to hand the previous track to pc.addTrack
+            // again, which the browser rejects with InvalidAccessError.
+            await streamApi.addStreamTrack(handle, { track: second.getVideoTracks()[0] });
+            await streamApi.updateStream(handle);
+
+            let published: Types.StreamInfo | undefined;
+            for (let i = 0; i < 20; i++) {
+                published = (await streamApi.listStreams(sId))[0];
+                if ((published?.tracks.length ?? 0) >= 3) break;
+                await new Promise((r) => setTimeout(r, 500));
+            }
+            return { trackCount: published?.tracks.length ?? 0 };
+        }, args);
+
+        expect(result.trackCount).toBe(3);
+    });
+
     test("updateStream: after failed add / unpublish", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {

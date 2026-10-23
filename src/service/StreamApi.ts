@@ -30,6 +30,7 @@ import {
     StreamRoomConnectionState,
 } from "../Types.js";
 import { StreamApiNative } from "../native/StreamApiNative.js";
+import { logger } from "../webStreams/Logger.js";
 
 /**
  * Real-time WebRTC streaming API: manages Stream Rooms (audio/video/data
@@ -567,6 +568,13 @@ export class StreamApi extends BaseApi {
      * Call after staging more {@link addStreamTrack} / {@link removeStreamTrack}
      * changes on a stream already sent with {@link publishStream}.
      *
+     * An update that succeeds is also recorded locally: the added tracks count
+     * as published and the removed ones are dropped from the handle, so a later
+     * update renegotiates only what changed since. An update that fails stages
+     * nothing - the tracks it was adding are discarded (and their senders taken
+     * off the peer connection), so the same tracks can simply be added again
+     * and are never published by some later, unrelated update.
+     *
      * @param {number} streamHandle local stream handle returned by
      *   {@link createStream} and already published via {@link publishStream}
      * @returns {StreamPublishResult} result of the update operation describing
@@ -579,24 +587,63 @@ export class StreamApi extends BaseApi {
             throw new Error("No stream defined to publish");
         }
 
-        const tracksToAdd: MediaStreamTrack[] = [];
-        const tracksToRemove: MediaStreamTrack[] = [];
+        const added: StreamTrack[] = [];
+        const removed: StreamTrack[] = [];
 
         for (const track of this.streamTracks.values()) {
             if (track.streamHandle !== streamHandle || !track.track) continue;
-            if (!track.published && !track.markedToRemove) tracksToAdd.push(track.track);
-            if (track.markedToRemove) tracksToRemove.push(track.track);
+            if (track.markedToRemove) removed.push(track);
+            else if (!track.published) added.push(track);
         }
+        const tracksToAdd = added.map((t) => t.track as MediaStreamTrack);
+        const tracksToRemove = removed.map((t) => t.track as MediaStreamTrack);
 
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(turnCredentials);
-        await this.client.updatePeerConnectionWithLocalStream(
-            stream.streamRoomId,
-            stream.localMediaStream,
-            tracksToAdd,
-            tracksToRemove,
-        );
-        return this.native.updateStream(this.servicePtr, [streamHandle]);
+
+        let result: StreamPublishResult;
+        try {
+            await this.client.updatePeerConnectionWithLocalStream(
+                stream.streamRoomId,
+                stream.localMediaStream,
+                tracksToAdd,
+                tracksToRemove,
+            );
+            result = await this.native.updateStream(this.servicePtr, [streamHandle]);
+        } catch (e) {
+            await this.rollbackAddedTracks(stream.streamRoomId, added, tracksToAdd);
+            throw e;
+        }
+
+        for (const track of added) track.published = true;
+        for (const track of removed) this.streamTracks.delete(track.id);
+        return result;
+    }
+
+    /**
+     * Undoes a half-applied addition after a failed {@link updateStream}: takes
+     * the senders back off the peer connection (they may already have been added
+     * before the failure) and un-stages the tracks.
+     */
+    private async rollbackAddedTracks(
+        streamRoomId: StreamRoomId,
+        added: StreamTrack[],
+        tracksToAdd: MediaStreamTrack[],
+    ): Promise<void> {
+        if (tracksToAdd.length > 0) {
+            try {
+                await this.client.updatePeerConnectionWithLocalStream(
+                    streamRoomId,
+                    undefined,
+                    [],
+                    tracksToAdd,
+                );
+            } catch (e) {
+                // Reported, never rethrown: the caller must see the original failure.
+                logger.error("[updateStream] rollback of added tracks failed:", e);
+            }
+        }
+        for (const track of added) this.streamTracks.delete(track.id);
     }
 
     /**
