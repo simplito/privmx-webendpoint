@@ -1,4 +1,4 @@
-import { Key, TurnCredentials, RemoteStreamListener } from "../Types.js";
+import { Key, TurnCredentials, RemoteStreamListener, StreamRoomConnectionState } from "../Types.js";
 import {
     DecryptedDataChannelMessage,
     Jsep,
@@ -15,9 +15,12 @@ import { KeySyncManager } from "./KeySyncManager.js";
 import { StateChangeDispatcher } from "./EventDispatcher.js";
 import { AudioManager, AudioLevelsStats, ActiveSpeakerDetectorConfig } from "./AudioManager.js";
 import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry.js";
+import { ReconnectManager } from "./ReconnectManager.js";
 
 export interface StreamsCallbackInterface {
     trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void>;
+    setNewOfferOnReconfigure(sessionId: SessionId, jsep: Jsep): Promise<void>;
+    restartSubscriberIce(streamRoomId: StreamRoomId): Promise<void>;
     decryptDataChannelMessage(
         streamRoomId: StreamRoomId,
         remoteStreamId: string,
@@ -54,6 +57,7 @@ export class WebRtcClient {
         private readonly pcFactory: PeerConnectionFactory,
         private readonly audioManager: AudioManager,
         private readonly e2eeWorker: E2eeWorker,
+        private readonly reconnect: ReconnectManager,
     ) {}
 
     /**
@@ -73,6 +77,63 @@ export class WebRtcClient {
     trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void> {
         if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
         return this.streamsApiInterface.trickle(sessionId, candidate);
+    }
+
+    /**
+     * Sends a publisher offer (e.g. one restarting ICE) to the media server.
+     * The library applies the answer itself, through
+     * `setAnswerAndSetRemoteDescription`.
+     * @throws if `bindApiInterface` has not been called yet.
+     */
+    setNewOfferOnReconfigure(sessionId: SessionId, jsep: Jsep): Promise<void> {
+        if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
+        return this.streamsApiInterface.setNewOfferOnReconfigure(sessionId, jsep);
+    }
+
+    /**
+     * Asks the media server to restart ICE on the room's subscriber stream; the
+     * offer it produces arrives through `createAnswerAndSetDescriptions`.
+     * @throws if `bindApiInterface` has not been called yet.
+     */
+    restartSubscriberIce(streamRoomId: StreamRoomId): Promise<void> {
+        if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
+        return this.streamsApiInterface.restartSubscriberIce(streamRoomId);
+    }
+
+    /**
+     * Registers the callback receiving `streamRoomId`'s connection state
+     * (connected / reconnecting / lost) while the room is joined.
+     */
+    setConnectionStateListener(
+        streamRoomId: StreamRoomId,
+        listener: (state: StreamRoomConnectionState) => void,
+    ): void {
+        this.reconnect.setListener(streamRoomId, listener);
+    }
+
+    /**
+     * Drops the connection state listener and all recovery state for
+     * `streamRoomId`, on leaving the room.
+     */
+    clearConnectionStateListener(streamRoomId: StreamRoomId): void {
+        this.reconnect.clearListener(streamRoomId);
+    }
+
+    /**
+     * Registers the callback receiving the raw `RTCPeerConnection` state of
+     * `streamRoomId`'s subscriber connection - the counterpart of the publisher
+     * states `StateChangeDispatcher` delivers per stream handle.
+     */
+    setSubscriberStateListener(
+        streamRoomId: StreamRoomId,
+        listener: (state: RTCPeerConnectionState) => void,
+    ): void {
+        this.reconnect.setRawStateListener(streamRoomId, "subscriber", listener);
+    }
+
+    /** Drops the subscriber state listener for `streamRoomId`. */
+    clearSubscriberStateListener(streamRoomId: StreamRoomId): void {
+        this.reconnect.clearRawStateListener(streamRoomId, "subscriber");
     }
 
     /**

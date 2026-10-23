@@ -27,6 +27,7 @@ import {
     StreamSubscriber,
     StreamPublishResult,
     RemoteStreamListener,
+    StreamRoomConnectionState,
 } from "../Types.js";
 import { StreamApiNative } from "../native/StreamApiNative.js";
 
@@ -249,9 +250,22 @@ export class StreamApi extends BaseApi {
      * @param {string} streamRoomId ID of the Stream Room to join, returned by
      *   {@link createStreamRoom} or from `StreamRoom.streamRoomId` in
      *   {@link listStreamRooms}
+     * @param {(state: StreamRoomConnectionState) => void} onConnectionState optional
+     *   callback invoked when the room's media transports change health:
+     *   `connected` (media flowing), `reconnecting` (a transport died - e.g. the
+     *   device moved from Wi-Fi to LTE - and the SDK is restarting ICE) or `lost`
+     *   (the restarts ran out; call {@link leaveStreamRoom} and
+     *   {@link joinStreamRoom} again, then republish and resubscribe).
+     *   Without it the recovery still runs, you just get no state updates.
      * @returns {Promise<void>} resolves when the encrypted Event channel for the room has been established
      */
-    public async joinStreamRoom(streamRoomId: string): Promise<void> {
+    public async joinStreamRoom(
+        streamRoomId: string,
+        onConnectionState?: (state: StreamRoomConnectionState) => void,
+    ): Promise<void> {
+        if (onConnectionState) {
+            this.client.setConnectionStateListener(streamRoomId as StreamRoomId, onConnectionState);
+        }
         return this.native.joinStreamRoom(this.servicePtr, [streamRoomId]);
     }
 
@@ -271,7 +285,11 @@ export class StreamApi extends BaseApi {
      * @returns {Promise<void>} resolves when the room's Event channel has been torn down
      */
     public async leaveStreamRoom(streamRoomId: string): Promise<void> {
-        return this.native.leaveStreamRoom(this.servicePtr, [streamRoomId]);
+        try {
+            return await this.native.leaveStreamRoom(this.servicePtr, [streamRoomId]);
+        } finally {
+            this.client.clearConnectionStateListener(streamRoomId as StreamRoomId);
+        }
     }
 
     /**
@@ -611,9 +629,9 @@ export class StreamApi extends BaseApi {
             stream.localMediaStream,
         );
         this.streams.delete(streamHandle as StreamHandle);
-        this.client
-            .getStreamStateChangeDispatcher()
-            .removeOnStateChangeListener({ streamHandle: streamHandle as StreamHandle });
+        this.client.getStreamStateChangeDispatcher().removeOnStateChangeListener({
+            streamHandle: streamHandle as StreamHandle,
+        });
     }
 
     /**
@@ -639,6 +657,12 @@ export class StreamApi extends BaseApi {
      * @param {StreamSubscription[]} subscriptions remote streams/tracks to
      *   subscribe to, selected from the descriptors returned by
      *   {@link listStreams}
+     * @param {(state: RTCPeerConnectionState) => void} onStreamState optional
+     *   callback invoked whenever the inbound `RTCPeerConnection` changes state
+     *   (e.g. `connected`, `disconnected`, `failed`) - the receive-side
+     *   counterpart of {@link publishStream}'s callback. The SDK restarts ICE on
+     *   its own; use {@link joinStreamRoom}'s callback for the recovery outcome
+     *   rather than reacting to the raw states here.
      * @returns {number} handle identifying the new subscriber
      *   stream - pass it to {@link updateSubscriberStream} and
      *   {@link removeSubscriberStream}
@@ -646,9 +670,15 @@ export class StreamApi extends BaseApi {
     async createSubscriberStream(
         streamRoomId: string,
         subscriptions: StreamSubscription[],
+        onStreamState?: (state: RTCPeerConnectionState) => void,
     ): Promise<number> {
         const peerCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(peerCredentials);
+        if (onStreamState) {
+            // Registered before the native call: it can already negotiate the
+            // inbound connection, and with it the first state changes.
+            this.client.setSubscriberStateListener(streamRoomId as StreamRoomId, onStreamState);
+        }
         const handle = await this.native.createSubscriberStream(this.servicePtr, [
             streamRoomId,
             subscriptions,
@@ -711,8 +741,12 @@ export class StreamApi extends BaseApi {
      * @returns {Promise<void>} resolves once the Bridge has stopped delivering the subscriber stream
      */
     async removeSubscriberStream(subscriberStreamHandle: number): Promise<void> {
+        const streamRoomId = this.subscriberStreams.get(
+            subscriberStreamHandle as SubscriberStreamHandle,
+        );
         await this.native.removeSubscriberStream(this.servicePtr, [subscriberStreamHandle]);
         this.subscriberStreams.delete(subscriberStreamHandle as SubscriberStreamHandle);
+        if (streamRoomId) this.client.clearSubscriberStateListener(streamRoomId);
     }
 
     /**

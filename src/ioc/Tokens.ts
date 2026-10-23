@@ -34,6 +34,7 @@ export const T = {
     PublisherManager: "rtc:PublisherManager",
     SubscriberManager: "rtc:SubscriberManager",
     KeySyncManager: "rtc:KeySyncManager",
+    ReconnectManager: "rtc:ReconnectManager",
     WebRtcClient: "rtc:WebRtcClient",
 
     // API layer (connection-scoped)
