@@ -75,6 +75,21 @@ export class ReconnectManager {
     }
 
     /**
+     * Stops every pending recovery and drops all listeners - otherwise a timer
+     * armed before the connection died would fire afterwards and signal on a
+     * freed native pointer, forever.
+     */
+    destroy(): void {
+        for (const recovery of this.recoveries.values()) {
+            if (recovery.timer) clearTimeout(recovery.timer);
+        }
+        this.recoveries.clear();
+        this.roomStates.clear();
+        this.listeners.clear();
+        this.rawListeners.clear();
+    }
+
+    /**
      * Registers a listener for the raw `RTCPeerConnection` state of one of
      * `room`'s connections, replacing any previous one. Unlike the coarse room
      * state this reports every transition, including `connecting` and `closed`.

@@ -87,6 +87,7 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
         audioManager,
         e2eeWorker,
         reconnect,
+        pcm,
     );
 
     // Register internally-constructed objects so the lazy callbacks can reach them.

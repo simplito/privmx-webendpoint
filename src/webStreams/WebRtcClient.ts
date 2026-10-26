@@ -6,7 +6,7 @@ import {
     StreamRoomId,
     StreamTrack,
 } from "./types/ApiTypes.js";
-import { ConnectionType, SessionId } from "./PeerConnectionManager.js";
+import { ConnectionType, PeerConnectionManager, SessionId } from "./PeerConnectionManager.js";
 import { PeerConnectionFactory } from "./PeerConnectionFactory.js";
 import { PublisherManager } from "./PublisherManager.js";
 import { SubscriberManager } from "./SubscriberManager.js";
@@ -58,6 +58,7 @@ export class WebRtcClient {
         private readonly audioManager: AudioManager,
         private readonly e2eeWorker: E2eeWorker,
         private readonly reconnect: ReconnectManager,
+        private readonly pcm: PeerConnectionManager,
     ) {}
 
     /**
@@ -319,10 +320,21 @@ export class WebRtcClient {
     }
 
     /**
-     * Terminates the E2EE worker thread and clears all watched audio senders/receivers.
-     * Called automatically by `StreamApi.destroyRefs()` during `Connection.disconnect()`.
+     * Tears the whole WebRTC session down: closes every peer connection of this
+     * connection (publisher and subscriber, in every room), stops any pending ICE
+     * recovery, terminates the E2EE worker thread and clears all watched audio
+     * senders/receivers.
+     *
+     * Called automatically by `StreamApi.destroyRefs()` during
+     * `Connection.disconnect()`. Closing the peer connections here does not
+     * depend on the native layer calling back, so a connection that died
+     * (`libDisconnected`) leaves no sender transmitting from a dead session. The
+     * local `MediaStreamTrack`s are left alone - they belong to the application,
+     * which may reuse them on the next connection.
      */
     destroy(): void {
+        this.pcm.closeAll();
+        this.reconnect.destroy();
         this.e2eeWorker.stop();
         this.audioManager.destroy();
     }

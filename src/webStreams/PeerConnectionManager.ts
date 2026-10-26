@@ -155,6 +155,21 @@ export class PeerConnectionManager {
     }
 
     /**
+     * Closes every peer connection of every room and empties the map.
+     *
+     * Called when the whole connection goes away (`disconnect()`, or a lost
+     * connection): nothing is signalled to the server, the local transports are
+     * simply torn down so no sender keeps sending from a dead session.
+     */
+    closeAll(): void {
+        for (const room of Object.keys(this.connections)) {
+            for (const connectionType of ["publisher", "subscriber"] as const) {
+                this.closePeerConnectionBySessionIfExists(room as StreamRoomId, connectionType);
+            }
+        }
+    }
+
+    /**
      * Closes the peer connection for `room` / `connectionType` (if one exists)
      * and removes it from the map. If both publisher and subscriber entries for
      * the room are now absent the outer room entry is also removed.

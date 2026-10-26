@@ -118,6 +118,18 @@ describe("ReconnectManager", () => {
         expect(raw).toEqual(["connecting", "connected", "disconnected", "closed"]);
     });
 
+    it("fires no restart after destroy, even with a recovery already armed", async () => {
+        const pc = makePc("failed");
+        const { manager, signalling, states } = setup({ subscriber: connection(pc) });
+
+        manager.onConnectionState(ROOM, "subscriber", "disconnected");
+        manager.destroy();
+        await vi.advanceTimersByTimeAsync(GRACE_MS * 5);
+
+        expect(signalling.restartSubscriberIce).not.toHaveBeenCalled();
+        expect(states).toEqual(["reconnecting"]);
+    });
+
     it("does not restart a closed connection", async () => {
         const pc = makePc("failed");
         const { manager, signalling } = setup({ publisher: connection(pc) });
