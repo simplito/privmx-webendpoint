@@ -20,6 +20,11 @@ export class SubscriberManager {
     private readonly reconfigureQueue: Queue<QueueItem>;
     private readonly lastProcessedAnswer: { [roomId: string]: Jsep } = {};
     private readonly bootstrapChannels: Map<StreamRoomId, RTCDataChannel[]> = new Map();
+    // Streams whose remote track the media server took away while they were still
+    // subscribed - which is what a republication looks like from here.
+    private readonly staleStreams: Map<StreamRoomId, Set<number>> = new Map();
+    // Removals we asked for ourselves, so the track going away is expected.
+    private readonly expectedRemovals: Map<StreamRoomId, Set<number>> = new Map();
     private readonly logger = new Logger();
 
     constructor(
@@ -90,7 +95,54 @@ export class SubscriberManager {
             }
         });
 
+        // The media server stops feeding a subscribed Stream by taking its track
+        // away - the browser reports that as `removetrack` (the track itself is
+        // only muted, and never ends). It is the one local sign that the
+        // subscriptions held for that Stream went stale.
+        //
+        // Unsubscribing removes the track just the same, so removals we asked
+        // for are announced through `expectStreamRemoval` and skipped here.
+        event.streams[0]?.addEventListener("removetrack", () => {
+            if (this.expectedRemovals.get(roomId)?.delete(publisherId)) {
+                this.logger.debug("remote track removed as asked:", publisherId);
+                return;
+            }
+            this.logger.debug("remote track taken away, marking stream stale:", publisherId);
+            const stale = this.staleStreams.get(roomId) ?? new Set<number>();
+            stale.add(publisherId);
+            this.staleStreams.set(roomId, stale);
+        });
+
         this.listenerRegistry.dispatchTrack(roomId, event);
+    }
+
+    /**
+     * IDs of the Streams in `roomId` which were taken away while subscribed, so
+     * their subscriptions no longer deliver anything and have to be made anew.
+     */
+    getStaleStreams(roomId: StreamRoomId): ReadonlySet<number> {
+        return this.staleStreams.get(roomId) ?? new Set<number>();
+    }
+
+    /** Forgets one Stream of `roomId` once its subscription was redone or dropped. */
+    forgetStaleStream(roomId: StreamRoomId, streamId: number): void {
+        this.staleStreams.get(roomId)?.delete(streamId);
+    }
+
+    /**
+     * Announces that `streamId` is being unsubscribed, so the remote track going
+     * away is not mistaken for the media server taking it from us.
+     */
+    expectStreamRemoval(roomId: StreamRoomId, streamId: number): void {
+        const expected = this.expectedRemovals.get(roomId) ?? new Set<number>();
+        expected.add(streamId);
+        this.expectedRemovals.set(roomId, expected);
+    }
+
+    /** Forgets every stale Stream of `roomId` (the subscriber stream was rebuilt). */
+    clearStaleStreams(roomId: StreamRoomId): void {
+        this.staleStreams.delete(roomId);
+        this.expectedRemovals.delete(roomId);
     }
 
     /**
@@ -109,6 +161,8 @@ export class SubscriberManager {
         this.pcm.closePeerConnectionBySessionIfExists(roomId, "subscriber");
         delete this.lastProcessedAnswer[roomId];
         this.closeBootstrapChannels(roomId);
+        this.staleStreams.delete(roomId);
+        this.expectedRemovals.delete(roomId);
     }
 
     private closeBootstrapChannels(roomId: StreamRoomId): void {

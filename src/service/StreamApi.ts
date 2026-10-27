@@ -30,6 +30,8 @@ import {
     StreamRoomConnectionState,
 } from "../Types.js";
 import { StreamApiNative } from "../native/StreamApiNative.js";
+import { NativeError } from "../native/NativeError.js";
+import { StreamRoomErrorCode } from "../native/NativeErrorCodes.js";
 import { logger } from "../webStreams/Logger.js";
 
 /**
@@ -624,6 +626,10 @@ export class StreamApi extends BaseApi {
      * Undoes a half-applied addition after a failed {@link updateStream}: takes
      * the senders back off the peer connection (they may already have been added
      * before the failure) and un-stages the tracks.
+     * @param {StreamRoomId} streamRoomId the room whose publisher connection was updated
+     * @param {StreamTrack[]} added the staged tracks the failed update tried to publish
+     * @param {MediaStreamTrack[]} tracksToAdd the browser tracks of `added`
+     * @returns {Promise<void>} resolves once the senders are off and the tracks un-staged
      */
     private async rollbackAddedTracks(
         streamRoomId: StreamRoomId,
@@ -698,6 +704,10 @@ export class StreamApi extends BaseApi {
      * tracks, then adjust the set with {@link updateSubscriberStream} or tear it
      * down with {@link removeSubscriberStream}.
      *
+     * When a Stream you subscribe to is published again it keeps its ID and
+     * stops being delivered; {@link updateSubscriberStream} is the only way to
+     * subscribe to it anew - see the note there.
+     *
      * @param {string} streamRoomId ID of the Stream Room to subscribe in,
      *   returned by {@link createStreamRoom} or from `StreamRoom.streamRoomId`
      *   in {@link listStreamRooms}
@@ -731,6 +741,7 @@ export class StreamApi extends BaseApi {
             subscriptions,
         ]);
         this.subscriberStreams.set(handle, streamRoomId as StreamRoomId);
+        this.client.clearStaleStreams(streamRoomId as StreamRoomId);
         this.client.initializeSubscriberConnection(streamRoomId as StreamRoomId);
         return handle;
     }
@@ -753,21 +764,96 @@ export class StreamApi extends BaseApi {
      * @param {StreamSubscription[]} subscriptionsToAdd remote streams/tracks to
      *   start receiving, selected from the descriptors returned by
      *   {@link listStreams}
+     * ## Streams which were published again
+     *
+     * A Stream keeps its ID when its publisher unpublishes it and publishes it
+     * again, and the media server stops feeding the subscriptions made against
+     * the earlier publication. Nothing in {@link listStreams} tells the two
+     * apart, so this method refuses to work on such a Stream rather than leave
+     * you with a subscription that looks alive and delivers nothing: it rejects
+     * with a `NativeError` carrying
+     * `StreamRoomErrorCode.STREAM_REQUIRES_RESUBSCRIPTION`.
+     *
+     * You get there after a `streamUnpublished` event followed by a
+     * `streamPublished` event for the same Stream ID, so reacting to those
+     * events is what keeps you out of this error.
+     *
+     * To subscribe to such a Stream again, pass it in **both** lists in one
+     * call. Passing the same subscription as removed and added is how you say
+     * "make this subscription anew", and it is the only way to do it - removing
+     * the subscriber stream and creating it again does not bring the media
+     * back. Dropping the Stream by passing it in `subscriptionsToRemove` alone
+     * is allowed too.
+     *
      * @param {StreamSubscription[]} subscriptionsToRemove remote streams/tracks
      *   to stop receiving, from the set previously passed to
      *   {@link createSubscriberStream} or {@link updateSubscriberStream}
      * @returns {Promise<void>} resolves when the Bridge has applied the subscription changes
+     * @throws {NativeError} with `StreamRoomErrorCode.STREAM_REQUIRES_RESUBSCRIPTION`
+     *   when `subscriptionsToAdd` holds a Stream which was published again and
+     *   `subscriptionsToRemove` does not hold it as well
      */
     async updateSubscriberStream(
         subscriberStreamHandle: number,
         subscriptionsToAdd: StreamSubscription[],
         subscriptionsToRemove: StreamSubscription[],
     ): Promise<void> {
-        return this.native.updateSubscriberStream(this.servicePtr, [
+        const streamRoomId = this.subscriberStreams.get(
+            subscriberStreamHandle as SubscriberStreamHandle,
+        );
+        if (streamRoomId) {
+            this.assertStaleStreamsAreRedone(
+                streamRoomId,
+                subscriptionsToAdd,
+                subscriptionsToRemove,
+            );
+            // The tracks of these are about to be taken away because we said so.
+            for (const removed of subscriptionsToRemove) {
+                this.client.expectStreamRemoval(streamRoomId, removed.streamId);
+            }
+        }
+        await this.native.updateSubscriberStream(this.servicePtr, [
             subscriberStreamHandle,
             subscriptionsToAdd,
             subscriptionsToRemove,
         ]);
+        if (!streamRoomId) return;
+        // A Stream subscribed anew or dropped is no longer one to warn about.
+        for (const removed of subscriptionsToRemove) {
+            this.client.forgetStaleStream(streamRoomId, removed.streamId);
+        }
+    }
+
+    /**
+     * Refuses an update that would add a subscription to a Stream which was
+     * published again, unless the same call also removes it - which is what
+     * makes the subscription anew.
+     * @param {StreamRoomId} streamRoomId the room the subscriptions belong to
+     * @param {StreamSubscription[]} subscriptionsToAdd the subscriptions being added
+     * @param {StreamSubscription[]} subscriptionsToRemove the subscriptions being removed
+     * @throws if a Stream which was published again is added without being removed
+     */
+    private assertStaleStreamsAreRedone(
+        streamRoomId: StreamRoomId,
+        subscriptionsToAdd: StreamSubscription[],
+        subscriptionsToRemove: StreamSubscription[],
+    ): void {
+        const stale = this.client.getStaleStreams(streamRoomId);
+        if (stale.size === 0) return;
+        for (const added of subscriptionsToAdd) {
+            if (!stale.has(added.streamId)) continue;
+            const isRedone = subscriptionsToRemove.some((r) => r.streamId === added.streamId);
+            if (isRedone) continue;
+            throw new NativeError({
+                code: StreamRoomErrorCode.STREAM_REQUIRES_RESUBSCRIPTION,
+                name: "StreamRequiresResubscriptionException",
+                scope: "StreamRoom",
+                description:
+                    `Stream ${added.streamId} was published again and its subscriptions have to ` +
+                    "be made anew - pass it in subscriptionsToRemove as well as subscriptionsToAdd.",
+                full: "",
+            });
+        }
     }
 
     /**
@@ -793,7 +879,10 @@ export class StreamApi extends BaseApi {
         );
         await this.native.removeSubscriberStream(this.servicePtr, [subscriberStreamHandle]);
         this.subscriberStreams.delete(subscriberStreamHandle as SubscriberStreamHandle);
-        if (streamRoomId) this.client.clearSubscriberStateListener(streamRoomId);
+        if (streamRoomId) {
+            this.client.clearSubscriberStateListener(streamRoomId);
+            this.client.clearStaleStreams(streamRoomId);
+        }
     }
 
     /**

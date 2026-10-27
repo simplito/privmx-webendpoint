@@ -62,9 +62,12 @@ export class E2eeTransformManager {
      * No-ops if `createEncodedStreams` is not supported by the browser.
      *
      * The same receiver can be handed to us more than once: when a remote peer
-     * rejoins, the SFU recycles the freed m-line and `ontrack` re-fires with a
-     * receiver whose transform is already installed. The transform is then
-     * replaced; the two transform APIs are never mixed on one receiver.
+     * republishes, the SFU recycles the freed m-line and `ontrack` re-fires with
+     * a receiver whose transform is already installed. That transform is left in
+     * place - it runs on the same worker and key store, so it keeps decrypting
+     * the recycled m-line, while replacing it would tear down the live pipe and
+     * make the worker report `InvalidStateError`. The two transform APIs are
+     * never mixed on one receiver.
      */
     async setupReceiverTransform(receiver: RTCRtpReceiver): Promise<void> {
         const win = window as unknown as WindowWithRTCRtpScriptTransform;
@@ -73,20 +76,16 @@ export class E2eeTransformManager {
 
         if (win.RTCRtpScriptTransform) {
             this.logger.debug("Receiver: using RTCRtpScriptTransform");
-            const worker = await this.e2eeWorker.get();
-            const hadTransform = !!receiverExt.transform;
-            try {
-                receiverExt.transform = new win.RTCRtpScriptTransform(worker, {
-                    operation: "decode",
-                    id: receiver.track.id,
-                    kind,
-                });
-            } catch (e) {
-                if (!hadTransform) throw e;
-                // The existing transform shares the same worker and key store, so
-                // decryption keeps working.
-                this.logger.warn("Receiver: keeping existing transform, replacement rejected:", e);
+            if (receiverExt.transform) {
+                this.logger.debug("Receiver: transform already installed, keeping it");
+                return;
             }
+            const worker = await this.e2eeWorker.get();
+            receiverExt.transform = new win.RTCRtpScriptTransform(worker, {
+                operation: "decode",
+                id: receiver.track.id,
+                kind,
+            });
             return;
         }
 

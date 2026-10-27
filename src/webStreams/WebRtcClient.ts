@@ -283,6 +283,34 @@ export class WebRtcClient {
     }
 
     /**
+     * IDs of `roomId`'s Streams whose remote track the media server took away
+     * while they were still subscribed - a Stream republished under the same ID
+     * looks exactly like this, and its subscriptions deliver nothing until they
+     * are made anew.
+     */
+    getStaleStreams(roomId: StreamRoomId): ReadonlySet<number> {
+        return this.subscriber.getStaleStreams(roomId);
+    }
+
+    /** Forgets one stale Stream of `roomId`, once its subscription was redone or dropped. */
+    forgetStaleStream(roomId: StreamRoomId, streamId: number): void {
+        this.subscriber.forgetStaleStream(roomId, streamId);
+    }
+
+    /**
+     * Announces that `streamId` is being unsubscribed in `roomId`, so its remote
+     * track going away is not taken for the media server dropping it.
+     */
+    expectStreamRemoval(roomId: StreamRoomId, streamId: number): void {
+        this.subscriber.expectStreamRemoval(roomId, streamId);
+    }
+
+    /** Forgets every stale Stream of `roomId` (its subscriber stream was rebuilt). */
+    clearStaleStreams(roomId: StreamRoomId): void {
+        this.subscriber.clearStaleStreams(roomId);
+    }
+
+    /**
      * Returns the last SDP answer produced for `room` during reconfiguration.
      * Used by `WebRtcInterfaceImpl` to reply to the server's accept-offer call.
      * @throws if no answer has been produced for the given room yet.

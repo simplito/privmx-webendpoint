@@ -101,7 +101,7 @@ describe("StreamApi track bookkeeping", () => {
     });
 
     it("un-stages a track whose update failed, and takes its sender back off", async () => {
-        const { api, native, client, addedTracks, removedTracks } = setup();
+        const { api, native, addedTracks, removedTracks } = setup();
         const [a, screen, camera] = [makeTrack("a"), makeTrack("screen"), makeTrack("camera")];
 
         const handle = await api.createStream("room");

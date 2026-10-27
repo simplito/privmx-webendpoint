@@ -25,6 +25,11 @@ export interface RawCppError {
  * numeric code, module scope and full message, and appends the native cause to
  * the JS stack trace.
  *
+ * A few conditions the SDK detects on its own - those the C++ core reports as
+ * exceptions in bindings that do not run the WebRTC layer in JavaScript, such
+ * as `STREAM_REQUIRES_RESUBSCRIPTION` - are raised as this same type, with the
+ * core's code, so applications branch on them the same way everywhere.
+ *
  * Branch on failures with `instanceof` and the constants from
  * `NativeErrorCodes.ts` (`CoreErrorCode`, `StoreErrorCode`, …) instead of
  * string-matching messages:
