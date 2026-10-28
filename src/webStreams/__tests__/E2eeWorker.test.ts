@@ -91,3 +91,28 @@ describe("E2eeWorker key-update serialization", () => {
         await expect(p2).resolves.toBeUndefined();
     });
 });
+
+describe("E2eeWorker missing key reports", () => {
+    it("hands a worker's missing-key report to the listener", async () => {
+        const w = new E2eeWorker("worker.js");
+        const onMissingKey = vi.fn();
+        w.setMissingKeyListener(onMissingKey);
+        await w.get();
+
+        FakeWorker.instances[0].emit({ type: "missingKey" });
+
+        expect(onMissingKey).toHaveBeenCalledTimes(1);
+    });
+
+    it("ignores the worker's other messages", async () => {
+        const w = new E2eeWorker("worker.js");
+        const onMissingKey = vi.fn();
+        w.setMissingKeyListener(onMissingKey);
+        await w.get();
+
+        FakeWorker.instances[0].emit({ type: "error", data: "boom" });
+        FakeWorker.instances[0].emit({ operation: "setKeys-ack" });
+
+        expect(onMissingKey).not.toHaveBeenCalled();
+    });
+});

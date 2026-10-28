@@ -6,6 +6,7 @@ import { KeySyncManager } from "../webStreams/KeySyncManager.js";
 import { PeerConnectionFactory } from "../webStreams/PeerConnectionFactory.js";
 import { PeerConnectionManager } from "../webStreams/PeerConnectionManager.js";
 import { PublisherManager } from "../webStreams/PublisherManager.js";
+import { KeyRefreshScheduler } from "../webStreams/KeyRefreshScheduler.js";
 import { ReconnectManager } from "../webStreams/ReconnectManager.js";
 import { RemoteStreamListenerRegistry } from "../webStreams/RemoteStreamListenerRegistry.js";
 import { SubscriberManager } from "../webStreams/SubscriberManager.js";
@@ -73,6 +74,13 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
                 .then((client) => client.restartSubscriberIce(streamRoomId)),
     });
 
+    // The refresh reaches the native layer through WebRtcClient, resolved lazily.
+    const keyRefresh = new KeyRefreshScheduler((streamRoomId) =>
+        c
+            .resolve<WebRtcClient>(T.WebRtcClient)
+            .then((client) => client.refreshStreamRoomKeys(streamRoomId)),
+    );
+
     const publisher = new PublisherManager(pcm, audioManager, e2eeTransform);
     const subscriber = new SubscriberManager(pcm, e2eeTransform, registry, audioManager);
     const keys = new KeySyncManager(e2eeWorker);
@@ -88,6 +96,7 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
         e2eeWorker,
         reconnect,
         pcm,
+        keyRefresh,
     );
 
     // Register internally-constructed objects so the lazy callbacks can reach them.
@@ -97,6 +106,7 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
     c.registerValue(T.SubscriberManager, subscriber);
     c.registerValue(T.KeySyncManager, keys);
     c.registerValue(T.ReconnectManager, reconnect);
+    c.registerValue(T.KeyRefreshScheduler, keyRefresh);
     c.registerValue(T.WebRtcClient, client);
 
     return client;

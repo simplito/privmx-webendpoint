@@ -11,6 +11,10 @@ import { Logger } from "./Logger.js";
  */
 export class KeySyncManager {
     private readonly logger = new Logger();
+    // Rooms whose keys were pushed to the worker. The worker holds one key set
+    // and cannot say which room a frame it failed to decrypt belongs to, so a
+    // missing key is reported against all of them.
+    private readonly rooms = new Set<StreamRoomId>();
 
     constructor(private readonly e2eeWorker: E2eeWorker) {}
 
@@ -21,6 +25,17 @@ export class KeySyncManager {
      */
     async updateKeys(streamRoomId: StreamRoomId, keys: Key[]): Promise<void> {
         this.logger.debug("UPDATE KEYS", streamRoomId, keys.length);
+        this.rooms.add(streamRoomId);
         await this.e2eeWorker.setKeys(keys);
+    }
+
+    /** Rooms whose keys have been pushed to the worker. */
+    getRooms(): ReadonlySet<StreamRoomId> {
+        return this.rooms;
+    }
+
+    /** Forgets `streamRoomId` (on leaving the room). */
+    forgetRoom(streamRoomId: StreamRoomId): void {
+        this.rooms.delete(streamRoomId);
     }
 }

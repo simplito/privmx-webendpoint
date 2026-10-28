@@ -377,6 +377,7 @@ API_FUNCTION(StreamApi, buildSubscriptionQuery)
 API_FUNCTION(StreamApi, trickle)
 API_FUNCTION(StreamApi, setNewOfferOnReconfigure)
 API_FUNCTION(StreamApi, restartSubscriberIce)
+API_FUNCTION(StreamApi, refreshStreamRoomKeys)
 
 API_FUNCTION(StreamApi, encryptDataChannelMessage)
 API_FUNCTION(StreamApi, decryptDataChannelMessage)

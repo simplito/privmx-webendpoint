@@ -292,7 +292,34 @@ export class StreamApi extends BaseApi {
             return await this.native.leaveStreamRoom(this.servicePtr, [streamRoomId]);
         } finally {
             this.client.clearConnectionStateListener(streamRoomId as StreamRoomId);
+            this.client.clearKeyRefreshState(streamRoomId as StreamRoomId);
         }
+    }
+
+    /**
+     * Fetches the Stream Room's encryption keys again and hands them to the
+     * WebRTC layer.
+     *
+     * Keys are normally kept current by the Stream Room update notification,
+     * and a key which went missing in spite of that is already fetched again by
+     * the SDK on its own - a media frame or a data channel message which cannot
+     * be decrypted for want of a key triggers a refresh, at most one per room
+     * at a time and no more often than every 10 seconds. Calling this is
+     * therefore not needed in the ordinary course of things. It is here for an
+     * application which knows it has been out of touch (the room reported
+     * `reconnecting` through {@link joinStreamRoom}, the device came back from
+     * the background, …) and would rather not wait for the first frame to fail.
+     *
+     * The key the Stream Room encrypts with is left as it was; only the set of
+     * keys available for decryption is refreshed, so this never disturbs what
+     * this client is publishing.
+     *
+     * @param {string} streamRoomId ID of the Stream Room whose keys are
+     *   refreshed; the room has to be joined with {@link joinStreamRoom}
+     * @returns {Promise<void>} resolves once the refreshed keys have been handed to the WebRTC layer
+     */
+    public async refreshStreamRoomKeys(streamRoomId: string): Promise<void> {
+        return this.native.refreshStreamRoomKeys(this.servicePtr, [streamRoomId]);
     }
 
     /**

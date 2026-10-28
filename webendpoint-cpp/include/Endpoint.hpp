@@ -205,6 +205,7 @@ API_FUNCTION_HEADER(StreamApi, buildSubscriptionQuery)
 API_FUNCTION_HEADER(StreamApi, trickle)
 API_FUNCTION_HEADER(StreamApi, setNewOfferOnReconfigure)
 API_FUNCTION_HEADER(StreamApi, restartSubscriberIce)
+API_FUNCTION_HEADER(StreamApi, refreshStreamRoomKeys)
 
 API_FUNCTION_HEADER(StreamApi, encryptDataChannelMessage)
 API_FUNCTION_HEADER(StreamApi, decryptDataChannelMessage)

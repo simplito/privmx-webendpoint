@@ -173,6 +173,8 @@ export function registerConnectionServices(
                 native.setNewOfferOnReconfigure(ptr, [sessionId, jsep]),
             restartSubscriberIce: (streamRoomId) =>
                 native.restartSubscriberIce(ptr, [streamRoomId]),
+            refreshStreamRoomKeys: (streamRoomId) =>
+                native.refreshStreamRoomKeys(ptr, [streamRoomId]),
             decryptDataChannelMessage: (streamRoomId, remoteStreamId, encryptedData) =>
                 native.decryptDataChannelMessage(ptr, [
                     streamRoomId,

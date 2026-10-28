@@ -16,11 +16,14 @@ import { StateChangeDispatcher } from "./EventDispatcher.js";
 import { AudioManager, AudioLevelsStats, ActiveSpeakerDetectorConfig } from "./AudioManager.js";
 import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry.js";
 import { ReconnectManager } from "./ReconnectManager.js";
+import { KeyRefreshScheduler } from "./KeyRefreshScheduler.js";
+import { StreamRoomErrorCode } from "../native/NativeErrorCodes.js";
 
 export interface StreamsCallbackInterface {
     trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void>;
     setNewOfferOnReconfigure(sessionId: SessionId, jsep: Jsep): Promise<void>;
     restartSubscriberIce(streamRoomId: StreamRoomId): Promise<void>;
+    refreshStreamRoomKeys(streamRoomId: StreamRoomId): Promise<void>;
     decryptDataChannelMessage(
         streamRoomId: StreamRoomId,
         remoteStreamId: string,
@@ -59,7 +62,10 @@ export class WebRtcClient {
         private readonly e2eeWorker: E2eeWorker,
         private readonly reconnect: ReconnectManager,
         private readonly pcm: PeerConnectionManager,
-    ) {}
+        private readonly keyRefresh: KeyRefreshScheduler,
+    ) {
+        this.e2eeWorker.setMissingKeyListener(() => this.onMissingMediaKey());
+    }
 
     /**
      * Binds the native WASM callback interface used to forward ICE trickle
@@ -200,11 +206,47 @@ export class WebRtcClient {
         encryptedData: Uint8Array,
     ): Promise<DecryptedDataChannelMessage> {
         if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
-        return this.streamsApiInterface.decryptDataChannelMessage(
+        const decrypted = await this.streamsApiInterface.decryptDataChannelMessage(
             streamRoomId,
             remoteStreamId,
             encryptedData,
         );
+        // Only a key which is not held can be mended by fetching the keys
+        // again; every other status means the key was found and something else
+        // went wrong.
+        if (decrypted.statusCode === StreamRoomErrorCode.NO_STREAM_DECRYPTION_KEY) {
+            this.keyRefresh.requestRefresh(streamRoomId);
+        }
+        return decrypted;
+    }
+
+    /**
+     * Fetches `streamRoomId`'s encryption keys from the Bridge again and hands
+     * them to this WebRTC layer, bypassing the scheduler's cooldown.
+     * @throws if `bindApiInterface` has not been called yet.
+     */
+    refreshStreamRoomKeys(streamRoomId: StreamRoomId): Promise<void> {
+        if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
+        return this.streamsApiInterface.refreshStreamRoomKeys(streamRoomId);
+    }
+
+    /** Drops the key bookkeeping for `streamRoomId`, on leaving the room. */
+    clearKeyRefreshState(streamRoomId: StreamRoomId): void {
+        this.keys.forgetRoom(streamRoomId);
+        this.keyRefresh.forgetRoom(streamRoomId);
+    }
+
+    /**
+     * Fed by the E2EE worker when a media frame cannot be decrypted for want of
+     * a key. The worker holds one key set for the whole session and cannot name
+     * the room the frame came from, so every room it holds keys for is
+     * refreshed - the scheduler keeps that from repeating.
+     * @returns {void}
+     */
+    private onMissingMediaKey(): void {
+        for (const streamRoomId of this.keys.getRooms()) {
+            this.keyRefresh.requestRefresh(streamRoomId);
+        }
     }
 
     /**
