@@ -14,7 +14,7 @@ export default defineConfig<WorkerOptions>({
     timeout: 60_000,
     globalSetup: './dockerCleanup',
     globalTeardown: './dockerCleanup',
-    workers: 3,
+    workers: process.env.CI ? '100%' : undefined,
     webServer: {
         command: 'npx serve . -p 8080',
         cwd: repoRoot,
