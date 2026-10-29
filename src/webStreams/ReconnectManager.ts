@@ -233,6 +233,14 @@ export class ReconnectManager {
 
     /** Emits the room's coarse state (connected / reconnecting / lost) when it changes. */
     private publish(room: StreamRoomId): void {
+        // A room left without connections has no state to report. Saying
+        // `connected` - which is what no pending recovery means - would announce
+        // a recovery at the very moment the transport was torn down: on
+        // `disconnect()`, on unpublishing, on removing the last subscriber
+        // stream. The last state the application saw stands until a connection
+        // is there again.
+        if (!this.hasLiveConnection(room)) return;
+
         let state: StreamRoomConnectionState = "connected";
         for (const connectionType of ["publisher", "subscriber"] as const) {
             const recovery = this.recoveries.get(this.key(room, connectionType));
@@ -254,6 +262,19 @@ export class ReconnectManager {
         } catch (e) {
             this.logger.error("Stream room connection state listener threw:", e);
         }
+    }
+
+    /**
+     * Whether `room` still holds a connection worth reporting on. A connection
+     * we closed ourselves is already out of the map; one the browser closed is
+     * still in it, in state `closed`.
+     */
+    private hasLiveConnection(room: StreamRoomId): boolean {
+        for (const connectionType of ["publisher", "subscriber"] as const) {
+            const conn = this.pcm.getConnection(room, connectionType);
+            if (conn && conn.pc.connectionState !== "closed") return true;
+        }
+        return false;
     }
 
     private key(room: StreamRoomId, connectionType: ConnectionType): string {

@@ -176,6 +176,124 @@ test.describe("StreamRepublish", () => {
         expect(result.rejection.code).toBe(0x80033);
     });
 
+    // Unsubscribing takes the remote tracks away just like a republish does, so
+    // the SDK announces its own removals to itself. A Stream carrying both audio
+    // and video brings several `removetrack` events, none of which may be taken
+    // for the media server dropping us, or an ordinary resubscribe is refused.
+    //
+    // Against the media server the removals land while `updateSubscriberStream`
+    // is still waiting, so this passes on the mishandling it guards as well -
+    // the window is a matter of timing and the unit tests are what pin it down.
+    // What this test does show is that the whole path still carries media.
+    test("a stream unsubscribed by hand can be subscribed to again", async ({
+        page,
+        backend,
+        cli,
+    }) => {
+        test.setTimeout(120000);
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const conn1 = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const publisher = await Endpoint.createStreamApi(
+                conn1,
+                await Endpoint.createEventApi(conn1),
+            );
+            const conn2 = await Endpoint.connect(users.u2.privKey, solutionId, bridgeUrl);
+            const subscriber = await Endpoint.createStreamApi(
+                conn2,
+                await Endpoint.createEventApi(conn2),
+            );
+            const enc = new TextEncoder();
+            const uObjs = [users.u1, users.u2].map((u) => ({ userId: u.id, pubKey: u.pubKey }));
+            const sId = await publisher.createStreamRoom(
+                contextId,
+                uObjs,
+                uObjs,
+                enc.encode("p"),
+                enc.encode("p"),
+            );
+
+            const framesDecoded = async () => {
+                const pc = (subscriber as any).client.subscriber.pcm.getConnection(
+                    sId,
+                    "subscriber",
+                ).pc as RTCPeerConnection;
+                let frames = 0;
+                (await pc.getStats()).forEach((report: any) => {
+                    if (report.type === "inbound-rtp" && report.kind === "video") {
+                        frames += report.framesDecoded ?? 0;
+                    }
+                });
+                return frames;
+            };
+            const waitFrames = async (above: number, tries = 20) => {
+                for (let i = 0; i < tries; i++) {
+                    const frames = await framesDecoded();
+                    if (frames > above) return frames;
+                    await new Promise((r) => setTimeout(r, 500));
+                }
+                return framesDecoded();
+            };
+            const listFirst = async (): Promise<Types.StreamInfo> => {
+                let list: Types.StreamInfo[] = [];
+                for (let i = 0; i < 40 && list.length === 0; i++) {
+                    list = await subscriber.listStreams(sId);
+                    await new Promise((r) => setTimeout(r, 500));
+                }
+                return list[0];
+            };
+            const subsOf = (s: Types.StreamInfo) =>
+                s.tracks.map((t) => ({ streamId: s.id, streamTrackId: t.mid }));
+
+            await publisher.joinStreamRoom(sId);
+            await subscriber.joinStreamRoom(sId);
+            const handle = await publisher.createStream(sId);
+            const media = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            // Both kinds, because they share one MediaStream on the receiving end.
+            await publisher.addStreamTrack(handle, { track: media.getVideoTracks()[0] });
+            await publisher.addStreamTrack(handle, { track: media.getAudioTracks()[0] });
+            await publisher.publishStream(handle);
+
+            const stream = await listFirst();
+            const subHandle = await subscriber.createSubscriberStream(sId, subsOf(stream));
+            const framesBefore = await waitFrames(0);
+
+            await subscriber.updateSubscriberStream(subHandle, [], subsOf(stream));
+            // Give the renegotiation time to take the tracks away.
+            await new Promise((r) => setTimeout(r, 3000));
+
+            let rejection: { name?: string; code?: number } | undefined;
+            try {
+                await subscriber.updateSubscriberStream(subHandle, subsOf(stream), []);
+            } catch (e) {
+                rejection = { name: (e as Error).name, code: (e as { code?: number }).code };
+            }
+            const framesAtResubscribe = await framesDecoded();
+            const framesAfter = rejection ? 0 : await waitFrames(framesAtResubscribe, 30);
+
+            return {
+                trackCount: stream.tracks.length,
+                framesBefore,
+                framesAtResubscribe,
+                framesAfter,
+                rejection,
+            };
+        }, args);
+
+        expect(result.trackCount).toBe(2);
+        expect(result.framesBefore).toBeGreaterThan(0);
+        expect(result.rejection).toBeUndefined();
+        expect(result.framesAfter).toBeGreaterThan(result.framesAtResubscribe);
+    });
+
     test("re-issuing the subscription restores media after a republish", async ({
         page,
         backend,

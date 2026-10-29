@@ -347,6 +347,14 @@ export class WebRtcClient {
         this.subscriber.expectStreamRemoval(roomId, streamId);
     }
 
+    /**
+     * Takes back an announcement made with {@link expectStreamRemoval}, after
+     * the unsubscribe it was made for failed.
+     */
+    forgetExpectedRemoval(roomId: StreamRoomId, streamId: number): void {
+        this.subscriber.forgetExpectedRemoval(roomId, streamId);
+    }
+
     /** Forgets every stale Stream of `roomId` (its subscriber stream was rebuilt). */
     clearStaleStreams(roomId: StreamRoomId): void {
         this.subscriber.clearStaleStreams(roomId);

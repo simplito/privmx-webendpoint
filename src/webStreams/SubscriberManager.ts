@@ -23,8 +23,15 @@ export class SubscriberManager {
     // Streams whose remote track the media server took away while they were still
     // subscribed - which is what a republication looks like from here.
     private readonly staleStreams: Map<StreamRoomId, Set<number>> = new Map();
-    // Removals we asked for ourselves, so the track going away is expected.
+    // Removals we asked for ourselves, so the track going away is expected. Held
+    // until the Stream delivers again rather than consumed by the first
+    // `removetrack`: one unsubscribe takes away every track of the Stream, and
+    // the events can arrive long after the call which asked for them returned.
     private readonly expectedRemovals: Map<StreamRoomId, Set<number>> = new Map();
+    // Remote streams whose `removetrack` is already watched, so the audio and
+    // the video of one publisher - which share a MediaStream - do not install
+    // the listener twice over.
+    private readonly watchedStreams = new WeakSet<MediaStream>();
     private readonly logger = new Logger();
 
     constructor(
@@ -75,8 +82,17 @@ export class SubscriberManager {
      */
     async onRemoteTrack(roomId: StreamRoomId, event: RTCTrackEvent): Promise<void> {
         const receiver = event.receiver;
-        const publisherId = Number(event.streams[0].id);
+        const stream = event.streams[0];
+        const publisherId = Number(stream.id);
         const pc = this.pcm.getOrCreateConnection(roomId, "subscriber").pc;
+
+        // A track arriving says this Stream delivers again: an unsubscribe we
+        // were still waiting on is over, and a stale mark left by an earlier
+        // publication no longer holds. A `removetrack` of the old track arriving
+        // after the new one would still mark the Stream stale; that costs the
+        // application one subscription made anew, not media lost in silence.
+        this.expectedRemovals.get(roomId)?.delete(publisherId);
+        this.staleStreams.get(roomId)?.delete(publisherId);
 
         this.logger.debug("waitUntilConnected...");
         await this.waitUntilConnected(pc);
@@ -101,17 +117,22 @@ export class SubscriberManager {
         // subscriptions held for that Stream went stale.
         //
         // Unsubscribing removes the track just the same, so removals we asked
-        // for are announced through `expectStreamRemoval` and skipped here.
-        event.streams[0]?.addEventListener("removetrack", () => {
-            if (this.expectedRemovals.get(roomId)?.delete(publisherId)) {
-                this.logger.debug("remote track removed as asked:", publisherId);
-                return;
-            }
-            this.logger.debug("remote track taken away, marking stream stale:", publisherId);
-            const stale = this.staleStreams.get(roomId) ?? new Set<number>();
-            stale.add(publisherId);
-            this.staleStreams.set(roomId, stale);
-        });
+        // for are announced through `expectStreamRemoval` and skipped here - the
+        // announcement is read, not consumed, because one `removetrack` reaches
+        // every listener installed on the Stream.
+        if (stream && !this.watchedStreams.has(stream)) {
+            this.watchedStreams.add(stream);
+            stream.addEventListener("removetrack", () => {
+                if (this.expectedRemovals.get(roomId)?.has(publisherId)) {
+                    this.logger.debug("remote track removed as asked:", publisherId);
+                    return;
+                }
+                this.logger.debug("remote track taken away, marking stream stale:", publisherId);
+                const stale = this.staleStreams.get(roomId) ?? new Set<number>();
+                stale.add(publisherId);
+                this.staleStreams.set(roomId, stale);
+            });
+        }
 
         this.listenerRegistry.dispatchTrack(roomId, event);
     }
@@ -131,12 +152,22 @@ export class SubscriberManager {
 
     /**
      * Announces that `streamId` is being unsubscribed, so the remote track going
-     * away is not mistaken for the media server taking it from us.
+     * away is not mistaken for the media server taking it from us. Stands until
+     * the Stream delivers again or {@link forgetExpectedRemoval} takes it back.
      */
     expectStreamRemoval(roomId: StreamRoomId, streamId: number): void {
         const expected = this.expectedRemovals.get(roomId) ?? new Set<number>();
         expected.add(streamId);
         this.expectedRemovals.set(roomId, expected);
+    }
+
+    /**
+     * Takes back an announcement made with {@link expectStreamRemoval}: the
+     * unsubscribe it was made for never happened, so `streamId` is still
+     * subscribed and its track going away is the media server taking it from us.
+     */
+    forgetExpectedRemoval(roomId: StreamRoomId, streamId: number): void {
+        this.expectedRemovals.get(roomId)?.delete(streamId);
     }
 
     /** Forgets every stale Stream of `roomId` (the subscriber stream was rebuilt). */

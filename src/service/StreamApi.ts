@@ -260,6 +260,9 @@ export class StreamApi extends BaseApi {
      *   (the restarts ran out; call {@link leaveStreamRoom} and
      *   {@link joinStreamRoom} again, then republish and resubscribe).
      *   Without it the recovery still runs, you just get no state updates.
+     *   Once the room's last media transport is closed - by unpublishing, by
+     *   removing the last subscriber stream or by disconnecting - there is
+     *   nothing left to report and the state stops changing.
      * @returns {Promise<void>} resolves when the encrypted Event channel for the room has been established
      */
     public async joinStreamRoom(
@@ -839,11 +842,23 @@ export class StreamApi extends BaseApi {
                 this.client.expectStreamRemoval(streamRoomId, removed.streamId);
             }
         }
-        await this.native.updateSubscriberStream(this.servicePtr, [
-            subscriberStreamHandle,
-            subscriptionsToAdd,
-            subscriptionsToRemove,
-        ]);
+        try {
+            await this.native.updateSubscriberStream(this.servicePtr, [
+                subscriberStreamHandle,
+                subscriptionsToAdd,
+                subscriptionsToRemove,
+            ]);
+        } catch (e) {
+            // The unsubscribe never happened, so these Streams stay subscribed:
+            // their tracks going away would be the media server taking them from
+            // us, which is exactly what the announcement would hide.
+            if (streamRoomId) {
+                for (const removed of subscriptionsToRemove) {
+                    this.client.forgetExpectedRemoval(streamRoomId, removed.streamId);
+                }
+            }
+            throw e;
+        }
         if (!streamRoomId) return;
         // A Stream subscribed anew or dropped is no longer one to warn about.
         for (const removed of subscriptionsToRemove) {

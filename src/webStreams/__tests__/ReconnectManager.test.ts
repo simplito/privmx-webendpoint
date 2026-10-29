@@ -130,6 +130,87 @@ describe("ReconnectManager", () => {
         expect(states).toEqual(["reconnecting"]);
     });
 
+    it("says nothing when the only connection of a room in recovery is closed", () => {
+        const conns: Partial<Record<ConnectionType, JanusConnection>> = {
+            publisher: connection(makePc("failed")),
+        };
+        const { manager, states } = setup(conns);
+
+        manager.onConnectionState(ROOM, "publisher", "failed");
+        expect(states).toEqual(["reconnecting"]);
+
+        // Closing a peer connection takes it out of the map and reports
+        // `closed` from PeerConnectionManager itself. The room is gone, not well.
+        delete conns.publisher;
+        manager.onConnectionState(ROOM, "publisher", "closed");
+
+        expect(states).toEqual(["reconnecting"]);
+    });
+
+    it("says nothing when a lost room is closed", async () => {
+        const conns: Partial<Record<ConnectionType, JanusConnection>> = {
+            subscriber: connection(makePc("failed")),
+        };
+        const { manager, states } = setup(conns);
+
+        manager.onConnectionState(ROOM, "subscriber", "failed");
+        await vi.advanceTimersByTimeAsync(GRACE_MS * 5);
+        expect(states).toEqual(["reconnecting", "lost"]);
+
+        delete conns.subscriber;
+        manager.onConnectionState(ROOM, "subscriber", "closed");
+
+        expect(states).toEqual(["reconnecting", "lost"]);
+    });
+
+    it("takes a connection the browser closed for gone as well", () => {
+        const pc = makePc("failed");
+        const { manager, states } = setup({ publisher: connection(pc) });
+
+        manager.onConnectionState(ROOM, "publisher", "failed");
+        (pc as { connectionState: RTCPeerConnectionState }).connectionState = "closed";
+        manager.onConnectionState(ROOM, "publisher", "closed");
+
+        expect(states).toEqual(["reconnecting"]);
+    });
+
+    it("keeps reporting the room while its other connection is still there", () => {
+        const subscriberPc = makePc("failed");
+        const conns: Partial<Record<ConnectionType, JanusConnection>> = {
+            publisher: connection(makePc("failed")),
+            subscriber: connection(subscriberPc),
+        };
+        const { manager, states } = setup(conns);
+
+        manager.onConnectionState(ROOM, "subscriber", "failed");
+        delete conns.publisher;
+        manager.onConnectionState(ROOM, "publisher", "closed");
+        expect(states).toEqual(["reconnecting"]);
+
+        (subscriberPc as { connectionState: RTCPeerConnectionState }).connectionState = "connected";
+        manager.onConnectionState(ROOM, "subscriber", "connected");
+
+        expect(states).toEqual(["reconnecting", "connected"]);
+    });
+
+    it("reports connected once the room is built again", () => {
+        const pc = makePc("failed");
+        const conns: Partial<Record<ConnectionType, JanusConnection>> = {
+            publisher: connection(pc),
+        };
+        const { manager, states } = setup(conns);
+
+        manager.onConnectionState(ROOM, "publisher", "failed");
+        delete conns.publisher;
+        manager.onConnectionState(ROOM, "publisher", "closed");
+
+        const fresh = makePc("connected");
+        conns.publisher = connection(fresh);
+        manager.onConnectionState(ROOM, "publisher", "connected");
+
+        expect(states).toEqual(["reconnecting", "connected"]);
+    });
+
     it("does not restart a closed connection", async () => {
         const pc = makePc("failed");
         const { manager, signalling } = setup({ publisher: connection(pc) });
