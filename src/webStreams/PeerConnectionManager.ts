@@ -45,6 +45,11 @@ export class PeerConnectionManager {
             streamHandle?: StreamHandle,
         ) => RTCPeerConnection,
         private readonly onTrickle: (sessionId: SessionId, candidate: RTCIceCandidate) => void,
+        private readonly onConnectionState: (
+            room: StreamRoomId,
+            connectionType: ConnectionType,
+            state: RTCPeerConnectionState,
+        ) => void = () => {},
     ) {}
 
     /**
@@ -90,6 +95,10 @@ export class PeerConnectionManager {
                 current.candidateQueue.push(event.candidate);
             }
         });
+
+        pc.addEventListener("connectionstatechange", () => {
+            this.onConnectionState(room, connectionType, pc.connectionState);
+        });
     }
 
     /**
@@ -127,6 +136,14 @@ export class PeerConnectionManager {
     }
 
     /**
+     * Returns the `JanusConnection` for `room` / `connectionType`, or `undefined`
+     * if none is registered. Unlike {@link getOrCreateConnection} it never creates one.
+     */
+    getConnection(room: StreamRoomId, connectionType: ConnectionType): JanusConnection | undefined {
+        return this.connections[room]?.[connectionType];
+    }
+
+    /**
      * Returns the `JanusConnection` for `room` / `connectionType`, creating it
      * first (with session ID `-1`) if it does not exist yet.
      */
@@ -138,6 +155,21 @@ export class PeerConnectionManager {
     }
 
     /**
+     * Closes every peer connection of every room and empties the map.
+     *
+     * Called when the whole connection goes away (`disconnect()`, or a lost
+     * connection): nothing is signalled to the server, the local transports are
+     * simply torn down so no sender keeps sending from a dead session.
+     */
+    closeAll(): void {
+        for (const room of Object.keys(this.connections)) {
+            for (const connectionType of ["publisher", "subscriber"] as const) {
+                this.closePeerConnectionBySessionIfExists(room as StreamRoomId, connectionType);
+            }
+        }
+    }
+
+    /**
      * Closes the peer connection for `room` / `connectionType` (if one exists)
      * and removes it from the map. If both publisher and subscriber entries for
      * the room are now absent the outer room entry is also removed.
@@ -146,6 +178,8 @@ export class PeerConnectionManager {
         if (this.hasConnection(room, connectionType)) {
             this.connections[room][connectionType]?.pc.close();
             delete this.connections[room][connectionType];
+            // Closing after the observer is gone delivers no `closed` event, so report it here.
+            this.onConnectionState(room, connectionType, "closed");
             if (!this.connections[room]?.publisher && !this.connections[room]?.subscriber) {
                 delete this.connections[room];
             }

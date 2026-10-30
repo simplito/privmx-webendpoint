@@ -3,7 +3,7 @@ import { KeyStore } from "../KeyStore.js";
 import { EncryptTransform, TransformContext } from "./EncryptTransform.js";
 
 const keyStore = new KeyStore();
-const encryptTransform = new EncryptTransform(keyStore);
+const encryptTransform = new EncryptTransform(keyStore, undefined, reportMissingKey);
 
 // Active decode pipelines keyed by track id - so stop() can cancel them.
 const sessions = new Map<string, { controller: AbortController }>();
@@ -168,4 +168,18 @@ function logPipelineError(err: unknown): void {
 function postError(msg: unknown): void {
     const err: events.ErrorEvent = { type: "error", data: msg };
     (self as unknown as Worker).postMessage(err);
+}
+
+// Every frame of a track encrypted with a key we lack is a missing key, which
+// at 30 fps per track is far more than the main thread needs to hear - one
+// report per interval is enough for it to fetch the keys again.
+const MISSING_KEY_REPORT_INTERVAL_MS = 1000;
+let lastMissingKeyReport = 0;
+
+function reportMissingKey(): void {
+    const now = Date.now();
+    if (now - lastMissingKeyReport < MISSING_KEY_REPORT_INTERVAL_MS) return;
+    lastMissingKeyReport = now;
+    const event: events.MissingKeyEvent = { type: "missingKey" };
+    (self as unknown as Worker).postMessage(event);
 }

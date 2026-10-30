@@ -155,18 +155,17 @@ describe("E2eeTransformManager", () => {
             );
         });
 
-        it("replaces an already-assigned transform (recycled m-line after rejoin)", async () => {
+        it("keeps an already-assigned transform (recycled m-line after republish)", async () => {
             const receiver = makeReceiver("track-already-transformed");
             const existing = { _existing: true };
             (receiver as any).transform = existing;
 
             await manager.setupReceiverTransform(receiver);
 
-            expect(testWindow.RTCRtpScriptTransform).toHaveBeenCalledWith(
-                expect.anything(),
-                expect.objectContaining({ operation: "decode" }),
-            );
-            expect(receiver.transform).not.toBe(existing);
+            // Replacing it would tear down the live pipe: the worker then
+            // reports "InvalidStateError" for the transform being detached.
+            expect(testWindow.RTCRtpScriptTransform).not.toHaveBeenCalled();
+            expect(receiver.transform).toBe(existing);
         });
 
         it("never falls through to EncodedStreams when a transform is already assigned", async () => {
@@ -179,16 +178,14 @@ describe("E2eeTransformManager", () => {
             expect(worker.postDecode).not.toHaveBeenCalled();
         });
 
-        it("keeps the existing transform when the browser rejects replacement", async () => {
-            const receiver = makeReceiver("track-reject-replace");
+        it("installs the transform once however often the same receiver arrives", async () => {
+            const receiver = makeReceiver("track-twice");
             await manager.setupReceiverTransform(receiver);
             const installed = receiver.transform;
 
-            (testWindow.RTCRtpScriptTransform as Mock).mockImplementation(() => {
-                throw new Error("InvalidStateError");
-            });
-
             await expect(manager.setupReceiverTransform(receiver)).resolves.toBeUndefined();
+
+            expect(testWindow.RTCRtpScriptTransform).toHaveBeenCalledTimes(1);
             expect(receiver.transform).toBe(installed);
             expect(receiver.createEncodedStreams).not.toHaveBeenCalled();
         });

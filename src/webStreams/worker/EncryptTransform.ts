@@ -34,6 +34,7 @@ export class EncryptTransform {
     constructor(
         private readonly keyStore: KeyStore,
         private readonly ivGenerator: FrameIvGenerator = new FrameIvGenerator(),
+        private readonly onMissingKey: (() => void) | undefined = undefined,
     ) {}
 
     private async encryptAes(
@@ -120,7 +121,15 @@ export class EncryptTransform {
 
         // Epoch selects the candidate key(s); the correct key is always among
         // them because the epoch tag is derived from the (shared) key id.
-        for (const internalKeyId of this.keyStore.resolveInternalKeyIdsByEpoch(epoch)) {
+        const candidates = this.keyStore.resolveInternalKeyIdsByEpoch(epoch);
+        if (candidates.length === 0) {
+            // No candidate at all: this key was never handed to us. That is the
+            // one decryption failure which fetching the keys again can mend - a
+            // frame failing the AEAD tag below was decrypted with the key in
+            // hand and is something else entirely.
+            this.onMissingKey?.();
+        }
+        for (const internalKeyId of candidates) {
             const plain = await this.decryptAes(internalKeyId, iv, ciphertext, aad);
             if (plain) {
                 const result = new Uint8Array(codecHeader.length + plain.length);

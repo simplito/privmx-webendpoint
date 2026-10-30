@@ -620,6 +620,15 @@ export interface ItemPolicy {
  */
 export type StreamRoomState = "created" | "open" | "closed";
 
+/**
+ * Coarse health of a joined Stream Room's media transports, reported to the
+ * callback passed to `StreamApi.joinStreamRoom`:
+ * - `connected` - media is flowing
+ * - `reconnecting` - a transport died and the SDK is restarting ICE
+ * - `lost` - the restarts ran out; rejoin the room to recover
+ */
+export type StreamRoomConnectionState = "connected" | "reconnecting" | "lost";
+
 export interface StreamRoom {
     contextId: string;
     streamRoomId: string;
@@ -931,4 +940,3 @@ export type CollectionChangedEventData = {
     affectedItemsCount: number;
     items: CollectionItemChange[];
 };
-

@@ -266,6 +266,18 @@ export class StreamApiNative extends BaseNative {
         );
     }
 
+    async restartSubscriberIce(ptr: number, args: [string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_restartSubscriberIce(taskId, ptr, args),
+        );
+    }
+
+    async refreshStreamRoomKeys(ptr: number, args: [string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.StreamApi_refreshStreamRoomKeys(taskId, ptr, args),
+        );
+    }
+
     async encryptDataChannelMessage(
         ptr: number,
         args: [string, DataChannelMessage],

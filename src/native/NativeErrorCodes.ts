@@ -374,4 +374,9 @@ export const StreamRoomErrorCode = {
     SUBSCRIBER_STREAM_ALREADY_CREATED: 0x80030,
     /** SubscriberStreamHandle not initialized */
     SUBSCRIBER_STREAM_HANDLE_NOT_INITIALIZED: 0x80031,
+    /**
+     * Stream was published again and its subscriptions have to be made anew.
+     * Raised by the SDK itself, with the code the C++ core uses for it.
+     */
+    STREAM_REQUIRES_RESUBSCRIPTION: 0x80033,
 } as const;

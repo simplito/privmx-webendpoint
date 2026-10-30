@@ -6,6 +6,8 @@ import { KeySyncManager } from "../webStreams/KeySyncManager.js";
 import { PeerConnectionFactory } from "../webStreams/PeerConnectionFactory.js";
 import { PeerConnectionManager } from "../webStreams/PeerConnectionManager.js";
 import { PublisherManager } from "../webStreams/PublisherManager.js";
+import { KeyRefreshScheduler } from "../webStreams/KeyRefreshScheduler.js";
+import { ReconnectManager } from "../webStreams/ReconnectManager.js";
 import { RemoteStreamListenerRegistry } from "../webStreams/RemoteStreamListenerRegistry.js";
 import { SubscriberManager } from "../webStreams/SubscriberManager.js";
 import { WebRtcClient } from "../webStreams/WebRtcClient.js";
@@ -49,12 +51,34 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
     );
 
     // onTrickle fires during ICE negotiation; WebRtcClient resolved lazily.
+    // onConnectionState fires once peer connections exist, by which time
+    // `reconnect` below is constructed.
     const pcm = new PeerConnectionManager(
         (room, streamHandle) => pcFactory.create(room, streamHandle),
         (sessionId, candidate) =>
             c
                 .resolve<WebRtcClient>(T.WebRtcClient)
                 .then((client) => client.trickle(sessionId, candidate)),
+        (room, connectionType, state) => reconnect.onConnectionState(room, connectionType, state),
+    );
+
+    // The signalling calls reach the native layer through WebRtcClient, resolved lazily.
+    const reconnect = new ReconnectManager(pcm, {
+        setNewOfferOnReconfigure: (sessionId, jsep) =>
+            c
+                .resolve<WebRtcClient>(T.WebRtcClient)
+                .then((client) => client.setNewOfferOnReconfigure(sessionId, jsep)),
+        restartSubscriberIce: (streamRoomId) =>
+            c
+                .resolve<WebRtcClient>(T.WebRtcClient)
+                .then((client) => client.restartSubscriberIce(streamRoomId)),
+    });
+
+    // The refresh reaches the native layer through WebRtcClient, resolved lazily.
+    const keyRefresh = new KeyRefreshScheduler((streamRoomId) =>
+        c
+            .resolve<WebRtcClient>(T.WebRtcClient)
+            .then((client) => client.refreshStreamRoomKeys(streamRoomId)),
     );
 
     const publisher = new PublisherManager(pcm, audioManager, e2eeTransform);
@@ -70,6 +94,9 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
         pcFactory,
         audioManager,
         e2eeWorker,
+        reconnect,
+        pcm,
+        keyRefresh,
     );
 
     // Register internally-constructed objects so the lazy callbacks can reach them.
@@ -78,6 +105,8 @@ export async function buildWebRtcClient(c: Container): Promise<WebRtcClient> {
     c.registerValue(T.PublisherManager, publisher);
     c.registerValue(T.SubscriberManager, subscriber);
     c.registerValue(T.KeySyncManager, keys);
+    c.registerValue(T.ReconnectManager, reconnect);
+    c.registerValue(T.KeyRefreshScheduler, keyRefresh);
     c.registerValue(T.WebRtcClient, client);
 
     return client;

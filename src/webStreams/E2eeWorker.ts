@@ -23,6 +23,7 @@ const swallow = (): void => undefined;
 export class E2eeWorker {
     private worker: Worker | undefined;
     private workerError: Error | undefined;
+    private missingKeyListener: (() => void) | undefined;
     private readonly logger = new Logger();
     // Pending operation rejects, so worker failure/teardown rejects them instead of hanging.
     private readonly pendingRejects = new Set<(err: Error) => void>();
@@ -45,8 +46,11 @@ export class E2eeWorker {
         if (!this.worker) {
             this.worker = new Worker(this.workerUrl);
             this.worker.onmessage = (event: MessageEvent<WorkerOutboundEvent>) => {
-                if ("type" in event.data && event.data.type === "error") {
+                if (!("type" in event.data)) return;
+                if (event.data.type === "error") {
                     this.logger.error("PrivMX E2EE worker error:", event.data.data);
+                } else if (event.data.type === "missingKey") {
+                    this.missingKeyListener?.();
                 }
             };
             this.worker.onerror = (e: ErrorEvent) => {
@@ -60,6 +64,15 @@ export class E2eeWorker {
             };
         }
         return this.worker;
+    }
+
+    /**
+     * Registers the callback told that a frame arrived encrypted with a key
+     * this client does not hold, replacing any previous one. Set it before the
+     * first track is wired up, since the worker reports only while decrypting.
+     */
+    setMissingKeyListener(listener: () => void): void {
+        this.missingKeyListener = listener;
     }
 
     private failPending(err: Error): void {

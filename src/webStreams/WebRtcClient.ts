@@ -1,4 +1,4 @@
-import { Key, TurnCredentials, RemoteStreamListener } from "../Types.js";
+import { Key, TurnCredentials, RemoteStreamListener, StreamRoomConnectionState } from "../Types.js";
 import {
     DecryptedDataChannelMessage,
     Jsep,
@@ -6,7 +6,7 @@ import {
     StreamRoomId,
     StreamTrack,
 } from "./types/ApiTypes.js";
-import { ConnectionType, SessionId } from "./PeerConnectionManager.js";
+import { ConnectionType, PeerConnectionManager, SessionId } from "./PeerConnectionManager.js";
 import { PeerConnectionFactory } from "./PeerConnectionFactory.js";
 import { PublisherManager } from "./PublisherManager.js";
 import { SubscriberManager } from "./SubscriberManager.js";
@@ -15,9 +15,15 @@ import { KeySyncManager } from "./KeySyncManager.js";
 import { StateChangeDispatcher } from "./EventDispatcher.js";
 import { AudioManager, AudioLevelsStats, ActiveSpeakerDetectorConfig } from "./AudioManager.js";
 import { RemoteStreamListenerRegistry } from "./RemoteStreamListenerRegistry.js";
+import { ReconnectManager } from "./ReconnectManager.js";
+import { KeyRefreshScheduler } from "./KeyRefreshScheduler.js";
+import { StreamRoomErrorCode } from "../native/NativeErrorCodes.js";
 
 export interface StreamsCallbackInterface {
     trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void>;
+    setNewOfferOnReconfigure(sessionId: SessionId, jsep: Jsep): Promise<void>;
+    restartSubscriberIce(streamRoomId: StreamRoomId): Promise<void>;
+    refreshStreamRoomKeys(streamRoomId: StreamRoomId): Promise<void>;
     decryptDataChannelMessage(
         streamRoomId: StreamRoomId,
         remoteStreamId: string,
@@ -54,7 +60,12 @@ export class WebRtcClient {
         private readonly pcFactory: PeerConnectionFactory,
         private readonly audioManager: AudioManager,
         private readonly e2eeWorker: E2eeWorker,
-    ) {}
+        private readonly reconnect: ReconnectManager,
+        private readonly pcm: PeerConnectionManager,
+        private readonly keyRefresh: KeyRefreshScheduler,
+    ) {
+        this.e2eeWorker.setMissingKeyListener(() => this.onMissingMediaKey());
+    }
 
     /**
      * Binds the native WASM callback interface used to forward ICE trickle
@@ -73,6 +84,63 @@ export class WebRtcClient {
     trickle(sessionId: SessionId, candidate: RTCIceCandidate): Promise<void> {
         if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
         return this.streamsApiInterface.trickle(sessionId, candidate);
+    }
+
+    /**
+     * Sends a publisher offer (e.g. one restarting ICE) to the media server.
+     * The library applies the answer itself, through
+     * `setAnswerAndSetRemoteDescription`.
+     * @throws if `bindApiInterface` has not been called yet.
+     */
+    setNewOfferOnReconfigure(sessionId: SessionId, jsep: Jsep): Promise<void> {
+        if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
+        return this.streamsApiInterface.setNewOfferOnReconfigure(sessionId, jsep);
+    }
+
+    /**
+     * Asks the media server to restart ICE on the room's subscriber stream; the
+     * offer it produces arrives through `createAnswerAndSetDescriptions`.
+     * @throws if `bindApiInterface` has not been called yet.
+     */
+    restartSubscriberIce(streamRoomId: StreamRoomId): Promise<void> {
+        if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
+        return this.streamsApiInterface.restartSubscriberIce(streamRoomId);
+    }
+
+    /**
+     * Registers the callback receiving `streamRoomId`'s connection state
+     * (connected / reconnecting / lost) while the room is joined.
+     */
+    setConnectionStateListener(
+        streamRoomId: StreamRoomId,
+        listener: (state: StreamRoomConnectionState) => void,
+    ): void {
+        this.reconnect.setListener(streamRoomId, listener);
+    }
+
+    /**
+     * Drops the connection state listener and all recovery state for
+     * `streamRoomId`, on leaving the room.
+     */
+    clearConnectionStateListener(streamRoomId: StreamRoomId): void {
+        this.reconnect.clearListener(streamRoomId);
+    }
+
+    /**
+     * Registers the callback receiving the raw `RTCPeerConnection` state of
+     * `streamRoomId`'s subscriber connection - the counterpart of the publisher
+     * states `StateChangeDispatcher` delivers per stream handle.
+     */
+    setSubscriberStateListener(
+        streamRoomId: StreamRoomId,
+        listener: (state: RTCPeerConnectionState) => void,
+    ): void {
+        this.reconnect.setRawStateListener(streamRoomId, "subscriber", listener);
+    }
+
+    /** Drops the subscriber state listener for `streamRoomId`. */
+    clearSubscriberStateListener(streamRoomId: StreamRoomId): void {
+        this.reconnect.clearRawStateListener(streamRoomId, "subscriber");
     }
 
     /**
@@ -138,11 +206,47 @@ export class WebRtcClient {
         encryptedData: Uint8Array,
     ): Promise<DecryptedDataChannelMessage> {
         if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
-        return this.streamsApiInterface.decryptDataChannelMessage(
+        const decrypted = await this.streamsApiInterface.decryptDataChannelMessage(
             streamRoomId,
             remoteStreamId,
             encryptedData,
         );
+        // Only a key which is not held can be mended by fetching the keys
+        // again; every other status means the key was found and something else
+        // went wrong.
+        if (decrypted.statusCode === StreamRoomErrorCode.NO_STREAM_DECRYPTION_KEY) {
+            this.keyRefresh.requestRefresh(streamRoomId);
+        }
+        return decrypted;
+    }
+
+    /**
+     * Fetches `streamRoomId`'s encryption keys from the Bridge again and hands
+     * them to this WebRTC layer, bypassing the scheduler's cooldown.
+     * @throws if `bindApiInterface` has not been called yet.
+     */
+    refreshStreamRoomKeys(streamRoomId: StreamRoomId): Promise<void> {
+        if (!this.streamsApiInterface) throw new Error("StreamsApiInterface not yet bound");
+        return this.streamsApiInterface.refreshStreamRoomKeys(streamRoomId);
+    }
+
+    /** Drops the key bookkeeping for `streamRoomId`, on leaving the room. */
+    clearKeyRefreshState(streamRoomId: StreamRoomId): void {
+        this.keys.forgetRoom(streamRoomId);
+        this.keyRefresh.forgetRoom(streamRoomId);
+    }
+
+    /**
+     * Fed by the E2EE worker when a media frame cannot be decrypted for want of
+     * a key. The worker holds one key set for the whole session and cannot name
+     * the room the frame came from, so every room it holds keys for is
+     * refreshed - the scheduler keeps that from repeating.
+     * @returns {void}
+     */
+    private onMissingMediaKey(): void {
+        for (const streamRoomId of this.keys.getRooms()) {
+            this.keyRefresh.requestRefresh(streamRoomId);
+        }
     }
 
     /**
@@ -221,6 +325,42 @@ export class WebRtcClient {
     }
 
     /**
+     * IDs of `roomId`'s Streams whose remote track the media server took away
+     * while they were still subscribed - a Stream republished under the same ID
+     * looks exactly like this, and its subscriptions deliver nothing until they
+     * are made anew.
+     */
+    getStaleStreams(roomId: StreamRoomId): ReadonlySet<number> {
+        return this.subscriber.getStaleStreams(roomId);
+    }
+
+    /** Forgets one stale Stream of `roomId`, once its subscription was redone or dropped. */
+    forgetStaleStream(roomId: StreamRoomId, streamId: number): void {
+        this.subscriber.forgetStaleStream(roomId, streamId);
+    }
+
+    /**
+     * Announces that `streamId` is being unsubscribed in `roomId`, so its remote
+     * track going away is not taken for the media server dropping it.
+     */
+    expectStreamRemoval(roomId: StreamRoomId, streamId: number): void {
+        this.subscriber.expectStreamRemoval(roomId, streamId);
+    }
+
+    /**
+     * Takes back an announcement made with {@link expectStreamRemoval}, after
+     * the unsubscribe it was made for failed.
+     */
+    forgetExpectedRemoval(roomId: StreamRoomId, streamId: number): void {
+        this.subscriber.forgetExpectedRemoval(roomId, streamId);
+    }
+
+    /** Forgets every stale Stream of `roomId` (its subscriber stream was rebuilt). */
+    clearStaleStreams(roomId: StreamRoomId): void {
+        this.subscriber.clearStaleStreams(roomId);
+    }
+
+    /**
      * Returns the last SDP answer produced for `room` during reconfiguration.
      * Used by `WebRtcInterfaceImpl` to reply to the server's accept-offer call.
      * @throws if no answer has been produced for the given room yet.
@@ -258,10 +398,21 @@ export class WebRtcClient {
     }
 
     /**
-     * Terminates the E2EE worker thread and clears all watched audio senders/receivers.
-     * Called automatically by `StreamApi.destroyRefs()` during `Connection.disconnect()`.
+     * Tears the whole WebRTC session down: closes every peer connection of this
+     * connection (publisher and subscriber, in every room), stops any pending ICE
+     * recovery, terminates the E2EE worker thread and clears all watched audio
+     * senders/receivers.
+     *
+     * Called automatically by `StreamApi.destroyRefs()` during
+     * `Connection.disconnect()`. Closing the peer connections here does not
+     * depend on the native layer calling back, so a connection that died
+     * (`libDisconnected`) leaves no sender transmitting from a dead session. The
+     * local `MediaStreamTrack`s are left alone - they belong to the application,
+     * which may reuse them on the next connection.
      */
     destroy(): void {
+        this.pcm.closeAll();
+        this.reconnect.destroy();
         this.e2eeWorker.stop();
         this.audioManager.destroy();
     }

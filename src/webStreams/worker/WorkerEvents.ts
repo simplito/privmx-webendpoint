@@ -73,6 +73,17 @@ export interface SetKeysNackEvent {
 }
 
 /**
+ * Worker event: a frame arrived encrypted with a key this client does not
+ * hold, so the Stream Room's keys are out of date. Carries no room: the worker
+ * holds one key set for the whole session and never learns which room a frame
+ * came from.
+ * @internal
+ */
+export interface MissingKeyEvent {
+    type: "missingKey";
+}
+
+/**
  * Worker event: debug payload forwarded to the main thread.
  * @internal
  */
@@ -94,4 +105,9 @@ export interface ErrorEvent {
  * Union of all messages sent from the E2EE worker to the main thread.
  * @internal
  */
-export type WorkerOutboundEvent = SetKeysAckEvent | SetKeysNackEvent | DebugEvent | ErrorEvent;
+export type WorkerOutboundEvent =
+    | SetKeysAckEvent
+    | SetKeysNackEvent
+    | MissingKeyEvent
+    | DebugEvent
+    | ErrorEvent;

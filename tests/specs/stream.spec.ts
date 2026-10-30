@@ -1468,6 +1468,129 @@ test.describe("StreamTest", () => {
         expect(result.success).toBe(true);
     });
 
+    test("disconnect: closes the peer connections of the connection", async ({
+        page,
+        backend,
+        cli,
+    }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const streamApi = await Endpoint.createStreamApi(
+                connection,
+                await Endpoint.createEventApi(connection),
+            );
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const sId = await streamApi.createStreamRoom(
+                contextId,
+                [u1Obj],
+                [u1Obj],
+                new TextEncoder().encode("p"),
+                new TextEncoder().encode("p"),
+            );
+
+            await streamApi.joinStreamRoom(sId);
+            const handle = await streamApi.createStream(sId);
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            const localTrack = stream.getVideoTracks()[0];
+            await streamApi.addStreamTrack(handle, { track: localTrack });
+            await streamApi.publishStream(handle);
+
+            // Subscribe to own stream so the inbound connection exists too.
+            let remote: Types.StreamInfo[] = [];
+            for (let i = 0; i < 20 && remote.length === 0; i++) {
+                remote = await streamApi.listStreams(sId);
+                await new Promise((r) => setTimeout(r, 500));
+            }
+            await streamApi.createSubscriberStream(sId, [
+                { streamId: remote[0].id, streamTrackId: remote[0].tracks[0].mid },
+            ]);
+
+            const client = (streamApi as any).client;
+            const publisherPc = client.publisher.pcm.getConnection(sId, "publisher").pc;
+            const subscriberPc = client.subscriber.pcm.getConnection(sId, "subscriber").pc;
+
+            await connection.disconnect();
+
+            return {
+                publisherState: publisherPc.signalingState,
+                subscriberState: subscriberPc.signalingState,
+                publisherConnectionState: publisherPc.connectionState,
+                subscriberConnectionState: subscriberPc.connectionState,
+                // The application owns the tracks it passed in; the SDK must not
+                // stop the camera behind its back.
+                localTrackState: localTrack.readyState,
+            };
+        }, args);
+
+        expect(result.publisherState).toBe("closed");
+        expect(result.subscriberState).toBe("closed");
+        expect(result.publisherConnectionState).toBe("closed");
+        expect(result.subscriberConnectionState).toBe("closed");
+        expect(result.localTrackState).toBe("live");
+    });
+
+    test("updateStream: repeated additions on one handle", async ({ page, backend, cli }) => {
+        const users = await setupUsers(page, cli);
+        const args = {
+            bridgeUrl: backend.bridgeUrl,
+            solutionId: testData.solutionId,
+            contextId: testData.contextId,
+            users,
+        };
+
+        const result = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const Endpoint = window.Endpoint;
+            const connection = await Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+            const streamApi = await Endpoint.createStreamApi(
+                connection,
+                await Endpoint.createEventApi(connection),
+            );
+            const u1Obj = { userId: users.u1.id, pubKey: users.u1.pubKey };
+            const sId = await streamApi.createStreamRoom(
+                contextId,
+                [u1Obj],
+                [u1Obj],
+                new TextEncoder().encode("p"),
+                new TextEncoder().encode("p"),
+            );
+
+            await streamApi.joinStreamRoom(sId);
+            const handle = await streamApi.createStream(sId);
+            const first = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            const second = await navigator.mediaDevices.getUserMedia({ video: true });
+
+            await streamApi.addStreamTrack(handle, { track: first.getAudioTracks()[0] });
+            await streamApi.publishStream(handle);
+
+            await streamApi.addStreamTrack(handle, { track: first.getVideoTracks()[0] });
+            await streamApi.updateStream(handle);
+
+            // The second update used to hand the previous track to pc.addTrack
+            // again, which the browser rejects with InvalidAccessError.
+            await streamApi.addStreamTrack(handle, { track: second.getVideoTracks()[0] });
+            await streamApi.updateStream(handle);
+
+            let published: Types.StreamInfo | undefined;
+            for (let i = 0; i < 20; i++) {
+                published = (await streamApi.listStreams(sId))[0];
+                if ((published?.tracks.length ?? 0) >= 3) break;
+                await new Promise((r) => setTimeout(r, 500));
+            }
+            return { trackCount: published?.tracks.length ?? 0 };
+        }, args);
+
+        expect(result.trackCount).toBe(3);
+    });
+
     test("updateStream: after failed add / unpublish", async ({ page, backend, cli }) => {
         const users = await setupUsers(page, cli);
         const args = {

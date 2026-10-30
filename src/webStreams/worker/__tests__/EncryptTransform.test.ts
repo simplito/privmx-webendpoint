@@ -297,7 +297,10 @@ describe("EncryptTransform (v2 wire format)", () => {
             const raw = new Uint8Array(40).fill(0x55);
             raw[raw.length - 1] = 99; // not the v2 marker
             const { controller, enqueued } = makeController();
-            await et.decryptFrame({ data: raw.slice().buffer } as unknown as RTCEncodedAudioFrame, controller);
+            await et.decryptFrame(
+                { data: raw.slice().buffer } as unknown as RTCEncodedAudioFrame,
+                controller,
+            );
 
             expect(enqueued).toHaveLength(1);
             expect(bufEqual(new Uint8Array(enqueued[0].data), raw)).toBe(true);
@@ -323,7 +326,10 @@ describe("EncryptTransform (v2 wire format)", () => {
             raw[raw.length - 1] = FRAME_V2_VERSION;
             raw[raw.length - 3] = 250; // ClearLen far past the ciphertext region
             const { controller, enqueued } = makeController();
-            await et.decryptFrame({ data: raw.slice().buffer } as unknown as RTCEncodedAudioFrame, controller);
+            await et.decryptFrame(
+                { data: raw.slice().buffer } as unknown as RTCEncodedAudioFrame,
+                controller,
+            );
 
             expect(enqueued).toHaveLength(1);
             expect(bufEqual(new Uint8Array(enqueued[0].data), raw)).toBe(true);
@@ -378,6 +384,59 @@ describe("EncryptTransform (v2 wire format)", () => {
             const second = await encryptBody();
 
             expect(bufEqual(first, second)).toBe(false);
+        });
+    });
+
+    describe("missing key reporting", () => {
+        it("reports a frame whose epoch matches no held key", async () => {
+            const { ks: encKs } = await makeKeyStore(0x11);
+            const { ks: decKs } = await makeKeyStore(0x22); // different key/id
+            const onMissingKey = vi.fn();
+
+            const frame = makeAudioFrame([0xca, 0xfe]) as RTCEncodedAudioFrame;
+            const { controller: encCtrl, enqueued: encQueued } = makeController();
+            await new EncryptTransform(encKs).encryptFrame(frame, "audio", encCtrl);
+
+            const { controller: decCtrl } = makeController();
+            await new EncryptTransform(decKs, undefined, onMissingKey).decryptFrame(
+                encQueued[0] as unknown as RTCEncodedAudioFrame,
+                decCtrl,
+            );
+
+            expect(onMissingKey).toHaveBeenCalledTimes(1);
+        });
+
+        it("stays quiet when the key is held and the AEAD tag fails", async () => {
+            const { ks } = await makeKeyStore(0x33);
+            const onMissingKey = vi.fn();
+            const et = new EncryptTransform(ks, undefined, onMissingKey);
+
+            const frame = makeAudioFrame([1, 2, 3, 4, 5, 6, 7, 8]) as RTCEncodedAudioFrame;
+            const { controller: encCtrl, enqueued: encQueued } = makeController();
+            await et.encryptFrame(frame, "audio", encCtrl);
+
+            const tampered = new Uint8Array(encQueued[0].data.slice(0));
+            tampered[2] ^= 0xff;
+            encQueued[0].data = tampered.buffer;
+
+            const { controller: decCtrl } = makeController();
+            await et.decryptFrame(encQueued[0] as unknown as RTCEncodedAudioFrame, decCtrl);
+
+            expect(onMissingKey).not.toHaveBeenCalled();
+        });
+
+        it("stays quiet on a frame which is not ours", async () => {
+            const { ks } = await makeKeyStore(0x44);
+            const onMissingKey = vi.fn();
+
+            const { controller, enqueued } = makeController();
+            await new EncryptTransform(ks, undefined, onMissingKey).decryptFrame(
+                makeAudioFrame([0x01, 0x02, 0x03]) as RTCEncodedAudioFrame,
+                controller,
+            );
+
+            expect(enqueued).toHaveLength(1);
+            expect(onMissingKey).not.toHaveBeenCalled();
         });
     });
 });

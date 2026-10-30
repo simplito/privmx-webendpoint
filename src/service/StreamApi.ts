@@ -27,8 +27,12 @@ import {
     StreamSubscriber,
     StreamPublishResult,
     RemoteStreamListener,
+    StreamRoomConnectionState,
 } from "../Types.js";
 import { StreamApiNative } from "../native/StreamApiNative.js";
+import { NativeError } from "../native/NativeError.js";
+import { StreamRoomErrorCode } from "../native/NativeErrorCodes.js";
+import { logger } from "../webStreams/Logger.js";
 
 /**
  * Real-time WebRTC streaming API: manages Stream Rooms (audio/video/data
@@ -249,9 +253,25 @@ export class StreamApi extends BaseApi {
      * @param {string} streamRoomId ID of the Stream Room to join, returned by
      *   {@link createStreamRoom} or from `StreamRoom.streamRoomId` in
      *   {@link listStreamRooms}
+     * @param {(state: StreamRoomConnectionState) => void} onConnectionState optional
+     *   callback invoked when the room's media transports change health:
+     *   `connected` (media flowing), `reconnecting` (a transport died - e.g. the
+     *   device moved from Wi-Fi to LTE - and the SDK is restarting ICE) or `lost`
+     *   (the restarts ran out; call {@link leaveStreamRoom} and
+     *   {@link joinStreamRoom} again, then republish and resubscribe).
+     *   Without it the recovery still runs, you just get no state updates.
+     *   Once the room's last media transport is closed - by unpublishing, by
+     *   removing the last subscriber stream or by disconnecting - there is
+     *   nothing left to report and the state stops changing.
      * @returns {Promise<void>} resolves when the encrypted Event channel for the room has been established
      */
-    public async joinStreamRoom(streamRoomId: string): Promise<void> {
+    public async joinStreamRoom(
+        streamRoomId: string,
+        onConnectionState?: (state: StreamRoomConnectionState) => void,
+    ): Promise<void> {
+        if (onConnectionState) {
+            this.client.setConnectionStateListener(streamRoomId as StreamRoomId, onConnectionState);
+        }
         return this.native.joinStreamRoom(this.servicePtr, [streamRoomId]);
     }
 
@@ -271,7 +291,38 @@ export class StreamApi extends BaseApi {
      * @returns {Promise<void>} resolves when the room's Event channel has been torn down
      */
     public async leaveStreamRoom(streamRoomId: string): Promise<void> {
-        return this.native.leaveStreamRoom(this.servicePtr, [streamRoomId]);
+        try {
+            return await this.native.leaveStreamRoom(this.servicePtr, [streamRoomId]);
+        } finally {
+            this.client.clearConnectionStateListener(streamRoomId as StreamRoomId);
+            this.client.clearKeyRefreshState(streamRoomId as StreamRoomId);
+        }
+    }
+
+    /**
+     * Fetches the Stream Room's encryption keys again and hands them to the
+     * WebRTC layer.
+     *
+     * Keys are normally kept current by the Stream Room update notification,
+     * and a key which went missing in spite of that is already fetched again by
+     * the SDK on its own - a media frame or a data channel message which cannot
+     * be decrypted for want of a key triggers a refresh, at most one per room
+     * at a time and no more often than every 10 seconds. Calling this is
+     * therefore not needed in the ordinary course of things. It is here for an
+     * application which knows it has been out of touch (the room reported
+     * `reconnecting` through {@link joinStreamRoom}, the device came back from
+     * the background, …) and would rather not wait for the first frame to fail.
+     *
+     * The key the Stream Room encrypts with is left as it was; only the set of
+     * keys available for decryption is refreshed, so this never disturbs what
+     * this client is publishing.
+     *
+     * @param {string} streamRoomId ID of the Stream Room whose keys are
+     *   refreshed; the room has to be joined with {@link joinStreamRoom}
+     * @returns {Promise<void>} resolves once the refreshed keys have been handed to the WebRTC layer
+     */
+    public async refreshStreamRoomKeys(streamRoomId: string): Promise<void> {
+        return this.native.refreshStreamRoomKeys(this.servicePtr, [streamRoomId]);
     }
 
     /**
@@ -549,6 +600,13 @@ export class StreamApi extends BaseApi {
      * Call after staging more {@link addStreamTrack} / {@link removeStreamTrack}
      * changes on a stream already sent with {@link publishStream}.
      *
+     * An update that succeeds is also recorded locally: the added tracks count
+     * as published and the removed ones are dropped from the handle, so a later
+     * update renegotiates only what changed since. An update that fails stages
+     * nothing - the tracks it was adding are discarded (and their senders taken
+     * off the peer connection), so the same tracks can simply be added again
+     * and are never published by some later, unrelated update.
+     *
      * @param {number} streamHandle local stream handle returned by
      *   {@link createStream} and already published via {@link publishStream}
      * @returns {StreamPublishResult} result of the update operation describing
@@ -561,24 +619,67 @@ export class StreamApi extends BaseApi {
             throw new Error("No stream defined to publish");
         }
 
-        const tracksToAdd: MediaStreamTrack[] = [];
-        const tracksToRemove: MediaStreamTrack[] = [];
+        const added: StreamTrack[] = [];
+        const removed: StreamTrack[] = [];
 
         for (const track of this.streamTracks.values()) {
             if (track.streamHandle !== streamHandle || !track.track) continue;
-            if (!track.published && !track.markedToRemove) tracksToAdd.push(track.track);
-            if (track.markedToRemove) tracksToRemove.push(track.track);
+            if (track.markedToRemove) removed.push(track);
+            else if (!track.published) added.push(track);
         }
+        const tracksToAdd = added.map((t) => t.track as MediaStreamTrack);
+        const tracksToRemove = removed.map((t) => t.track as MediaStreamTrack);
 
         const turnCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(turnCredentials);
-        await this.client.updatePeerConnectionWithLocalStream(
-            stream.streamRoomId,
-            stream.localMediaStream,
-            tracksToAdd,
-            tracksToRemove,
-        );
-        return this.native.updateStream(this.servicePtr, [streamHandle]);
+
+        let result: StreamPublishResult;
+        try {
+            await this.client.updatePeerConnectionWithLocalStream(
+                stream.streamRoomId,
+                stream.localMediaStream,
+                tracksToAdd,
+                tracksToRemove,
+            );
+            result = await this.native.updateStream(this.servicePtr, [streamHandle]);
+        } catch (e) {
+            await this.rollbackAddedTracks(stream.streamRoomId, added, tracksToAdd);
+            throw e;
+        }
+
+        for (const track of added) track.published = true;
+        for (const track of removed) this.streamTracks.delete(track.id);
+        return result;
+    }
+
+    /**
+     * Undoes a half-applied addition after a failed {@link updateStream}: takes
+     * the senders back off the peer connection (they may already have been added
+     * before the failure) and un-stages the tracks.
+     * @param {StreamRoomId} streamRoomId the room whose publisher connection was updated
+     * @param {StreamTrack[]} added the staged tracks the failed update tried to publish
+     * @param {MediaStreamTrack[]} tracksToAdd the browser tracks of `added`
+     * @returns {Promise<void>} resolves once the senders are off and the tracks un-staged
+     */
+    private async rollbackAddedTracks(
+        streamRoomId: StreamRoomId,
+        added: StreamTrack[],
+        tracksToAdd: MediaStreamTrack[],
+    ): Promise<void> {
+        if (tracksToAdd.length > 0) {
+            try {
+                await this.client.updatePeerConnectionWithLocalStream(
+                    streamRoomId,
+                    undefined,
+                    [],
+                    tracksToAdd,
+                );
+            } catch (e) {
+                // Reported, never rethrown: the caller must see the original failure.
+                logger.error("[updateStream] rollback of added tracks failed:", e);
+            }
+        }
+        for (const track of added) this.streamTracks.delete(track.id);
     }
 
     /**
@@ -611,9 +712,9 @@ export class StreamApi extends BaseApi {
             stream.localMediaStream,
         );
         this.streams.delete(streamHandle as StreamHandle);
-        this.client
-            .getStreamStateChangeDispatcher()
-            .removeOnStateChangeListener({ streamHandle: streamHandle as StreamHandle });
+        this.client.getStreamStateChangeDispatcher().removeOnStateChangeListener({
+            streamHandle: streamHandle as StreamHandle,
+        });
     }
 
     /**
@@ -633,12 +734,22 @@ export class StreamApi extends BaseApi {
      * tracks, then adjust the set with {@link updateSubscriberStream} or tear it
      * down with {@link removeSubscriberStream}.
      *
+     * When a Stream you subscribe to is published again it keeps its ID and
+     * stops being delivered; {@link updateSubscriberStream} is the only way to
+     * subscribe to it anew - see the note there.
+     *
      * @param {string} streamRoomId ID of the Stream Room to subscribe in,
      *   returned by {@link createStreamRoom} or from `StreamRoom.streamRoomId`
      *   in {@link listStreamRooms}
      * @param {StreamSubscription[]} subscriptions remote streams/tracks to
      *   subscribe to, selected from the descriptors returned by
      *   {@link listStreams}
+     * @param {(state: RTCPeerConnectionState) => void} onStreamState optional
+     *   callback invoked whenever the inbound `RTCPeerConnection` changes state
+     *   (e.g. `connected`, `disconnected`, `failed`) - the receive-side
+     *   counterpart of {@link publishStream}'s callback. The SDK restarts ICE on
+     *   its own; use {@link joinStreamRoom}'s callback for the recovery outcome
+     *   rather than reacting to the raw states here.
      * @returns {number} handle identifying the new subscriber
      *   stream - pass it to {@link updateSubscriberStream} and
      *   {@link removeSubscriberStream}
@@ -646,14 +757,21 @@ export class StreamApi extends BaseApi {
     async createSubscriberStream(
         streamRoomId: string,
         subscriptions: StreamSubscription[],
+        onStreamState?: (state: RTCPeerConnectionState) => void,
     ): Promise<number> {
         const peerCredentials = await this.native.getTurnCredentials(this.servicePtr, []);
         await this.client.setTurnCredentials(peerCredentials);
+        if (onStreamState) {
+            // Registered before the native call: it can already negotiate the
+            // inbound connection, and with it the first state changes.
+            this.client.setSubscriberStateListener(streamRoomId as StreamRoomId, onStreamState);
+        }
         const handle = await this.native.createSubscriberStream(this.servicePtr, [
             streamRoomId,
             subscriptions,
         ]);
         this.subscriberStreams.set(handle, streamRoomId as StreamRoomId);
+        this.client.clearStaleStreams(streamRoomId as StreamRoomId);
         this.client.initializeSubscriberConnection(streamRoomId as StreamRoomId);
         return handle;
     }
@@ -676,21 +794,108 @@ export class StreamApi extends BaseApi {
      * @param {StreamSubscription[]} subscriptionsToAdd remote streams/tracks to
      *   start receiving, selected from the descriptors returned by
      *   {@link listStreams}
+     * ## Streams which were published again
+     *
+     * A Stream keeps its ID when its publisher unpublishes it and publishes it
+     * again, and the media server stops feeding the subscriptions made against
+     * the earlier publication. Nothing in {@link listStreams} tells the two
+     * apart, so this method refuses to work on such a Stream rather than leave
+     * you with a subscription that looks alive and delivers nothing: it rejects
+     * with a `NativeError` carrying
+     * `StreamRoomErrorCode.STREAM_REQUIRES_RESUBSCRIPTION`.
+     *
+     * You get there after a `streamUnpublished` event followed by a
+     * `streamPublished` event for the same Stream ID, so reacting to those
+     * events is what keeps you out of this error.
+     *
+     * To subscribe to such a Stream again, pass it in **both** lists in one
+     * call. Passing the same subscription as removed and added is how you say
+     * "make this subscription anew", and it is the only way to do it - removing
+     * the subscriber stream and creating it again does not bring the media
+     * back. Dropping the Stream by passing it in `subscriptionsToRemove` alone
+     * is allowed too.
+     *
      * @param {StreamSubscription[]} subscriptionsToRemove remote streams/tracks
      *   to stop receiving, from the set previously passed to
      *   {@link createSubscriberStream} or {@link updateSubscriberStream}
      * @returns {Promise<void>} resolves when the Bridge has applied the subscription changes
+     * @throws {NativeError} with `StreamRoomErrorCode.STREAM_REQUIRES_RESUBSCRIPTION`
+     *   when `subscriptionsToAdd` holds a Stream which was published again and
+     *   `subscriptionsToRemove` does not hold it as well
      */
     async updateSubscriberStream(
         subscriberStreamHandle: number,
         subscriptionsToAdd: StreamSubscription[],
         subscriptionsToRemove: StreamSubscription[],
     ): Promise<void> {
-        return this.native.updateSubscriberStream(this.servicePtr, [
-            subscriberStreamHandle,
-            subscriptionsToAdd,
-            subscriptionsToRemove,
-        ]);
+        const streamRoomId = this.subscriberStreams.get(
+            subscriberStreamHandle as SubscriberStreamHandle,
+        );
+        if (streamRoomId) {
+            this.assertStaleStreamsAreRedone(
+                streamRoomId,
+                subscriptionsToAdd,
+                subscriptionsToRemove,
+            );
+            // The tracks of these are about to be taken away because we said so.
+            for (const removed of subscriptionsToRemove) {
+                this.client.expectStreamRemoval(streamRoomId, removed.streamId);
+            }
+        }
+        try {
+            await this.native.updateSubscriberStream(this.servicePtr, [
+                subscriberStreamHandle,
+                subscriptionsToAdd,
+                subscriptionsToRemove,
+            ]);
+        } catch (e) {
+            // The unsubscribe never happened, so these Streams stay subscribed:
+            // their tracks going away would be the media server taking them from
+            // us, which is exactly what the announcement would hide.
+            if (streamRoomId) {
+                for (const removed of subscriptionsToRemove) {
+                    this.client.forgetExpectedRemoval(streamRoomId, removed.streamId);
+                }
+            }
+            throw e;
+        }
+        if (!streamRoomId) return;
+        // A Stream subscribed anew or dropped is no longer one to warn about.
+        for (const removed of subscriptionsToRemove) {
+            this.client.forgetStaleStream(streamRoomId, removed.streamId);
+        }
+    }
+
+    /**
+     * Refuses an update that would add a subscription to a Stream which was
+     * published again, unless the same call also removes it - which is what
+     * makes the subscription anew.
+     * @param {StreamRoomId} streamRoomId the room the subscriptions belong to
+     * @param {StreamSubscription[]} subscriptionsToAdd the subscriptions being added
+     * @param {StreamSubscription[]} subscriptionsToRemove the subscriptions being removed
+     * @throws if a Stream which was published again is added without being removed
+     */
+    private assertStaleStreamsAreRedone(
+        streamRoomId: StreamRoomId,
+        subscriptionsToAdd: StreamSubscription[],
+        subscriptionsToRemove: StreamSubscription[],
+    ): void {
+        const stale = this.client.getStaleStreams(streamRoomId);
+        if (stale.size === 0) return;
+        for (const added of subscriptionsToAdd) {
+            if (!stale.has(added.streamId)) continue;
+            const isRedone = subscriptionsToRemove.some((r) => r.streamId === added.streamId);
+            if (isRedone) continue;
+            throw new NativeError({
+                code: StreamRoomErrorCode.STREAM_REQUIRES_RESUBSCRIPTION,
+                name: "StreamRequiresResubscriptionException",
+                scope: "StreamRoom",
+                description:
+                    `Stream ${added.streamId} was published again and its subscriptions have to ` +
+                    "be made anew - pass it in subscriptionsToRemove as well as subscriptionsToAdd.",
+                full: "",
+            });
+        }
     }
 
     /**
@@ -711,8 +916,15 @@ export class StreamApi extends BaseApi {
      * @returns {Promise<void>} resolves once the Bridge has stopped delivering the subscriber stream
      */
     async removeSubscriberStream(subscriberStreamHandle: number): Promise<void> {
+        const streamRoomId = this.subscriberStreams.get(
+            subscriberStreamHandle as SubscriberStreamHandle,
+        );
         await this.native.removeSubscriberStream(this.servicePtr, [subscriberStreamHandle]);
         this.subscriberStreams.delete(subscriberStreamHandle as SubscriberStreamHandle);
+        if (streamRoomId) {
+            this.client.clearSubscriberStateListener(streamRoomId);
+            this.client.clearStaleStreams(streamRoomId);
+        }
     }
 
     /**
