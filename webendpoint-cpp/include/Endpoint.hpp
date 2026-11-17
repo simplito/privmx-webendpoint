@@ -74,6 +74,17 @@ API_FUNCTION_HEADER(GroupApi, subscribeFor)
 API_FUNCTION_HEADER(GroupApi, unsubscribeFrom)
 API_FUNCTION_HEADER(GroupApi, buildSubscriptionQuery)
 API_FUNCTION_HEADER(GroupApi, buildCustomEventSubscriptionQuery)
+API_FUNCTION_HEADER(GroupApi, rotateGroupKey)
+API_FUNCTION_HEADER(GroupApi, decryptMany)
+API_FUNCTION_HEADER(GroupApi, encryptAsOutsider)
+API_FUNCTION_HEADER(GroupApi, decryptFromOutsider)
+API_FUNCTION_HEADER(GroupApi, decryptAnonymous)
+API_FUNCTION_HEADER(GroupApi, decryptShared)
+API_FUNCTION_HEADER(GroupApi, peekEnvelope)
+API_FUNCTION_HEADER(GroupApi, deriveGroupId)
+API_FUNCTION_HEADER(GroupApi, getGroups)
+API_FUNCTION_HEADER(GroupApi, getGroupPublicKey)
+API_FUNCTION_HEADER(GroupApi, setGroupVisibility)
 
 // groupApiPtr: pointer to a created GroupApi so the module can grant/resolve group
 // access, or 0 for a group-unaware instance.

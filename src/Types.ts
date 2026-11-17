@@ -619,6 +619,8 @@ export interface Group {
     statusCode: number;
     schemaVersion: number;
     keyVersion: number;
+    /** Who beside the members may read the Group's identity key, roster and statements. The Bridge's own setting. */
+    visibleTo: "members" | "context";
     type?: string;
 }
 
@@ -648,25 +650,131 @@ export enum EnvelopeType {
     ENVELOPE_FROM_MEMBER = 1,
     /** Sealed to the Group's identity public key by an outsider using a throwaway keypair. Unattributable. */
     ENVELOPE_ANONYMOUS = 2,
+    /** Sealed to the Group's identity public key by someone who is not a member, and signed by them. */
+    ENVELOPE_FROM_OUTSIDER = 3,
 }
 
-/**
- * The plaintext of an envelope, together with what could be established about
- * who wrote it. Returned by {@link GroupApi.decrypt}.
- *
- * @type {DecryptedEnvelope}
- *
- * @param {Uint8Array} data decrypted content
- * @param {string} groupId ID of the Group the envelope was sealed for; authenticated
- * @param {string} authorPubKey verified author public key (base58-DER encoded), EMPTY when
- *   `type` is `ENVELOPE_ANONYMOUS` - branch on `type`, not on this field being non-empty
- * @param {EnvelopeType} type which of the Group's keys sealed this envelope
- */
+/** The verified author of a member's envelope. */
+export interface EnvelopeAuthor {
+    userId: string;
+    /** Base58-DER. The key the envelope was signed with; your UserVerifier accepted it for `userId`. */
+    pubKey: string;
+    /** The author's role in the Group **now**. Past rosters are not kept, so this is not the role they had when they wrote. */
+    role: "user" | "manager";
+}
+
+/** A verified writer who is not a member of the Group you read with. */
+export interface EnvelopeSender {
+    userId: string;
+    pubKey: string;
+}
+
+/** Who else an envelope was written for (`alsoFor`). Signed by the writer. */
+export interface EnvelopeAudience {
+    groups: string[];
+    users: string[];
+}
+
+/** A member's envelope, opened. Returned by {@link GroupApi.decrypt}. */
 export interface DecryptedEnvelope {
     data: Uint8Array;
+    author: EnvelopeAuthor;
+    /** The epoch of the Group key it was sealed under. */
+    epoch: number;
+    /** The author's clock, in milliseconds. Not proof of when it was written. */
+    encryptedAt: number;
+    sharedWith: EnvelopeAudience;
+}
+
+/** Written to a Group, and signed, by someone who is not in it. Returned by {@link GroupApi.decryptFromOutsider}. */
+export interface DecryptedOutsiderEnvelope {
+    data: Uint8Array;
+    epoch: number;
+    sender: EnvelopeSender;
+    encryptedAt: number;
+    sharedWith: EnvelopeAudience;
+}
+
+/** An unsigned envelope. No sender: anyone who knows the Group's public key could have written it. */
+export interface DecryptedAnonymousEnvelope {
+    data: Uint8Array;
+    epoch: number;
+}
+
+/** Written in another Group and shared with you through `alsoFor`. Returned by {@link GroupApi.decryptShared}. */
+export interface DecryptedSharedEnvelope {
+    data: Uint8Array;
+    sender: EnvelopeSender;
+    /** The Group it says it was written in. The writer's claim; see `senderIsMember`. */
+    homeGroupId: string;
+    /**
+     * Whether the sender is a member of `homeGroupId` now; `"unknown"` when you
+     * cannot see its roster. Anyone in the Context can address an envelope to
+     * you and name any Group as its origin: only `true` says it came from inside.
+     */
+    senderIsMember: boolean | "unknown";
+    /** How you had access: as a user, or through the recipient Group you are a member of. */
+    via: "user" | string;
+    encryptedAt: number;
+    sharedWith: EnvelopeAudience;
+}
+
+/** One more reader of an envelope, beside the Group it is written in. */
+export type EnvelopeRecipient =
+    /** Another Group, by its ID. Its current, verified key is fetched at every encryption. */
+    | { group: string }
+    /** One user. Their key goes through your UserVerifier first. */
+    | { user: UserWithPubKey };
+
+export interface EncryptOptions {
+    alsoFor?: EnvelopeRecipient[];
+}
+
+/** Who or what a failure is about. Only the fields that apply are set. */
+export interface GroupErrorDetails {
+    /** The user and key in question: who really signed, or whose key your UserVerifier refused. */
+    userId?: string;
+    pubKey?: string;
+    /** On a wrong kind of envelope. */
+    envelopeKind?: "member" | "outsider" | "anonymous" | "shared";
+}
+
+/** One result of {@link GroupApi.decryptMany}. `code` is a `GroupErrorCode` (or another `NativeError` code). */
+export type DecryptOutcome =
+    | ({ ok: true } & DecryptedEnvelope)
+    | { ok: false; code: number; details: GroupErrorDetails };
+
+/** One result of {@link GroupApi.getGroups}. */
+export type GroupOutcome = { ok: true; group: Group } | { ok: false; code: number };
+
+/**
+ * A Group's current identity key, verified against the Group's latest
+ * statement. Stale after the Group's next removal or rotation: fetch it when
+ * you need it, do not store it.
+ */
+export interface GroupPublicKey {
     groupId: string;
-    authorPubKey: string;
-    type: EnvelopeType;
+    epoch: number;
+    pubKey: string;
+}
+
+/** The part of an envelope readable without any key. Not authenticated: for refusing writes early. */
+export interface EnvelopeHeader {
+    version: number;
+    groupId: string;
+    /** The epoch the writer claims. 0 for an envelope written from outside the Group. */
+    epoch: number;
+    /** `true` when the writer is not a member of `groupId`. */
+    fromOutsider: boolean;
+    /** `true` when a writer signed it. Always `true` for a member's envelope. */
+    isSigned: boolean;
+    isFile: boolean;
+    /** `false` for an envelope written with `NO_LOCATION`. A server can refuse those. */
+    hasLocation: boolean;
+    /** The writer's claim, for a signed envelope; empty otherwise. */
+    authorUserId: string;
+    alsoForGroups: Array<{ groupId: string; epoch: number }>;
+    alsoForUsers: string[];
 }
 
 /**
@@ -714,6 +822,7 @@ export interface GroupSummary {
     rosterVersion: number;
     policy: ContainerPolicy;
     keyVersion: number;
+    visibleTo: "members" | "context";
     type?: string;
 }
 

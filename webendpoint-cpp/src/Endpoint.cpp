@@ -164,6 +164,17 @@ API_FUNCTION(GroupApi, subscribeFor)
 API_FUNCTION(GroupApi, unsubscribeFrom)
 API_FUNCTION(GroupApi, buildSubscriptionQuery)
 API_FUNCTION(GroupApi, buildCustomEventSubscriptionQuery)
+API_FUNCTION(GroupApi, rotateGroupKey)
+API_FUNCTION(GroupApi, decryptMany)
+API_FUNCTION(GroupApi, encryptAsOutsider)
+API_FUNCTION(GroupApi, decryptFromOutsider)
+API_FUNCTION(GroupApi, decryptAnonymous)
+API_FUNCTION(GroupApi, decryptShared)
+API_FUNCTION(GroupApi, peekEnvelope)
+API_FUNCTION(GroupApi, deriveGroupId)
+API_FUNCTION(GroupApi, getGroups)
+API_FUNCTION(GroupApi, getGroupPublicKey)
+API_FUNCTION(GroupApi, setGroupVisibility)
 
 void ThreadApi_newThreadApi(int taskId, int connectionPtr, int groupApiPtr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, groupApiPtr] {

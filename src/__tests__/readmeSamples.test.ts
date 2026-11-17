@@ -56,6 +56,11 @@ const PLACEHOLDERS: Record<string, string> = {
     roomId: "string",
     indexId: "string",
     messageId: "string",
+    noteId: "string",
+    tipId: "string",
+    // where a Group envelope lives in the reader's data, and the row the server served beside it
+    place: 'readonly ["my-app", "note", __Id, "body"]',
+    row: "{ authorId: string }",
     handle: "number",
     envelope: "Uint8Array",
     ciphertext: "ReadableStream<Uint8Array>",
@@ -87,6 +92,7 @@ const PRELUDE_IMPORT =
     "    StreamApi as __StreamApi,\n" +
     "    SearchApi as __SearchApi,\n" +
     "    Types as __Types,\n" +
+    "    Id as __Id,\n" +
     '} from "@simplito/privmx-webendpoint";\n';
 
 /** Names the sample declares itself, which the prelude must then leave alone. */

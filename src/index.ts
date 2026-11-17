@@ -88,6 +88,9 @@ export type {
 // Small helpers that need no API instance: data shaping you would otherwise
 // write again in every project.
 export { groupGrant } from "./service/groupGrant.js";
+export { id, NO_LOCATION, ANY_AUTHOR } from "./service/groupPaths.js";
+export type { Id, PathSegment, Location, LocationOrNone } from "./service/groupPaths.js";
+export type { DecryptOptions } from "./service/GroupApi.js";
 export { serializeObject, deserializeObject, strToUint8, uint8ToStr } from "./extra/utils.js";
 
 // Stream pieces that belong to no single API: drop them into any pipeline.

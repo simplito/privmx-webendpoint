@@ -17,12 +17,71 @@ import {
     GroupSummary,
     GroupMemberToAdd,
     ContainerPolicy,
-    DecryptedEnvelope,
     DecryptedFileInfo,
     GroupEventSelectorType,
     GroupEventType,
 } from "../Types.js";
 import { BaseNative } from "./BaseNative.js";
+import type { NativeSegment } from "../service/groupPaths.js";
+
+/** Results as the core serializes them; GroupApi maps them to the public shapes. @internal */
+export interface NativeAudience {
+    groups: string[];
+    users: string[];
+}
+export interface NativeDecryptedEnvelope {
+    data: Uint8Array;
+    author: { userId: string; pubKey: string; role: string };
+    keyVersion: number;
+    encryptedAt: number;
+    sharedWith: NativeAudience;
+}
+export interface NativeDecryptResult {
+    statusCode: number;
+    envelope: NativeDecryptedEnvelope;
+    details: { userId: string; pubKey: string; envelopeKind: string };
+}
+export interface NativeDecryptOptions {
+    expectedAuthor?: string;
+    anyAuthor?: boolean;
+    currentEpochOnly?: boolean;
+}
+export interface NativeEncryptOptions {
+    alsoFor: Array<{ groupId?: string; user?: UserWithPubKey }>;
+}
+export interface NativeDecryptItem {
+    envelope: Uint8Array;
+    location: NativeSegment[];
+    options: NativeDecryptOptions;
+}
+export interface NativeOutsiderEnvelope {
+    data: Uint8Array;
+    keyVersion: number;
+    sender: { userId: string; pubKey: string };
+    encryptedAt: number;
+    sharedWith: NativeAudience;
+}
+export interface NativeSharedEnvelope {
+    data: Uint8Array;
+    sender: { userId: string; pubKey: string };
+    homeGroupId: string;
+    senderMembership: string;
+    via: string;
+    encryptedAt: number;
+    sharedWith: NativeAudience;
+}
+export interface NativeEnvelopeHeader {
+    version: number;
+    groupId: string;
+    keyVersion: number;
+    fromOutsider: boolean;
+    isSigned: boolean;
+    isFile: boolean;
+    hasLocation: boolean;
+    authorUserId: string;
+    alsoForGroups: Array<{ groupId: string; keyVersion: number }>;
+    alsoForUsers: string[];
+}
 
 /**
  * Raw WASM wrapper for the C++ GroupApi - holds and forwards raw pointers.
@@ -51,6 +110,8 @@ export class GroupApiNative extends BaseNative {
             Uint8Array,
             Uint8Array,
             ContainerPolicy | undefined,
+            Uint8Array | undefined,
+            string,
         ],
     ): Promise<string> {
         return this.runAsync<string>((taskId) =>
@@ -62,8 +123,8 @@ export class GroupApiNative extends BaseNative {
             this.api.lib.GroupApi_addGroupMembers(taskId, ptr, args),
         );
     }
-    async removeGroupMembers(ptr: number, args: [string, string[]]): Promise<void> {
-        return this.runAsync<void>((taskId) =>
+    async removeGroupMembers(ptr: number, args: [string, string[]]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
             this.api.lib.GroupApi_removeGroupMembers(taskId, ptr, args),
         );
     }
@@ -95,19 +156,106 @@ export class GroupApiNative extends BaseNative {
             this.api.lib.GroupApi_listGroups(taskId, ptr, args),
         );
     }
-    async encrypt(ptr: number, args: [string, Uint8Array]): Promise<Uint8Array> {
+    async rotateGroupKey(ptr: number, args: [string]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_rotateGroupKey(taskId, ptr, args),
+        );
+    }
+    async deriveGroupId(ptr: number, args: [string, Uint8Array]): Promise<string> {
+        return this.runAsync<string>((taskId) =>
+            this.api.lib.GroupApi_deriveGroupId(taskId, ptr, args),
+        );
+    }
+    async getGroups(
+        ptr: number,
+        args: [string[]],
+    ): Promise<Array<{ statusCode: number; group: Group }>> {
+        return this.runAsync<Array<{ statusCode: number; group: Group }>>((taskId) =>
+            this.api.lib.GroupApi_getGroups(taskId, ptr, args),
+        );
+    }
+    async getGroupPublicKey(
+        ptr: number,
+        args: [string, string],
+    ): Promise<{ groupId: string; keyVersion: number; pubKey: string }> {
+        return this.runAsync<{
+            groupId: string;
+            keyVersion: number;
+            pubKey: string;
+        }>((taskId) => this.api.lib.GroupApi_getGroupPublicKey(taskId, ptr, args));
+    }
+    async setGroupVisibility(ptr: number, args: [string, string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.GroupApi_setGroupVisibility(taskId, ptr, args),
+        );
+    }
+    async encrypt(
+        ptr: number,
+        args: [string, NativeSegment[], Uint8Array, NativeEncryptOptions],
+    ): Promise<Uint8Array> {
         return this.runAsync<Uint8Array>((taskId) =>
             this.api.lib.GroupApi_encrypt(taskId, ptr, args),
         );
     }
-    async encryptAnonymously(ptr: number, args: [string, string, Uint8Array]): Promise<Uint8Array> {
+    async decrypt(
+        ptr: number,
+        args: [string, NativeSegment[], Uint8Array, NativeDecryptOptions],
+    ): Promise<NativeDecryptedEnvelope> {
+        return this.runAsync<NativeDecryptedEnvelope>((taskId) =>
+            this.api.lib.GroupApi_decrypt(taskId, ptr, args),
+        );
+    }
+    async decryptMany(
+        ptr: number,
+        args: [string, NativeDecryptItem[]],
+    ): Promise<NativeDecryptResult[]> {
+        return this.runAsync<NativeDecryptResult[]>((taskId) =>
+            this.api.lib.GroupApi_decryptMany(taskId, ptr, args),
+        );
+    }
+    async encryptAsOutsider(
+        ptr: number,
+        args: [string, string, NativeSegment[], Uint8Array, NativeEncryptOptions],
+    ): Promise<Uint8Array> {
+        return this.runAsync<Uint8Array>((taskId) =>
+            this.api.lib.GroupApi_encryptAsOutsider(taskId, ptr, args),
+        );
+    }
+    async encryptAnonymously(
+        ptr: number,
+        args: [string, string, NativeSegment[], Uint8Array],
+    ): Promise<Uint8Array> {
         return this.runAsync<Uint8Array>((taskId) =>
             this.api.lib.GroupApi_encryptAnonymously(taskId, ptr, args),
         );
     }
-    async decrypt(ptr: number, args: [Uint8Array]): Promise<DecryptedEnvelope> {
-        return this.runAsync<DecryptedEnvelope>((taskId) =>
-            this.api.lib.GroupApi_decrypt(taskId, ptr, args),
+    async decryptFromOutsider(
+        ptr: number,
+        args: [string, NativeSegment[], Uint8Array, NativeDecryptOptions],
+    ): Promise<NativeOutsiderEnvelope> {
+        return this.runAsync<NativeOutsiderEnvelope>((taskId) =>
+            this.api.lib.GroupApi_decryptFromOutsider(taskId, ptr, args),
+        );
+    }
+    async decryptAnonymous(
+        ptr: number,
+        args: [string, NativeSegment[], Uint8Array],
+    ): Promise<{ data: Uint8Array; keyVersion: number }> {
+        return this.runAsync<{ data: Uint8Array; keyVersion: number }>((taskId) =>
+            this.api.lib.GroupApi_decryptAnonymous(taskId, ptr, args),
+        );
+    }
+    async decryptShared(
+        ptr: number,
+        args: [string, NativeSegment[], Uint8Array, NativeDecryptOptions],
+    ): Promise<NativeSharedEnvelope> {
+        return this.runAsync<NativeSharedEnvelope>((taskId) =>
+            this.api.lib.GroupApi_decryptShared(taskId, ptr, args),
+        );
+    }
+    async peekEnvelope(ptr: number, args: [Uint8Array]): Promise<NativeEnvelopeHeader> {
+        return this.runAsync<NativeEnvelopeHeader>((taskId) =>
+            this.api.lib.GroupApi_peekEnvelope(taskId, ptr, args),
         );
     }
     async beginFileEncryption(ptr: number, args: [string, number]): Promise<number> {

@@ -29,7 +29,7 @@ This README walks through both, in that order.
 ### Quick look
 
 ```ts
-import { Endpoint, setupAuto } from "@simplito/privmx-webendpoint";
+import { Endpoint, id, setupAuto } from "@simplito/privmx-webendpoint";
 
 await setupAuto();                                   // load the WASM core
 const conn   = await Endpoint.connect(privateKey, solutionId, bridgeUrl);
@@ -37,9 +37,11 @@ const groups = await conn.getGroupApi();
 
 const groupId = await groups.createGroup(contextId, [alice, bob], [alice], publicMeta, privateMeta);
 
-// A Group can encrypt on its own. No container needed.
-const sealed = await groups.encrypt(groupId, new TextEncoder().encode("ship it"));
-const opened = await groups.decrypt(sealed);         // you also learn who wrote it
+// A Group can encrypt on its own. No container needed. The envelope is bound to
+// where the value lives in your data, and a read says whose writing it expects.
+const place  = ["my-app", "note", id(noteId)] as const;
+const sealed = await groups.encrypt(groupId, place, new TextEncoder().encode("ship it"));
+const opened = await groups.decrypt(groupId, place, sealed, { expectedAuthor: "alice" });
 ```
 
 **You need** a browser page with cross-origin isolation (see
@@ -287,29 +289,39 @@ the [API reference](https://docs.privmx.dev/docs/latest/reference/webendpoint/ap
 
 ### 3. Encrypt something for a Group
 
-You do not need a container. `encrypt` seals the bytes for the Group and signs
-them with your key:
+You do not need a container. `encrypt` seals the bytes for the Group, signs them
+with your key, and binds them to **where the value lives in your data**:
 
 ```ts
-const sealed = await groups.encrypt(groupId, new TextEncoder().encode("ship it"));
+import { id } from "@simplito/privmx-webendpoint";
+
+// A name you write in code is a string; anything that comes from data goes through id().
+const place  = ["my-app", "note", id(noteId), "body"] as const;
+const sealed = await groups.encrypt(groupId, place, new TextEncoder().encode("ship it"));
 await myBucket.put(key, sealed);                    // your storage sees ciphertext
 ```
 
-`decrypt` gives you the plaintext back together with the envelope's metadata,
-including who sealed it:
+`decrypt` takes the same place, and the author you are about to show - usually
+the one your server names next to the envelope:
 
 ```ts
-import { Types } from "@simplito/privmx-webendpoint";
-
-const opened = await groups.decrypt(await myBucket.get(key));
-if (opened.type === Types.EnvelopeType.ENVELOPE_FROM_MEMBER) {
-    console.log("written by", opened.authorPubKey);   // checked
-} else {
-    console.log("anonymous, and nobody can tell you who sent it");
-}
+const opened = await groups.decrypt(groupId, place, await myBucket.get(key), {
+    expectedAuthor: row.authorId,
+});
+console.log("written by", opened.author.userId, "as", opened.author.role);   // checked
 ```
 
-Check `type`. A filled-in author field proves nothing on its own.
+Three things your server could do, and what the read answers:
+
+- **Store the envelope under another record.** The place no longer matches:
+  `GroupErrorCode.ENVELOPE_WRONG_LOCATION`.
+- **Name another author beside it.** `GroupErrorCode.ENVELOPE_WRONG_AUTHOR`.
+- **Hand over what somebody outside the Group wrote.** `decrypt` reads a member's
+  envelope and nothing else: `GroupErrorCode.ENVELOPE_WRONG_KIND`.
+
+If you show the author only from the result, pass `ANY_AUTHOR` instead of a name.
+For a value that belongs to no record, pass `NO_LOCATION` as the place: it has to
+be said, and it gives up the first of the three checks above.
 
 An envelope carries its own Group id and key version, so any member can open it
 later, even after the key rotates, with nothing else alongside it.
@@ -386,14 +398,15 @@ tipster, a customer with a link, a form on a public page. They need the Group's
 **id and public key**, both public:
 
 ```ts
-import { Endpoint } from "@simplito/privmx-webendpoint";
+import { Endpoint, id } from "@simplito/privmx-webendpoint";
 
 // No user, no registered key, no login.
 const guest       = await Endpoint.connectPublic(solutionId, bridgeUrl);
 const guestGroups = await Endpoint.createGroupApi(guest);
 
 const sealed = await guestGroups.encryptAnonymously(
-    groupId, groupPubKey, new TextEncoder().encode("I saw the invoices being rewritten"),
+    groupId, groupPubKey, ["my-app", "tip", id(tipId)],
+    new TextEncoder().encode("I saw the invoices being rewritten"),
 );
 
 // Files have their own call, which says what it does.
@@ -404,8 +417,9 @@ await file.stream().pipeThrough(sealer).pipeTo(myBucket.writable(key));
 Three properties come with it:
 
 - **Sealing calls no server.** The Bridge never learns the submission happened.
-- **Nobody can attribute it.** Each call uses a throwaway keypair, so members see
-  `ENVELOPE_ANONYMOUS` and no author.
+- **Nobody can attribute it.** Each call uses a throwaway keypair. Members open
+  it with `decryptAnonymous`, which reports no sender; `decrypt` refuses it, so
+  it is never shown as a member's.
 - **The sender cannot read it back.** Only the Group can.
 
 A guest cannot send Group notifications, which need membership. Whatever

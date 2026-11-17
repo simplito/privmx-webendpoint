@@ -29,10 +29,96 @@ import {
     GroupMemberToAdd,
     ContainerPolicy,
     DecryptedEnvelope,
+    DecryptedOutsiderEnvelope,
+    DecryptedAnonymousEnvelope,
+    DecryptedSharedEnvelope,
+    DecryptOutcome,
+    EncryptOptions,
+    EnvelopeHeader,
+    GroupErrorDetails,
+    GroupOutcome,
+    GroupPublicKey,
     DecryptedFileInfo,
     GroupEventType,
     GroupEventSelectorType,
 } from "../Types.js";
+import { ANY_AUTHOR, toNativePath, type LocationOrNone } from "./groupPaths.js";
+import type {
+    NativeDecryptedEnvelope,
+    NativeDecryptOptions,
+    NativeDecryptResult,
+    NativeEncryptOptions,
+} from "../native/GroupApiNative.js";
+
+/** Every read says whose writing it expects; there is no way to leave the question out. */
+export interface DecryptOptions {
+    /**
+     * The author you are about to show: usually the one your server names next
+     * to the envelope. A different author fails with
+     * `GroupErrorCode.ENVELOPE_WRONG_AUTHOR`. Pass {@link ANY_AUTHOR} only if
+     * you display `author.userId` from the result.
+     */
+    expectedAuthor: string | typeof ANY_AUTHOR;
+    /** For content that reached you as new: it must be from the current epoch. */
+    currentEpochOnly?: boolean;
+}
+
+function toNativeDecryptOptions(options: DecryptOptions): NativeDecryptOptions {
+    // Checked here as well as in the core: a caller in plain JavaScript gets the reason, not a bare native error.
+    if (options === undefined || options === null || options.expectedAuthor === undefined) {
+        throw new TypeError("a read names its expectedAuthor, or passes ANY_AUTHOR");
+    }
+    if (options.expectedAuthor === ANY_AUTHOR) {
+        return {
+            anyAuthor: true,
+            currentEpochOnly: options.currentEpochOnly === true,
+        };
+    }
+    if (typeof options.expectedAuthor !== "string" || options.expectedAuthor.length === 0) {
+        throw new TypeError("expectedAuthor is a user ID, or ANY_AUTHOR");
+    }
+    return {
+        expectedAuthor: options.expectedAuthor,
+        currentEpochOnly: options.currentEpochOnly === true,
+    };
+}
+
+function toNativeEncryptOptions(options?: EncryptOptions): NativeEncryptOptions {
+    return {
+        alsoFor: (options?.alsoFor ?? []).map((recipient) =>
+            "group" in recipient ? { groupId: recipient.group } : { user: recipient.user },
+        ),
+    };
+}
+
+function fromNativeEnvelope(native: NativeDecryptedEnvelope): DecryptedEnvelope {
+    return {
+        data: native.data,
+        author: {
+            userId: native.author.userId,
+            pubKey: native.author.pubKey,
+            role: native.author.role === "manager" ? "manager" : "user",
+        },
+        epoch: native.keyVersion,
+        encryptedAt: native.encryptedAt,
+        sharedWith: native.sharedWith,
+    };
+}
+
+function fromNativeDetails(native: NativeDecryptResult["details"]): GroupErrorDetails {
+    const details: GroupErrorDetails = {};
+    if (native?.userId) details.userId = native.userId;
+    if (native?.pubKey) details.pubKey = native.pubKey;
+    if (
+        native?.envelopeKind === "member" ||
+        native?.envelopeKind === "outsider" ||
+        native?.envelopeKind === "anonymous" ||
+        native?.envelopeKind === "shared"
+    ) {
+        details.envelopeKind = native.envelopeKind;
+    }
+    return details;
+}
 
 /**
  * Groups: who your app shares things with.
@@ -214,6 +300,7 @@ export class GroupApi extends BaseApi {
         publicMeta: Uint8Array,
         privateMeta: Uint8Array,
         policies?: ContainerPolicy,
+        options?: { idSeed?: Uint8Array; visibleTo?: "members" | "context" },
     ): Promise<string> {
         return this.native.createGroup(this.servicePtr, [
             contextId,
@@ -222,6 +309,8 @@ export class GroupApi extends BaseApi {
             publicMeta,
             privateMeta,
             policies,
+            options?.idSeed,
+            options?.visibleTo ?? "members",
         ]);
     }
 
@@ -284,7 +373,7 @@ export class GroupApi extends BaseApi {
      * @throws {NativeError} when the Group does not exist or the user lacks
      *   management rights
      */
-    async removeGroupMembers(groupId: string, userIds: string[]): Promise<void> {
+    async removeGroupMembers(groupId: string, userIds: string[]): Promise<number> {
         return this.native.removeGroupMembers(this.servicePtr, [groupId, userIds]);
     }
 
@@ -442,73 +531,309 @@ export class GroupApi extends BaseApi {
     }
 
     /**
-     * Seals content for a Group, as one of its members.
+     * Seals content for a Group, as one of its members, bound to a location in
+     * your data.
      *
-     * The returned envelope is self-contained: it names the Group and the key
-     * version it was sealed under, so any member can {@link decrypt} it later -
-     * including after the Group's key has rotated - without being told anything
-     * alongside it. It is signed with your own key, so a reader also learns that
-     * you wrote it.
+     * The envelope opens only with the same `location`: a server that stores it
+     * under another record gets `ENVELOPE_WRONG_LOCATION` on every reader. It is
+     * signed with your key and names you. `options.alsoFor` adds readers beside
+     * the Group: other Groups, single users.
      *
-     * Requires membership. To seal for a Group you are not in, use
-     * {@link encryptAnonymously}.
+     * ```ts
+     * const body = await api.encrypt(groupId, ["chat", id(chatId), "message", id(messageId), "body"], data);
+     * ```
      *
-     * @param {string} groupId ID of the Group to seal for
+     * @param {string} groupId ID of the Group to seal for; you must be a member
+     * @param {LocationOrNone} location where the value lives, or {@link NO_LOCATION}
      * @param {Uint8Array} content data to encrypt
+     * @param {EncryptOptions} [options] further recipients
      * @returns {Uint8Array} the envelope
-     * @throws {NativeError} when the Group does not exist or the user is not a
-     *   member of it
+     * @throws {NativeError} when the Group does not exist or you are not a member of it
      */
-    async encrypt(groupId: string, content: Uint8Array): Promise<Uint8Array> {
-        return this.native.encrypt(this.servicePtr, [groupId, content]);
+    async encrypt(
+        groupId: string,
+        location: LocationOrNone,
+        content: Uint8Array,
+        options?: EncryptOptions,
+    ): Promise<Uint8Array> {
+        return this.native.encrypt(this.servicePtr, [
+            groupId,
+            toNativePath(location),
+            content,
+            toNativeEncryptOptions(options),
+        ]);
+    }
+
+    /**
+     * Opens an envelope written by a member of `groupId` with {@link encrypt}.
+     *
+     * Each of the four reading calls takes exactly one kind of envelope and
+     * throws `ENVELOPE_WRONG_KIND` for the others: {@link decrypt} (a member's),
+     * {@link decryptFromOutsider} (signed by a non-member),
+     * {@link decryptAnonymous} (unsigned), {@link decryptShared} (written in
+     * another Group). So what a non-member wrote is never shown as a member's,
+     * and what nobody signed is never shown as somebody's.
+     *
+     * Every read says whose writing it expects: the author your server names
+     * next to the envelope, or {@link ANY_AUTHOR} if you show the author from
+     * the result and from nowhere else.
+     *
+     * A removed member keeps the keys of the epochs they were in. For content
+     * that arrived as new, set `currentEpochOnly`, and have your server refuse
+     * envelopes that are not from the current epoch ({@link peekEnvelope}).
+     *
+     * @throws {NativeError} `GroupErrorCode.ENVELOPE_WRONG_LOCATION`, `ENVELOPE_WRONG_GROUP`,
+     *   `ENVELOPE_WRONG_AUTHOR`, `ENVELOPE_UNVERIFIED_AUTHOR`, `ENVELOPE_AUTHOR_NOT_MEMBER`,
+     *   `ENVELOPE_STALE_EPOCH`, `ENVELOPE_WRONG_KIND`
+     */
+    async decrypt(
+        groupId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: DecryptOptions,
+    ): Promise<DecryptedEnvelope> {
+        return fromNativeEnvelope(
+            await this.native.decrypt(this.servicePtr, [
+                groupId,
+                toNativePath(location),
+                envelope,
+                toNativeDecryptOptions(options),
+            ]),
+        );
+    }
+
+    /**
+     * {@link decrypt} for a page of envelopes of one Group. Never throws for a
+     * bad item: each reports on its own, so one moved or forged message becomes
+     * a warning and the rest still show.
+     */
+    async decryptMany(
+        groupId: string,
+        items: ReadonlyArray<{
+            location: LocationOrNone;
+            envelope: Uint8Array;
+            options: DecryptOptions;
+        }>,
+    ): Promise<DecryptOutcome[]> {
+        const results = await this.native.decryptMany(this.servicePtr, [
+            groupId,
+            items.map((item) => ({
+                envelope: item.envelope,
+                location: toNativePath(item.location),
+                options: toNativeDecryptOptions(item.options),
+            })),
+        ]);
+        return results.map((result) =>
+            result.statusCode === 0
+                ? { ok: true as const, ...fromNativeEnvelope(result.envelope) }
+                : {
+                      ok: false as const,
+                      code: result.statusCode,
+                      details: fromNativeDetails(result.details),
+                  },
+        );
+    }
+
+    /**
+     * Seals content for a Group you are not a member of, signed by you: you can
+     * write and prove it was you, and cannot read it back. The Group opens it
+     * with {@link decryptFromOutsider}.
+     *
+     * The Group's current key is read and verified here; none is passed in. The
+     * Group has to be visible to the Context ({@link setGroupVisibility}).
+     */
+    async encryptAsOutsider(
+        contextId: string,
+        groupId: string,
+        location: LocationOrNone,
+        content: Uint8Array,
+        options?: EncryptOptions,
+    ): Promise<Uint8Array> {
+        return this.native.encryptAsOutsider(this.servicePtr, [
+            contextId,
+            groupId,
+            toNativePath(location),
+            content,
+            toNativeEncryptOptions(options),
+        ]);
     }
 
     /**
      * Seals content for a Group without revealing, or proving, who sent it.
+     * Needs only public information - the Group's ID and its identity public
+     * key - and makes no server call. The Group opens it with
+     * {@link decryptAnonymous}, which reports no sender.
      *
-     * Needs only public information - the Group's ID and its identity public key
-     * (`Group.groupPubKey`) - so it works whether or not you are a member, and
-     * makes no server call. A throwaway keypair is generated per call and
-     * discarded, which is what makes the result unattributable: members open it
-     * with {@link decrypt}, which reports `ENVELOPE_ANONYMOUS` and no author.
-     *
-     * You cannot read back what you sealed here. Only the Group can.
-     *
-     * @param {string} groupId ID of the Group to seal for
-     * @param {string} groupPubKey the Group's identity public key (base58-DER
-     *   encoded), from `Group.groupPubKey`
-     * @param {Uint8Array} content data to encrypt
-     * @returns {Uint8Array} the envelope
-     * @throws {NativeError} when `groupPubKey` is not a valid public key
+     * @param {string} groupPubKey the Group's identity public key (base58-DER encoded)
      */
     async encryptAnonymously(
         groupId: string,
         groupPubKey: string,
+        location: LocationOrNone,
         content: Uint8Array,
     ): Promise<Uint8Array> {
-        return this.native.encryptAnonymously(this.servicePtr, [groupId, groupPubKey, content]);
+        return this.native.encryptAnonymously(this.servicePtr, [
+            groupId,
+            groupPubKey,
+            toNativePath(location),
+            content,
+        ]);
     }
 
     /**
-     * Opens an envelope sealed by {@link encrypt} or {@link encryptAnonymously}.
-     *
-     * Which of the two it was is reported as `DecryptedEnvelope.type`, and that
-     * decides what `authorPubKey` is worth: `ENVELOPE_FROM_MEMBER` means the
-     * signature was verified and the author is who it says;
-     * `ENVELOPE_ANONYMOUS` means the sender is unknown and `authorPubKey` is
-     * empty. Branch on the type, not on the field being non-empty.
-     *
-     * A file envelope is not accepted here - open one with
-     * {@link beginFileDecryption}.
-     *
-     * @param {Uint8Array} envelope envelope to open
-     * @returns {DecryptedEnvelope} the content, and what could be established
-     *   about its author
-     * @throws {NativeError} when the envelope does not decrypt or does not
-     *   verify
+     * Opens an envelope written to `groupId`, and signed, by someone who is not
+     * a member ({@link encryptAsOutsider}). The sender is who they say; whether
+     * they may write here is your question to answer.
      */
-    async decrypt(envelope: Uint8Array): Promise<DecryptedEnvelope> {
-        return this.native.decrypt(this.servicePtr, [envelope]);
+    async decryptFromOutsider(
+        groupId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: DecryptOptions,
+    ): Promise<DecryptedOutsiderEnvelope> {
+        const result = await this.native.decryptFromOutsider(this.servicePtr, [
+            groupId,
+            toNativePath(location),
+            envelope,
+            toNativeDecryptOptions(options),
+        ]);
+        return {
+            data: result.data,
+            epoch: result.keyVersion,
+            sender: result.sender,
+            encryptedAt: result.encryptedAt,
+            sharedWith: result.sharedWith,
+        };
+    }
+
+    /** Opens an unsigned envelope written to `groupId` ({@link encryptAnonymously}). There is no sender to report. */
+    async decryptAnonymous(
+        groupId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+    ): Promise<DecryptedAnonymousEnvelope> {
+        const result = await this.native.decryptAnonymous(this.servicePtr, [
+            groupId,
+            toNativePath(location),
+            envelope,
+        ]);
+        return { data: result.data, epoch: result.keyVersion };
+    }
+
+    /**
+     * Opens an envelope written in another Group and shared with you through
+     * `alsoFor`: as a user, or as a member of one of the recipient Groups. You
+     * need not know which. `location` is the one the author wrote it at.
+     *
+     * The result has a sender, not an author. Check `senderIsMember`: anyone in
+     * the Context can address an envelope to you and name any Group as its
+     * origin.
+     *
+     * @throws {NativeError} `GroupErrorCode.ENVELOPE_NOT_A_RECIPIENT` when you are not among the recipients
+     */
+    async decryptShared(
+        contextId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: DecryptOptions,
+    ): Promise<DecryptedSharedEnvelope> {
+        const result = await this.native.decryptShared(this.servicePtr, [
+            contextId,
+            toNativePath(location),
+            envelope,
+            toNativeDecryptOptions(options),
+        ]);
+        return {
+            data: result.data,
+            sender: result.sender,
+            homeGroupId: result.homeGroupId,
+            // Anything the core does not positively call a member or a non-member stays unknown.
+            senderIsMember:
+                result.senderMembership === "member"
+                    ? true
+                    : result.senderMembership === "notMember"
+                      ? false
+                      : "unknown",
+            via: result.via,
+            encryptedAt: result.encryptedAt,
+            sharedWith: result.sharedWith,
+        };
+    }
+
+    /**
+     * The part of an envelope (a message's or a file's) readable without any
+     * key: for a server that refuses writes early, such as one from a stale
+     * epoch. Nothing in it is authenticated.
+     */
+    async peekEnvelope(envelope: Uint8Array): Promise<EnvelopeHeader> {
+        const header = await this.native.peekEnvelope(this.servicePtr, [envelope]);
+        return {
+            version: header.version,
+            groupId: header.groupId,
+            epoch: header.keyVersion,
+            fromOutsider: header.fromOutsider,
+            isSigned: header.isSigned,
+            isFile: header.isFile,
+            hasLocation: header.hasLocation,
+            authorUserId: header.authorUserId,
+            alsoForGroups: header.alsoForGroups.map((g) => ({
+                groupId: g.groupId,
+                epoch: g.keyVersion,
+            })),
+            alsoForUsers: header.alsoForUsers,
+        };
+    }
+
+    /**
+     * The ID of a Group created with `idSeed`: every client computes the same
+     * one from the Context and the seed, so no server has to be asked which
+     * Group belongs to an entity.
+     *
+     * A seed anybody can compute is a name anybody can take first. Creating a
+     * Group under a seed fails when one exists or ever existed; when you find a
+     * Group under a derived ID, check `Group.creator` against who owns the
+     * entity before you trust it.
+     */
+    async deriveGroupId(contextId: string, idSeed: Uint8Array): Promise<string> {
+        return this.native.deriveGroupId(this.servicePtr, [contextId, idSeed]);
+    }
+
+    /** {@link getGroup} for several Groups. One result per ID, in order; a Group that fails reports its own code. */
+    async getGroups(groupIds: string[]): Promise<GroupOutcome[]> {
+        const results = await this.native.getGroups(this.servicePtr, [groupIds]);
+        return results.map((result) =>
+            result.statusCode === 0
+                ? { ok: true as const, group: result.group }
+                : { ok: false as const, code: result.statusCode },
+        );
+    }
+
+    /**
+     * The Group's current identity key, read and verified against the Group's
+     * latest statement. For a member, and for any user of the Context when the
+     * Group is visible to the Context.
+     */
+    async getGroupPublicKey(contextId: string, groupId: string): Promise<GroupPublicKey> {
+        const key = await this.native.getGroupPublicKey(this.servicePtr, [contextId, groupId]);
+        return { groupId: key.groupId, epoch: key.keyVersion, pubKey: key.pubKey };
+    }
+
+    /**
+     * Sets who beside the members may read the Group's identity key, roster and
+     * statements. A manager's call. Making a Group visible to the Context is
+     * what lets someone outside it write to it with {@link encryptAsOutsider};
+     * it also shows the roster to every user of the Context.
+     */
+    async setGroupVisibility(groupId: string, visibleTo: "members" | "context"): Promise<void> {
+        return this.native.setGroupVisibility(this.servicePtr, [groupId, visibleTo]);
+    }
+
+    /**
+     * Replaces the Group's key without changing its members.
+     * @returns {number} the Group's epoch after the call
+     */
+    async rotateGroupKey(groupId: string): Promise<number> {
+        return this.native.rotateGroupKey(this.servicePtr, [groupId]);
     }
 
     /**
