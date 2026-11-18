@@ -76,6 +76,7 @@ describe("Connection key-change calls", () => {
         const native = {
             renewIdentity: vi.fn().mockResolvedValue(undefined),
             acceptKeyChange: vi.fn().mockResolvedValue(undefined),
+            useKeyContinuity: vi.fn().mockResolvedValue(undefined),
         };
         return {
             conn: new Connection(
@@ -91,6 +92,13 @@ describe("Connection key-change calls", () => {
         const { conn, native } = connection();
         await conn.renewIdentity("WIF");
         expect(native.renewIdentity).toHaveBeenCalledWith(PTR, ["WIF"]);
+    });
+
+    it("useKeyContinuity is a call of its own: nothing turns it on by default", async () => {
+        const { conn, native } = connection();
+        expect(native.useKeyContinuity).not.toHaveBeenCalled();
+        await conn.useKeyContinuity();
+        expect(native.useKeyContinuity).toHaveBeenCalledWith(PTR, []);
     });
 
     it("acceptKeyChange names the Context, the user, and the keys in order: previous, then new", async () => {

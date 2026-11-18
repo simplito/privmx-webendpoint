@@ -840,8 +840,8 @@ export class GroupApi extends BaseApi {
      * nothing written from here on.
      *
      * The members' current keys go through the Connection's UserVerifier like
-     * any key this client wraps to. A connection without a verifier of its own
-     * keeps to key continuity, so accept the change first
+     * any key this client wraps to. With key continuity on
+     * ({@link Connection.useKeyContinuity}), accept the change first
      * ({@link Connection.acceptKeyChange}), after checking it is genuine.
      *
      * Allowed by the `removeMembers` rule. The caller cannot be among `userIds`.

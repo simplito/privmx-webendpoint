@@ -36,6 +36,7 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(Connection, disconnect)
     BINDING_FUNCTION(Connection, renewIdentity)
     BINDING_FUNCTION(Connection, acceptKeyChange)
+    BINDING_FUNCTION(Connection, useKeyContinuity)
     BINDING_FUNCTION(Connection, newUserVerifierInterface)
     BINDING_FUNCTION(Connection, deleteUserVerifierInterface)
 

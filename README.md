@@ -314,12 +314,18 @@ connecting; without it, somebody else lets them back in:
 await connection.renewIdentity(previousPrivKeyWif);
 
 // Somebody else, after checking the new key really is Dana's:
-await connection.acceptKeyChange(contextId, "dana", danaOldPubKey, danaPubKey);
 await groups.reseatGroupMembers(groupId, ["dana"]);   // a new key version; Dana keeps her seat
 ```
 
-A connection without a `UserVerifierInterface` of its own remembers the first
-key it sees each user with and refuses any other until `acceptKeyChange`.
+The reseat wraps to the key the Context lists for Dana now, so whether that key
+is hers is your `UserVerifierInterface`'s answer. With no service to ask, a
+connection can keep to key continuity instead: it remembers the first key it
+sees each user with and refuses any other until told the change is genuine.
+
+```ts
+await connection.useKeyContinuity();                  // right after connecting
+await connection.acceptKeyChange(contextId, "dana", danaOldPubKey, danaPubKey);
+```
 
 ### 3. Encrypt something for a Group
 

@@ -526,18 +526,36 @@ export class Connection extends BaseApi {
     }
 
     /**
-     * Tells this connection that a user's identity key changed, and that the
-     * application has checked the change.
+     * Sets the built-in key-continuity verifier as this connection's
+     * UserVerifier: the first key a user of a Context is seen with is taken as
+     * theirs (trust on first use), and any other key for that user is refused
+     * until {@link acceptKeyChange}. For an application with no server of its
+     * own to ask; one that has such a service should implement
+     * {@link UserVerifierInterface} instead, which also covers the first key.
      *
-     * A connection without a {@link UserVerifierInterface} of its own keeps to
-     * key continuity: the first key it sees a user of a Context with is taken
-     * as theirs, and any other is refused. After this call `newPubKey` is the
-     * user's key; `previousPubKey` stays good for what was signed before. The
-     * knowledge lives in this connection's memory only.
+     * Not the default, and not free of consequences. What it knows lives in
+     * this connection's memory, so every new connection trusts first use again
+     * and has to be told again of every change it must accept. And a user whose
+     * key changed is refused wherever both keys appear: in a Group's history
+     * after a leaf renewal, or on an item one user wrote and another edited.
+     * Call it right after connecting, before creating any module API.
+     */
+    useKeyContinuity(): Promise<void> {
+        return this.native.useKeyContinuity(this.servicePtr, []);
+    }
+
+    /**
+     * Tells this connection that a user's identity key changed, and that the
+     * application has checked the change. For a connection that keeps to key
+     * continuity ({@link useKeyContinuity}).
+     *
+     * After this call `newPubKey` is the user's key; `previousPubKey` stays
+     * good for what was signed before. The knowledge lives in this
+     * connection's memory only.
      *
      * Rejects when `previousPubKey` is not the key this connection knows the
-     * user by, or when a verifier was set with {@link setUserVerifier}: that
-     * verifier decides, and is the thing to update.
+     * user by, or when key continuity is not on: the application's own
+     * verifier decides then, and is the thing to update.
      *
      * @param {string} contextId ID of the Context the user belongs to
      * @param {string} userId ID of the user

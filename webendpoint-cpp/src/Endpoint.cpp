@@ -113,6 +113,7 @@ API_FUNCTION(Connection, buildSubscriptionQuery)
 API_FUNCTION(Connection, disconnect)
 API_FUNCTION(Connection, renewIdentity)
 API_FUNCTION(Connection, acceptKeyChange)
+API_FUNCTION(Connection, useKeyContinuity)
 
 void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int interfaceBindId) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, interfaceBindId] {

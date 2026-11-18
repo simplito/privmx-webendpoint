@@ -122,6 +122,11 @@ export class ConnectionNative extends BaseNative {
             this.api.lib.Connection_renewIdentity(taskId, ptr, args),
         );
     }
+    async useKeyContinuity(ptr: number, args: []): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.Connection_useKeyContinuity(taskId, ptr, args),
+        );
+    }
     async acceptKeyChange(ptr: number, args: [string, string, string, string]): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.Connection_acceptKeyChange(taskId, ptr, args),
