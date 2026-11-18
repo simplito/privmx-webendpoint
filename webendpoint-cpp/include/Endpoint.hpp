@@ -42,6 +42,8 @@ API_FUNCTION_HEADER(Connection, subscribeFor)
 API_FUNCTION_HEADER(Connection, unsubscribeFrom)
 API_FUNCTION_HEADER(Connection, buildSubscriptionQuery)
 API_FUNCTION_HEADER(Connection, disconnect)
+API_FUNCTION_HEADER(Connection, renewIdentity)
+API_FUNCTION_HEADER(Connection, acceptKeyChange)
 void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int interfaceBindId);
 void Connection_deleteUserVerifierInterface(int taskId, int ptr);
 emscripten::val callVerifierOnJS(emscripten::val& name, emscripten::val& params);
@@ -85,6 +87,10 @@ API_FUNCTION_HEADER(GroupApi, deriveGroupId)
 API_FUNCTION_HEADER(GroupApi, getGroups)
 API_FUNCTION_HEADER(GroupApi, getGroupPublicKey)
 API_FUNCTION_HEADER(GroupApi, setGroupVisibility)
+API_FUNCTION_HEADER(GroupApi, reseatGroupMembers)
+API_FUNCTION_HEADER(GroupApi, setGroupRoles)
+API_FUNCTION_HEADER(GroupApi, updateGroupRules)
+API_FUNCTION_HEADER(GroupApi, getGroupLog)
 
 // groupApiPtr: pointer to a created GroupApi so the module can grant/resolve group
 // access, or 0 for a group-unaware instance.

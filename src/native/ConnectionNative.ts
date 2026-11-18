@@ -117,6 +117,16 @@ export class ConnectionNative extends BaseNative {
             this.api.lib.Connection_disconnect(taskId, ptr, args),
         );
     }
+    async renewIdentity(ptr: number, args: [string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.Connection_renewIdentity(taskId, ptr, args),
+        );
+    }
+    async acceptKeyChange(ptr: number, args: [string, string, string, string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.Connection_acceptKeyChange(taskId, ptr, args),
+        );
+    }
     async setUserVerifier(_ptr: number, args: [number, UserVerifierInterface]): Promise<void> {
         if (this.userVerifierPtr > -1) {
             await this.deleteUserVerifierInterface(this.userVerifierPtr);

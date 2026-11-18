@@ -111,6 +111,8 @@ API_FUNCTION(Connection, subscribeFor)
 API_FUNCTION(Connection, unsubscribeFrom)
 API_FUNCTION(Connection, buildSubscriptionQuery)
 API_FUNCTION(Connection, disconnect)
+API_FUNCTION(Connection, renewIdentity)
+API_FUNCTION(Connection, acceptKeyChange)
 
 void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int interfaceBindId) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, interfaceBindId] {
@@ -175,6 +177,10 @@ API_FUNCTION(GroupApi, deriveGroupId)
 API_FUNCTION(GroupApi, getGroups)
 API_FUNCTION(GroupApi, getGroupPublicKey)
 API_FUNCTION(GroupApi, setGroupVisibility)
+API_FUNCTION(GroupApi, reseatGroupMembers)
+API_FUNCTION(GroupApi, setGroupRoles)
+API_FUNCTION(GroupApi, updateGroupRules)
+API_FUNCTION(GroupApi, getGroupLog)
 
 void ThreadApi_newThreadApi(int taskId, int connectionPtr, int groupApiPtr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, groupApiPtr] {

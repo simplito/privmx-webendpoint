@@ -20,11 +20,26 @@ import {
     DecryptedFileInfo,
     GroupEventSelectorType,
     GroupEventType,
+    GroupRoleChange,
+    GroupRulesUpdate,
+    GroupLogKind,
 } from "../Types.js";
 import { BaseNative } from "./BaseNative.js";
 import type { NativeSegment } from "../service/groupPaths.js";
 
 /** Results as the core serializes them; GroupApi maps them to the public shapes. @internal */
+export interface NativeGroupLogEntry {
+    seq: number;
+    kind: GroupLogKind;
+    author: string;
+    authorPubKey: string;
+    date: number;
+    keyVersion: number;
+    rosterVersion: number;
+    addedUsers: string[];
+    addedManagers: string[];
+    removed: string[];
+}
 export interface NativeAudience {
     groups: string[];
     users: string[];
@@ -187,6 +202,29 @@ export class GroupApiNative extends BaseNative {
     async setGroupVisibility(ptr: number, args: [string, string]): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.GroupApi_setGroupVisibility(taskId, ptr, args),
+        );
+    }
+    async reseatGroupMembers(ptr: number, args: [string, string[]]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_reseatGroupMembers(taskId, ptr, args),
+        );
+    }
+    async setGroupRoles(ptr: number, args: [string, GroupRoleChange[]]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.GroupApi_setGroupRoles(taskId, ptr, args),
+        );
+    }
+    async updateGroupRules(ptr: number, args: [string, GroupRulesUpdate]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.GroupApi_updateGroupRules(taskId, ptr, args),
+        );
+    }
+    async getGroupLog(
+        ptr: number,
+        args: [string, PagingQuery],
+    ): Promise<PagingList<NativeGroupLogEntry>> {
+        return this.runAsync<PagingList<NativeGroupLogEntry>>((taskId) =>
+            this.api.lib.GroupApi_getGroupLog(taskId, ptr, args),
         );
     }
     async encrypt(

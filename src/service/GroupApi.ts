@@ -38,6 +38,9 @@ import {
     GroupErrorDetails,
     GroupOutcome,
     GroupPublicKey,
+    GroupRoleChange,
+    GroupRulesUpdate,
+    GroupLogEntry,
     DecryptedFileInfo,
     GroupEventType,
     GroupEventSelectorType,
@@ -826,6 +829,81 @@ export class GroupApi extends BaseApi {
      */
     async setGroupVisibility(groupId: string, visibleTo: "members" | "context"): Promise<void> {
         return this.native.setGroupVisibility(this.servicePtr, [groupId, visibleTo]);
+    }
+
+    /**
+     * Lets members back in after their identity key was replaced and they
+     * cannot renew their own leaf (that needs the previous key,
+     * {@link Connection.renewIdentity}). Everything they could open is re-keyed
+     * and the key epoch advances once; they keep their seats, their roles and
+     * their place on the roster. Whoever still holds a previous key reads
+     * nothing written from here on.
+     *
+     * The members' current keys go through the Connection's UserVerifier like
+     * any key this client wraps to. A connection without a verifier of its own
+     * keeps to key continuity, so accept the change first
+     * ({@link Connection.acceptKeyChange}), after checking it is genuine.
+     *
+     * Allowed by the `removeMembers` rule. The caller cannot be among `userIds`.
+     *
+     * @param {string} groupId ID of the Group
+     * @param {string[]} userIds IDs of the members to reseat
+     * @returns {Promise<number>} the Group's key epoch after the call
+     */
+    async reseatGroupMembers(groupId: string, userIds: string[]): Promise<number> {
+        return this.native.reseatGroupMembers(this.servicePtr, [groupId, userIds]);
+    }
+
+    /**
+     * Changes the role of members already in the Group. No key moves: a role
+     * decides what the Bridge and the other members accept from somebody, not
+     * what they can read.
+     *
+     * Allowed by the `updatePolicy` rule (managers, by default). Refused when it
+     * would leave a Group that has managers with none.
+     *
+     * @param {string} groupId ID of the Group
+     * @param {GroupRoleChange[]} changes the members and the role each takes
+     */
+    async setGroupRoles(groupId: string, changes: GroupRoleChange[]): Promise<void> {
+        return this.native.setGroupRoles(this.servicePtr, [groupId, changes]);
+    }
+
+    /**
+     * Changes who may add members, remove members and rewrite the Group's
+     * metadata, leaving the rest of the policy as it is. A signed commit like
+     * {@link updateGroupPolicy}, under the same rule.
+     *
+     * @param {string} groupId ID of the Group
+     * @param {GroupRulesUpdate} rules the rules to change; one left out stays
+     */
+    async updateGroupRules(groupId: string, rules: GroupRulesUpdate): Promise<void> {
+        return this.native.updateGroupRules(this.servicePtr, [groupId, rules]);
+    }
+
+    /**
+     * The Group's history: every signed statement since its creation, verified
+     * from the first to the one the Group is at now. Reads the whole chain on
+     * every call, so its cost grows with the Group's age, not with `limit`.
+     *
+     * @param {string} groupId ID of the Group
+     * @param {PagingQuery} pagingQuery `skip`, `limit` and `sortOrder`
+     *   ("asc": oldest first)
+     * @returns {Promise<PagingList<GroupLogEntry>>} the statements in the
+     *   window, and how many there are in all
+     */
+    async getGroupLog(
+        groupId: string,
+        pagingQuery: PagingQuery,
+    ): Promise<PagingList<GroupLogEntry>> {
+        const page = await this.native.getGroupLog(this.servicePtr, [groupId, pagingQuery]);
+        return {
+            totalAvailable: page.totalAvailable,
+            readItems: page.readItems.map(({ keyVersion, ...entry }) => ({
+                ...entry,
+                epoch: keyVersion,
+            })),
+        };
     }
 
     /**

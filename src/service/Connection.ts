@@ -509,6 +509,55 @@ export class Connection extends BaseApi {
         return this.native.setUserVerifier(this.servicePtr, [this.servicePtr, verifier]);
     }
 
+    /**
+     * After the user's identity key changed and the previous one is still at
+     * hand: from then on every GroupApi of this connection re-wraps the
+     * caller's own leaf to the current key by itself, the first time it reads a
+     * Group the current key does not open. Call it right after connecting, on
+     * every start for as long as some Group may still be waiting.
+     *
+     * Without the previous key there is nothing to renew with: another member
+     * lets the user back in with {@link GroupApi.reseatGroupMembers}.
+     *
+     * @param {string} previousUserPrivKey the previous identity private key in WIF
+     */
+    renewIdentity(previousUserPrivKey: string): Promise<void> {
+        return this.native.renewIdentity(this.servicePtr, [previousUserPrivKey]);
+    }
+
+    /**
+     * Tells this connection that a user's identity key changed, and that the
+     * application has checked the change.
+     *
+     * A connection without a {@link UserVerifierInterface} of its own keeps to
+     * key continuity: the first key it sees a user of a Context with is taken
+     * as theirs, and any other is refused. After this call `newPubKey` is the
+     * user's key; `previousPubKey` stays good for what was signed before. The
+     * knowledge lives in this connection's memory only.
+     *
+     * Rejects when `previousPubKey` is not the key this connection knows the
+     * user by, or when a verifier was set with {@link setUserVerifier}: that
+     * verifier decides, and is the thing to update.
+     *
+     * @param {string} contextId ID of the Context the user belongs to
+     * @param {string} userId ID of the user
+     * @param {string} previousPubKey the key the user had, in Base58DER
+     * @param {string} newPubKey the key the user has now, in Base58DER
+     */
+    acceptKeyChange(
+        contextId: string,
+        userId: string,
+        previousPubKey: string,
+        newPubKey: string,
+    ): Promise<void> {
+        return this.native.acceptKeyChange(this.servicePtr, [
+            contextId,
+            userId,
+            previousPubKey,
+            newPubKey,
+        ]);
+    }
+
     private async freeApis() {
         for (const apiId in this.apisRefs) {
             this.jsApiInstances[apiId]?.destroyRefs();

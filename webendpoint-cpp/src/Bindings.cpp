@@ -34,6 +34,8 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(Connection, unsubscribeFrom)
     BINDING_FUNCTION(Connection, buildSubscriptionQuery)
     BINDING_FUNCTION(Connection, disconnect)
+    BINDING_FUNCTION(Connection, renewIdentity)
+    BINDING_FUNCTION(Connection, acceptKeyChange)
     BINDING_FUNCTION(Connection, newUserVerifierInterface)
     BINDING_FUNCTION(Connection, deleteUserVerifierInterface)
 
@@ -76,6 +78,10 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(GroupApi, getGroups)
     BINDING_FUNCTION(GroupApi, getGroupPublicKey)
     BINDING_FUNCTION(GroupApi, setGroupVisibility)
+    BINDING_FUNCTION(GroupApi, reseatGroupMembers)
+    BINDING_FUNCTION(GroupApi, setGroupRoles)
+    BINDING_FUNCTION(GroupApi, updateGroupRules)
+    BINDING_FUNCTION(GroupApi, getGroupLog)
 
     BINDING_FUNCTION(ThreadApi, newThreadApi)
     BINDING_FUNCTION(ThreadApi, deleteThreadApi)

@@ -287,6 +287,40 @@ Removal cost grows with the *logarithm* of the Group size, so Groups of a few
 thousand people are fine. For which key versions stay readable and for whom, see
 the [API reference](https://docs.privmx.dev/docs/latest/reference/webendpoint/api-reference/connection).
 
+**Roles, rules, and a member whose key changed.** A role is not a key, so
+changing one moves nothing anybody reads with:
+
+```ts
+await groups.setGroupRoles(groupId, [{ userId: "dana", role: "manager" }]);
+
+// Who may add, remove, and rewrite metadata. Here: any member adds, managers remove.
+await groups.updateGroupRules(groupId, { addMembers: "user", removeMembers: "manager" });
+```
+
+Every change above is a signed statement, and `getGroupLog` returns them all,
+verified from the Group's creation:
+
+```ts
+const { readItems } = await groups.getGroupLog(groupId, { skip: 0, limit: 20, sortOrder: "desc" });
+for (const entry of readItems) console.log(entry.seq, entry.kind, entry.author);
+```
+
+When a member's identity key is replaced, they are still on the roster but can
+open nothing. With the old key at hand they fix it themselves, once, on
+connecting; without it, somebody else lets them back in:
+
+```ts
+// The member, old key still at hand:
+await connection.renewIdentity(previousPrivKeyWif);
+
+// Somebody else, after checking the new key really is Dana's:
+await connection.acceptKeyChange(contextId, "dana", danaOldPubKey, danaPubKey);
+await groups.reseatGroupMembers(groupId, ["dana"]);   // a new key version; Dana keeps her seat
+```
+
+A connection without a `UserVerifierInterface` of its own remembers the first
+key it sees each user with and refuses any other until `acceptKeyChange`.
+
 ### 3. Encrypt something for a Group
 
 You do not need a container. `encrypt` seals the bytes for the Group, signs them

@@ -621,7 +621,65 @@ export interface Group {
     keyVersion: number;
     /** Who beside the members may read the Group's identity key, roster and statements. The Bridge's own setting. */
     visibleTo: "members" | "context";
+    /** The Group's signed rules, resolved. Empty strings when the policy served did not verify. */
+    rules: GroupRules;
     type?: string;
+}
+
+/**
+ * Who may change what in a Group, as the Group's signed statements bind it.
+ * `updateMeta` is the policy's `update`; the other two follow it until set.
+ */
+export interface GroupRules {
+    /** Who may add members. */
+    addMembers: PolicyEntry;
+    /** Who may remove or reseat members. */
+    removeMembers: PolicyEntry;
+    /** Who may rewrite the Group's metadata. */
+    updateMeta: PolicyEntry;
+}
+
+/** The rules {@link GroupApi.updateGroupRules} changes; one left out stays as it is. */
+export type GroupRulesUpdate = Partial<GroupRules>;
+
+/** A member of a Group and the role {@link GroupApi.setGroupRoles} gives them. */
+export interface GroupRoleChange {
+    userId: string;
+    role: "user" | "manager";
+}
+
+/** What a statement of a Group's history did. */
+export type GroupLogKind =
+    | "create"
+    | "add"
+    | "remove"
+    | "reseat"
+    | "roles"
+    | "rotate"
+    | "policy"
+    | "selfUpdate";
+
+/**
+ * One signed statement of a Group's history, as {@link GroupApi.getGroupLog}
+ * returns it: verified, from the creation on.
+ */
+export interface GroupLogEntry {
+    /** 1 for the creation, one more for each later statement. */
+    seq: number;
+    kind: GroupLogKind;
+    /** The member who signed it, and the identity key it was signed with. */
+    author: string;
+    authorPubKey: string;
+    /** The author's clock, in milliseconds. */
+    date: number;
+    /** The Group's key epoch and roster version after it. */
+    epoch: number;
+    rosterVersion: number;
+    /** "add": who joined as a user or as a manager. "roles": who became one. */
+    addedUsers: string[];
+    addedManagers: string[];
+    /** "remove": who left. "reseat": who was reseated. */
+    removed: string[];
 }
 
 /**
@@ -913,6 +971,10 @@ export interface ContainerWithoutItemPolicy {
     updaterCanBeRemovedFromManagers?: PolicyBooleanEntry;
     ownerCanBeRemovedFromManagers?: PolicyBooleanEntry;
     forwardSecrecy?: PolicyBooleanEntry;
+    /** Groups only: who can add members. Unset, whoever `update` allows. Refused on any other container. */
+    addMembers?: PolicyEntry;
+    /** Groups only: who can remove or reseat members. Unset, whoever `update` allows. */
+    removeMembers?: PolicyEntry;
 }
 
 /**

@@ -38,6 +38,8 @@ const PLACEHOLDERS: Record<string, string> = {
     bob: "__Types.UserWithPubKey",
     danaPubKey: "string",
     erinPubKey: "string",
+    danaOldPubKey: "string",
+    previousPrivKeyWif: "string",
     // APIs and values earlier blocks produce
     conn: "__Connection",
     groups: "__GroupApi",
