@@ -827,7 +827,10 @@ export class GroupClient {
         return new GroupOutsider(this.core, key.groupId, subject, key.pubKey);
     }
 
-    private async requireHome(author: Subject, envelope: Uint8Array, home: OpenOptions): Promise<void> {
+    private async requireHome(author: Subject, envelope: Uint8Array, createdBy: string | null): Promise<void> {
+        if (createdBy === undefined) {
+            throw new TypeError("a shared read says who created the author's Group (homeCreatedBy), or null");
+        }
         // The envelope says which Group it was written in; where it was found says which Group that should be.
         const homeId = await this.core.groupIdOf(author);
         if ((await this.core.api.peekEnvelope(envelope)).groupId !== homeId) {
@@ -836,8 +839,8 @@ export class GroupClient {
                 "not written in the Group of the author's subject",
             );
         }
-        if (home.createdBy !== undefined) {
-            await this.core.groupOfSubject({ subject: author, createdBy: home.createdBy });
+        if (createdBy !== null) {
+            await this.core.groupOfSubject({ subject: author, createdBy });
         }
     }
 
@@ -846,14 +849,19 @@ export class GroupClient {
      * `alsoFor`. The value sits at `authorSubject + place` and must say it was
      * written in the Group of `authorSubject`; `senderIsMember` in the result
      * is then about that Group.
+     *
+     * `homeCreatedBy` is who created that Group, checked against its signed
+     * policy: without it, "a member of the Group under this subject" could be
+     * a member of a Group somebody else put there. Pass `null` only when you
+     * do not rely on `senderIsMember` (the author is checked either way).
      */
     async decryptShared(
         authorSubject: Subject,
         place: Place,
         envelope: Uint8Array,
-        opts: DecryptOptions & { home?: OpenOptions },
+        opts: DecryptOptions & { homeCreatedBy: string | null },
     ): Promise<DecryptedSharedEnvelope> {
-        await this.requireHome(authorSubject, envelope, opts.home ?? {});
+        await this.requireHome(authorSubject, envelope, opts.homeCreatedBy);
         return this.core.api.decryptShared(this.core.contextId, join(authorSubject, place), envelope, opts);
     }
 
@@ -861,9 +869,9 @@ export class GroupClient {
         authorSubject: Subject,
         place: Place,
         envelope: Uint8Array,
-        opts: DecryptOptions & FileRange & { home?: OpenOptions },
+        opts: DecryptOptions & FileRange & { homeCreatedBy: string | null },
     ): Promise<GroupFileReader> {
-        await this.requireHome(authorSubject, envelope, opts.home ?? {});
+        await this.requireHome(authorSubject, envelope, opts.homeCreatedBy);
         return this.core.api.openSharedFile(this.core.contextId, join(authorSubject, place), envelope, opts);
     }
 }

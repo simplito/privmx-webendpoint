@@ -1,6 +1,6 @@
 # PrivMX Web Endpoint - searchable group chat
 
-A demo of **`GroupApi`** and **`SearchApi`** working together: one Group of
+A demo of **`GroupClient`** and **`SearchApi`** working together: one Group of
 Context users is granted access to *both* a Thread and a full-text Search Index,
 so membership is managed in a single place, and every message is indexed by its
 sender - end-to-end encrypted, yet searchable.

@@ -9,10 +9,12 @@ import {
     createThreadSubscription,
     deserializeObject,
     groupGrant,
+    id,
     strToUint8,
     uint8ToStr,
     type Connection,
-    type GroupApi,
+    type Group,
+    type GroupClient,
     type ThreadApi,
     type SearchApi,
 } from "@simplito/privmx-webendpoint";
@@ -22,6 +24,8 @@ import { guard, log } from "./log";
 /** publicMeta tag that identifies this demo's room. */
 const ROOM = "privmx-group-chat-demo";
 const PAGE = { skip: 0, limit: 100, sortOrder: "desc" } as const;
+/** Where the room lives in this app's data. Its Group is the Group of this subject. */
+const roomSubject = (roomId: string) => ["group-chat", "room", id(roomId)] as const;
 /** How long the indexing transaction stays open after the last message. */
 const COMMIT_DEBOUNCE_MS = 1500;
 
@@ -47,7 +51,10 @@ export interface ChatMessage {
 
 export class Peer {
     connection!: Connection;
-    groupApi!: GroupApi;
+    /** The Groups of this Context, by the entity they serve. */
+    groups!: GroupClient;
+    /** The room's Group: opened by the room's subject, never by an ID a server handed over. */
+    room?: Group;
     threadApi!: ThreadApi;
     searchApi!: SearchApi;
     contextId!: string;
@@ -140,7 +147,7 @@ export class Peer {
         this.contextId = contextId;
         this.me = { userId: this.userId, pubKey };
         this.connection = await Endpoint.connect(privateKey, solutionId, bridgeUrl);
-        this.groupApi = await Endpoint.createGroupApi(this.connection);
+        this.groups = await this.connection.groups(this.contextId);
         this.threadApi = await Endpoint.createThreadApi(this.connection);
         this.searchApi = await Endpoint.createSearchApi(this.connection);
         this.setStatus("connected", "warn");
@@ -168,7 +175,10 @@ export class Peer {
         }
         this.threadId = room.threadId;
         this.indexId = json(room.publicMeta).indexId;
-        this.groupId = room.groups[0]?.groupId ?? "";
+        // The Thread says which room this is; the room says which Group. The Group's ID follows from the
+        // room's subject and its creator is checked, so a Thread granted to somebody else's Group is refused.
+        this.room = await this.groups.open(roomSubject(json(room.publicMeta).roomId), { createdBy: "alice" });
+        this.groupId = this.room.groupId;
         await this.enterRoom();
         log(this.userId, `joined room ${this.threadId}`);
         return true;
@@ -177,14 +187,15 @@ export class Peer {
     /** Alice-only: creates the Group and the two containers granted to it. */
     async createRoom(): Promise<void> {
         // The Group starts with its creator only; Bob is added later, on camera.
-        this.groupId = await this.groupApi.createGroup(
-            this.contextId,
-            [this.me],
-            [this.me],
-            enc(JSON.stringify({ room: ROOM })),
-            enc(JSON.stringify({ name: "Chat members" })),
-        );
-        const group = await this.groupApi.getGroup(this.groupId);
+        // The room's ID is made together with its Group: nobody knew it before the Group existed.
+        const created = await this.groups.create(["group-chat", "room"], [{ user: this.me, role: "manager" }], {
+            publicMeta: enc(JSON.stringify({ room: ROOM })),
+            privateMeta: enc(JSON.stringify({ name: "Chat members" })),
+        });
+        this.room = created.group;
+        this.groupId = this.room.groupId;
+        const roomId = created.entityId;
+        const group = await this.room.state();
         log(this.userId, `created group ${this.groupId} (epoch ${group.keyVersion})`);
 
         // The Index is deliberately left without forwardSecrecy: its content is one long-lived SQLite file, and
@@ -208,7 +219,7 @@ export class Peer {
             this.contextId,
             [this.me],
             [this.me],
-            enc(JSON.stringify({ room: ROOM, indexId: this.indexId })),
+            enc(JSON.stringify({ room: ROOM, roomId, indexId: this.indexId })),
             enc(JSON.stringify({ title: "Group chat" })),
             policy,
             [groupGrant(group, "user")],

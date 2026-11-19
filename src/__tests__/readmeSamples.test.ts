@@ -61,6 +61,18 @@ const PLACEHOLDERS: Record<string, string> = {
     noteId: "string",
     tipId: "string",
     scanId: "string",
+    projectId: "string",
+    salesId: "string",
+    supportId: "string",
+    supportLeadId: "string",
+    billingOwnerId: "string",
+    dana: "__Types.UserWithPubKey",
+    client: "__GroupClient",
+    chat: "__Group",
+    chatRow: "{ chatId: string; createdBy: string }",
+    body: "Uint8Array",
+    myDb: "any",
+    strToUint8: "(text: string) => Uint8Array",
     docId: "string",
     uploadedBy: "string",
     authorId: "string",
@@ -105,6 +117,8 @@ const PRELUDE_IMPORT =
     "    SearchApi as __SearchApi,\n" +
     "    Types as __Types,\n" +
     "    Id as __Id,\n" +
+    "    GroupClient as __GroupClient,\n" +
+    "    Group as __Group,\n" +
     '} from "@simplito/privmx-webendpoint";\n';
 
 /** Names the sample declares itself, which the prelude must then leave alone. */

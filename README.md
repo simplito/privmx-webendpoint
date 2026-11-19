@@ -552,6 +552,98 @@ that has to survive in a container.
 
 ---
 
+### 7. Groups by the entity they serve
+
+Everything above names a Group by its ID. That ID usually comes from your
+server, in a row beside the record it protects, and whoever controls that row
+decides which Group your user encrypts for. `GroupClient` removes the row. A
+Group is named by its **subject**, the path of the entity it belongs to, and
+its ID follows from that path.
+
+```ts
+const client = await conn.groups(contextId);
+
+// A new chat: the library makes the chat's id together with the Group.
+const { group: chat, entityId: chatId } = await client.create(
+    ["chat-app", "chat"],
+    [{ user: me, role: "manager" }, { user: dana, role: "user" }],
+);
+await myDb.chats.insert({ chatId, createdBy: me.userId });
+
+// Every value is bound to subject + place.
+const body = await chat.encrypt(["message", id(messageId), "body"], strToUint8("Hello"));
+```
+
+Reading it, on another device:
+
+```ts
+const chat = await client.open(["chat-app", "chat", id(chatRow.chatId)], {
+    createdBy: chatRow.createdBy,
+});
+const message = await chat.decrypt(["message", id(messageId), "body"], body, {
+    expectedAuthor: row.authorId,
+});
+```
+
+`createdBy` is checked against the Group's first signed statement. If someone
+else made a Group under your chat's subject first, `open` fails with
+`GROUP_WRONG_CREATOR` instead of handing you their Group.
+
+Pick the pair that fits how the entity gets its identifier:
+
+| You have | Create | Open |
+|---|---|---|
+| A new entity | `create(kind, members)` | `open(subject)` |
+| An entity with its own id | `createFor(subject, members)` | `open(subject, { createdBy })` |
+| A 1:1 chat named by its two users | `createFixed(subject, users)` | `openFixed(subject, userIds)` |
+| A Group that already has an ID | `GroupApi.createGroup` | `openPinned(subject, groupId)` |
+| No entity at all | `createUnbound(members)` | `openUnbound(groupId)` |
+
+Never "open it, and create it if it is not there". That is how a Group someone
+else made under your subject gets used.
+
+A Group you are not in is named with its creator too, wherever something is
+wrapped for it or written to it:
+
+```ts
+// One note, also readable by billing.
+await chat.encrypt(["note", id(noteId)], strToUint8("Invoice sent"), {
+    alsoFor: [{ subject: ["chat-app", "billing"], createdBy: billingOwnerId }],
+});
+
+// A writer that is not a member: it can write, and read nothing back.
+const outsider = await client.openForWriting({
+    subject: ["chat-app", "chat", id(chatRow.chatId)],
+    createdBy: chatRow.createdBy,
+});
+await outsider.encrypt(["lab", id(noteId)], strToUint8("CRP 3.1"));
+```
+
+#### One key for several Groups
+
+`alsoFor` wraps a value's key once per reader, for every value. When the same
+Groups read the same records all the time, a **Space** wraps one key for them
+once, and writing a value wraps nothing.
+
+```ts
+const space = await client.createSpaceFor(["crm", "project", id(projectId)], [
+    { subject: ["crm", "team", id(salesId)], createdBy: me.userId, role: "manager" },
+    { subject: ["crm", "team", id(supportId)], createdBy: supportLeadId, role: "user" },
+]);
+const sealedNote = await space.encrypt(["note", id(noteId)], strToUint8("Call the client"));
+
+const opened = await space.decrypt(["note", id(noteId)], sealedNote, { expectedAuthor: row.authorId });
+if (opened.origin.authorAccess !== "yes") {
+    throw new Error("written by someone whose access is not confirmed");
+}
+```
+
+Check `authorAccess`. Someone removed from a team still holds the Space's key
+until it is replaced, so the key alone does not say the author had access. The
+Bridge marks the Space as stale after such a removal and the next write
+replaces the key first. To close the window at once, call `space.rotateKey()`
+right after the removal.
+
 ## What's included
 
 With a Group in hand, choose a container by the shape of your data. The Group

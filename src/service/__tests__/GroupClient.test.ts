@@ -341,17 +341,21 @@ describe("GroupClient: from outside a Group", () => {
     it("a shared value must say it was written in the Group of the subject it was found under", async () => {
         const header = (groupId: string) => ({ groupId });
         const { groups, api } = setup({ peekEnvelope: header(idOf("group", PATIENT)), getGroupPublicKey: key("alice") });
-        await groups.decryptShared(PATIENT, ["discharge", id("d1")], ENVELOPE, BY_ALICE);
-        expect(api.decryptShared).toHaveBeenCalledWith(CTX, [...PATIENT, "discharge", id("d1")], ENVELOPE, BY_ALICE);
-        expect(await codeOf(groups.decryptShared(PATIENT, ["discharge", id("d1")], ENVELOPE, { ...BY_ALICE, home: { createdBy: "mallory" } }))).toBe(
+        const read = { ...BY_ALICE, homeCreatedBy: "alice" };
+        await groups.decryptShared(PATIENT, ["discharge", id("d1")], ENVELOPE, read);
+        expect(api.decryptShared).toHaveBeenCalledWith(CTX, [...PATIENT, "discharge", id("d1")], ENVELOPE, read);
+        // Who made the author's Group is said, or said not to matter: it is never left out.
+        await expect(groups.decryptShared(PATIENT, ["discharge", id("d1")], ENVELOPE, BY_ALICE as never)).rejects.toThrow(TypeError);
+        await expect(groups.decryptShared(PATIENT, ["discharge", id("d1")], ENVELOPE, { ...BY_ALICE, homeCreatedBy: null })).resolves.toBeUndefined();
+        expect(await codeOf(groups.decryptShared(PATIENT, ["discharge", id("d1")], ENVELOPE, { ...BY_ALICE, homeCreatedBy: "mallory" }))).toBe(
             GroupErrorCode.GROUP_WRONG_CREATOR,
         );
         // Another patient's summary put in this patient's row: its header names another Group.
         const moved = setup({ peekEnvelope: header("group:someone-else") });
-        expect(await codeOf(moved.groups.decryptShared(PATIENT, ["discharge", id("d1")], ENVELOPE, BY_ALICE))).toBe(
+        expect(await codeOf(moved.groups.decryptShared(PATIENT, ["discharge", id("d1")], ENVELOPE, { ...BY_ALICE, homeCreatedBy: null }))).toBe(
             GroupErrorCode.ENVELOPE_WRONG_GROUP,
         );
-        expect(await codeOf(moved.groups.openSharedFile(PATIENT, ["scan", id("s1")], ENVELOPE, BY_ALICE))).toBe(
+        expect(await codeOf(moved.groups.openSharedFile(PATIENT, ["scan", id("s1")], ENVELOPE, { ...BY_ALICE, homeCreatedBy: null }))).toBe(
             GroupErrorCode.ENVELOPE_WRONG_GROUP,
         );
         expect(moved.api.decryptShared).not.toHaveBeenCalled();
