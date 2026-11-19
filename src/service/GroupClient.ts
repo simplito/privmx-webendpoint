@@ -68,6 +68,7 @@ import {
     type SequenceItem,
     type SequenceMarkInfo,
     type SpaceDecryptOutcome,
+    type SpaceLogEntry,
     type SpaceOrigin,
     type SpaceState,
     type UserWithPubKey,
@@ -112,8 +113,8 @@ export interface OpenOptions {
     /**
      * The user who created the entity. The Group's first, signed statement
      * names who created the Group; someone else's fails with
-     * `GROUP_WRONG_CREATOR`. (For a Space the creator is the Bridge's word: a
-     * Space has no signed history.)
+     * `GROUP_WRONG_CREATOR`. For a Space it is the signer of the Space's first
+     * statement.
      */
     createdBy?: string;
 }
@@ -476,6 +477,10 @@ export class Space<P = Place> {
 
     state(): Promise<SpaceState> {
         return this.core.api.getSpace(this.spaceId);
+    }
+    /** Every change of the recipients and the key, verified from the creation. */
+    log(query: PagingQuery): Promise<PagingList<SpaceLogEntry>> {
+        return this.core.api.getSpaceLog(this.spaceId, query);
     }
     async encrypt(place: P, data: Uint8Array): Promise<Uint8Array> {
         return this.core.api.encryptInSpace(this.spaceId, this.at(place), data);

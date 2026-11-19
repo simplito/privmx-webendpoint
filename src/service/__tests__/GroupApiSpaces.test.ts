@@ -236,6 +236,31 @@ describe("GroupApi spaces", () => {
         expect(native.deriveSpaceId).toHaveBeenCalledWith(PTR, ["ctx", bytes]);
     });
 
+    it("getSpaceLog returns the core's verified history as it is", async () => {
+        const page = {
+            totalAvailable: 1,
+            readItems: [
+                {
+                    seq: 1,
+                    kind: "create",
+                    author: "alice",
+                    authorPubKey: "PK",
+                    via: "sales",
+                    date: 5,
+                    keyVersion: 1,
+                    addedGroups: ["sales"],
+                    addedUsers: [],
+                    removedGroups: [],
+                    removedUsers: [],
+                },
+            ],
+        };
+        const { api, native } = setup({ getSpaceLog: page });
+        const query = { skip: 0, limit: 10, sortOrder: "asc" as const };
+        await expect(api.getSpaceLog("s1", query)).resolves.toEqual(page);
+        expect(native.getSpaceLog).toHaveBeenCalledWith(PTR, ["s1", query]);
+    });
+
     it("getGroupPublicKey carries the Group's creator", async () => {
         const { api } = setup({
             getGroupPublicKey: { groupId: "g1", keyVersion: 3, pubKey: "PUB", creator: "alice" },

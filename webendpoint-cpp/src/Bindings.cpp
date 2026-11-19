@@ -118,6 +118,7 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(GroupApi, getSpaceSequenceOrigin)
     BINDING_FUNCTION(GroupApi, encodePath)
     BINDING_FUNCTION(GroupApi, pinGroupToSubject)
+    BINDING_FUNCTION(GroupApi, getSpaceLog)
 
     BINDING_FUNCTION(ThreadApi, newThreadApi)
     BINDING_FUNCTION(ThreadApi, deleteThreadApi)

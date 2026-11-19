@@ -18,6 +18,7 @@ import {
     GroupMemberToAdd,
     ContainerPolicy,
     CipherRange,
+    SpaceLogEntry,
     SequenceAppendResult,
     SequenceItem,
     SequenceItemHeader,
@@ -597,6 +598,11 @@ export class GroupApiNative extends BaseNative {
     async pinGroupToSubject(ptr: number, args: [string, NativeSegment[], string]): Promise<void> {
         return this.runAsync<void>((taskId) =>
             this.api.lib.GroupApi_pinGroupToSubject(taskId, ptr, args),
+        );
+    }
+    async getSpaceLog(ptr: number, args: [string, PagingQuery]): Promise<PagingList<SpaceLogEntry>> {
+        return this.runAsync<PagingList<SpaceLogEntry>>((taskId) =>
+            this.api.lib.GroupApi_getSpaceLog(taskId, ptr, args),
         );
     }
 }

@@ -53,6 +53,7 @@ import {
     SpaceOrigin,
     DecryptedSpaceEnvelope,
     SpaceDecryptOutcome,
+    SpaceLogEntry,
     GroupEventType,
     GroupEventSelectorType,
 } from "../Types.js";
@@ -1402,6 +1403,10 @@ export class GroupApi extends BaseApi {
     // once per recipient when it is created and when the key is replaced, and
     // writing a value wraps nothing. A Space has its own kind of envelope:
     // `decrypt` refuses it and `decryptInSpace` refuses the others.
+    //
+    // A Space has a signed history, like a Group. Who its recipients are, which
+    // key is current and who made it is what its statements add up to, checked
+    // by the core; the Bridge cannot add a recipient or plant a key.
 
     /**
      * @param {SpaceRecipient[]} recipients the Groups and users the key is wrapped for; the caller must be
@@ -1585,6 +1590,15 @@ export class GroupApi extends BaseApi {
         return fromNativeSpaceOrigin(
             await this.native.getSpaceSequenceOrigin(this.servicePtr, [sequence]),
         );
+    }
+
+    /**
+     * The Space's history: every change of its recipients and its key, verified
+     * from the creation. Each statement is signed by a recipient - themselves,
+     * or through a recipient Group, shown by that Group's key.
+     */
+    async getSpaceLog(spaceId: string, pagingQuery: PagingQuery): Promise<PagingList<SpaceLogEntry>> {
+        return this.native.getSpaceLog(this.servicePtr, [spaceId, pagingQuery]);
     }
 
     /**

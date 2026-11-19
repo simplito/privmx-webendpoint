@@ -835,6 +835,7 @@ export type SpaceRecipientRef = { group: string } | { userId: string };
 export interface SpaceState {
     spaceId: string;
     contextId: string;
+    /** Who created the Space: the signer of its first statement. */
     createdBy: string;
     /** `epoch`: the Group's epoch the current key is wrapped for. */
     groups: Array<{ groupId: string; role: "user" | "manager"; epoch: number }>;
@@ -865,6 +866,26 @@ export interface SpaceOrigin {
     authorAccess: "yes" | "no" | "unknown";
     /** The version of the Space's key the value was sealed under. */
     keyVersion: number;
+}
+
+/** One signed statement of a Space's history. Returned by {@link GroupApi.getSpaceLog}. */
+export interface SpaceLogEntry {
+    /** 1 for the creation, one more for each later statement. */
+    seq: number;
+    kind: "create" | "add" | "remove" | "rotate";
+    /** The recipient who signed it, and the identity key it was signed with. */
+    author: string;
+    authorPubKey: string;
+    /** `"user"`, or the ID of the recipient Group the author acted through (shown by that Group's key). */
+    via: string;
+    /** The author's clock, in milliseconds. */
+    date: number;
+    /** The version of the Space's key after it. */
+    keyVersion: number;
+    addedGroups: string[];
+    addedUsers: string[];
+    removedGroups: string[];
+    removedUsers: string[];
 }
 
 export interface DecryptedSpaceEnvelope {
