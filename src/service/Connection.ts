@@ -9,6 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { GroupClient } from "./GroupClient.js";
 import { BaseApi } from "./BaseApi.js";
 import { ConnectionNative } from "../native/ConnectionNative.js";
 import {
@@ -383,6 +384,18 @@ export class Connection extends BaseApi {
      */
     getGroupApi(): Promise<GroupApi> {
         return this.services.createGroupApi(this);
+    }
+
+    /**
+     * The Groups and Spaces of one Context, addressed by the entity of your app
+     * they serve instead of by an ID read from a server. Built on
+     * {@link getGroupApi}; see {@link GroupClient}.
+     *
+     * @param {string} contextId the Context the Groups live in
+     * @returns {Promise<GroupClient>} a client for that Context
+     */
+    async groups(contextId: string): Promise<GroupClient> {
+        return new GroupClient(await this.getGroupApi(), contextId, () => this.getEventManager());
     }
 
     /**

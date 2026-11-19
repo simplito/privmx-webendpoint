@@ -91,6 +91,26 @@ export { groupGrant } from "./service/groupGrant.js";
 export { id, NO_LOCATION, ANY_AUTHOR } from "./service/groupPaths.js";
 export type { Id, PathSegment, Location, LocationOrNone } from "./service/groupPaths.js";
 export type { DecryptOptions } from "./service/GroupApi.js";
+export {
+    GroupClient,
+    GroupClientError,
+    Group,
+    GroupOutsider,
+    Space,
+    SequenceWriter,
+    SequenceReader,
+} from "./service/GroupClient.js";
+export type {
+    Subject,
+    Place,
+    GroupBySubject,
+    ClientRecipient,
+    ClientSpaceRecipient,
+    OpenOptions,
+    OpenItem,
+    OpenOutcome,
+    CreateOptions,
+} from "./service/GroupClient.js";
 export { serializeObject, deserializeObject, strToUint8, uint8ToStr } from "./extra/utils.js";
 
 // Stream pieces that belong to no single API: drop them into any pipeline.
