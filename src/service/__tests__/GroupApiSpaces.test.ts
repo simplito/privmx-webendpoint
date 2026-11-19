@@ -249,9 +249,9 @@ describe("GroupApi spaces", () => {
                     date: 5,
                     keyVersion: 1,
                     addedGroups: ["sales"],
-                    addedUsers: [],
-                    removedGroups: [],
-                    removedUsers: [],
+                    addedUsers: [] as string[],
+                    removedGroups: [] as string[],
+                    removedUsers: [] as string[],
                 },
             ],
         };
