@@ -365,6 +365,10 @@ export const GroupErrorCode = {
     ENVELOPE_STALE_EPOCH: 0xd001c,
     /** A read must name the expected author or say that any author is accepted */
     ENVELOPE_AUTHOR_NOT_STATED: 0xd001d,
+    /** Sequence item or mark is out of order, repeated, or does not match what was read */
+    ENVELOPE_SEQUENCE_ORDER: 0xd001e,
+    /** Encrypted file data is not what its envelope lists */
+    ENVELOPE_FILE_CORRUPTED: 0xd001f,
 } as const;
 
 /**

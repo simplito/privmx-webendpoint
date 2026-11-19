@@ -379,41 +379,50 @@ bucket, a file the user downloads. Whoever stores them learns nothing from them.
 ### 4. Files of any size
 
 `sealFile` gives you a `TransformStream`. Plaintext goes in, ciphertext comes
-out, and the envelope arrives at the end.
+out, and the envelope arrives at the end. You do not need the size up front.
 
 ```ts
-const sealer = groups.sealFile({ groupId, size: file.size });
+const sealer = groups.sealFile({ groupId, location: ["my-app", "scan", id(scanId)] });
 
 await file.stream().pipeThrough(sealer).pipeTo(myBucket.writable(key));
 await myBucket.put(`${key}.envelope`, await sealer.envelope);
 ```
 
-Keep both. The ciphertext is the file. The envelope is a small header naming the
-Group, the key version, the author and the size, and without it nobody opens the
-file, including members.
+Keep both. The ciphertext is the file. The envelope names the Group, the key
+version, the author and the place, and lists the size and a digest of every
+chunk, signed by the author. Without it nobody opens the file, including
+members. With it, a chunk that anyone else rewrote, moved or swapped is refused
+at that chunk.
 
-Reading it back mirrors that:
+Reading it back mirrors that. As with `decrypt`, you say where the file belongs
+and who you expect it from:
 
 ```ts
-const reader = await groups.openFile(envelope);
-const blob   = await new Response(ciphertext.pipeThrough(reader.stream)).blob();
+const reader = await groups.openFile(groupId, ["my-app", "scan", id(scanId)], envelope, {
+    expectedAuthor: uploadedBy,
+});
+const blob = await new Response(ciphertext.pipeThrough(reader.stream)).blob();
 
-if (!(await reader.info).complete) throw new Error("the file was cut short");
+const info = await reader.info;                    // rejects if the file was cut short
+console.log(info.author?.userId, info.size);
 ```
 
-Only a start-to-end read can answer `info.complete`. For a **range**, ask where
-to start and fetch that part:
+For a **range**, ask which ciphertext bytes hold it and fetch only those:
 
 ```ts
-const r = await groups.openFile(envelope, { from: 1 << 20, length: 64 });
+const r = await groups.openFile(groupId, ["my-app", "scan", id(scanId)], envelope, {
+    expectedAuthor: uploadedBy,
+    from: 1 << 20,
+    length: 64,
+});
+const { offset, length } = r.cipherRange;          // for an HTTP Range request
 const head = await new Response(
-    myBucket.readableFrom(key, r.ciphertextOffset).pipeThrough(r.stream),
+    myBucket.readableRange(key, offset, length!).pipeThrough(r.stream),
 ).text();                                          // output starts at plaintext byte 1 MiB
 ```
 
-`ciphertextOffset` is the point. In a 2 MiB file, seeking to 1 MiB leaves about
-half the ciphertext unfetched. A seeked read gives up the completeness check, so
-`complete` comes back `false` there.
+A ranged read gives up the completeness check, so `complete` comes back `false`
+there. The bytes you did read are still the author's.
 
 Streams bring backpressure with them, so a slow sink slows the reader down and a
 file bigger than memory still goes through. Add progress and cancellation with
@@ -424,12 +433,42 @@ import { progressStream } from "@simplito/privmx-webendpoint";
 
 await file.stream()
     .pipeThrough(progressStream((sent) => setPct(sent / file.size)))
-    .pipeThrough(groups.sealFile({ groupId, size: file.size }))
+    .pipeThrough(groups.sealFile({ groupId, location: ["my-app", "scan", id(scanId)] }))
     .pipeTo(myBucket.writable(key), { signal });
 ```
 
 The chunked calls underneath (`beginFileEncryption`, `encryptFileChunk`,
 `finishFileEncryption`) are still there if you want to drive them.
+
+#### Many small items in order
+
+For edits of a shared document, live captions or cursors, signing every item is
+too slow. A **sequence** signs once, in its header, and then seals each item
+under the sequence's own key with its position. Every so often (64 items by
+default) the author signs a checkpoint over everything so far.
+
+```ts
+const ops = await groups.beginSequence(groupId, ["my-app", "doc", id(docId), "ops"]);
+send(await groups.getSequenceHeader(ops));          // first, before the items
+
+const { item, mark } = await groups.appendToSequence(ops, edit);
+send(item);
+if (mark) send(mark);                               // a checkpoint was due
+```
+
+```ts
+const reading = await groups.openSequence(groupId, ["my-app", "doc", id(docId), "ops"], header, {
+    expectedAuthor: authorId,
+});
+const { data, missing } = await groups.readSequenceItem(reading, item);
+const { attestedItems } = await groups.verifySequenceMark(reading, mark);
+```
+
+An item is readable at once, and at that point you know a member of the Group
+made it and where it belongs. That the **author** made it you know after the
+next checkpoint verifies. A sequence ends with its epoch: after a removal
+`appendToSequence` fails with `ENVELOPE_STALE_EPOCH` and you begin a new one, so
+the removed member reads nothing new.
 
 ### 5. Senders with no account
 
@@ -450,7 +489,9 @@ const sealed = await guestGroups.encryptAnonymously(
 );
 
 // Files have their own call, which says what it does.
-const sealer = guestGroups.sealFileAnonymously({ groupId, groupPubKey, size: file.size });
+const sealer = guestGroups.sealFileAnonymously({
+    groupId, groupPubKey, location: ["my-app", "tip", id(tipId), "file"],
+});
 await file.stream().pipeThrough(sealer).pipeTo(myBucket.writable(key));
 ```
 

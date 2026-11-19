@@ -831,28 +831,77 @@ export interface EnvelopeHeader {
     hasLocation: boolean;
     /** The writer's claim, for a signed envelope; empty otherwise. */
     authorUserId: string;
+    /** Set when the envelope is the header of a sequence: the id its items and marks carry. */
+    sequenceId?: string;
     alsoForGroups: Array<{ groupId: string; epoch: number }>;
     alsoForUsers: string[];
 }
 
 /**
- * What could be established about a sealed file, once all of it has been
- * received. Returned by {@link GroupApi.finishFileDecryption}.
+ * What is known about a decrypted Group file. Returned by
+ * {@link GroupApi.finishFileDecryption} and as `info` of the stream readers.
+ * Which optional fields are set follows from the call that opened the file:
+ * a member's file has `author`, an outsider's `sender`, an anonymous one
+ * neither, a shared one `sender` with `homeGroupId`, `senderIsMember` and `via`.
+ * A sender is never reported as an author.
  *
  * @type {DecryptedFileInfo}
- *
- * @param {string} groupId ID of the Group the file was sealed for
- * @param {string} authorPubKey verified author public key (base58-DER encoded), EMPTY when
- *   `type` is `ENVELOPE_ANONYMOUS`
- * @param {EnvelopeType} type whether the file came from a member or an anonymous outsider
- * @param {boolean} complete whether the whole file was verified to be present; `false` once
- *   {@link GroupApi.seekInEncryptedFile} has been used on the handle
  */
 export interface DecryptedFileInfo {
-    groupId: string;
-    authorPubKey: string;
-    type: EnvelopeType;
+    author?: EnvelopeAuthor;
+    sender?: { userId: string; pubKey: string };
+    /** For a shared file: as in {@link DecryptedSharedEnvelope}. */
+    homeGroupId?: string;
+    senderIsMember?: boolean | "unknown";
+    via?: string;
+    sharedWith: EnvelopeAudience;
+    /** The epoch of the Group key the envelope was sealed to. 0 for a shared file. */
+    epoch: number;
+    /** The size of the plaintext, in bytes. */
+    size: number;
+    /** `false` after a ranged read: the parts read are the writer's, the whole file is not proven. */
     complete: boolean;
+}
+
+/** Where in the ciphertext a range of a file's plaintext lives. */
+export interface CipherRange {
+    offset: number;
+    length: number;
+}
+
+/** The plain part of a sequence item, checkpoint or close. Not authenticated. */
+export interface SequenceItemHeader {
+    sequenceId: string;
+    /** An item's position; for a mark, how many items it covers. */
+    index: number;
+    isMark: boolean;
+}
+
+/** What {@link GroupApi.appendToSequence} produced: send `item`, then `mark` when there is one. */
+export interface SequenceAppendResult {
+    item: Uint8Array;
+    /** An automatic checkpoint, when one was due. */
+    mark?: Uint8Array;
+}
+
+/**
+ * One decrypted item of a sequence. Not yet the author's: until a later mark
+ * verifies, another member could have forged it.
+ */
+export interface SequenceItem {
+    data: Uint8Array;
+    /** Position in the sequence, from 0. */
+    index: number;
+    /** How many items before this one never arrived. */
+    missing: number;
+}
+
+/** What a checkpoint or a close proved. */
+export interface SequenceMarkInfo {
+    /** Items `0 .. attestedItems-1` are exactly what the author wrote, in that order. */
+    attestedItems: number;
+    /** `true` for a close: the author wrote nothing after it. */
+    closed: boolean;
 }
 
 /**

@@ -98,6 +98,7 @@ export { progressStream, takeStream, DEFAULT_CHUNK_SIZE } from "./service/fileSt
 export type {
     FileLike,
     GroupFileReader,
+    FileRange,
     GroupFileSealer,
     StoreFileHandle,
     StoreFileWriter,

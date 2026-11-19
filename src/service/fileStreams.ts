@@ -30,22 +30,22 @@ limitations under the License.
  * Everything here takes the API it works on as an argument. That is the shape
  * the class methods delegate to - call those instead.
  */
-import type { DecryptedFileInfo } from "../Types.js";
+import type { CipherRange, DecryptedFileInfo } from "../Types.js";
 
 /** What sealing and opening Group files needs. @internal */
 export interface GroupFileApi {
-    beginFileEncryption(groupId: string, size: number): Promise<number>;
-    beginFileEncryptionAnonymously(
-        groupId: string,
-        groupPubKey: string,
-        size: number,
-    ): Promise<number>;
     encryptFileChunk(handle: number, chunk: Uint8Array): Promise<Uint8Array>;
     finishFileEncryption(handle: number): Promise<Uint8Array>;
-    beginFileDecryption(envelope: Uint8Array): Promise<number>;
     decryptFileChunk(handle: number, chunk: Uint8Array): Promise<Uint8Array>;
+    getFileCipherRange(handle: number, from: number, to: number): Promise<CipherRange>;
     seekInEncryptedFile(handle: number, position: number): Promise<number>;
     finishFileDecryption(handle: number): Promise<DecryptedFileInfo>;
+}
+
+/** A part of a file's plaintext: from `from` (default 0), `length` bytes (default: to the end). */
+export interface FileRange {
+    from?: number;
+    length?: number;
 }
 
 /** What reading a container file needs. @internal */
@@ -359,14 +359,19 @@ export class GroupFileSealer extends TransformStream<Uint8Array, Uint8Array> {
         // without it a caller awaiting the envelope would wait forever.
         const transformer: Transformer<Uint8Array, Uint8Array> & CancellableTransformer = {
             async transform(chunk, controller) {
-                const sealed = await api.encryptFileChunk(await begin, chunk);
-                if (sealed.length) controller.enqueue(sealed);
+                try {
+                    const sealed = await api.encryptFileChunk(await begin, chunk);
+                    if (sealed.length) controller.enqueue(sealed);
+                } catch (e) {
+                    fail(e); // an errored stream never reaches `flush`: the envelope must not hang
+                    throw e;
+                }
             },
             async flush() {
                 try {
                     settle(await api.finishFileEncryption(await begin));
                 } catch (e) {
-                    fail(e); // e.g. fewer bytes than the declared size
+                    fail(e);
                     throw e;
                 }
             },
@@ -378,90 +383,55 @@ export class GroupFileSealer extends TransformStream<Uint8Array, Uint8Array> {
 }
 
 /**
- * Seals a file for a Group as one of its members, as a stream.
+ * A stream that encrypts a Group file. `begin` is the handle of a file already
+ * begun, by whichever of the `beginFileEncryption...` calls fits the writer.
  *
- * The declared `size` is enforced when the stream closes: writing less than
- * promised fails, because it cannot be told apart from a file cut short.
- *
- * @param {GroupFileApi} api the Group API
- * @param {object} opts `groupId` and the plaintext `size` in bytes
- * @returns {GroupFileSealer} transform stream carrying the envelope
- * @internal use `GroupApi.sealFile`
+ * @param {GroupFileApi} api `GroupApi`
+ * @param {Promise<number>} begin the file handle
+ * @returns {GroupFileSealer} plaintext in, ciphertext out; `envelope` settles at the end
  */
-export function sealGroupFile(
-    api: GroupFileApi,
-    opts: { groupId: string; size: number },
-): GroupFileSealer {
-    return new GroupFileSealer(api.beginFileEncryption(opts.groupId, opts.size), api);
+export function sealGroupFile(api: GroupFileApi, begin: Promise<number>): GroupFileSealer {
+    return new GroupFileSealer(begin, api);
 }
 
-/**
- * Seals a file for a Group without saying who sent it, as a stream.
- *
- * Needs public information only, works without membership, makes no server
- * call, and produces something the sender cannot read back.
- *
- * @param {GroupFileApi} api the Group API
- * @param {object} opts `groupId`, the Group's `groupPubKey`, and the plaintext
- *   `size` in bytes
- * @returns {GroupFileSealer} transform stream carrying the envelope
- * @internal use `GroupApi.sealFileAnonymously`
- */
-export function sealGroupFileAnonymously(
-    api: GroupFileApi,
-    opts: { groupId: string; groupPubKey: string; size: number },
-): GroupFileSealer {
-    return new GroupFileSealer(
-        api.beginFileEncryptionAnonymously(opts.groupId, opts.groupPubKey, opts.size),
-        api,
-    );
-}
-
-/** An opened Group file: feed ciphertext in, read plaintext out. */
+/** A Group file being read. From `GroupApi.openFile` and its siblings. */
 export interface GroupFileReader {
-    /** Ciphertext in, plaintext out. Feeds larger than 4 MiB are split for you. */
+    /** Ciphertext in, plaintext out. */
     stream: TransformStream<Uint8Array, Uint8Array>;
     /**
-     * Byte offset in the **ciphertext** to start feeding from - the answer to a
-     * `from` seek, and what makes a ranged read cheap: everything before it
-     * never has to be fetched.
+     * Which ciphertext bytes to feed `stream`: the whole file, or - for a ranged
+     * read - the chunks that hold the range. Use it for an HTTP Range request.
+     * Without `length`: to the end of the ciphertext.
      */
-    ciphertextOffset: number;
-    /**
-     * Resolves when the stream closes: which Group the file came from, who - if
-     * anyone - provably wrote it, and whether all of it arrived. `complete` is
-     * `false` for any seeked read; that check is only meaningful start-to-end.
-     */
+    cipherRange: { offset: number; length?: number };
+    /** What the envelope established about the file. Settles when the stream ends. */
     info: Promise<DecryptedFileInfo>;
 }
 
 /**
- * Opens a file sealed for a Group.
+ * Wraps a file handle from one of the `beginFileDecryption...` calls in a
+ * stream.
  *
- * With no `from`, feed the whole ciphertext and `info.complete` answers whether
- * the file was truncated. With `from`, seek first: fetch from
- * {@link GroupFileReader.ciphertextOffset} onwards and the output begins exactly
- * at the plaintext byte you asked for.
- *
- * @param {GroupApi} api the Group API
- * @param {Uint8Array} envelope the file envelope kept alongside the ciphertext
- * @param {object} [opts] `from` - plaintext offset to start at; `length` - trim
- *   the output to this many bytes (feed only the range you need: that, not the
- *   trim, is what makes the read cheap)
- * @returns {Promise<GroupFileReader>} the reader
- * @example
- * const r = await openGroupFile(groups, envelope, { from: 1 << 20, length: 64 });
- * const head = await new Response(
- *     myBucket.readableFrom(key, r.ciphertextOffset).pipeThrough(r.stream),
- * ).text();
+ * @param {GroupFileApi} api `GroupApi`
+ * @param {number} handle the file handle
+ * @param {FileRange} [range] read only this part of the plaintext
+ * @returns {Promise<GroupFileReader>} the stream, the ciphertext range it expects, and the file's info
  */
 export async function openGroupFile(
     api: GroupFileApi,
-    envelope: Uint8Array,
-    opts: { from?: number; length?: number } = {},
+    handle: number,
+    range: FileRange = {},
 ): Promise<GroupFileReader> {
-    const handle = await api.beginFileDecryption(envelope);
-    const ciphertextOffset = opts.from ? await api.seekInEncryptedFile(handle, opts.from) : 0;
+    const ranged = range.from !== undefined || range.length !== undefined;
+    const from = range.from ?? 0;
+    let cipherRange: { offset: number; length?: number } = { offset: 0 };
+    if (ranged) {
+        const offset = await api.seekInEncryptedFile(handle, from);
+        cipherRange =
+            range.length === undefined
+                ? { offset }
+                : await api.getFileCipherRange(handle, from, from + range.length);
+    }
 
     let settle: (i: DecryptedFileInfo) => void;
     let fail: (e: unknown) => void;
@@ -471,9 +441,9 @@ export async function openGroupFile(
     });
     info.catch(() => {});
 
-    // A seeked read starts at the beginning of the chunk holding `from` and runs
-    // to the end of the last one, so the caller's window is trimmed here.
-    let left = opts.length ?? Infinity;
+    // A ranged read starts at `from` and runs to the end of the last chunk fed,
+    // so the caller's window is trimmed here.
+    let left = range.length ?? Infinity;
     const transformer: Transformer<Uint8Array, Uint8Array> & CancellableTransformer = {
         async transform(chunk, controller) {
             for (let at = 0; at < chunk.length; at += MAX_DECRYPT_CHUNK) {
@@ -498,11 +468,11 @@ export async function openGroupFile(
                 throw e;
             }
         },
-        cancel: (reason) => fail(reason), // as above: an abort must reject `info`
+        cancel: (reason) => fail(reason), // an abort must reject `info`
     };
     const stream = new TransformStream<Uint8Array, Uint8Array>(transformer);
 
-    return { ciphertextOffset, info, stream };
+    return { cipherRange, info, stream };
 }
 
 // --- one-liners ------------------------------------------------------------

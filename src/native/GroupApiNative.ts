@@ -17,7 +17,11 @@ import {
     GroupSummary,
     GroupMemberToAdd,
     ContainerPolicy,
-    DecryptedFileInfo,
+    CipherRange,
+    SequenceAppendResult,
+    SequenceItem,
+    SequenceItemHeader,
+    SequenceMarkInfo,
     GroupEventSelectorType,
     GroupEventType,
     GroupRoleChange,
@@ -94,8 +98,21 @@ export interface NativeEnvelopeHeader {
     isFile: boolean;
     hasLocation: boolean;
     authorUserId: string;
+    sequenceId?: string;
     alsoForGroups: Array<{ groupId: string; keyVersion: number }>;
     alsoForUsers: string[];
+}
+
+export interface NativeFileInfo {
+    author?: { userId: string; pubKey: string; role: string };
+    sender?: { userId: string; pubKey: string };
+    homeGroupId: string;
+    senderMembership: string;
+    via: string;
+    sharedWith: NativeAudience;
+    keyVersion: number;
+    size: number;
+    complete: boolean;
 }
 
 /**
@@ -296,15 +313,17 @@ export class GroupApiNative extends BaseNative {
             this.api.lib.GroupApi_peekEnvelope(taskId, ptr, args),
         );
     }
-    async beginFileEncryption(ptr: number, args: [string, number]): Promise<number> {
+    async beginFileEncryption(ptr: number, args: [string, NativeSegment[], NativeEncryptOptions]): Promise<number> {
         return this.runAsync<number>((taskId) =>
             this.api.lib.GroupApi_beginFileEncryption(taskId, ptr, args),
         );
     }
-    async beginFileEncryptionAnonymously(
-        ptr: number,
-        args: [string, string, number],
-    ): Promise<number> {
+    async beginFileEncryptionAsOutsider(ptr: number, args: [string, string, NativeSegment[], NativeEncryptOptions]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_beginFileEncryptionAsOutsider(taskId, ptr, args),
+        );
+    }
+    async beginFileEncryptionAnonymously(ptr: number, args: [string, string, NativeSegment[]]): Promise<number> {
         return this.runAsync<number>((taskId) =>
             this.api.lib.GroupApi_beginFileEncryptionAnonymously(taskId, ptr, args),
         );
@@ -319,9 +338,24 @@ export class GroupApiNative extends BaseNative {
             this.api.lib.GroupApi_finishFileEncryption(taskId, ptr, args),
         );
     }
-    async beginFileDecryption(ptr: number, args: [Uint8Array]): Promise<number> {
+    async beginFileDecryption(ptr: number, args: [string, NativeSegment[], Uint8Array, NativeDecryptOptions]): Promise<number> {
         return this.runAsync<number>((taskId) =>
             this.api.lib.GroupApi_beginFileDecryption(taskId, ptr, args),
+        );
+    }
+    async beginFileDecryptionFromOutsider(ptr: number, args: [string, NativeSegment[], Uint8Array, NativeDecryptOptions]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_beginFileDecryptionFromOutsider(taskId, ptr, args),
+        );
+    }
+    async beginAnonymousFileDecryption(ptr: number, args: [string, NativeSegment[], Uint8Array]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_beginAnonymousFileDecryption(taskId, ptr, args),
+        );
+    }
+    async beginSharedFileDecryption(ptr: number, args: [string, NativeSegment[], Uint8Array, NativeDecryptOptions]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_beginSharedFileDecryption(taskId, ptr, args),
         );
     }
     async decryptFileChunk(ptr: number, args: [number, Uint8Array]): Promise<Uint8Array> {
@@ -329,14 +363,69 @@ export class GroupApiNative extends BaseNative {
             this.api.lib.GroupApi_decryptFileChunk(taskId, ptr, args),
         );
     }
+    async getFileCipherRange(ptr: number, args: [number, number, number]): Promise<CipherRange> {
+        return this.runAsync<CipherRange>((taskId) =>
+            this.api.lib.GroupApi_getFileCipherRange(taskId, ptr, args),
+        );
+    }
     async seekInEncryptedFile(ptr: number, args: [number, number]): Promise<number> {
         return this.runAsync<number>((taskId) =>
             this.api.lib.GroupApi_seekInEncryptedFile(taskId, ptr, args),
         );
     }
-    async finishFileDecryption(ptr: number, args: [number]): Promise<DecryptedFileInfo> {
-        return this.runAsync<DecryptedFileInfo>((taskId) =>
+    async finishFileDecryption(ptr: number, args: [number]): Promise<NativeFileInfo> {
+        return this.runAsync<NativeFileInfo>((taskId) =>
             this.api.lib.GroupApi_finishFileDecryption(taskId, ptr, args),
+        );
+    }
+    async beginSequence(ptr: number, args: [string, NativeSegment[], number]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_beginSequence(taskId, ptr, args),
+        );
+    }
+    async getSequenceHeader(ptr: number, args: [number]): Promise<Uint8Array> {
+        return this.runAsync<Uint8Array>((taskId) =>
+            this.api.lib.GroupApi_getSequenceHeader(taskId, ptr, args),
+        );
+    }
+    async appendToSequence(ptr: number, args: [number, Uint8Array]): Promise<SequenceAppendResult> {
+        return this.runAsync<SequenceAppendResult>((taskId) =>
+            this.api.lib.GroupApi_appendToSequence(taskId, ptr, args),
+        );
+    }
+    async checkpointSequence(ptr: number, args: [number]): Promise<Uint8Array> {
+        return this.runAsync<Uint8Array>((taskId) =>
+            this.api.lib.GroupApi_checkpointSequence(taskId, ptr, args),
+        );
+    }
+    async finishSequence(ptr: number, args: [number]): Promise<Uint8Array> {
+        return this.runAsync<Uint8Array>((taskId) =>
+            this.api.lib.GroupApi_finishSequence(taskId, ptr, args),
+        );
+    }
+    async openSequence(ptr: number, args: [string, NativeSegment[], Uint8Array, NativeDecryptOptions, Uint8Array | undefined]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_openSequence(taskId, ptr, args),
+        );
+    }
+    async readSequenceItem(ptr: number, args: [number, Uint8Array]): Promise<SequenceItem> {
+        return this.runAsync<SequenceItem>((taskId) =>
+            this.api.lib.GroupApi_readSequenceItem(taskId, ptr, args),
+        );
+    }
+    async verifySequenceMark(ptr: number, args: [number, Uint8Array]): Promise<SequenceMarkInfo> {
+        return this.runAsync<SequenceMarkInfo>((taskId) =>
+            this.api.lib.GroupApi_verifySequenceMark(taskId, ptr, args),
+        );
+    }
+    async closeSequence(ptr: number, args: [number]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.GroupApi_closeSequence(taskId, ptr, args),
+        );
+    }
+    async peekSequenceItem(ptr: number, args: [Uint8Array]): Promise<SequenceItemHeader> {
+        return this.runAsync<SequenceItemHeader>((taskId) =>
+            this.api.lib.GroupApi_peekSequenceItem(taskId, ptr, args),
         );
     }
     async sendCustomEvent(
