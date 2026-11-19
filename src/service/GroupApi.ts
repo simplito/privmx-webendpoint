@@ -47,11 +47,21 @@ import {
     SequenceItem,
     SequenceItemHeader,
     SequenceMarkInfo,
+    SpaceRecipient,
+    SpaceRecipientRef,
+    SpaceState,
+    SpaceOrigin,
+    DecryptedSpaceEnvelope,
+    SpaceDecryptOutcome,
     GroupEventType,
     GroupEventSelectorType,
 } from "../Types.js";
-import { ANY_AUTHOR, toNativePath, type LocationOrNone } from "./groupPaths.js";
+import { ANY_AUTHOR, toNativePath, type Location, type LocationOrNone } from "./groupPaths.js";
 import type {
+    NativeSpaceEnvelope,
+    NativeSpaceOrigin,
+    NativeSpaceRecipient,
+    NativeSpaceState,
     NativeDecryptedEnvelope,
     NativeDecryptOptions,
     NativeDecryptResult,
@@ -113,6 +123,53 @@ function fromNativeEnvelope(native: NativeDecryptedEnvelope): DecryptedEnvelope 
     };
 }
 
+const asRole = (role: string): "user" | "manager" => (role === "manager" ? "manager" : "user");
+
+function toNativeSpaceRecipient(recipient: SpaceRecipient): NativeSpaceRecipient {
+    return "group" in recipient
+        ? { groupId: recipient.group, role: recipient.role }
+        : { user: recipient.user, role: recipient.role };
+}
+
+function fromNativeSpaceState(native: NativeSpaceState): SpaceState {
+    return {
+        spaceId: native.spaceId,
+        contextId: native.contextId,
+        createdBy: native.createdBy,
+        groups: native.groups.map((g) => ({
+            groupId: g.groupId,
+            role: asRole(g.role),
+            epoch: g.keyVersion,
+        })),
+        users: native.users.map((u) => ({ ...u, role: asRole(u.role) })),
+        keyVersion: native.keyVersion,
+        keyIsStale: native.keyIsStale,
+        publicMeta: native.publicMeta,
+        privateMeta: native.privateMeta,
+        publicMetaVersion: native.publicMetaVersion,
+        privateMetaVersion: native.privateMetaVersion,
+    };
+}
+
+function fromNativeSpaceOrigin(native: NativeSpaceOrigin): SpaceOrigin {
+    return {
+        author: native.author,
+        via: native.via,
+        // Anything the core does not positively call access or no access stays unknown.
+        authorAccess:
+            native.authorAccess === "yes" ? "yes" : native.authorAccess === "no" ? "no" : "unknown",
+        keyVersion: native.keyVersion,
+    };
+}
+
+function fromNativeSpaceEnvelope(native: NativeSpaceEnvelope): DecryptedSpaceEnvelope {
+    return {
+        data: native.data,
+        origin: fromNativeSpaceOrigin(native.origin),
+        encryptedAt: native.encryptedAt,
+    };
+}
+
 function fromNativeDetails(native: NativeDecryptResult["details"]): GroupErrorDetails {
     const details: GroupErrorDetails = {};
     if (native?.userId) details.userId = native.userId;
@@ -121,7 +178,8 @@ function fromNativeDetails(native: NativeDecryptResult["details"]): GroupErrorDe
         native?.envelopeKind === "member" ||
         native?.envelopeKind === "outsider" ||
         native?.envelopeKind === "anonymous" ||
-        native?.envelopeKind === "shared"
+        native?.envelopeKind === "shared" ||
+        native?.envelopeKind === "space"
     ) {
         details.envelopeKind = native.envelopeKind;
     }
@@ -785,6 +843,7 @@ export class GroupApi extends BaseApi {
             hasLocation: header.hasLocation,
             authorUserId: header.authorUserId,
             ...(header.sequenceId ? { sequenceId: header.sequenceId } : {}),
+            ...(header.spaceId ? { spaceId: header.spaceId } : {}),
             alsoForGroups: header.alsoForGroups.map((g) => ({
                 groupId: g.groupId,
                 epoch: g.keyVersion,
@@ -824,7 +883,12 @@ export class GroupApi extends BaseApi {
      */
     async getGroupPublicKey(contextId: string, groupId: string): Promise<GroupPublicKey> {
         const key = await this.native.getGroupPublicKey(this.servicePtr, [contextId, groupId]);
-        return { groupId: key.groupId, epoch: key.keyVersion, pubKey: key.pubKey };
+        return {
+            groupId: key.groupId,
+            epoch: key.keyVersion,
+            pubKey: key.pubKey,
+            creator: key.creator,
+        };
     }
 
     /**
@@ -1330,6 +1394,219 @@ export class GroupApi extends BaseApi {
     }
 
     // --- files, as streams ------------------------------------------------
+
+    // ── Spaces: one key for several Groups ─────────────────────────────────
+    //
+    // For records that the same Groups read all the time. `alsoFor` wraps a
+    // value's key once per recipient, for every value; a Space wraps its key
+    // once per recipient when it is created and when the key is replaced, and
+    // writing a value wraps nothing. A Space has its own kind of envelope:
+    // `decrypt` refuses it and `decryptInSpace` refuses the others.
+
+    /**
+     * @param {SpaceRecipient[]} recipients the Groups and users the key is wrapped for; the caller must be
+     *   among them as a manager, themselves or through a Group
+     * @param {Uint8Array} [idSeed] when set, the Space's ID is `deriveSpaceId(contextId, idSeed)` instead of random
+     * @returns {string} the Space's ID
+     */
+    async createSpace(
+        contextId: string,
+        recipients: SpaceRecipient[],
+        publicMeta: Uint8Array,
+        privateMeta: Uint8Array,
+        idSeed?: Uint8Array,
+    ): Promise<string> {
+        return this.native.createSpace(this.servicePtr, [
+            contextId,
+            recipients.map(toNativeSpaceRecipient),
+            publicMeta,
+            privateMeta,
+            idSeed,
+        ]);
+    }
+
+    async deriveSpaceId(contextId: string, idSeed: Uint8Array): Promise<string> {
+        return this.native.deriveSpaceId(this.servicePtr, [contextId, idSeed]);
+    }
+
+    async getSpace(spaceId: string): Promise<SpaceState> {
+        return fromNativeSpaceState(await this.native.getSpace(this.servicePtr, [spaceId]));
+    }
+
+    async listSpaces(contextId: string, pagingQuery: PagingQuery): Promise<PagingList<SpaceState>> {
+        const page = await this.native.listSpaces(this.servicePtr, [contextId, pagingQuery]);
+        return {
+            totalAvailable: page.totalAvailable,
+            readItems: page.readItems.map(fromNativeSpaceState),
+        };
+    }
+
+    async deleteSpace(spaceId: string): Promise<void> {
+        return this.native.deleteSpace(this.servicePtr, [spaceId]);
+    }
+
+    /** The current key and every earlier version are wrapped for them: they read what is already there. */
+    async addSpaceRecipients(spaceId: string, recipients: SpaceRecipient[]): Promise<void> {
+        return this.native.addSpaceRecipients(this.servicePtr, [
+            spaceId,
+            recipients.map(toNativeSpaceRecipient),
+        ]);
+    }
+
+    /** Makes a new key the removed do not get, and returns its version. */
+    async removeSpaceRecipients(spaceId: string, recipients: SpaceRecipientRef[]): Promise<number> {
+        return this.native.removeSpaceRecipients(this.servicePtr, [
+            spaceId,
+            recipients.map((r) => ("group" in r ? { groupId: r.group } : { userId: r.userId })),
+        ]);
+    }
+
+    /**
+     * Makes a new key, wrapped for every recipient's current key, and returns its version.
+     *
+     * @throws {NativeError} `GroupErrorCode.SPACE_RECIPIENT_UNAVAILABLE` when the caller cannot see a recipient Group's key
+     */
+    async rotateSpaceKey(spaceId: string): Promise<number> {
+        return this.native.rotateSpaceKey(this.servicePtr, [spaceId]);
+    }
+
+    async updateSpacePublicMeta(spaceId: string, meta: Uint8Array, version: number): Promise<void> {
+        return this.native.updateSpacePublicMeta(this.servicePtr, [spaceId, meta, version]);
+    }
+
+    async updateSpacePrivateMeta(spaceId: string, meta: Uint8Array, version: number): Promise<void> {
+        return this.native.updateSpacePrivateMeta(this.servicePtr, [spaceId, meta, version]);
+    }
+
+    /** One symmetric encryption and one signature. When the key is stale, it is replaced first. */
+    async encryptInSpace(
+        spaceId: string,
+        location: LocationOrNone,
+        data: Uint8Array,
+    ): Promise<Uint8Array> {
+        return this.native.encryptInSpace(this.servicePtr, [spaceId, toNativePath(location), data]);
+    }
+
+    /** `options.currentEpochOnly` means the Space's current key version. */
+    async decryptInSpace(
+        spaceId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: DecryptOptions,
+    ): Promise<DecryptedSpaceEnvelope> {
+        return fromNativeSpaceEnvelope(
+            await this.native.decryptInSpace(this.servicePtr, [
+                spaceId,
+                toNativePath(location),
+                envelope,
+                toNativeDecryptOptions(options),
+            ]),
+        );
+    }
+
+    async decryptManyInSpace(
+        spaceId: string,
+        items: ReadonlyArray<{
+            location: LocationOrNone;
+            envelope: Uint8Array;
+            options: DecryptOptions;
+        }>,
+    ): Promise<SpaceDecryptOutcome[]> {
+        const results = await this.native.decryptManyInSpace(this.servicePtr, [
+            spaceId,
+            items.map((item) => ({
+                envelope: item.envelope,
+                location: toNativePath(item.location),
+                options: toNativeDecryptOptions(item.options),
+            })),
+        ]);
+        return results.map((result) =>
+            result.statusCode === 0
+                ? { ok: true as const, ...fromNativeSpaceEnvelope(result.envelope) }
+                : {
+                      ok: false as const,
+                      code: result.statusCode,
+                      details: fromNativeDetails(result.details),
+                  },
+        );
+    }
+
+    async beginFileEncryptionInSpace(spaceId: string, location: LocationOrNone): Promise<number> {
+        return this.native.beginFileEncryptionInSpace(this.servicePtr, [
+            spaceId,
+            toNativePath(location),
+        ]);
+    }
+
+    async beginFileDecryptionInSpace(
+        spaceId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: DecryptOptions,
+    ): Promise<number> {
+        return this.native.beginFileDecryptionInSpace(this.servicePtr, [
+            spaceId,
+            toNativePath(location),
+            envelope,
+            toNativeDecryptOptions(options),
+        ]);
+    }
+
+    async beginSequenceInSpace(
+        spaceId: string,
+        location: LocationOrNone,
+        checkpointEvery = 64,
+    ): Promise<number> {
+        return this.native.beginSequenceInSpace(this.servicePtr, [
+            spaceId,
+            toNativePath(location),
+            checkpointEvery,
+        ]);
+    }
+
+    async openSequenceInSpace(
+        spaceId: string,
+        location: LocationOrNone,
+        header: Uint8Array,
+        options: DecryptOptions,
+        resumeFrom?: Uint8Array,
+    ): Promise<number> {
+        return this.native.openSequenceInSpace(this.servicePtr, [
+            spaceId,
+            toNativePath(location),
+            header,
+            toNativeDecryptOptions(options),
+            resumeFrom,
+        ]);
+    }
+
+    /** Who wrote the sequence opened with {@link openSequenceInSpace}, and how they had access. */
+    async getSpaceSequenceOrigin(sequence: number): Promise<SpaceOrigin> {
+        return fromNativeSpaceOrigin(
+            await this.native.getSpaceSequenceOrigin(this.servicePtr, [sequence]),
+        );
+    }
+
+    /**
+     * The one spelling of a path, as bytes: the seed of a Group or Space
+     * addressed by its subject ({@link deriveGroupId}, {@link deriveSpaceId}).
+     */
+    async encodePath(path: Location): Promise<Uint8Array> {
+        return this.native.encodePath(this.servicePtr, [toNativePath(path)]);
+    }
+
+    /**
+     * Ties a Group to a subject on this device.
+     *
+     * @throws {NativeError} `GroupErrorCode.GROUP_SUBJECT_REBOUND` when the device knows the subject under another Group
+     */
+    async pinGroupToSubject(contextId: string, subject: Location, groupId: string): Promise<void> {
+        return this.native.pinGroupToSubject(this.servicePtr, [
+            contextId,
+            toNativePath(subject),
+            groupId,
+        ]);
+    }
 
     /**
      * Encrypts a file for a Group as a stream: plaintext in, ciphertext out.

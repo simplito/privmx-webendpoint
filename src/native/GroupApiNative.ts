@@ -99,8 +99,44 @@ export interface NativeEnvelopeHeader {
     hasLocation: boolean;
     authorUserId: string;
     sequenceId?: string;
+    spaceId?: string;
     alsoForGroups: Array<{ groupId: string; keyVersion: number }>;
     alsoForUsers: string[];
+}
+
+export interface NativeSpaceRecipient {
+    groupId?: string;
+    user?: UserWithPubKey;
+    role: string;
+}
+export interface NativeSpaceState {
+    spaceId: string;
+    contextId: string;
+    createdBy: string;
+    groups: Array<{ groupId: string; role: string; keyVersion: number }>;
+    users: Array<{ userId: string; pubKey: string; role: string }>;
+    keyVersion: number;
+    keyIsStale: boolean;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    publicMetaVersion: number;
+    privateMetaVersion: number;
+}
+export interface NativeSpaceOrigin {
+    author: { userId: string; pubKey: string };
+    via: string;
+    authorAccess: string;
+    keyVersion: number;
+}
+export interface NativeSpaceEnvelope {
+    data: Uint8Array;
+    origin: NativeSpaceOrigin;
+    encryptedAt: number;
+}
+export interface NativeSpaceDecryptResult {
+    statusCode: number;
+    envelope: NativeSpaceEnvelope;
+    details: { userId: string; pubKey: string; envelopeKind: string };
 }
 
 export interface NativeFileInfo {
@@ -209,9 +245,10 @@ export class GroupApiNative extends BaseNative {
     async getGroupPublicKey(
         ptr: number,
         args: [string, string],
-    ): Promise<{ groupId: string; keyVersion: number; pubKey: string }> {
+    ): Promise<{ groupId: string; keyVersion: number; pubKey: string; creator: string }> {
         return this.runAsync<{
             groupId: string;
+            creator: string;
             keyVersion: number;
             pubKey: string;
         }>((taskId) => this.api.lib.GroupApi_getGroupPublicKey(taskId, ptr, args));
@@ -460,6 +497,106 @@ export class GroupApiNative extends BaseNative {
     ): Promise<string> {
         return this.runAsync<string>((taskId) =>
             this.api.lib.GroupApi_buildCustomEventSubscriptionQuery(taskId, ptr, args),
+        );
+    }
+    async createSpace(ptr: number, args: [string, NativeSpaceRecipient[], Uint8Array, Uint8Array, Uint8Array | undefined]): Promise<string> {
+        return this.runAsync<string>((taskId) =>
+            this.api.lib.GroupApi_createSpace(taskId, ptr, args),
+        );
+    }
+    async deriveSpaceId(ptr: number, args: [string, Uint8Array]): Promise<string> {
+        return this.runAsync<string>((taskId) =>
+            this.api.lib.GroupApi_deriveSpaceId(taskId, ptr, args),
+        );
+    }
+    async getSpace(ptr: number, args: [string]): Promise<NativeSpaceState> {
+        return this.runAsync<NativeSpaceState>((taskId) =>
+            this.api.lib.GroupApi_getSpace(taskId, ptr, args),
+        );
+    }
+    async listSpaces(ptr: number, args: [string, PagingQuery]): Promise<PagingList<NativeSpaceState>> {
+        return this.runAsync<PagingList<NativeSpaceState>>((taskId) =>
+            this.api.lib.GroupApi_listSpaces(taskId, ptr, args),
+        );
+    }
+    async deleteSpace(ptr: number, args: [string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.GroupApi_deleteSpace(taskId, ptr, args),
+        );
+    }
+    async addSpaceRecipients(ptr: number, args: [string, NativeSpaceRecipient[]]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.GroupApi_addSpaceRecipients(taskId, ptr, args),
+        );
+    }
+    async removeSpaceRecipients(ptr: number, args: [string, Array<{ groupId?: string; userId?: string }>]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_removeSpaceRecipients(taskId, ptr, args),
+        );
+    }
+    async rotateSpaceKey(ptr: number, args: [string]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_rotateSpaceKey(taskId, ptr, args),
+        );
+    }
+    async updateSpacePublicMeta(ptr: number, args: [string, Uint8Array, number]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.GroupApi_updateSpacePublicMeta(taskId, ptr, args),
+        );
+    }
+    async updateSpacePrivateMeta(ptr: number, args: [string, Uint8Array, number]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.GroupApi_updateSpacePrivateMeta(taskId, ptr, args),
+        );
+    }
+    async encryptInSpace(ptr: number, args: [string, NativeSegment[], Uint8Array]): Promise<Uint8Array> {
+        return this.runAsync<Uint8Array>((taskId) =>
+            this.api.lib.GroupApi_encryptInSpace(taskId, ptr, args),
+        );
+    }
+    async decryptInSpace(ptr: number, args: [string, NativeSegment[], Uint8Array, NativeDecryptOptions]): Promise<NativeSpaceEnvelope> {
+        return this.runAsync<NativeSpaceEnvelope>((taskId) =>
+            this.api.lib.GroupApi_decryptInSpace(taskId, ptr, args),
+        );
+    }
+    async decryptManyInSpace(ptr: number, args: [string, NativeDecryptItem[]]): Promise<NativeSpaceDecryptResult[]> {
+        return this.runAsync<NativeSpaceDecryptResult[]>((taskId) =>
+            this.api.lib.GroupApi_decryptManyInSpace(taskId, ptr, args),
+        );
+    }
+    async beginFileEncryptionInSpace(ptr: number, args: [string, NativeSegment[]]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_beginFileEncryptionInSpace(taskId, ptr, args),
+        );
+    }
+    async beginFileDecryptionInSpace(ptr: number, args: [string, NativeSegment[], Uint8Array, NativeDecryptOptions]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_beginFileDecryptionInSpace(taskId, ptr, args),
+        );
+    }
+    async beginSequenceInSpace(ptr: number, args: [string, NativeSegment[], number]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_beginSequenceInSpace(taskId, ptr, args),
+        );
+    }
+    async openSequenceInSpace(ptr: number, args: [string, NativeSegment[], Uint8Array, NativeDecryptOptions, Uint8Array | undefined]): Promise<number> {
+        return this.runAsync<number>((taskId) =>
+            this.api.lib.GroupApi_openSequenceInSpace(taskId, ptr, args),
+        );
+    }
+    async getSpaceSequenceOrigin(ptr: number, args: [number]): Promise<NativeSpaceOrigin> {
+        return this.runAsync<NativeSpaceOrigin>((taskId) =>
+            this.api.lib.GroupApi_getSpaceSequenceOrigin(taskId, ptr, args),
+        );
+    }
+    async encodePath(ptr: number, args: [NativeSegment[]]): Promise<Uint8Array> {
+        return this.runAsync<Uint8Array>((taskId) =>
+            this.api.lib.GroupApi_encodePath(taskId, ptr, args),
+        );
+    }
+    async pinGroupToSubject(ptr: number, args: [string, NativeSegment[], string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.GroupApi_pinGroupToSubject(taskId, ptr, args),
         );
     }
 }

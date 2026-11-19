@@ -369,6 +369,14 @@ export const GroupErrorCode = {
     ENVELOPE_SEQUENCE_ORDER: 0xd001e,
     /** Encrypted file data is not what its envelope lists */
     ENVELOPE_FILE_CORRUPTED: 0xd001f,
+    /** The caller cannot see the current key of a recipient Group of the Space */
+    SPACE_RECIPIENT_UNAVAILABLE: 0xd0020,
+    /** A Group or Space already exists, or existed, under this subject */
+    GROUP_ALREADY_EXISTS: 0xd0021,
+    /** The Group or Space was created by someone other than the expected user */
+    GROUP_WRONG_CREATOR: 0xd0022,
+    /** This device knows the subject under another Group */
+    GROUP_SUBJECT_REBOUND: 0xd0023,
 } as const;
 
 /**

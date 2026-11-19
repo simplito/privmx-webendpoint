@@ -794,7 +794,7 @@ export interface GroupErrorDetails {
     userId?: string;
     pubKey?: string;
     /** On a wrong kind of envelope. */
-    envelopeKind?: "member" | "outsider" | "anonymous" | "shared";
+    envelopeKind?: "member" | "outsider" | "anonymous" | "shared" | "space";
 }
 
 /** One result of {@link GroupApi.decryptMany}. `code` is a `GroupErrorCode` (or another `NativeError` code). */
@@ -814,7 +814,70 @@ export interface GroupPublicKey {
     groupId: string;
     epoch: number;
     pubKey: string;
+    /** Who created the Group. Held to the Group's latest signed statement: its policy names the creator. */
+    creator: string;
 }
+
+// ── Spaces: one key for several Groups ──────────────────────────────────────
+
+/**
+ * Who a Space's key is wrapped for: a Group, by its ID, or one user. A
+ * "manager" may change the recipients and the meta; everyone may write, read
+ * and replace the key.
+ */
+export type SpaceRecipient =
+    | { group: string; role: "user" | "manager" }
+    | { user: UserWithPubKey; role: "user" | "manager" };
+
+/** A recipient to remove. */
+export type SpaceRecipientRef = { group: string } | { userId: string };
+
+export interface SpaceState {
+    spaceId: string;
+    contextId: string;
+    createdBy: string;
+    /** `epoch`: the Group's epoch the current key is wrapped for. */
+    groups: Array<{ groupId: string; role: "user" | "manager"; epoch: number }>;
+    users: Array<{ userId: string; pubKey: string; role: "user" | "manager" }>;
+    keyVersion: number;
+    /**
+     * `true` when a recipient Group has had a removal since the key was made:
+     * whoever was removed still holds this key. The next write replaces it.
+     */
+    keyIsStale: boolean;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    publicMetaVersion: number;
+    privateMetaVersion: number;
+}
+
+/** How the author of a value in a Space had access to it. */
+export interface SpaceOrigin {
+    author: { userId: string; pubKey: string };
+    /** `"user"`, or the ID of the Group the author wrote through. Signed by the author. */
+    via: string;
+    /**
+     * Whether the author is a recipient now - themselves, or as a member of
+     * `via`. `"unknown"` when `via` is a Group whose roster you cannot see. The
+     * key alone does not answer this: someone removed from a Group keeps the
+     * Space's key until it is replaced. Only `"yes"` says they have access.
+     */
+    authorAccess: "yes" | "no" | "unknown";
+    /** The version of the Space's key the value was sealed under. */
+    keyVersion: number;
+}
+
+export interface DecryptedSpaceEnvelope {
+    data: Uint8Array;
+    origin: SpaceOrigin;
+    /** The author's clock, in milliseconds. Not proof of when it was written. */
+    encryptedAt: number;
+}
+
+/** One result of {@link GroupApi.decryptManyInSpace}. */
+export type SpaceDecryptOutcome =
+    | ({ ok: true } & DecryptedSpaceEnvelope)
+    | { ok: false; code: number; details: GroupErrorDetails };
 
 /** The part of an envelope readable without any key. Not authenticated: for refusing writes early. */
 export interface EnvelopeHeader {
@@ -833,6 +896,11 @@ export interface EnvelopeHeader {
     authorUserId: string;
     /** Set when the envelope is the header of a sequence: the id its items and marks carry. */
     sequenceId?: string;
+    /**
+     * Set when the envelope was written in a Space. `epoch` is then the version
+     * of the Space's key, and `groupId` the Group the author wrote through.
+     */
+    spaceId?: string;
     alsoForGroups: Array<{ groupId: string; epoch: number }>;
     alsoForUsers: string[];
 }
