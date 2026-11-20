@@ -187,14 +187,13 @@ export class Peer {
     /** Alice-only: creates the Group and the two containers granted to it. */
     async createRoom(): Promise<void> {
         // The Group starts with its creator only; Bob is added later, on camera.
-        // The room's ID is made together with its Group: nobody knew it before the Group existed.
-        const created = await this.groups.create(["group-chat", "room"], [{ user: this.me, role: "manager" }], {
+        // The room's ID is made at random right before its Group: nobody knew it before the Group existed.
+        const roomId = crypto.randomUUID();
+        this.room = await this.groups.create(["group-chat", "room", id(roomId)], [{ user: this.me, role: "manager" }], {
             publicMeta: enc(JSON.stringify({ room: ROOM })),
             privateMeta: enc(JSON.stringify({ name: "Chat members" })),
         });
-        this.room = created.group;
         this.groupId = this.room.groupId;
-        const roomId = created.entityId;
         const group = await this.room.state();
         log(this.userId, `created group ${this.groupId} (epoch ${group.keyVersion})`);
 

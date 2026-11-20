@@ -21,11 +21,14 @@ limitations under the License.
  * Whoever knows a subject before its Group exists can create that Group first.
  * The ways to create and open a Group differ in who can do that to you:
  *
- * - `createFor` + `open({ createdBy })` - the entity has its own identifier.
- *   Another user is caught: `createFor` fails with `GROUP_ALREADY_EXISTS`, and
- *   `open` fails when the Group's creator is not the one expected.
- * - `create` + `open` - a new entity whose identifier is made here, at random.
- *   Nobody knew it before the Group existed.
+ * - `create` + `open` - the Group of an entity. When you make the entity's
+ *   identifier yourself, at random, right before `create`
+ *   (`id(crypto.randomUUID())`), nobody knew the subject before the Group
+ *   existed and a plain `open(subject)` is enough.
+ *   When the identifier existed earlier or came from somewhere else (a row
+ *   your server numbered), another user is caught instead: `create` fails with
+ *   `GROUP_ALREADY_EXISTS`, and `open(subject, { createdBy })` fails when the
+ *   Group's creator is not the one expected.
  * - `openPinned` - a Group that already exists under an ID of its own. The
  *   first time the ID is taken on trust; from then on this device refuses any
  *   other Group for that subject.
@@ -44,7 +47,7 @@ import {
     type GenericEvent,
 } from "../events/subscriptions.js";
 import type { FileRange, GroupFileReader, GroupFileSealer } from "./fileStreams.js";
-import { NO_LOCATION, id, type Id, type Location, type LocationOrNone, type PathSegment } from "./groupPaths.js";
+import { NO_LOCATION, type Location, type LocationOrNone, type PathSegment } from "./groupPaths.js";
 import { GroupErrorCode } from "../native/NativeErrorCodes.js";
 import {
     GroupEventSelectorType,
@@ -628,24 +631,23 @@ export class GroupClient {
         }
     }
 
-    /** Creates the Group of an entity that has its own identifier. Call it once; open with `createdBy`. */
-    async createFor(subject: Subject, members: GroupMemberToAdd[], opts: CreateOptions = {}): Promise<Group> {
-        return new Group(this.core, await this.make(subject, members, opts), subject);
-    }
-
     /**
-     * Creates a Group for a new entity of `kind` (`["chat-app", "chat"]`). The
-     * entity's identifier is made here, at random: `id` is what your row gets.
+     * Creates the Group of the entity `subject` names. Call it once per entity.
+     *
+     * For a new entity, make its identifier at random right before the call;
+     * nobody could have taken the subject first, and `open(subject)` is enough:
+     *
+     * ```ts
+     * const chatId = crypto.randomUUID(); // what your row gets
+     * const chat = await groups.create(["chat-app", "chat", id(chatId)], members);
+     * ```
+     *
+     * For an identifier that was known before this call (your server numbered
+     * the row, a slug, a user's name), always open with `createdBy`: whoever
+     * knew the subject could have created a Group under it first.
      */
-    async create(
-        kind: Location,
-        members: GroupMemberToAdd[],
-        opts: CreateOptions = {},
-    ): Promise<{ group: Group; id: Id; entityId: string }> {
-        const entityId = crypto.randomUUID();
-        const segment = id(entityId);
-        const subject = [...kind, segment] as unknown as Subject;
-        return { group: await this.createFor(subject, members, opts), id: segment, entityId };
+    async create(subject: Subject, members: GroupMemberToAdd[], opts: CreateOptions = {}): Promise<Group> {
+        return new Group(this.core, await this.make(subject, members, opts), subject);
     }
 
     private async check(item: OpenItem, state: GroupState): Promise<void> {

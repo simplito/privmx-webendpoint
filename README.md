@@ -563,9 +563,10 @@ its ID follows from that path.
 ```ts
 const client = await conn.groups(contextId);
 
-// A new chat: the library makes the chat's id together with the Group.
-const { group: chat, entityId: chatId } = await client.create(
-    ["chat-app", "chat"],
+// A new chat: make its id at random, then the Group under it.
+const chatId = crypto.randomUUID();
+const chat = await client.create(
+    ["chat-app", "chat", id(chatId)],
     [{ user: me, role: "manager" }, { user: dana, role: "user" }],
 );
 await myDb.chats.insert({ chatId, createdBy: me.userId });
@@ -589,12 +590,22 @@ const message = await chat.decrypt(["message", id(messageId), "body"], body, {
 else made a Group under your chat's subject first, `open` fails with
 `GROUP_WRONG_CREATOR` instead of handing you their Group.
 
-Pick the pair that fits how the entity gets its identifier:
+When do you need `createdBy`? Whoever knows a subject before its Group exists
+can create that Group first. So it depends on where the identifier came from:
+
+- **You made it at random right before `create`** (as above): nobody knew it,
+  nobody could be first, and `open(subject)` is enough.
+- **It existed before, or someone else chose it** (your server numbered the
+  row, a slug, a user's name): always `open(subject, { createdBy })`.
+
+If in doubt, pass `createdBy`. It is never wrong, only sometimes unnecessary.
+
+Pick the pair that fits the entity:
 
 | You have | Create | Open |
 |---|---|---|
-| A new entity | `create(kind, members)` | `open(subject)` |
-| An entity with its own id | `createFor(subject, members)` | `open(subject, { createdBy })` |
+| An entity, id made at random just now | `create(subject, members)` | `open(subject)` |
+| An entity whose id was known earlier | `create(subject, members)` | `open(subject, { createdBy })` |
 | A 1:1 chat named by its two users | `createFixed(subject, users)` | `openFixed(subject, userIds)` |
 | A Group that already has an ID | `GroupApi.createGroup` | `openPinned(subject, groupId)` |
 | No entity at all | `createUnbound(members)` | `openUnbound(groupId)` |

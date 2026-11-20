@@ -51,40 +51,37 @@ const BILLING: Location = ["clinic", "billing"];
 const codeOf = async (p: Promise<unknown>) => p.then(() => 0, (e: unknown) => (e as { code?: number }).code ?? (e instanceof TypeError ? "TypeError" : -1));
 
 describe("GroupClient: creating", () => {
-    it("create makes the entity's id, and the Group's id follows from the subject", async () => {
+    it("create binds the Group to the subject, and the Group's id follows from it", async () => {
         const { groups, api } = setup({ createGroup: "made" });
-        const created = await groups.create(["chat-app", "chat"], [
+        const created = await groups.create(CHAT, [
             { user: ALICE, role: "manager" },
             { user: BOB, role: "user" },
         ], { privateMeta: DATA });
-        expect(created.group.groupId).toBe("made");
-        expect(created.group.subject).toEqual(["chat-app", "chat", created.id]);
-        expect(created.id).toEqual(id(created.entityId));
+        expect(created.groupId).toBe("made");
+        expect(created.subject).toEqual(CHAT);
         const [ctx, users, managers, publicMeta, privateMeta, policy, options] = api.createGroup.mock.lastCall!;
         expect([ctx, users, managers]).toEqual([CTX, [BOB], [ALICE]]);
         expect(publicMeta).toEqual(new Uint8Array(0));
         expect(privateMeta).toBe(DATA);
         expect(policy).toBeUndefined();
-        expect(options).toEqual({ idSeed: seedOf(created.group.subject!), visibleTo: "members" });
-        // Two chats never share an id.
-        expect((await groups.create(["chat-app", "chat"], [{ user: ALICE, role: "manager" }])).entityId).not.toBe(created.entityId);
+        expect(options).toEqual({ idSeed: seedOf(CHAT), visibleTo: "members" });
     });
 
-    it("createFor turns a taken subject into GROUP_ALREADY_EXISTS, and passes the rules as policy", async () => {
+    it("create turns a taken subject into GROUP_ALREADY_EXISTS, and passes the rules as policy", async () => {
         const taken = Object.assign(new Error("dup"), { name: "DuplicateResourceIdException", code: 0xe6138 });
-        expect(await codeOf(setup({ createGroup: taken }).groups.createFor(CHAT, [{ user: ALICE, role: "manager" }]))).toBe(
+        expect(await codeOf(setup({ createGroup: taken }).groups.create(CHAT, [{ user: ALICE, role: "manager" }]))).toBe(
             GroupErrorCode.GROUP_ALREADY_EXISTS,
         );
         const other = new Error("network");
-        await expect(setup({ createGroup: other }).groups.createFor(CHAT, [])).rejects.toBe(other);
+        await expect(setup({ createGroup: other }).groups.create(CHAT, [])).rejects.toBe(other);
         const { groups, api } = setup({ createGroup: "g" });
-        await groups.createFor(CHAT, [{ user: ALICE, role: "manager" }], {
+        await groups.create(CHAT, [{ user: ALICE, role: "manager" }], {
             rules: { addMembers: "user", removeMembers: "manager", updateMeta: "manager" },
             visibleTo: "context",
         });
         expect(api.createGroup.mock.lastCall![5]).toEqual({ addMembers: "user", removeMembers: "manager", update: "manager" });
         expect(api.createGroup.mock.lastCall![6].visibleTo).toBe("context");
-        await expect(groups.createFor(CHAT, [{ user: ALICE, role: "admin" }])).rejects.toThrow(TypeError);
+        await expect(groups.create(CHAT, [{ user: ALICE, role: "admin" }])).rejects.toThrow(TypeError);
     });
 
     it("createFixed makes every member a manager and freezes the roster, the roles and the rules", async () => {

@@ -404,18 +404,18 @@ test.describe("GroupApiV2", () => {
             const c1 = await connect(users.u1);
             const c2 = await connect(users.u2);
 
-            // A new chat: its id is made together with its Group.
+            // A new chat: its id is made at random right before its Group.
+            const subject = ["chat-app", "chat", id(crypto.randomUUID())];
             const created = await c1.groups.create(
-                ["chat-app", "chat"],
+                subject,
                 [
                     { user: u(users.u1), role: "manager" },
                     { user: u(users.u2), role: "user" },
                 ],
                 { privateMeta: enc.encode("Design") },
             );
-            const subject = ["chat-app", "chat", id(created.entityId)];
             const place = ["message", id("m1"), "body"];
-            const body = await created.group.encrypt(place, enc.encode("hello"));
+            const body = await created.encrypt(place, enc.encode("hello"));
 
             const chat = await c2.groups.open(subject, { createdBy: users.u1.id });
             const opened = await chat.decrypt(place, body, { expectedAuthor: users.u1.id });
@@ -442,12 +442,12 @@ test.describe("GroupApiV2", () => {
             });
 
             return {
-                sameId: chat.groupId === created.group.groupId && chat.groupId === (await c2.groups.groupIdOf(subject)),
+                sameId: chat.groupId === created.groupId && chat.groupId === (await c2.groups.groupIdOf(subject)),
                 data: dec.decode(opened.data),
                 meta: dec.decode((await chat.state()).privateMeta),
                 wrongCreator: await codeOf(c2.groups.open(subject, { createdBy: users.u3.id })),
-                taken: await codeOf(c2.groups.createFor(subject, [{ user: u(users.u2), role: "manager" }])),
-                noPlace: await codeOf(created.group.encrypt(NO_LOCATION, enc.encode("x"))),
+                taken: await codeOf(c2.groups.create(subject, [{ user: u(users.u2), role: "manager" }])),
+                noPlace: await codeOf(created.encrypt(NO_LOCATION, enc.encode("x"))),
                 dmManagers: [...dmState.managers].sort(),
                 dmOthers: await codeOf(c2.groups.openFixed(dm, [users.u2.id, users.u3.id])),
                 dmAsOrdinary: await codeOf(c2.groups.open(dm)),
@@ -508,7 +508,7 @@ test.describe("GroupApiV2", () => {
             const sales = ["crm", "team", id("sales")];
             const support = ["crm", "team", id("support")];
             const project = ["crm", "project", id("p1")];
-            const salesGroup = await g1.createFor(
+            const salesGroup = await g1.create(
                 sales,
                 [
                     { user: u(users.u1), role: "manager" },
@@ -516,7 +516,7 @@ test.describe("GroupApiV2", () => {
                 ],
                 { visibleTo: "context" },
             );
-            await g3.createFor(support, [{ user: u(users.u3), role: "manager" }], { visibleTo: "context" });
+            await g3.create(support, [{ user: u(users.u3), role: "manager" }], { visibleTo: "context" });
 
             // Each team is named with who made it: somebody else's "support" gets no key.
             const squatted = await codeOf(
@@ -635,7 +635,7 @@ test.describe("GroupApiV2", () => {
             const subject = ["chat-app", "chat", id("pinned")];
             const place = ["message", id("m1")];
             const first = await session();
-            const group = await first.groups.createFor(subject, [{ user: u(users.u1), role: "manager" }]);
+            const group = await first.groups.create(subject, [{ user: u(users.u1), role: "manager" }]);
             const sealed = await group.encrypt(place, enc.encode("kept"));
             await first.conn.disconnect();
 
