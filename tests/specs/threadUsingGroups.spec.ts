@@ -1577,7 +1577,7 @@ test.describe("ThreadUsingGroupsTest", () => {
         expect(result.rejected).toBe(true);
     });
 
-    test('a "manager" role grantee cannot update the thread while keeping the manager list', async ({
+    test('a "manager" role grantee updates the thread without becoming a direct manager', async ({
         page,
         backend,
         cli,
@@ -1597,14 +1597,9 @@ test.describe("ThreadUsingGroupsTest", () => {
                 const u1 = gk.u(users.u1);
                 const u2 = gk.u(users.u2);
 
-                // The one place "manager" is not enough. The update check runs
-                // "is the updater being removed from managers" against the
-                // group-aware copy - in which the grant has already put user_2 into
-                // `managers` - while comparing it to the list the caller submitted.
-                // So the update is refused for "removing" a manager who was never on
-                // the stored list. Naming yourself in `managers` is the only way
-                // through, and that makes the grantee a permanent *direct* manager
-                // with its own key wrap - exactly what the grant was meant to avoid.
+                // The grant it keeps is what makes user_2 a manager, so the update
+                // goes through without naming user_2 in `managers`, and does not
+                // turn it into a direct manager with its own key wrap.
                 const group2 = await gk.mkGroup(
                     groupApi1,
                     contextId,
@@ -1630,29 +1625,12 @@ test.describe("ThreadUsingGroupsTest", () => {
                 const threadApi2 = await window.Endpoint.createThreadApi(conn2);
                 const thread = await threadApi2.getThread(threadId);
 
-                const rejected = await gk.caught(() =>
-                    threadApi2.updateThread(
-                        threadId,
-                        [u1],
-                        [u1],
-                        gk.enc("trap_public"),
-                        gk.enc("trap_private"),
-                        thread.version,
-                        false,
-                        false,
-                        undefined,
-                        gk.grants([group2], "manager"),
-                    ),
-                );
-
-                // Same call, same version - the refusal left the thread untouched -
-                // but now naming user_2 as a manager of the container itself.
                 await threadApi2.updateThread(
                     threadId,
                     [u1],
-                    [u1, u2],
-                    gk.enc("promoted_public"),
-                    gk.enc("promoted_private"),
+                    [u1],
+                    gk.enc("kept_public"),
+                    gk.enc("kept_private"),
                     thread.version,
                     false,
                     false,
@@ -1665,7 +1643,6 @@ test.describe("ThreadUsingGroupsTest", () => {
                     readStatusCode: thread.statusCode,
                     threadUsers: thread.users,
                     threadManagers: thread.managers,
-                    rejected,
                     updated: {
                         statusCode: updated.statusCode,
                         privateMeta: gk.dec(updated.privateMeta),
@@ -1680,10 +1657,9 @@ test.describe("ThreadUsingGroupsTest", () => {
         // user_2 holds no direct membership: everything it does here goes through the grant.
         expect(result.threadUsers).not.toContain(users.u2.id);
         expect(result.threadManagers).not.toContain(users.u2.id);
-        expect(result.rejected).toBe(true);
         expect(result.updated.statusCode).toEqual(0);
-        expect(result.updated.privateMeta).toEqual("promoted_private");
-        expect(result.updated.managers).toContain(users.u2.id);
+        expect(result.updated.privateMeta).toEqual("kept_private");
+        expect(result.updated.managers).not.toContain(users.u2.id);
     });
 
     test('a "manager" role grantee can update someone else\'s message', async ({
