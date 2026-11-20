@@ -31,7 +31,7 @@ const sameBytes = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.e
  * the compare and the write, so two tabs cannot overwrite each other.
  *
  * ```ts
- * const connection = await Endpoint.connect(privKey, solutionId, bridgeUrl);
+ * const connection = await Endpoint.connect(privateKey, solutionId, bridgeUrl);
  * await connection.setPinStore(new IndexedDbPinStore());
  * ```
  */

@@ -644,6 +644,28 @@ Bridge marks the Space as stale after such a removal and the next write
 replaces the key first. To close the window at once, call `space.rotateKey()`
 right after the removal.
 
+`space.onChange(callback)` tells you when that happens, or anything else about
+the Space moves (`event.data.changeKind`: `keyStale`, `keyRotated`,
+`recipientsAdded`, `recipientsRemoved`, `metaUpdated`, `deleted`). The event is
+the Bridge's word; `space.state()` after it reads and verifies.
+
+#### Remember what was verified
+
+The library checks the signed history of every Group and Space, and remembers
+how far it got. In a browser that memory ends with the page unless you give it
+a place to live:
+
+```ts
+import { IndexedDbPinStore } from "@simplito/privmx-webendpoint";
+
+await connection.setPinStore(new IndexedDbPinStore()); // right after connecting, before any other API
+```
+
+Without it every reload starts from first contact, and a Bridge that serves an
+older history after a reload is not caught. Any object with `load(key)` and
+`save(key, blob, expected)` works (`PinStore`); `save` must be a
+compare-and-swap.
+
 ## What's included
 
 With a Group in hand, choose a container by the shape of your data. The Group
@@ -1119,6 +1141,8 @@ on an API after disconnect throws.
   than buffering whole files in memory on top of it.
 - **Compression:** the `.wasm` is ~6.7 MB; serve it gzip/brotli (brotli ≈ −70%).
 - **Errors:** treat `NativeError` as your typed failure channel (see above).
+- **Groups:** call `connection.setPinStore(new IndexedDbPinStore())` right after
+  connecting, so what was verified survives a reload.
 
 ---
 
