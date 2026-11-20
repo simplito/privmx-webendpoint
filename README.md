@@ -606,7 +606,7 @@ Pick the pair that fits the entity:
 |---|---|---|
 | An entity, id made at random just now | `create(subject, members)` | `open(subject)` |
 | An entity whose id was known earlier | `create(subject, members)` | `open(subject, { createdBy })` |
-| A 1:1 chat named by its two users | `createFixed(subject, users)` | `openFixed(subject, userIds)` |
+| A 1:1 chat named by its two users | `createFixed(subject, users)` | `open(subject, { fixedMembers: userIds })` |
 | A Group that already has an ID | `GroupApi.createGroup` | `openPinned(subject, groupId)` |
 | No entity at all | `createUnbound(members)` | `openUnbound(groupId)` |
 

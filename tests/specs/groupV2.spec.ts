@@ -423,7 +423,7 @@ test.describe("GroupApiV2", () => {
             // A 1:1 chat named by its two users.
             const dm = ["chat-app", "dm", id(users.u1.id), id(users.u2.id)];
             await c1.groups.createFixed(dm, [u(users.u1), u(users.u2)]);
-            const dmState = await (await c2.groups.openFixed(dm, [users.u2.id, users.u1.id])).state();
+            const dmState = await (await c2.groups.open(dm, { fixedMembers: [users.u2.id, users.u1.id] })).state();
 
             // A Group with an id of its own, tied to a subject on this device.
             const legacyId = await c1.api.createGroup(contextId, [u(users.u2)], [u(users.u1)], enc.encode(""), enc.encode(""));
@@ -449,10 +449,10 @@ test.describe("GroupApiV2", () => {
                 taken: await codeOf(c2.groups.create(subject, [{ user: u(users.u2), role: "manager" }])),
                 noPlace: await codeOf(created.encrypt(NO_LOCATION, enc.encode("x"))),
                 dmManagers: [...dmState.managers].sort(),
-                dmOthers: await codeOf(c2.groups.openFixed(dm, [users.u2.id, users.u3.id])),
+                dmOthers: await codeOf(c2.groups.open(dm, { fixedMembers: [users.u2.id, users.u3.id] })),
                 dmAsOrdinary: await codeOf(c2.groups.open(dm)),
                 dmFrozen: await codeOf(
-                    (await c1.groups.openFixed(dm, [users.u1.id, users.u2.id])).add([{ user: u(users.u3), role: "user" }]),
+                    (await c1.groups.open(dm, { fixedMembers: [users.u1.id, users.u2.id] })).add([{ user: u(users.u3), role: "user" }]),
                 ),
                 pinnedId: pinned.groupId === legacyId,
                 rebound: await codeOf(c1.groups.openPinned(room, otherId)),

@@ -32,8 +32,9 @@ limitations under the License.
  * - `openPinned` - a Group that already exists under an ID of its own. The
  *   first time the ID is taken on trust; from then on this device refuses any
  *   other Group for that subject.
- * - `createFixed` + `openFixed` - a subject you chose and a roster frozen for
- *   good; opening checks that the Group holds exactly the users you expect.
+ * - `createFixed` + `open({ fixedMembers })` - a subject you chose and a roster
+ *   frozen for good; opening checks that the Group holds exactly the users
+ *   you expect.
  * - `createUnbound` + `openUnbound` - no entity at all. The ID is trusted.
  *
  * Never "open it, and create it if it is not there": that is how a Group
@@ -114,21 +115,32 @@ export type ClientRecipient = GroupBySubject | { group: string } | { user: UserW
 /** A recipient of a Space, with its role. */
 export type ClientSpaceRecipient = ClientRecipient & { role: "user" | "manager" };
 
-export interface OpenOptions {
-    /**
-     * The user who created the entity. The Group's first, signed statement
-     * names who created the Group; someone else's fails with
-     * `GROUP_WRONG_CREATOR`. For a Space it is the signer of the Space's first
-     * statement.
-     */
-    createdBy?: string;
-}
+/** How {@link GroupClient.open} checks the Group: by its creator, or by its frozen roster. Not both. */
+export type OpenOptions =
+    | {
+          /**
+           * The user who created the entity. The Group's first, signed statement
+           * names who created the Group; someone else's fails with
+           * `GROUP_WRONG_CREATOR`. For a Space it is the signer of the Space's
+           * first statement.
+           */
+          createdBy?: string;
+          fixedMembers?: undefined;
+      }
+    | {
+          /**
+           * For a Group made with `createFixed`: the users it must hold, exactly.
+           * Anything else fails with `GROUP_MEMBERSHIP_MISMATCH`.
+           */
+          fixedMembers: string[];
+          createdBy?: undefined;
+      };
 
 /** One Group to open with {@link GroupClient.openMany}. At most one of the optional fields. */
 export interface OpenItem {
     subject: Subject;
     createdBy?: string;
-    /** As in {@link GroupClient.openFixed}. */
+    /** As in {@link GroupClient.open} with `fixedMembers`. */
     fixedMembers?: string[];
     /** As in {@link GroupClient.openPinned}. */
     pinnedGroupId?: string;
@@ -669,7 +681,7 @@ export class GroupClient {
             // Anyone can make a fixed Group under a subject they chose; it opens only for someone who names its members.
             throw new GroupClientError(
                 GroupErrorCode.GROUP_MEMBERSHIP_MISMATCH,
-                "a fixed Group: open it with openFixed",
+                "a fixed Group: open it with fixedMembers",
             );
         }
         if (item.createdBy !== undefined) {
@@ -688,10 +700,23 @@ export class GroupClient {
         }
     }
 
-    /** Opens and verifies the Group of `subject`. Refuses a Group made by `createFixed`. */
+    /**
+     * Opens and verifies the Group of `subject`.
+     *
+     * A Group made by `createFixed` opens only with `fixedMembers`, and then
+     * only when it holds exactly those users; without the option it is refused
+     * (`GROUP_MEMBERSHIP_MISMATCH`), so forgetting it cannot open someone
+     * else's roster.
+     */
     async open(subject: Subject, opts: OpenOptions = {}): Promise<Group> {
+        if (opts.createdBy !== undefined && opts.fixedMembers !== undefined) {
+            throw new TypeError("open checks the creator or the fixed roster, not both");
+        }
         const groupId = await this.core.groupIdOf(subject);
-        await this.check({ subject, createdBy: opts.createdBy }, await this.core.api.getGroup(groupId));
+        await this.check(
+            { subject, createdBy: opts.createdBy, fixedMembers: opts.fixedMembers },
+            await this.core.api.getGroup(groupId),
+        );
         return new Group(this.core, groupId, subject);
     }
 
@@ -714,13 +739,6 @@ export class GroupClient {
         const members = users.map((user) => ({ user, role: "manager" }));
         const frozen: ContainerPolicy = { addMembers: "none", removeMembers: "none", updatePolicy: "none" };
         return new Group(this.core, await this.make(subject, members, opts, frozen), subject);
-    }
-
-    /** Opens a fixed Group; fails with `GROUP_MEMBERSHIP_MISMATCH` unless it holds exactly `userIds`. */
-    async openFixed(subject: Subject, userIds: string[]): Promise<Group> {
-        const groupId = await this.core.groupIdOf(subject);
-        await this.check({ subject, fixedMembers: userIds }, await this.core.api.getGroup(groupId));
-        return new Group(this.core, groupId, subject);
     }
 
     /**
@@ -793,7 +811,7 @@ export class GroupClient {
         }
     }
 
-    async openSpace(subject: Subject, opts: OpenOptions = {}): Promise<Space> {
+    async openSpace(subject: Subject, opts: { createdBy?: string } = {}): Promise<Space> {
         const spaceId = await this.core.api.deriveSpaceId(
             this.core.contextId,
             await this.core.api.encodePath(subject),

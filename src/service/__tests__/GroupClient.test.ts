@@ -121,18 +121,20 @@ describe("GroupClient: opening", () => {
         const frozen = { addMembers: "none", removeMembers: "none", updatePolicy: "none" };
         const fixed = groupState({ users: [], managers: ["alice", "bob"], policy: frozen });
         const { groups } = setup({ getGroup: fixed });
-        await expect(groups.openFixed(CHAT, ["bob", "alice"])).resolves.toBeDefined();
+        await expect(groups.open(CHAT, { fixedMembers: ["bob", "alice"] })).resolves.toBeDefined();
         for (const members of [["alice"], ["alice", "carol"], ["alice", "bob", "carol"]]) {
-            expect(await codeOf(groups.openFixed(CHAT, members))).toBe(GroupErrorCode.GROUP_MEMBERSHIP_MISMATCH);
+            expect(await codeOf(groups.open(CHAT, { fixedMembers: members }))).toBe(GroupErrorCode.GROUP_MEMBERSHIP_MISMATCH);
         }
         expect(await codeOf(groups.open(CHAT))).toBe(GroupErrorCode.GROUP_MEMBERSHIP_MISMATCH);
+        // The creator or the roster, never both: the types say so, and so does the call.
+        expect(await codeOf(groups.open(CHAT, { createdBy: "alice", fixedMembers: ["alice", "bob"] } as never))).toBe("TypeError");
         // The right two users in a Group that is not frozen: somebody can still be added to it.
         for (const state of [
             groupState({ users: [], managers: ["alice", "bob"], policy: { ...frozen, addMembers: "manager" } }),
             groupState({ users: [], managers: ["alice", "bob"], policy: { ...frozen, updatePolicy: undefined } }),
             groupState({ users: ["bob"], managers: ["alice"], policy: frozen }),
         ]) {
-            expect(await codeOf(setup({ getGroup: state }).groups.openFixed(CHAT, ["alice", "bob"]))).toBe(
+            expect(await codeOf(setup({ getGroup: state }).groups.open(CHAT, { fixedMembers: ["alice", "bob"] }))).toBe(
                 GroupErrorCode.GROUP_MEMBERSHIP_MISMATCH,
             );
         }
