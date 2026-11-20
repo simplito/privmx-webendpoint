@@ -41,6 +41,7 @@ import type { EventManager } from "../events/EventManager.js";
 import {
     createGroupCustomEventSubscription,
     createGroupSubscription,
+    type GenericEvent,
 } from "../events/subscriptions.js";
 import type { FileRange, GroupFileReader, GroupFileSealer } from "./fileStreams.js";
 import { NO_LOCATION, id, type Id, type Location, type LocationOrNone, type PathSegment } from "./groupPaths.js";
@@ -67,6 +68,7 @@ import {
     type SequenceAppendResult,
     type SequenceItem,
     type SequenceMarkInfo,
+    type SpaceChangedEventData,
     type SpaceDecryptOutcome,
     type SpaceLogEntry,
     type SpaceOrigin,
@@ -529,6 +531,28 @@ export class Space<P = Place> {
     }
     rotateKey(): Promise<number> {
         return this.core.api.rotateSpaceKey(this.spaceId);
+    }
+    /**
+     * Calls back when this Space changes or is deleted (`event.data.changeKind`
+     * says which). The event is a hint from the Bridge; `state()` after it reads
+     * and verifies. @returns a function that stops listening
+     */
+    async onChange(callback: (event: GenericEvent<SpaceChangedEventData>) => void): Promise<() => Promise<void>> {
+        if (!this.core.events) {
+            throw new TypeError("this GroupClient was made without an event manager; use connection.groups()");
+        }
+        const events = await this.core.events();
+        const ids = await events.subscribe(
+            ([GroupEventType.SPACE_UPDATE, GroupEventType.SPACE_DELETE] as const).map((type) =>
+                createGroupSubscription({
+                    type,
+                    selector: GroupEventSelectorType.SPACE_ID,
+                    id: this.spaceId,
+                    callbacks: [callback],
+                }),
+            ),
+        );
+        return () => events.unsubscribe(ids);
     }
     updatePublicMeta(meta: Uint8Array, version: number): Promise<void> {
         return this.core.api.updateSpacePublicMeta(this.spaceId, meta, version);

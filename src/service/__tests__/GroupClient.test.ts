@@ -428,4 +428,16 @@ describe("GroupClient: Spaces", () => {
         expect(api.encryptInSpace).toHaveBeenCalledWith("u", NO_LOCATION, DATA);
         await expect(setup({ getSpace: { ...state("alice"), contextId: "other" } }).groups.openUnboundSpace("u")).rejects.toThrow(TypeError);
     });
+
+    it("onChange subscribes to this Space's changes and its deletion", async () => {
+        const { groups, events } = setup({ getSpace: state("alice") });
+        const space = await groups.openSpace(PROJECT);
+        const off = await space.onChange(() => {});
+        expect(events.subscribe.mock.lastCall![0]).toMatchObject([
+            { module: "group", type: 4, selector: 2, id: space.spaceId },
+            { module: "group", type: 5, selector: 2, id: space.spaceId },
+        ]);
+        await off();
+        expect(events.unsubscribe).toHaveBeenCalledWith(["s1", "s2"]);
+    });
 });

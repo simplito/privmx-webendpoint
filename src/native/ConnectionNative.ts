@@ -21,14 +21,29 @@ import {
     ConnectionEventSelectorType,
 } from "../Types.js";
 import { BaseNative } from "./BaseNative.js";
+import type { PinStore } from "../service/PinStore.js";
 
 type UserVierifierVerifyFunc = (request: VerificationRequest[]) => Promise<boolean[]>;
 
 declare global {
     interface Window {
         userVerifierBinder?: { [id: number]: { userVierifier_verify: UserVierifierVerifyFunc } };
+        pinStoreBinder?: {
+            [id: number]: {
+                load: (key: string) => Promise<string>;
+                save: (key: string, blob: string, expected: string) => Promise<boolean>;
+            };
+        };
     }
 }
+
+// Blobs cross the WASM boundary as base64.
+const toBase64 = (bytes: Uint8Array) => {
+    let text = "";
+    for (const byte of bytes) text += String.fromCharCode(byte); // no spread: a blob may outgrow the argument limit
+    return btoa(text);
+};
+const fromBase64 = (text: string) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
 /**
  * Raw WASM wrapper for the C++ Connection - holds and forwards raw pointers.
  * Use {@link Connection} (src/service) instead.
@@ -155,6 +170,15 @@ export class ConnectionNative extends BaseNative {
         this.userVerifierPtr = await this.runAsync<number>((taskId) =>
             this.api.lib.Connection_newUserVerifierInterface(taskId, connectionPtr, bindingId),
         );
+    }
+
+    async setPinStore(connectionPtr: number, store: PinStore): Promise<void> {
+        const bindingId = ConnectionNative.getVerifierBindingId();
+        (window.pinStoreBinder ??= {})[bindingId] = {
+            load: async (key) => toBase64(await store.load(key)),
+            save: (key, blob, expected) => store.save(key, fromBase64(blob), fromBase64(expected)),
+        };
+        await this.runAsync<void>((taskId) => this.api.lib.Connection_setPinStore(taskId, connectionPtr, bindingId));
     }
 
     protected async newUserVerifierInterface(connectionPtr: number): Promise<number> {

@@ -540,6 +540,12 @@ test.describe("GroupApiV2", () => {
             });
             const wrongCreator = await codeOf(g3.openSpace(project, { createdBy: users.u3.id }));
 
+            // Support listens: the Bridge tells every recipient that something about the Space moved.
+            const heard: string[] = [];
+            const stopListening = await (await g3.openSpace(project)).onChange((e: any) => {
+                heard.push(`${e.data.changeKind}:${e.data.keyVersion}`);
+            });
+
             // User 2 leaves sales and still holds the Space's key: it is stale until somebody replaces it.
             await salesGroup.remove([users.u2.id]);
             const stale = (await space.state()).keyIsStale;
@@ -547,6 +553,8 @@ test.describe("GroupApiV2", () => {
             const after = await space.encrypt(["note", id("n2")], enc.encode("new terms"));
             const state = await space.state();
             const log = await space.log({ skip: 0, limit: 10, sortOrder: "asc" });
+            for (let i = 0; i < 50 && heard.length < 2; i++) await new Promise((r) => setTimeout(r, 100));
+            await stopListening();
 
             return {
                 squatted,
@@ -557,6 +565,7 @@ test.describe("GroupApiV2", () => {
                 version,
                 state: { createdBy: state.createdBy, keyVersion: state.keyVersion, keyIsStale: state.keyIsStale, groups: state.groups.length },
                 log: log.readItems.map((e: any) => [e.seq, e.kind, e.author, e.via === salesGroup.groupId, e.keyVersion]),
+                heard,
                 removedReads: await codeOf(g2.openSpace(project)),
                 supportReadsNew: dec.decode(
                     (await (await g3.openSpace(project)).decrypt(["note", id("n2")], after, { expectedAuthor: users.u1.id })).data,
@@ -578,7 +587,68 @@ test.describe("GroupApiV2", () => {
             [1, "create", r.u1, true, 1],
             [2, "rotate", r.u1, true, 2],
         ]);
+        expect(r.heard).toEqual(["keyStale:1", "keyRotated:2"]);
         expect(r.removedReads).not.toEqual(0);
         expect(r.supportReadsNew).toEqual("new terms");
+    });
+
+    test("A pin store in IndexedDB: what was verified survives a new connection", async ({ page, backend, cli }) => {
+        const args = argsOf(backend, await setupUsers(page, cli));
+        const r = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const lib = (window as any).PrivmxWebEndpoint;
+            const { id } = lib;
+            const enc = new TextEncoder();
+            const dec = new TextDecoder();
+            const u = (x: { id: string; pubKey: string }) => ({ userId: x.id, pubKey: x.pubKey });
+            const dbName = `pins-${crypto.randomUUID()}`;
+            const bytes = (...v: number[]) => new Uint8Array(v);
+
+            // The store alone: a write goes through only against the value it expects.
+            const store = new lib.IndexedDbPinStore(dbName);
+            const cas = [
+                await store.save("k", bytes(1), bytes()),
+                await store.save("k", bytes(2), bytes()),
+                [...(await store.load("k"))],
+                await store.save("k", bytes(2), bytes(1)),
+                [...(await store.load("missing"))],
+            ];
+
+            // Behind a connection: every load and save the library makes is noted.
+            const session = async () => {
+                const seen: string[] = [];
+                const conn = await lib.Endpoint.connect(users.u1.privKey, solutionId, bridgeUrl);
+                const inner = new lib.IndexedDbPinStore(dbName);
+                await conn.setPinStore({
+                    load: async (key: string) => {
+                        const blob = await inner.load(key);
+                        seen.push(`load:${key.split("/")[0]}:${blob.length > 0}`);
+                        return blob;
+                    },
+                    save: async (key: string, blob: Uint8Array, expected: Uint8Array) => {
+                        const stored = await inner.save(key, blob, expected);
+                        seen.push(`save:${key.split("/")[0]}:${stored}`);
+                        return stored;
+                    },
+                });
+                return { conn, seen, groups: await conn.groups(contextId) };
+            };
+            const subject = ["chat-app", "chat", id("pinned")];
+            const place = ["message", id("m1")];
+            const first = await session();
+            const group = await first.groups.createFor(subject, [{ user: u(users.u1), role: "manager" }]);
+            const sealed = await group.encrypt(place, enc.encode("kept"));
+            await first.conn.disconnect();
+
+            const second = await session();
+            const again = await second.groups.open(subject, { createdBy: users.u1.id });
+            const opened = await again.decrypt(place, sealed, { expectedAuthor: users.u1.id });
+            return { cas, first: first.seen, second: second.seen, text: dec.decode(opened.data) };
+        }, args);
+
+        expect(r.cas).toEqual([true, false, [1], true, []]);
+        // The first session finds nothing and saves what it verified; the second starts from that.
+        expect(r.first).toContain("save:group-pins:true");
+        expect(r.second).toContain("load:group-pins:true");
+        expect(r.text).toEqual("kept");
     });
 });

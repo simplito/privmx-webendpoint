@@ -30,6 +30,7 @@ limitations under the License.
 #include <privmx/endpoint/thread/varinterface/ThreadApiVarInterface.hpp>
 
 #include "AsyncEngine.hpp"
+#include "CustomPinStoreInterface.hpp"
 #include "CustomUserVerifierInterface.hpp"
 #include "Macros.hpp"
 #include "Mapper.hpp"
@@ -126,6 +127,13 @@ void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int inte
 
 void Connection_deleteUserVerifierInterface(int taskId, int ptr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (UserVerifierHolder*)ptr; });
+}
+
+// The connection owns the store. Set it before any module API is made: each reads it when created.
+void Connection_setPinStore(int taskId, int connectionPtr, int interfaceBindId) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, interfaceBindId] {
+        ((ConnectionVar*)connectionPtr)->getApi().setPinStore(std::make_shared<CustomPinStoreInterface>(interfaceBindId));
+    });
 }
 
 void GroupApi_newGroupApi(int taskId, int connectionPtr) {

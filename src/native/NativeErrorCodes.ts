@@ -377,6 +377,8 @@ export const GroupErrorCode = {
     GROUP_WRONG_CREATOR: 0xd0022,
     /** This device knows the subject under another Group */
     GROUP_SUBJECT_REBOUND: 0xd0023,
+    /** Cannot extract SpaceChangedEvent */
+    CANNOT_EXTRACT_SPACE_CHANGED_EVENT: 0xd0024,
 } as const;
 
 /**

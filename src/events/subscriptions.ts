@@ -123,6 +123,9 @@ export type GroupCallbackPayload = {
     [Types.GroupEventType.GROUP_CREATE]: Types.GroupChangedEventData;
     [Types.GroupEventType.GROUP_UPDATE]: Types.GroupChangedEventData;
     [Types.GroupEventType.GROUP_DELETE]: Types.GroupDeletedEventData;
+    [Types.GroupEventType.SPACE_CREATE]: Types.SpaceChangedEventData;
+    [Types.GroupEventType.SPACE_UPDATE]: Types.SpaceChangedEventData;
+    [Types.GroupEventType.SPACE_DELETE]: Types.SpaceChangedEventData;
 };
 
 /**

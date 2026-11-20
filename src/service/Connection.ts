@@ -24,6 +24,7 @@ import {
 } from "../Types.js";
 import { BaseNative } from "../native/BaseNative.js";
 import { UserVerifierInterface } from "./UserVerifierInterface.js";
+import type { PinStore } from "./PinStore.js";
 import type { ThreadApi } from "./ThreadApi.js";
 import type { StoreApi } from "./StoreApi.js";
 import type { InboxApi } from "./InboxApi.js";
@@ -520,6 +521,21 @@ export class Connection extends BaseApi {
      */
     setUserVerifier(verifier: UserVerifierInterface): Promise<void> {
         return this.native.setUserVerifier(this.servicePtr, [this.servicePtr, verifier]);
+    }
+
+    /**
+     * Gives the connection a place to keep, between sessions, what this device
+     * has already verified about Groups and Spaces - see {@link PinStore}.
+     * Without it a reload forgets, and a Bridge may serve an older history.
+     *
+     * Call it right after connecting, before `getGroupApi()`, `groups()` or any
+     * other API of this connection: each reads the store when it is created.
+     *
+     * @param {PinStore} store e.g. `new IndexedDbPinStore()`
+     * @returns {Promise<void>} resolves when the store is registered with the WASM core
+     */
+    setPinStore(store: PinStore): Promise<void> {
+        return this.native.setPinStore(this.servicePtr, store);
     }
 
     /**

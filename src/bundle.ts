@@ -16,6 +16,7 @@ import { deserializeObject, serializeObject, strToUint8, uint8ToStr } from "./ex
 import { ANY_AUTHOR, NO_LOCATION, id } from "./service/groupPaths.js";
 import { GroupClient, GroupClientError } from "./service/GroupClient.js";
 import { GroupErrorCode } from "./native/NativeErrorCodes.js";
+import { IndexedDbPinStore } from "./service/PinStore.js";
 
 /**
  * Vite bundle entry point - what the `<script>`-tag build puts on
@@ -40,4 +41,5 @@ export {
     GroupClient,
     GroupClientError,
     GroupErrorCode,
+    IndexedDbPinStore,
 };

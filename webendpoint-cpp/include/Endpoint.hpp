@@ -47,6 +47,7 @@ API_FUNCTION_HEADER(Connection, acceptKeyChange)
 API_FUNCTION_HEADER(Connection, useKeyContinuity)
 void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int interfaceBindId);
 void Connection_deleteUserVerifierInterface(int taskId, int ptr);
+void Connection_setPinStore(int taskId, int connectionPtr, int interfaceBindId);
 emscripten::val callVerifierOnJS(emscripten::val& name, emscripten::val& params);
 
 void GroupApi_newGroupApi(int taskId, int connectionPtr);

@@ -1378,7 +1378,7 @@ export class GroupApi extends BaseApi {
      *
      * @param {GroupEventType} eventType which Group event class to listen for
      * @param {GroupEventSelectorType} selectorType what `selectorId` refers to
-     *   (a whole Context or a single Group)
+     *   (a whole Context, a single Group, or a single Space for the `SPACE_*` types)
      * @param {string} selectorId ID of the selected scope
      * @returns {string} query string consumed by {@link subscribeFor}
      */

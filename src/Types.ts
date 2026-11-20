@@ -1076,6 +1076,30 @@ export interface GroupCustomEventData {
 }
 
 /**
+ * Payload of every Space event (created, changed, deleted). It is the Bridge's
+ * word alone: treat it as a hint to read the Space again, which verifies its
+ * signed history.
+ *
+ * @type {SpaceChangedEventData}
+ *
+ * @param {string} spaceId ID of the Space
+ * @param {string} contextId ID of the Context
+ * @param {number} keyVersion version of the Space key after the change (0 when deleted)
+ * @param {number} publicMetaVersion version of the public metadata after the change
+ * @param {number} privateMetaVersion version of the private metadata after the change
+ * @param {string} changeKind "created", "recipientsAdded", "recipientsRemoved",
+ *   "keyRotated", "keyStale", "metaUpdated" or "deleted"
+ */
+export interface SpaceChangedEventData {
+    spaceId: string;
+    contextId: string;
+    keyVersion: number;
+    publicMetaVersion: number;
+    privateMetaVersion: number;
+    changeKind: string;
+}
+
+/**
  * Payload of a Group deleted event.
  *
  * @type {GroupDeletedEventData}
@@ -1545,11 +1569,18 @@ export enum GroupEventType {
     GROUP_CREATE = 0,
     GROUP_UPDATE = 1,
     GROUP_DELETE = 2,
+    /** A Space the user can read was created. Selector: `CONTEXT_ID`. */
+    SPACE_CREATE = 3,
+    /** A Space changed: recipients, key, stale key or metadata. Selector: `CONTEXT_ID` or `SPACE_ID`. */
+    SPACE_UPDATE = 4,
+    /** A Space was deleted. Selector: `CONTEXT_ID` or `SPACE_ID`. */
+    SPACE_DELETE = 5,
 }
 
 export enum GroupEventSelectorType {
     CONTEXT_ID = 0,
     GROUP_ID = 1,
+    SPACE_ID = 2,
 }
 
 export enum StreamEventType {

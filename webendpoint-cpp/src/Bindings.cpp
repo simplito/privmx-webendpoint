@@ -39,6 +39,7 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(Connection, useKeyContinuity)
     BINDING_FUNCTION(Connection, newUserVerifierInterface)
     BINDING_FUNCTION(Connection, deleteUserVerifierInterface)
+    BINDING_FUNCTION(Connection, setPinStore)
 
     BINDING_FUNCTION(GroupApi, newGroupApi)
     BINDING_FUNCTION(GroupApi, deleteGroupApi)

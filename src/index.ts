@@ -91,6 +91,8 @@ export { groupGrant } from "./service/groupGrant.js";
 export { id, NO_LOCATION, ANY_AUTHOR } from "./service/groupPaths.js";
 export type { Id, PathSegment, Location, LocationOrNone } from "./service/groupPaths.js";
 export type { DecryptOptions } from "./service/GroupApi.js";
+export { IndexedDbPinStore } from "./service/PinStore.js";
+export type { PinStore } from "./service/PinStore.js";
 export {
     GroupClient,
     GroupClientError,
