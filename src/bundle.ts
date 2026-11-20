@@ -13,6 +13,9 @@ import { EndpointFactory as Endpoint } from "./service/EndpointFactory.js";
 import { groupGrant } from "./service/groupGrant.js";
 import { progressStream, takeStream } from "./service/fileStreams.js";
 import { deserializeObject, serializeObject, strToUint8, uint8ToStr } from "./extra/utils.js";
+import { ANY_AUTHOR, NO_LOCATION, id } from "./service/groupPaths.js";
+import { GroupClient, GroupClientError } from "./service/GroupClient.js";
+import { GroupErrorCode } from "./native/NativeErrorCodes.js";
 
 /**
  * Vite bundle entry point - what the `<script>`-tag build puts on
@@ -30,4 +33,11 @@ export {
     deserializeObject,
     strToUint8,
     uint8ToStr,
+    // Groups: without these a page with no bundler cannot name a location or an expected author at all.
+    id,
+    NO_LOCATION,
+    ANY_AUTHOR,
+    GroupClient,
+    GroupClientError,
+    GroupErrorCode,
 };

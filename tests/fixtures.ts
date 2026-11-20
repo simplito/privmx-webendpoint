@@ -150,7 +150,8 @@ export const test = base.extend<
     workerBackend: [
         async ({ dockerImage }, use, workerInfo) => {
             const id = workerInfo.workerIndex;
-            const hostPort = 3001 + id;
+            // E2E_PORT_BASE: for a machine where 3001.. is taken by something else.
+            const hostPort = Number(process.env.E2E_PORT_BASE ?? 3001) + id;
             const containerName = `privmx_e2e_worker_${id}`;
             const dbName = `privmx_e2e_db_${id}`;
 
