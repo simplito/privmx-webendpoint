@@ -2,8 +2,8 @@
 #define _PRIVMXLIB_WEBENDPOINT_CUSTOMPINSTORE_HPP_
 
 #include <Poco/Dynamic/Var.h>
-#include <privmx/endpoint/core/PinStoreInterface.hpp>
 
+#include <privmx/endpoint/core/PinStoreInterface.hpp>
 #include <string>
 #include <vector>
 
@@ -17,8 +17,7 @@ class CustomPinStoreInterface : public endpoint::core::PinStoreInterface {
 public:
     explicit CustomPinStoreInterface(int bindId) : _bindId(bindId) {}
     endpoint::core::Buffer load(const std::string& key) override;
-    bool save(const std::string& key,
-              const endpoint::core::Buffer& blob,
+    bool save(const std::string& key, const endpoint::core::Buffer& blob,
               const endpoint::core::Buffer& expected) override;
 
 private:

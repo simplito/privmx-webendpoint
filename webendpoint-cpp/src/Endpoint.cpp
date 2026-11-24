@@ -132,7 +132,9 @@ void Connection_deleteUserVerifierInterface(int taskId, int ptr) {
 // The connection owns the store. Set it before any module API is made: each reads it when created.
 void Connection_setPinStore(int taskId, int connectionPtr, int interfaceBindId) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, interfaceBindId] {
-        ((ConnectionVar*)connectionPtr)->getApi().setPinStore(std::make_shared<CustomPinStoreInterface>(interfaceBindId));
+        ((ConnectionVar*)connectionPtr)
+            ->getApi()
+            .setPinStore(std::make_shared<CustomPinStoreInterface>(interfaceBindId));
     });
 }
 
