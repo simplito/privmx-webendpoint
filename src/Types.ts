@@ -633,7 +633,7 @@ export interface Group {
 export interface GroupRules {
     /** Who may add members. */
     addMembers: PolicyEntry;
-    /** Who may remove or reseat members. */
+    /** Who may remove members or replace their keys. */
     removeMembers: PolicyEntry;
     /** Who may rewrite the Group's metadata. */
     updateMeta: PolicyEntry;
@@ -678,7 +678,7 @@ export interface GroupLogEntry {
     /** "add": who joined as a user or as a manager. "roles": who became one. */
     addedUsers: string[];
     addedManagers: string[];
-    /** "remove": who left. "reseat": who was reseated. */
+    /** "remove": who left. "reseat": whose key was replaced ({@link GroupApi.replaceGroupMemberKeys}). */
     removed: string[];
 }
 
@@ -1135,7 +1135,7 @@ export interface ContainerWithoutItemPolicy {
     forwardSecrecy?: PolicyBooleanEntry;
     /** Groups only: who can add members. Unset, whoever `update` allows. Refused on any other container. */
     addMembers?: PolicyEntry;
-    /** Groups only: who can remove or reseat members. Unset, whoever `update` allows. */
+    /** Groups only: who can remove members or replace their keys. Unset, whoever `update` allows. */
     removeMembers?: PolicyEntry;
 }
 

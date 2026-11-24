@@ -314,10 +314,10 @@ connecting; without it, somebody else lets them back in:
 await connection.renewIdentity(previousPrivKeyWif);
 
 // Somebody else, after checking the new key really is Dana's:
-await groups.reseatGroupMembers(groupId, ["dana"]);   // a new key version; Dana keeps her seat
+await groups.replaceGroupMemberKeys(groupId, ["dana"]);   // a new key version; Dana keeps her seat
 ```
 
-The reseat wraps to the key the Context lists for Dana now, so whether that key
+The replacement wraps to the key the Context lists for Dana now, so whether that key
 is hers is your `UserVerifierInterface`'s answer. With no service to ask, a
 connection can keep to key continuity instead: it remembers the first key it
 sees each user with and refuses any other until told the change is genuine.
@@ -606,7 +606,7 @@ Pick the pair that fits the entity:
 |---|---|---|
 | An entity, id made at random just now | `create(subject, members)` | `open(subject)` |
 | An entity whose id was known earlier | `create(subject, members)` | `open(subject, { createdBy })` |
-| A 1:1 chat named by its two users | `createFixed(subject, users)` | `open(subject, { fixedMembers: userIds })` |
+| A 1:1 chat named by its two users | `createImmutable(subject, users)` | `open(subject, { immutableMembers: userIds })` |
 | A Group that already has an ID | `GroupApi.createGroup` | `openPinned(subject, groupId)` |
 | No entity at all | `createUnbound(members)` | `openUnbound(groupId)` |
 

@@ -15,17 +15,17 @@ const PTR = 7;
 
 function setup(returns: Record<string, unknown> = {}) {
     const native: Record<string, Mock> = {};
-    for (const m of ["reseatGroupMembers", "setGroupRoles", "updateGroupRules", "getGroupLog"]) {
+    for (const m of ["replaceGroupMemberKeys", "setGroupRoles", "updateGroupRules", "getGroupLog"]) {
         native[m] = vi.fn().mockResolvedValue(returns[m]);
     }
     return { api: new GroupApi(native as unknown as GroupApiNative, PTR), native };
 }
 
 describe("GroupApi roster calls", () => {
-    it("reseatGroupMembers forwards the members and returns the epoch it made", async () => {
-        const { api, native } = setup({ reseatGroupMembers: 5 });
-        await expect(api.reseatGroupMembers("g1", ["bob"])).resolves.toBe(5);
-        expect(native.reseatGroupMembers).toHaveBeenCalledWith(PTR, ["g1", ["bob"]]);
+    it("replaceGroupMemberKeys forwards the members and returns the epoch it made", async () => {
+        const { api, native } = setup({ replaceGroupMemberKeys: 5 });
+        await expect(api.replaceGroupMemberKeys("g1", ["bob"])).resolves.toBe(5);
+        expect(native.replaceGroupMemberKeys).toHaveBeenCalledWith(PTR, ["g1", ["bob"]]);
     });
 
     it("setGroupRoles forwards each member with its role", async () => {

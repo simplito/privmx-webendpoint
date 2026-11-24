@@ -259,9 +259,9 @@ export class GroupApiNative extends BaseNative {
             this.api.lib.GroupApi_setGroupVisibility(taskId, ptr, args),
         );
     }
-    async reseatGroupMembers(ptr: number, args: [string, string[]]): Promise<number> {
+    async replaceGroupMemberKeys(ptr: number, args: [string, string[]]): Promise<number> {
         return this.runAsync<number>((taskId) =>
-            this.api.lib.GroupApi_reseatGroupMembers(taskId, ptr, args),
+            this.api.lib.GroupApi_replaceGroupMemberKeys(taskId, ptr, args),
         );
     }
     async setGroupRoles(ptr: number, args: [string, GroupRoleChange[]]): Promise<void> {

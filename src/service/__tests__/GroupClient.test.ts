@@ -90,9 +90,9 @@ describe("GroupClient: creating", () => {
         await expect(groups.create(CHAT, [{ user: ALICE, role: "admin" }])).rejects.toThrow(TypeError);
     });
 
-    it("createFixed makes every member a manager and freezes the roster, the roles and the rules", async () => {
+    it("createImmutable makes every member a manager and freezes the roster, the roles and the rules", async () => {
         const { groups, api } = setup({ createGroup: "dm" });
-        await groups.createFixed(CHAT, [ALICE, BOB]);
+        await groups.createImmutable(CHAT, [ALICE, BOB]);
         const [, users, managers, , , policy] = api.createGroup.mock.lastCall!;
         expect(users).toEqual([]);
         expect(managers).toEqual([ALICE, BOB]);
@@ -123,24 +123,24 @@ describe("GroupClient: opening", () => {
         await expect(setup({ getGroup: groupState({ contextId: "other" }) }).groups.open(CHAT)).rejects.toThrow(TypeError);
     });
 
-    it("a fixed Group opens only for someone who names exactly its members", async () => {
+    it("an immutable Group opens only for someone who names exactly its members", async () => {
         const frozen = { addMembers: "none", removeMembers: "none", updatePolicy: "none" };
         const fixed = groupState({ users: [], managers: ["alice", "bob"], policy: frozen });
         const { groups } = setup({ getGroup: fixed });
-        await expect(groups.open(CHAT, { fixedMembers: ["bob", "alice"] })).resolves.toBeDefined();
+        await expect(groups.open(CHAT, { immutableMembers: ["bob", "alice"] })).resolves.toBeDefined();
         for (const members of [["alice"], ["alice", "carol"], ["alice", "bob", "carol"]]) {
-            expect(await codeOf(groups.open(CHAT, { fixedMembers: members }))).toBe(GroupErrorCode.GROUP_MEMBERSHIP_MISMATCH);
+            expect(await codeOf(groups.open(CHAT, { immutableMembers: members }))).toBe(GroupErrorCode.GROUP_MEMBERSHIP_MISMATCH);
         }
         expect(await codeOf(groups.open(CHAT))).toBe(GroupErrorCode.GROUP_MEMBERSHIP_MISMATCH);
         // The creator or the roster, never both: the types say so, and so does the call.
-        expect(await codeOf(groups.open(CHAT, { createdBy: "alice", fixedMembers: ["alice", "bob"] } as never))).toBe("TypeError");
+        expect(await codeOf(groups.open(CHAT, { createdBy: "alice", immutableMembers: ["alice", "bob"] } as never))).toBe("TypeError");
         // The right two users in a Group that is not frozen: somebody can still be added to it.
         for (const state of [
             groupState({ users: [], managers: ["alice", "bob"], policy: { ...frozen, addMembers: "manager" } }),
             groupState({ users: [], managers: ["alice", "bob"], policy: { ...frozen, updatePolicy: undefined } }),
             groupState({ users: ["bob"], managers: ["alice"], policy: frozen }),
         ]) {
-            expect(await codeOf(setup({ getGroup: state }).groups.open(CHAT, { fixedMembers: ["alice", "bob"] }))).toBe(
+            expect(await codeOf(setup({ getGroup: state }).groups.open(CHAT, { immutableMembers: ["alice", "bob"] }))).toBe(
                 GroupErrorCode.GROUP_MEMBERSHIP_MISMATCH,
             );
         }
@@ -265,11 +265,11 @@ describe("Group: values at subject + place", () => {
     });
 
     it("membership calls forward to the Group and return the epoch the core made", async () => {
-        const { group, api } = await chat({ removeGroupMembers: 2, reseatGroupMembers: 3, rotateGroupKey: 4 });
+        const { group, api } = await chat({ removeGroupMembers: 2, replaceGroupMemberKeys: 3, rotateGroupKey: 4 });
         await group.add([{ user: BOB, role: "user" }]);
         expect(api.addGroupMembers).toHaveBeenCalledWith(group.groupId, [{ user: BOB, role: "user" }]);
         await expect(group.remove(["bob"])).resolves.toBe(2);
-        await expect(group.reseat(["bob"])).resolves.toBe(3);
+        await expect(group.replaceMemberKey(["bob"])).resolves.toBe(3);
         await expect(group.rotateKey()).resolves.toBe(4);
         await group.setRoles([{ userId: "bob", role: "manager" }]);
         expect(api.setGroupRoles).toHaveBeenCalledWith(group.groupId, [{ userId: "bob", role: "manager" }]);

@@ -918,11 +918,11 @@ export class GroupApi extends BaseApi {
      * Allowed by the `removeMembers` rule. The caller cannot be among `userIds`.
      *
      * @param {string} groupId ID of the Group
-     * @param {string[]} userIds IDs of the members to reseat
+     * @param {string[]} userIds IDs of the members whose key is replaced
      * @returns {Promise<number>} the Group's key epoch after the call
      */
-    async reseatGroupMembers(groupId: string, userIds: string[]): Promise<number> {
-        return this.native.reseatGroupMembers(this.servicePtr, [groupId, userIds]);
+    async replaceGroupMemberKeys(groupId: string, userIds: string[]): Promise<number> {
+        return this.native.replaceGroupMemberKeys(this.servicePtr, [groupId, userIds]);
     }
 
     /**

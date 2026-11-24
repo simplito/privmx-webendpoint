@@ -32,7 +32,7 @@ limitations under the License.
  * - `openPinned` - a Group that already exists under an ID of its own. The
  *   first time the ID is taken on trust; from then on this device refuses any
  *   other Group for that subject.
- * - `createFixed` + `open({ fixedMembers })` - a subject you chose and a roster
+ * - `createImmutable` + `open({ immutableMembers })` - a subject you chose and a roster
  *   frozen for good; opening checks that the Group holds exactly the users
  *   you expect.
  * - `createUnbound` + `openUnbound` - no entity at all. The ID is trusted.
@@ -122,26 +122,26 @@ export type OpenOptions =
            * first statement.
            */
           createdBy?: string;
-          fixedMembers?: undefined;
+          immutableMembers?: undefined;
       }
     | {
           /**
-           * For a Group made with `createFixed`: the users it must hold, exactly.
+           * For a Group made with `createImmutable`: the users it must hold, exactly.
            * Anything else fails with `GROUP_MEMBERSHIP_MISMATCH`.
            */
-          fixedMembers: string[];
+          immutableMembers: string[];
           createdBy?: undefined;
       };
 
 /**
- * One Group to open with {@link GroupClient.openMany}. `fixedMembers` stands
+ * One Group to open with {@link GroupClient.openMany}. `immutableMembers` stands
  * alone; `createdBy` may go with `pinnedGroupId`.
  */
 export interface OpenItem {
     subject: Subject;
     createdBy?: string;
-    /** As in {@link GroupClient.open} with `fixedMembers`. */
-    fixedMembers?: string[];
+    /** As in {@link GroupClient.open} with `immutableMembers`. */
+    immutableMembers?: string[];
     /** As in {@link GroupClient.openPinned}. */
     pinnedGroupId?: string;
 }
@@ -169,7 +169,7 @@ function join(subject: Subject | undefined, place: LocationOrNone | Place): Loca
     return [...subject, ...(place as Place)] as unknown as Location;
 }
 
-function isFixed(state: GroupState): boolean {
+function isImmutable(state: GroupState): boolean {
     return (
         state.users.length === 0 &&
         state.policy.addMembers === "none" &&
@@ -434,8 +434,8 @@ export class Group<P = Place> {
         return this.core.api.removeGroupMembers(this.groupId, userIds);
     }
     /** For members whose key was replaced and who no longer hold the old one. @returns the new epoch */
-    reseat(userIds: string[]): Promise<number> {
-        return this.core.api.reseatGroupMembers(this.groupId, userIds);
+    replaceMemberKey(userIds: string[]): Promise<number> {
+        return this.core.api.replaceGroupMemberKeys(this.groupId, userIds);
     }
     setRoles(changes: GroupRoleChange[]): Promise<void> {
         return this.core.api.setGroupRoles(this.groupId, changes);
@@ -743,22 +743,22 @@ export class GroupClient {
         if (state.contextId !== this.core.contextId) {
             throw new TypeError("a Group of another Context");
         }
-        if (item.fixedMembers) {
+        if (item.immutableMembers) {
             const held = [...state.managers].sort().join("\0");
-            const expected = [...new Set(item.fixedMembers)].sort().join("\0");
-            if (!isFixed(state) || held !== expected) {
+            const expected = [...new Set(item.immutableMembers)].sort().join("\0");
+            if (!isImmutable(state) || held !== expected) {
                 throw new GroupClientError(
                     GroupErrorCode.GROUP_MEMBERSHIP_MISMATCH,
-                    "not the fixed Group of exactly the expected users",
+                    "not the immutable Group of exactly the expected users",
                 );
             }
             return;
         }
-        if (isFixed(state) && !item.pinnedGroupId) {
-            // Anyone can make a fixed Group under a subject they chose; it opens only for someone who names its members.
+        if (isImmutable(state) && !item.pinnedGroupId) {
+            // Anyone can make an immutable Group under a subject they chose; it opens only for someone who names its members.
             throw new GroupClientError(
                 GroupErrorCode.GROUP_MEMBERSHIP_MISMATCH,
-                "a fixed Group: open it with fixedMembers",
+                "an immutable Group: open it with immutableMembers",
             );
         }
         if (item.createdBy !== undefined) {
@@ -780,18 +780,18 @@ export class GroupClient {
     /**
      * Opens and verifies the Group of `subject`.
      *
-     * A Group made by `createFixed` opens only with `fixedMembers`, and then
+     * A Group made by `createImmutable` opens only with `immutableMembers`, and then
      * only when it holds exactly those users; without the option it is refused
      * (`GROUP_MEMBERSHIP_MISMATCH`), so forgetting it cannot open someone
      * else's roster.
      */
     async open(subject: Subject, opts: OpenOptions = {}): Promise<Group> {
-        if (opts.createdBy !== undefined && opts.fixedMembers !== undefined) {
-            throw new TypeError("open checks the creator or the fixed roster, not both");
+        if (opts.createdBy !== undefined && opts.immutableMembers !== undefined) {
+            throw new TypeError("open checks the creator or the immutable roster, not both");
         }
         const groupId = await this.core.groupIdOf(subject);
         await this.check(
-            { subject, createdBy: opts.createdBy, fixedMembers: opts.fixedMembers },
+            { subject, createdBy: opts.createdBy, immutableMembers: opts.immutableMembers },
             await this.core.api.getGroup(groupId),
         );
         return new Group(this.core, groupId, subject);
@@ -820,7 +820,7 @@ export class GroupClient {
      * them managers: nobody is more than another) and a roster, roles and
      * rules that can never change. Members can still rotate the key.
      */
-    async createFixed(subject: Subject, users: UserWithPubKey[], opts: Omit<CreateOptions, "rules"> = {}): Promise<Group> {
+    async createImmutable(subject: Subject, users: UserWithPubKey[], opts: Omit<CreateOptions, "rules"> = {}): Promise<Group> {
         const members = users.map((user) => ({ user, role: "manager" }));
         const frozen: ContainerPolicy = { addMembers: "none", removeMembers: "none", updatePolicy: "none" };
         return new Group(this.core, await this.make(subject, members, opts, frozen), subject);

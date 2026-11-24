@@ -95,7 +95,7 @@ EMSCRIPTEN_BINDINGS(webendpoint) {
     BINDING_FUNCTION(GroupApi, getGroups)
     BINDING_FUNCTION(GroupApi, getGroupPublicKey)
     BINDING_FUNCTION(GroupApi, setGroupVisibility)
-    BINDING_FUNCTION(GroupApi, reseatGroupMembers)
+    BINDING_FUNCTION(GroupApi, replaceGroupMemberKeys)
     BINDING_FUNCTION(GroupApi, setGroupRoles)
     BINDING_FUNCTION(GroupApi, updateGroupRules)
     BINDING_FUNCTION(GroupApi, getGroupLog)

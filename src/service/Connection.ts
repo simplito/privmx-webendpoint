@@ -546,7 +546,7 @@ export class Connection extends BaseApi {
      * every start for as long as some Group may still be waiting.
      *
      * Without the previous key there is nothing to renew with: another member
-     * lets the user back in with {@link GroupApi.reseatGroupMembers}.
+     * lets the user back in with {@link GroupApi.replaceGroupMemberKeys}.
      *
      * @param {string} previousUserPrivKey the previous identity private key in WIF
      */
