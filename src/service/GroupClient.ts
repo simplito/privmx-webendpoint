@@ -47,7 +47,7 @@ import {
     createGroupSubscription,
     type GenericEvent,
 } from "../events/subscriptions.js";
-import type { FileRange, GroupFileReader, GroupFileSealer } from "./fileStreams.js";
+import { openGroupFile, sealGroupFile, type FileRange, type GroupFileReader, type GroupFileSealer } from "./fileStreams.js";
 import { NO_LOCATION, type Location, type LocationOrNone, type PathSegment } from "./groupPaths.js";
 import { GroupErrorCode } from "../native/NativeErrorCodes.js";
 import {
@@ -69,9 +69,6 @@ import {
     type GroupRulesUpdate,
     type PagingList,
     type PagingQuery,
-    type SequenceAppendResult,
-    type SequenceItem,
-    type SequenceMarkInfo,
     type SpaceChangedEventData,
     type SpaceDecryptOutcome,
     type SpaceLogEntry,
@@ -136,7 +133,10 @@ export type OpenOptions =
           createdBy?: undefined;
       };
 
-/** One Group to open with {@link GroupClient.openMany}. At most one of the optional fields. */
+/**
+ * One Group to open with {@link GroupClient.openMany}. `fixedMembers` stands
+ * alone; `createdBy` may go with `pinnedGroupId`.
+ */
 export interface OpenItem {
     subject: Subject;
     createdBy?: string;
@@ -229,44 +229,113 @@ class Core {
     }
 }
 
-/** A sequence being written. See "Sequences" on {@link GroupApi} for what a reader can rely on, and when. */
-export class SequenceWriter {
+/**
+ * A sequence being written, as a stream: data in, packets out. See
+ * "Sequences" on {@link GroupApi} for what a reader can rely on, and when.
+ *
+ * Store or send {@link header} first, then every packet from `readable`, in
+ * order: items, and the marks (checkpoints) that let a reader confirm the
+ * author. Closing `writable` signs the end; aborting it, or an error such as
+ * `ENVELOPE_STALE_EPOCH` after a removal, ends the sequence without that
+ * signature.
+ *
+ * @example
+ * const enc = await group.encryptSequence(["doc", id(docId), "ops"]);
+ * await backend.saveHeader(enc.header);
+ * enc.readable.pipeTo(socketSink);
+ * const w = enc.writable.getWriter();
+ * await w.write(op);
+ * await w.close(); // nothing follows
+ */
+export class SequenceEncryptor extends TransformStream<Uint8Array, Uint8Array> {
+    /** The signed header. A reader needs it before any packet. */
+    readonly header: Uint8Array;
+    /** Emits a mark now, after the items written so far. */
+    readonly checkpoint: () => Promise<void>;
+
     /** @internal */
-    constructor(
-        private readonly api: GroupApi,
-        private readonly handle: number,
-        /** The signed header. Send or store it before the items. */
-        readonly header: Uint8Array,
-    ) {}
-    /** Send `item`, then `mark` when there is one. Fails with `ENVELOPE_STALE_EPOCH` after a removal. */
-    append(data: Uint8Array): Promise<SequenceAppendResult> {
-        return this.api.appendToSequence(this.handle, data);
-    }
-    checkpoint(): Promise<Uint8Array> {
-        return this.api.checkpointSequence(this.handle);
-    }
-    /** A final checkpoint that also says nothing follows. */
-    close(): Promise<Uint8Array> {
-        return this.api.finishSequence(this.handle);
+    constructor(api: GroupApi, handle: number, header: Uint8Array) {
+        let out!: TransformStreamDefaultController<Uint8Array>;
+        // One call at a time, so a checkpoint never lands between an item and its mark.
+        let queue: Promise<unknown> = Promise.resolve();
+        const serial = <T>(step: () => Promise<T>): Promise<T> => {
+            const next = queue.then(step);
+            queue = next.catch(() => {});
+            return next;
+        };
+        const free = () => api.closeSequence(handle).catch(() => {});
+        const failed = async (e: unknown) => {
+            await free();
+            throw e;
+        };
+        const transformer: Transformer<Uint8Array, Uint8Array> & { cancel?: () => Promise<void> } = {
+            start: (controller) => {
+                out = controller;
+            },
+            transform: (data) =>
+                serial(async () => {
+                    const { item, mark } = await api.appendToSequence(handle, data);
+                    out.enqueue(item);
+                    if (mark) out.enqueue(mark);
+                }).catch(failed),
+            flush: () => serial(async () => out.enqueue(await api.finishSequence(handle))).catch(failed),
+            cancel: () => serial(free),
+        };
+        super(transformer);
+        this.header = header;
+        this.checkpoint = () => serial(async () => out.enqueue(await api.checkpointSequence(handle)));
     }
 }
 
-export class SequenceReader {
+/** What a {@link SequenceDecryptor} emits, one per packet. */
+export type SequenceEvent =
+    /** Decrypted, in place, but not yet confirmed to be the author's: another member could have forged it. */
+    | { kind: "item"; index: number; data: Uint8Array; missing: number }
+    /** Items `0 .. verifiedUpTo-1` are exactly what the author wrote. `closed`: nothing follows. */
+    | { kind: "verified"; verifiedUpTo: number; closed: boolean }
+    /** A packet that was refused: earlier or repeated, forged, or a mark the items read do not match. */
+    | { kind: "rejected"; error: unknown };
+
+/**
+ * A sequence being read, as a stream: packets in, {@link SequenceEvent}s out.
+ * A bad packet does not end the stream; it comes out as `rejected`.
+ *
+ * @example
+ * const dec = await group.decryptSequence(["doc", id(docId), "ops"], header, { expectedAuthor });
+ * socketSource.pipeThrough(dec).pipeTo(new WritableStream({ write: (e) => apply(e) }));
+ */
+export class SequenceDecryptor extends TransformStream<Uint8Array, SequenceEvent> {
+    /** Items below this index are confirmed to be the author's. */
+    verifiedUpTo = 0;
+    /** The author closed the sequence, and everything read up to the close is confirmed. */
+    closed = false;
+    /** For a sequence read from a Space: who wrote it, and how they had access. */
+    readonly spaceOrigin?: SpaceOrigin;
+
     /** @internal */
-    constructor(
-        private readonly api: GroupApi,
-        private readonly handle: number,
-        /** For a sequence read from a Space: who wrote it, and how they had access. */
-        readonly spaceOrigin?: SpaceOrigin,
-    ) {}
-    read(item: Uint8Array): Promise<SequenceItem> {
-        return this.api.readSequenceItem(this.handle, item);
-    }
-    verify(mark: Uint8Array): Promise<SequenceMarkInfo> {
-        return this.api.verifySequenceMark(this.handle, mark);
-    }
-    close(): Promise<void> {
-        return this.api.closeSequence(this.handle);
+    constructor(api: GroupApi, handle: number, spaceOrigin?: SpaceOrigin) {
+        const free = () => api.closeSequence(handle).catch(() => {});
+        const transformer: Transformer<Uint8Array, SequenceEvent> & { cancel?: () => Promise<void> } = {
+            transform: async (packet, out) => {
+                try {
+                    if ((await api.peekSequenceItem(packet)).isMark) {
+                        const { attestedItems, closed } = await api.verifySequenceMark(handle, packet);
+                        this.verifiedUpTo = Math.max(this.verifiedUpTo, attestedItems);
+                        this.closed ||= closed;
+                        out.enqueue({ kind: "verified", verifiedUpTo: this.verifiedUpTo, closed: this.closed });
+                    } else {
+                        const { index, data, missing } = await api.readSequenceItem(handle, packet);
+                        out.enqueue({ kind: "item", index, data, missing });
+                    }
+                } catch (error) {
+                    out.enqueue({ kind: "rejected", error });
+                }
+            },
+            flush: free,
+            cancel: free,
+        };
+        super(transformer);
+        this.spaceOrigin = spaceOrigin;
     }
 }
 
@@ -337,19 +406,20 @@ export class Group<P = Place> {
         return this.core.api.openAnonymousFile(this.groupId, this.at(place), envelope, range);
     }
 
-    // ── sequences ──
-    async openSequence(place: P, opts: { checkpointEvery?: number } = {}): Promise<SequenceWriter> {
+    // ── sequences, as streams ──
+    /** @param opts.checkpointEvery a mark after this many items (default 64); 0: only on {@link SequenceEncryptor.checkpoint} */
+    async encryptSequence(place: P, opts: { checkpointEvery?: number } = {}): Promise<SequenceEncryptor> {
         const api = this.core.api;
         const handle = await api.beginSequence(this.groupId, this.at(place), opts.checkpointEvery);
-        return new SequenceWriter(api, handle, await api.getSequenceHeader(handle));
+        return new SequenceEncryptor(api, handle, await api.getSequenceHeader(handle));
     }
-    async readSequence(
+    async decryptSequence(
         place: P,
         header: Uint8Array,
         opts: DecryptOptions & { resumeFrom?: Uint8Array },
-    ): Promise<SequenceReader> {
+    ): Promise<SequenceDecryptor> {
         const api = this.core.api;
-        return new SequenceReader(
+        return new SequenceDecryptor(
             api,
             await api.openSequence(this.groupId, this.at(place), header, opts, opts.resumeFrom),
         );
@@ -514,19 +584,26 @@ export class Space<P = Place> {
             items.map((item) => ({ location: this.at(item.place), envelope: item.envelope, options: item.options })),
         );
     }
-    async openSequence(place: P, opts: { checkpointEvery?: number } = {}): Promise<SequenceWriter> {
+    async encryptFile(place: P): Promise<GroupFileSealer> {
+        return sealGroupFile(this.core.api, this.core.api.beginFileEncryptionInSpace(this.spaceId, this.at(place)));
+    }
+    async openFile(place: P, envelope: Uint8Array, opts: DecryptOptions & FileRange): Promise<GroupFileReader> {
+        const api = this.core.api;
+        return openGroupFile(api, await api.beginFileDecryptionInSpace(this.spaceId, this.at(place), envelope, opts), opts);
+    }
+    async encryptSequence(place: P, opts: { checkpointEvery?: number } = {}): Promise<SequenceEncryptor> {
         const api = this.core.api;
         const handle = await api.beginSequenceInSpace(this.spaceId, this.at(place), opts.checkpointEvery);
-        return new SequenceWriter(api, handle, await api.getSequenceHeader(handle));
+        return new SequenceEncryptor(api, handle, await api.getSequenceHeader(handle));
     }
-    async readSequence(
+    async decryptSequence(
         place: P,
         header: Uint8Array,
         opts: DecryptOptions & { resumeFrom?: Uint8Array },
-    ): Promise<SequenceReader> {
+    ): Promise<SequenceDecryptor> {
         const api = this.core.api;
         const handle = await api.openSequenceInSpace(this.spaceId, this.at(place), header, opts, opts.resumeFrom);
-        return new SequenceReader(api, handle, await api.getSpaceSequenceOrigin(handle));
+        return new SequenceDecryptor(api, handle, await api.getSpaceSequenceOrigin(handle));
     }
 
     // ── recipients: managers only ──
@@ -724,9 +801,17 @@ export class GroupClient {
      * Opens a Group that exists under an ID of its own and ties it to
      * `subject` on this device. Fails with `GROUP_SUBJECT_REBOUND` when the
      * device knows the subject under another Group.
+     *
+     * For Groups made before subjects (`GroupApi.createGroup`, a random ID kept
+     * in your database). The first open on a device takes the ID on trust;
+     * `createdBy` checks the Group's signed creator then too, so another user
+     * cannot hand over a Group of their own.
      */
-    async openPinned(subject: Subject, groupId: string): Promise<Group> {
-        await this.check({ subject, pinnedGroupId: groupId }, await this.core.api.getGroup(groupId));
+    async openPinned(subject: Subject, groupId: string, opts: { createdBy?: string } = {}): Promise<Group> {
+        await this.check(
+            { subject, pinnedGroupId: groupId, createdBy: opts.createdBy },
+            await this.core.api.getGroup(groupId),
+        );
         return new Group(this.core, groupId, subject);
     }
 

@@ -26,6 +26,12 @@ function groupState(over: Record<string, unknown> = {}) {
 }
 
 /** A GroupApi that answers from `returns` and remembers every call. */
+async function collect<T>(readable: ReadableStream<T>): Promise<T[]> {
+    const all: T[] = [];
+    await readable.pipeTo(new WritableStream({ write: (chunk) => void all.push(chunk) }));
+    return all;
+}
+
 function setup(returns: Record<string, unknown> = {}) {
     const calls: Record<string, Mock> = {};
     const base: Record<string, (...args: never[]) => unknown> = {
@@ -151,6 +157,14 @@ describe("GroupClient: opening", () => {
         );
     });
 
+    it("openPinned with createdBy checks the signed creator before pinning", async () => {
+        const { groups, api } = setup({ getGroup: groupState(), getGroupLog: first("alice") });
+        await groups.openPinned(CHAT, "legacy", { createdBy: "alice" });
+        expect(api.pinGroupToSubject).toHaveBeenCalledTimes(1);
+        expect(await codeOf(groups.openPinned(CHAT, "legacy", { createdBy: "mallory" }))).toBe(GroupErrorCode.GROUP_WRONG_CREATOR);
+        expect(api.pinGroupToSubject).toHaveBeenCalledTimes(1);
+    });
+
     it("openMany reads the states once and reports each Group on its own", async () => {
         const other: Location = ["chat-app", "chat", id("c2")];
         const { groups, api } = setup({
@@ -265,25 +279,78 @@ describe("Group: values at subject + place", () => {
         expect(api.setGroupVisibility).toHaveBeenCalledWith(group.groupId, "context");
     });
 
-    it("a sequence comes with its header, and is read with the expected author", async () => {
+    it("a sequence is written as a stream: items and marks out in order, close signs the end", async () => {
         const header = new Uint8Array([7]);
-        const { group, api } = await chat({ beginSequence: 5, getSequenceHeader: header, openSequence: 6 });
+        const item = new Uint8Array([10]);
+        const autoMark = new Uint8Array([11]);
+        const mark = new Uint8Array([12]);
+        const end = new Uint8Array([13]);
+        const { group, api } = await chat({
+            beginSequence: 5,
+            getSequenceHeader: header,
+            appendToSequence: { item, mark: autoMark },
+            checkpointSequence: mark,
+            finishSequence: end,
+        });
         const place = ["ops", id("s1")] as const;
-        const writer = await group.openSequence(place, { checkpointEvery: 8 });
-        expect(writer.header).toBe(header);
+        const enc = await group.encryptSequence(place, { checkpointEvery: 8 });
+        expect(enc.header).toBe(header);
         expect(api.beginSequence).toHaveBeenCalledWith(group.groupId, [...CHAT, ...place], 8);
-        await writer.append(DATA);
+        const packets = collect(enc.readable);
+        const w = enc.writable.getWriter();
+        await w.write(DATA);
+        await enc.checkpoint();
+        await w.close();
+        expect(await packets).toEqual([item, autoMark, mark, end]);
         expect(api.appendToSequence).toHaveBeenCalledWith(5, DATA);
-        await writer.close();
-        expect(api.finishSequence).toHaveBeenCalledWith(5);
-        const mark = new Uint8Array([3]);
-        const reader = await group.readSequence(place, header, { ...BY_ALICE, resumeFrom: mark });
-        expect(api.openSequence.mock.lastCall!.slice(0, 3)).toEqual([group.groupId, [...CHAT, ...place], header]);
-        expect(api.openSequence.mock.lastCall![4]).toBe(mark);
-        await reader.read(DATA);
-        expect(api.readSequenceItem).toHaveBeenCalledWith(6, DATA);
-        await reader.verify(mark);
-        expect(api.verifySequenceMark).toHaveBeenCalledWith(6, mark);
+        expect(api.closeSequence).not.toHaveBeenCalled();
+    });
+
+    it("an aborted or failed sequence is freed without a signed end", async () => {
+        const { group, api } = await chat({ beginSequence: 5, getSequenceHeader: ENVELOPE });
+        const aborted = await group.encryptSequence(["ops"]);
+        await aborted.writable.abort("gone");
+        expect(api.closeSequence).toHaveBeenCalledWith(5);
+        expect(api.finishSequence).not.toHaveBeenCalled();
+
+        const stale = Object.assign(new Error("stale"), { code: GroupErrorCode.ENVELOPE_STALE_EPOCH });
+        const { group: g2, api: api2 } = await chat({ beginSequence: 6, getSequenceHeader: ENVELOPE, appendToSequence: stale });
+        const failing = await g2.encryptSequence(["ops"]);
+        void failing.readable.pipeTo(new WritableStream()).catch(() => {});
+        await expect(failing.writable.getWriter().write(DATA)).rejects.toBe(stale);
+        expect(api2.closeSequence).toHaveBeenCalledWith(6);
+        expect(api2.finishSequence).not.toHaveBeenCalled();
+    });
+
+    it("a sequence is read as a stream of events; a bad packet is reported, not fatal", async () => {
+        const item = new Uint8Array([1]);
+        const mark = new Uint8Array([2]);
+        const forged = new Uint8Array([3]);
+        const refused = Object.assign(new Error("order"), { code: GroupErrorCode.ENVELOPE_SEQUENCE_ORDER });
+        const { group, api } = await chat({
+            openSequence: 6,
+            peekSequenceItem: (p: Uint8Array) => ({ sequenceId: "q", index: 0, isMark: p === mark }),
+            readSequenceItem: (_h: number, p: Uint8Array) => {
+                if (p === forged) throw refused;
+                return { data: DATA, index: 0, missing: 0 };
+            },
+            verifySequenceMark: { attestedItems: 1, closed: true },
+        });
+        const place = ["ops", id("s1")] as const;
+        const resumeFrom = new Uint8Array([4]);
+        const dec = await group.decryptSequence(place, ENVELOPE, { ...BY_ALICE, resumeFrom });
+        expect(api.openSequence).toHaveBeenCalledWith(group.groupId, [...CHAT, ...place], ENVELOPE, { ...BY_ALICE, resumeFrom }, resumeFrom);
+        const events = collect(dec.readable);
+        const w = dec.writable.getWriter();
+        for (const p of [item, forged, mark]) await w.write(p);
+        await w.close();
+        expect(await events).toEqual([
+            { kind: "item", index: 0, data: DATA, missing: 0 },
+            { kind: "rejected", error: refused },
+            { kind: "verified", verifiedUpTo: 1, closed: true },
+        ]);
+        expect([dec.verifiedUpTo, dec.closed]).toEqual([1, true]);
+        expect(api.closeSequence).toHaveBeenCalledWith(6);
     });
 
     it("on() subscribes to the Group's changes or to a channel, and returns the way out", async () => {
@@ -414,9 +481,19 @@ describe("GroupClient: Spaces", () => {
             { userId: "bob" },
             { group: "g9" },
         ]);
-        const reader = await space.readSequence(["ops"], ENVELOPE, BY_ALICE);
+        const reader = await space.decryptSequence(["ops"], ENVELOPE, BY_ALICE);
         expect(reader.spaceOrigin).toEqual(origin);
         expect(api.getSpaceSequenceOrigin).toHaveBeenCalledWith(6);
+    });
+
+    it("a Space seals and opens files at subject + place", async () => {
+        const { groups, api } = setup({ getSpace: state("alice"), beginFileEncryptionInSpace: 7, beginFileDecryptionInSpace: 8 });
+        const space = await groups.openSpace(PROJECT);
+        const location = [...PROJECT, "scan", id("s1")];
+        await space.encryptFile(["scan", id("s1")]);
+        expect(api.beginFileEncryptionInSpace).toHaveBeenCalledWith(space.spaceId, location);
+        await space.openFile(["scan", id("s1")], ENVELOPE, BY_ALICE);
+        expect(api.beginFileDecryptionInSpace).toHaveBeenCalledWith(space.spaceId, location, ENVELOPE, BY_ALICE);
     });
 
     it("an unbound Space takes a full location, or none", async () => {

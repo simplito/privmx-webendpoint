@@ -484,6 +484,73 @@ test.describe("GroupApiV2", () => {
         expect(r.unbound).toEqual("room talk");
     });
 
+    test("GroupClient: a sequence and a Space file as streams", async ({ page, backend, cli }) => {
+        const args = argsOf(backend, await setupUsers(page, cli));
+        const r = await page.evaluate(async ({ bridgeUrl, solutionId, contextId, users }) => {
+            const lib = (window as any).PrivmxWebEndpoint;
+            const { id } = lib;
+            const enc = new TextEncoder();
+            const dec = new TextDecoder();
+            const u = (x: { id: string; pubKey: string }) => ({ userId: x.id, pubKey: x.pubKey });
+            const connect = async (x: { privKey: string }) =>
+                (await lib.Endpoint.connect(x.privKey, solutionId, bridgeUrl)).groups(contextId);
+            const collect = async (readable: ReadableStream<any>) => {
+                const all: any[] = [];
+                await readable.pipeTo(new WritableStream({ write: (c) => void all.push(c) }));
+                return all;
+            };
+            const g1 = await connect(users.u1);
+            const g2 = await connect(users.u2);
+            const members = [
+                { user: u(users.u1), role: "manager" },
+                { user: u(users.u2), role: "user" },
+            ];
+
+            // A sequence: three items, a mark every two, a manual mark, a signed end.
+            const doc = ["docs", "doc", id(crypto.randomUUID())];
+            const group = await g1.create(doc, members);
+            const writer = await group.encryptSequence(["ops"], { checkpointEvery: 2 });
+            const packets = collect(writer.readable);
+            const w = writer.writable.getWriter();
+            for (const op of ["a", "b", "c"]) await w.write(enc.encode(op));
+            await writer.checkpoint();
+            await w.close();
+            const sent: Uint8Array[] = await packets;
+
+            const reader = await (await g2.open(doc)).decryptSequence(["ops"], writer.header, { expectedAuthor: users.u1.id });
+            const events = collect(reader.readable);
+            const rw = reader.writable.getWriter();
+            for (const p of [...sent, sent[0]]) await rw.write(p); // the first item again, at the end
+            await rw.close();
+            const seen = (await events).map((e: any) =>
+                e.kind === "item" ? `item:${e.index}:${dec.decode(e.data)}` : e.kind === "verified" ? `verified:${e.verifiedUpTo}:${e.closed}` : e.kind,
+            );
+
+            // A file in a Space.
+            const project = ["crm", "project", id(crypto.randomUUID())];
+            const space = await g1.createSpaceFor(project, members);
+            const sealer = await space.encryptFile(["scan"]);
+            const cipher = new Blob(await collect(new Blob([enc.encode("scan bytes")]).stream().pipeThrough(sealer)));
+            const envelope = await sealer.envelope;
+            const opened = await (await g2.openSpace(project)).openFile(["scan"], envelope, { expectedAuthor: users.u1.id });
+            const plain = await collect(cipher.stream().pipeThrough(opened.stream));
+            return { packets: sent.length, seen, file: dec.decode(await new Blob(plain).arrayBuffer()) };
+        }, args);
+
+        // a, b, mark(2), c, manual mark(3), end(3)
+        expect(r.packets).toBe(6);
+        expect(r.seen).toEqual([
+            "item:0:a",
+            "item:1:b",
+            "verified:2:false",
+            "item:2:c",
+            "verified:3:false",
+            "verified:3:true",
+            "rejected",
+        ]);
+        expect(r.file).toEqual("scan bytes");
+    });
+
     test("A Space: one key for two teams, its signed history, and a key replaced after a removal", async ({
         page,
         backend,

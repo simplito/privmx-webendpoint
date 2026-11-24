@@ -99,8 +99,8 @@ export {
     Group,
     GroupOutsider,
     Space,
-    SequenceWriter,
-    SequenceReader,
+    SequenceEncryptor,
+    SequenceDecryptor,
 } from "./service/GroupClient.js";
 export type {
     Subject,
@@ -112,6 +112,7 @@ export type {
     OpenItem,
     OpenOutcome,
     CreateOptions,
+    SequenceEvent,
 } from "./service/GroupClient.js";
 export { serializeObject, deserializeObject, strToUint8, uint8ToStr } from "./extra/utils.js";
 
