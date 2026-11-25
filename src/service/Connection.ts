@@ -533,8 +533,12 @@ export class Connection extends BaseApi {
      *
      * @param {PinStore} store e.g. `new IndexedDbPinStore()`
      * @returns {Promise<void>} resolves when the store is registered with the WASM core
+     * @throws {Error} when this connection already has a GroupApi, which would not see the store
      */
-    setPinStore(store: PinStore): Promise<void> {
+    async setPinStore(store: PinStore): Promise<void> {
+        if (this.hasApi("groups")) {
+            throw new Error("setPinStore after the GroupApi was made: call it right after connecting");
+        }
         return this.native.setPinStore(this.servicePtr, store);
     }
 

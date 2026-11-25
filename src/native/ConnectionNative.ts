@@ -52,6 +52,7 @@ const fromBase64 = (text: string) => Uint8Array.from(atob(text), (c) => c.charCo
 export class ConnectionNative extends BaseNative {
     protected lastConnectionId: number = -1;
     protected userVerifierPtr: number = -1;
+    protected pinStoreBindingId: number = -1;
 
     protected static verifierBindingId: number = -1;
     protected static getVerifierBindingId() {
@@ -59,10 +60,7 @@ export class ConnectionNative extends BaseNative {
     }
 
     async deleteApi(ptr: number): Promise<void> {
-        await this.runAsync<void>((taskId) =>
-            this.api.lib.Connection_deleteConnection(taskId, ptr),
-        );
-        this.deleteApiRef();
+        await this.deleteConnection(ptr);
     }
     async newConnection(): Promise<number> {
         return this.runAsync<number>((taskId) => this.api.lib.Connection_newConnection(taskId));
@@ -72,6 +70,11 @@ export class ConnectionNative extends BaseNative {
             this.api.lib.Connection_deleteConnection(taskId, ptr),
         );
         this.deleteApiRef();
+        this.unbindPinStore();
+    }
+    private unbindPinStore() {
+        if (this.pinStoreBindingId > -1) delete window.pinStoreBinder?.[this.pinStoreBindingId];
+        this.pinStoreBindingId = -1;
     }
     async connect(
         ptr: number,
@@ -179,6 +182,8 @@ export class ConnectionNative extends BaseNative {
             save: (key, blob, expected) => store.save(key, fromBase64(blob), fromBase64(expected)),
         };
         await this.runAsync<void>((taskId) => this.api.lib.Connection_setPinStore(taskId, connectionPtr, bindingId));
+        this.unbindPinStore(); // the store it replaced
+        this.pinStoreBindingId = bindingId;
     }
 
     protected async newUserVerifierInterface(connectionPtr: number): Promise<number> {
