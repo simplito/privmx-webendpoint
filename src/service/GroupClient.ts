@@ -41,7 +41,7 @@ limitations under the License.
  * Never "open it, and create it if it is not there": that is how a Group
  * someone else made under your subject gets used.
  */
-import type { GroupApi, DecryptOptions } from "./GroupApi.js";
+import type { GroupApi, DecryptOptions, SharedDecryptOptions } from "./GroupApi.js";
 import type { EventManager } from "../events/EventManager.js";
 import {
     createGroupCustomEventSubscription,
@@ -302,8 +302,14 @@ export class SequenceEncryptor extends TransformStream<Uint8Array, Uint8Array> {
 export type SequenceEvent =
     /** Decrypted, in place, but not yet confirmed to be the author's: another member could have forged it. */
     | { kind: "item"; index: number; data: Uint8Array; missing: number }
-    /** Items `0 .. verifiedUpTo-1` are exactly what the author wrote. `closed`: nothing follows. */
-    | { kind: "verified"; verifiedUpTo: number; closed: boolean }
+    /**
+     * A mark verified: items `from .. to-1` are exactly what the author wrote.
+     * `verifiedUpTo` is where the confirmed prefix ends: items `0 .. verifiedUpTo-1`
+     * are all the author's. It reaches `to` only when nothing before `from` is
+     * left unconfirmed - after a rejected mark it stays at the gap.
+     * `closed`: the author wrote nothing after `to`, and everything up to it is confirmed.
+     */
+    | { kind: "verified"; from: number; to: number; verifiedUpTo: number; closed: boolean }
     /** A packet that was refused: earlier or repeated, forged, or a mark the items read do not match. */
     | { kind: "rejected"; error: unknown };
 
@@ -316,9 +322,9 @@ export type SequenceEvent =
  * socketSource.pipeThrough(dec).pipeTo(new WritableStream({ write: (e) => apply(e) }));
  */
 export class SequenceDecryptor extends TransformStream<Uint8Array, SequenceEvent> {
-    /** Items below this index are confirmed to be the author's. */
+    /** Items below this index are confirmed to be the author's: a prefix with no gap. */
     verifiedUpTo = 0;
-    /** The author closed the sequence, and everything read up to the close is confirmed. */
+    /** The author closed the sequence, and everything up to the close is confirmed. */
     closed = false;
     /** For a sequence read from a Space: who wrote it, and how they had access. */
     readonly spaceOrigin?: SpaceOrigin;
@@ -330,10 +336,20 @@ export class SequenceDecryptor extends TransformStream<Uint8Array, SequenceEvent
             transform: async (packet, out) => {
                 try {
                     if ((await api.peekSequenceItem(packet)).isMark) {
-                        const { attestedItems, closed } = await api.verifySequenceMark(handle, packet);
-                        this.verifiedUpTo = Math.max(this.verifiedUpTo, attestedItems);
-                        this.closed ||= closed;
-                        out.enqueue({ kind: "verified", verifiedUpTo: this.verifiedUpTo, closed: this.closed });
+                        const { attestedFrom, attestedItems, closed } = await api.verifySequenceMark(handle, packet);
+                        // Only a mark that starts inside the confirmed prefix extends it: after a rejected
+                        // mark, the items before `attestedFrom` may hold a forgery.
+                        if (attestedFrom <= this.verifiedUpTo) {
+                            this.verifiedUpTo = Math.max(this.verifiedUpTo, attestedItems);
+                        }
+                        this.closed ||= closed && this.verifiedUpTo === attestedItems;
+                        out.enqueue({
+                            kind: "verified",
+                            from: attestedFrom,
+                            to: attestedItems,
+                            verifiedUpTo: this.verifiedUpTo,
+                            closed: this.closed,
+                        });
                     } else {
                         const { index, data, missing } = await api.readSequenceItem(handle, packet);
                         out.enqueue({ kind: "item", index, data, missing });
@@ -1015,7 +1031,7 @@ export class GroupClient {
         authorSubject: Subject,
         place: Place,
         envelope: Uint8Array,
-        opts: DecryptOptions & { homeCreatedBy: string | null },
+        opts: SharedDecryptOptions & { homeCreatedBy: string | null },
     ): Promise<DecryptedSharedEnvelope> {
         await this.requireHome(authorSubject, envelope, opts.homeCreatedBy);
         return this.core.api.decryptShared(this.core.contextId, join(authorSubject, place), envelope, opts);
@@ -1025,7 +1041,7 @@ export class GroupClient {
         authorSubject: Subject,
         place: Place,
         envelope: Uint8Array,
-        opts: DecryptOptions & FileRange & { homeCreatedBy: string | null },
+        opts: SharedDecryptOptions & FileRange & { homeCreatedBy: string | null },
     ): Promise<GroupFileReader> {
         await this.requireHome(authorSubject, envelope, opts.homeCreatedBy);
         return this.core.api.openSharedFile(this.core.contextId, join(authorSubject, place), envelope, opts);

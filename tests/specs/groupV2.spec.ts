@@ -370,8 +370,8 @@ test.describe("GroupApiV2", () => {
             ["b", 1, 0],
             ["c", 2, 0],
         ]);
-        expect(r.checkpoint).toEqual({ attestedItems: 2, closed: false });
-        expect(r.end).toEqual({ attestedItems: 3, closed: true });
+        expect(r.checkpoint).toEqual({ attestedFrom: 0, attestedItems: 2, closed: false });
+        expect(r.end).toEqual({ attestedFrom: 2, attestedItems: 3, closed: true }); // a mark proves the items since the previous one
         expect(r.afterRemoval).toEqual(r.codes.stale);
         expect(r.replayed).toEqual(r.codes.order);
         expect(r.skippedMissing).toEqual(1);

@@ -987,7 +987,14 @@ export interface SequenceItem {
 
 /** What a checkpoint or a close proved. */
 export interface SequenceMarkInfo {
-    /** Items `0 .. attestedItems-1` are exactly what the author wrote, in that order. */
+    /**
+     * The first item this mark proves. Items `attestedFrom .. attestedItems-1` are
+     * exactly what the author wrote, in that order. It is 0 unless an earlier
+     * mark failed: after one, a mark attests only from that mark on, and the
+     * items before it are not confirmed by it.
+     */
+    attestedFrom: number;
+    /** One past the last item this mark proves: how many items the author had written at the mark. */
     attestedItems: number;
     /** `true` for a close: the author wrote nothing after it. */
     closed: boolean;

@@ -353,7 +353,7 @@ describe("Group: values at subject + place", () => {
                 if (p === forged) throw refused;
                 return { data: DATA, index: 0, missing: 0 };
             },
-            verifySequenceMark: { attestedItems: 1, closed: true },
+            verifySequenceMark: { attestedFrom: 0, attestedItems: 1, closed: true },
         });
         const place = ["ops", id("s1")] as const;
         const resumeFrom = new Uint8Array([4]);
@@ -366,10 +366,37 @@ describe("Group: values at subject + place", () => {
         expect(await events).toEqual([
             { kind: "item", index: 0, data: DATA, missing: 0 },
             { kind: "rejected", error: refused },
-            { kind: "verified", verifiedUpTo: 1, closed: true },
+            { kind: "verified", from: 0, to: 1, verifiedUpTo: 1, closed: true },
         ]);
         expect([dec.verifiedUpTo, dec.closed]).toEqual([1, true]);
         expect(api.closeSequence).toHaveBeenCalledWith(6);
+    });
+
+    it("a mark after a rejected one does not confirm the gap: verifiedUpTo stays at the forged item", async () => {
+        const [first, firstMark, forged, badMark, third, closeMark] = [1, 2, 3, 4, 5, 6].map((n) => new Uint8Array([n]));
+        const marks = [firstMark, badMark, closeMark];
+        const mismatch = Object.assign(new Error("mark"), { code: GroupErrorCode.ENVELOPE_SEQUENCE_ORDER });
+        const { group } = await chat({
+            openSequence: 6,
+            peekSequenceItem: (p: Uint8Array) => ({ sequenceId: "q", index: 0, isMark: marks.includes(p) }),
+            readSequenceItem: (_h: number, p: Uint8Array) => ({ data: p, index: [first, forged, third].indexOf(p), missing: 0 }),
+            verifySequenceMark: (_h: number, p: Uint8Array) => {
+                if (p === firstMark) return { attestedFrom: 0, attestedItems: 1, closed: false };
+                if (p === badMark) throw mismatch; // item 1 is not what the author wrote
+                return { attestedFrom: 2, attestedItems: 3, closed: true }; // only from the failed mark on
+            },
+        });
+        const dec = await group.decryptSequence(["ops"], ENVELOPE, BY_ALICE);
+        const events = collect(dec.readable);
+        const w = dec.writable.getWriter();
+        for (const p of [first, firstMark, forged, badMark, third, closeMark]) await w.write(p);
+        await w.close();
+        const all = await events;
+        expect(all.map((e) => e.kind)).toEqual(["item", "verified", "item", "rejected", "item", "verified"]);
+        expect(all[1]).toEqual({ kind: "verified", from: 0, to: 1, verifiedUpTo: 1, closed: false });
+        // Items 2..3 are the author's, but item 1 is not confirmed: the prefix stops there, and the close does not count.
+        expect(all[5]).toEqual({ kind: "verified", from: 2, to: 3, verifiedUpTo: 1, closed: false });
+        expect([dec.verifiedUpTo, dec.closed]).toEqual([1, false]);
     });
 
     it("on() subscribes to the Group's changes or to a channel, and returns the way out", async () => {
