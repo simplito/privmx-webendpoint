@@ -30,8 +30,9 @@ limitations under the License.
  *   `GROUP_ALREADY_EXISTS`, and `open(subject, { createdBy })` fails when the
  *   Group's creator is not the one expected.
  * - `openPinned` - a Group that already exists under an ID of its own. The
- *   first time the ID is taken on trust; from then on this device refuses any
- *   other Group for that subject.
+ *   first time the ID is taken on trust; from then on `openPinned` on this
+ *   device refuses any other Group for that subject. `open(subject)` does not
+ *   consult the pin: it opens the Group the subject derives.
  * - `createImmutable` + `open({ immutableMembers })` - a subject you chose and a roster
  *   frozen for good; opening checks that the Group holds exactly the users
  *   you expect.
@@ -184,6 +185,16 @@ function isDuplicate(e: unknown): boolean {
         error?.name === "DuplicateResourceIdException" ||
         (typeof error?.code === "number" && (error.code & 0xffff) === DUPLICATE_RESOURCE_ID)
     );
+}
+
+// Frees a sequence handle when the step that follows its opening fails.
+async function closeOnError<T>(api: GroupApi, handle: number, step: () => Promise<T>): Promise<T> {
+    try {
+        return await step();
+    } catch (e) {
+        await api.closeSequence(handle).catch(() => {});
+        throw e;
+    }
 }
 
 function codeOf(e: unknown): number {
@@ -411,7 +422,7 @@ export class Group<P = Place> {
     async encryptSequence(place: P, opts: { checkpointEvery?: number } = {}): Promise<SequenceEncryptor> {
         const api = this.core.api;
         const handle = await api.beginSequence(this.groupId, this.at(place), opts.checkpointEvery);
-        return new SequenceEncryptor(api, handle, await api.getSequenceHeader(handle));
+        return new SequenceEncryptor(api, handle, await closeOnError(api, handle, () => api.getSequenceHeader(handle)));
     }
     async decryptSequence(
         place: P,
@@ -594,7 +605,7 @@ export class Space<P = Place> {
     async encryptSequence(place: P, opts: { checkpointEvery?: number } = {}): Promise<SequenceEncryptor> {
         const api = this.core.api;
         const handle = await api.beginSequenceInSpace(this.spaceId, this.at(place), opts.checkpointEvery);
-        return new SequenceEncryptor(api, handle, await api.getSequenceHeader(handle));
+        return new SequenceEncryptor(api, handle, await closeOnError(api, handle, () => api.getSequenceHeader(handle)));
     }
     async decryptSequence(
         place: P,
@@ -603,7 +614,7 @@ export class Space<P = Place> {
     ): Promise<SequenceDecryptor> {
         const api = this.core.api;
         const handle = await api.openSequenceInSpace(this.spaceId, this.at(place), header, opts, opts.resumeFrom);
-        return new SequenceDecryptor(api, handle, await api.getSpaceSequenceOrigin(handle));
+        return new SequenceDecryptor(api, handle, await closeOnError(api, handle, () => api.getSpaceSequenceOrigin(handle)));
     }
 
     // ── recipients: managers only ──
@@ -740,6 +751,9 @@ export class GroupClient {
     }
 
     private async check(item: OpenItem, state: GroupState): Promise<void> {
+        if (item.immutableMembers && (item.createdBy !== undefined || item.pinnedGroupId !== undefined)) {
+            throw new TypeError("immutableMembers stands alone: not with createdBy or pinnedGroupId");
+        }
         if (state.contextId !== this.core.contextId) {
             throw new TypeError("a Group of another Context");
         }
@@ -806,6 +820,9 @@ export class GroupClient {
      * in your database). The first open on a device takes the ID on trust;
      * `createdBy` checks the Group's signed creator then too, so another user
      * cannot hand over a Group of their own.
+     *
+     * Only `openPinned` (and `openMany` with `pinnedGroupId`) consults the pin;
+     * `open(subject)` opens the Group the subject derives, pinned or not.
      */
     async openPinned(subject: Subject, groupId: string, opts: { createdBy?: string } = {}): Promise<Group> {
         await this.check(
@@ -828,7 +845,8 @@ export class GroupClient {
 
     /**
      * Opens many Groups with one read of their states. One result per item,
-     * in order; a Group that failed reports its own code.
+     * in order; a Group that failed reports its own code, and an item with
+     * `immutableMembers` next to `createdBy` or `pinnedGroupId` fails on its own.
      */
     async openMany(items: OpenItem[]): Promise<OpenOutcome[]> {
         const groupIds = await Promise.all(
@@ -955,9 +973,13 @@ export class GroupClient {
      * A writer with no account, from a key the Group published. Makes no
      * request; its envelopes are unsigned and read with `decryptAnonymous`.
      *
-     * @param subject the subject of the Group the key belongs to
+     * @param subject the subject of the Group the key belongs to; a key of
+     *   another Group fails with `ENVELOPE_WRONG_GROUP`
      */
-    anonymousWriter(key: GroupPublicKey, subject: Subject): GroupOutsider {
+    async anonymousWriter(key: GroupPublicKey, subject: Subject): Promise<GroupOutsider> {
+        if ((await this.core.groupIdOf(subject)) !== key.groupId) {
+            throw new GroupClientError(GroupErrorCode.ENVELOPE_WRONG_GROUP, "the key is not of the Group of this subject");
+        }
         return new GroupOutsider(this.core, key.groupId, subject, key.pubKey);
     }
 

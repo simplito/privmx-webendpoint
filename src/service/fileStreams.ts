@@ -353,6 +353,8 @@ export class GroupFileSealer extends TransformStream<Uint8Array, Uint8Array> {
             fail = reject;
         });
         envelope.catch(() => {}); // nobody awaits it before the pipe finishes
+        // A sealer cancelled or never written to does not await `begin`: a failed begin must not go unhandled.
+        begin.catch((e) => fail(e));
 
         // `cancel` is part of Transformer but missing from this build's `lib`,
         // hence the widened type. An aborted pipe never reaches `flush`, so
@@ -425,12 +427,19 @@ export async function openGroupFile(
     const ranged = range.from !== undefined || range.length !== undefined;
     const from = range.from ?? 0;
     let cipherRange: { offset: number; length?: number } = { offset: 0 };
+    // ponytail: a no-op until the core has abortFile; then `() => api.abortFile(handle).catch(() => {})`.
+    const abort = async () => {};
     if (ranged) {
-        const offset = await api.seekInEncryptedFile(handle, from);
-        cipherRange =
-            range.length === undefined
-                ? { offset }
-                : await api.getFileCipherRange(handle, from, from + range.length);
+        try {
+            const offset = await api.seekInEncryptedFile(handle, from);
+            cipherRange =
+                range.length === undefined
+                    ? { offset }
+                    : await api.getFileCipherRange(handle, from, from + range.length);
+        } catch (e) {
+            await abort(); // the handle must not outlive a reader that was never returned
+            throw e;
+        }
     }
 
     let settle: (i: DecryptedFileInfo) => void;

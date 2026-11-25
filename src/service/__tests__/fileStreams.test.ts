@@ -231,6 +231,17 @@ describe("group files", () => {
         await expect(sealer.envelope).rejects.toThrow();
     });
 
+    test("a sealer never written to still handles a failed begin, and its envelope says so", async () => {
+        const { api } = fakeGroup();
+        const unhandled = vi.fn();
+        process.on("unhandledRejection", unhandled);
+        const sealer = sealGroupFile(api, Promise.reject(new Error("not a member")));
+        await expect(sealer.envelope).rejects.toThrow("not a member");
+        await new Promise((r) => setTimeout(r, 0));
+        process.off("unhandledRejection", unhandled);
+        expect(unhandled).not.toHaveBeenCalled();
+    });
+
     test("an aborted seal rejects the envelope instead of hanging", async () => {
         const { api, begin } = fakeGroup();
         const sealer = sealGroupFile(api, begin());

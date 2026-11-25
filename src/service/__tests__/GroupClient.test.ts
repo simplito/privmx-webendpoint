@@ -192,6 +192,19 @@ describe("GroupClient: opening", () => {
         ]);
     });
 
+    it("openMany refuses immutableMembers next to createdBy or pinnedGroupId, item by item", async () => {
+        const frozen = { addMembers: "none", removeMembers: "none", updatePolicy: "none" };
+        const fixed = { ok: true, group: groupState({ users: [], managers: ["alice", "bob"], policy: frozen }) };
+        const { groups, api } = setup({ getGroups: [fixed, fixed, fixed] });
+        const opened = await groups.openMany([
+            { subject: CHAT, immutableMembers: ["alice", "bob"], createdBy: "alice" },
+            { subject: CHAT, immutableMembers: ["alice", "bob"], pinnedGroupId: "legacy" },
+            { subject: CHAT, immutableMembers: ["alice", "bob"] },
+        ]);
+        expect(opened.map((o) => o.ok)).toEqual([false, false, true]);
+        expect(api.pinGroupToSubject).not.toHaveBeenCalled();
+    });
+
     it("an unbound Group takes a full location, or none when that is said", async () => {
         const { groups, api } = setup({ createGroup: "room", getGroup: groupState() });
         const room = await groups.createUnbound([{ user: ALICE, role: "manager" }]);
@@ -320,6 +333,12 @@ describe("Group: values at subject + place", () => {
         await expect(failing.writable.getWriter().write(DATA)).rejects.toBe(stale);
         expect(api2.closeSequence).toHaveBeenCalledWith(6);
         expect(api2.finishSequence).not.toHaveBeenCalled();
+
+        // Begun, but the header could not be read: the handle is freed, the error comes through.
+        const broken = new Error("header");
+        const { group: g3, api: api3 } = await chat({ beginSequence: 7, getSequenceHeader: broken });
+        await expect(g3.encryptSequence(["ops"])).rejects.toBe(broken);
+        expect(api3.closeSequence).toHaveBeenCalledWith(7);
     });
 
     it("a sequence is read as a stream of events; a bad packet is reported, not fatal", async () => {
@@ -391,17 +410,19 @@ describe("GroupClient: from outside a Group", () => {
 
     it("an anonymous writer makes no request and has no further recipients", async () => {
         const { groups, api } = setup();
-        const writer = groups.anonymousWriter(key("alice"), PATIENT);
+        const writer = await groups.anonymousWriter({ ...key("alice"), groupId: idOf("group", PATIENT) }, PATIENT);
         await writer.encrypt(["intake", id("i1")], DATA);
-        expect(api.encryptAnonymously).toHaveBeenCalledWith("care", "PUB", [...PATIENT, "intake", id("i1")], DATA);
+        expect(api.encryptAnonymously).toHaveBeenCalledWith(idOf("group", PATIENT), "PUB", [...PATIENT, "intake", id("i1")], DATA);
         expect(api.getGroupPublicKey).not.toHaveBeenCalled();
         await expect(writer.encrypt(["intake", id("i1")], DATA, { alsoFor: [{ user: ALICE }] })).rejects.toThrow(TypeError);
         await writer.encryptFile(["intake", id("i1"), "scan"]);
         expect(api.sealFileAnonymously).toHaveBeenCalledWith({
-            groupId: "care",
+            groupId: idOf("group", PATIENT),
             groupPubKey: "PUB",
             location: [...PATIENT, "intake", id("i1"), "scan"],
         });
+        // A key of another Group is not taken for this subject's.
+        expect(await codeOf(groups.anonymousWriter(key("alice"), PATIENT))).toBe(GroupErrorCode.ENVELOPE_WRONG_GROUP);
     });
 
     it("a shared value must say it was written in the Group of the subject it was found under", async () => {
@@ -484,6 +505,11 @@ describe("GroupClient: Spaces", () => {
         const reader = await space.decryptSequence(["ops"], ENVELOPE, BY_ALICE);
         expect(reader.spaceOrigin).toEqual(origin);
         expect(api.getSpaceSequenceOrigin).toHaveBeenCalledWith(6);
+
+        const broken = new Error("origin");
+        const failing = setup({ getSpace: state("alice"), openSequenceInSpace: 9, getSpaceSequenceOrigin: broken });
+        await expect((await failing.groups.openSpace(PROJECT)).decryptSequence(["ops"], ENVELOPE, BY_ALICE)).rejects.toBe(broken);
+        expect(failing.api.closeSequence).toHaveBeenCalledWith(9);
     });
 
     it("a Space seals and opens files at subject + place", async () => {
