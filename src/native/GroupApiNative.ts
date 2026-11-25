@@ -605,4 +605,9 @@ export class GroupApiNative extends BaseNative {
             this.api.lib.GroupApi_getSpaceLog(taskId, ptr, args),
         );
     }
+    async abortFile(ptr: number, args: [number]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.GroupApi_abortFile(taskId, ptr, args),
+        );
+    }
 }

@@ -78,9 +78,16 @@ export interface DecryptOptions {
      * you display `author.userId` from the result.
      */
     expectedAuthor: string | typeof ANY_AUTHOR;
-    /** For content that reached you as new: it must be from the current epoch. */
+    /**
+     * For content that reached you as new: it must be from the current epoch.
+     * Not for a shared read ({@link GroupApi.decryptShared}): a recipient holds
+     * no epoch of the author's Group, so it is refused there.
+     */
     currentEpochOnly?: boolean;
 }
+
+/** {@link DecryptOptions} for a shared read: there is no epoch of the author's Group to hold it to. */
+export type SharedDecryptOptions = Omit<DecryptOptions, "currentEpochOnly">;
 
 function toNativeDecryptOptions(options: DecryptOptions): NativeDecryptOptions {
     // Checked here as well as in the core: a caller in plain JavaScript gets the reason, not a bare native error.
@@ -796,13 +803,14 @@ export class GroupApi extends BaseApi {
      * the Context can address an envelope to you and name any Group as its
      * origin.
      *
-     * @throws {NativeError} `GroupErrorCode.ENVELOPE_NOT_A_RECIPIENT` when you are not among the recipients
+     * @throws {NativeError} `GroupErrorCode.ENVELOPE_NOT_A_RECIPIENT` when you are not among the recipients,
+     *   and `InvalidParams` for `currentEpochOnly`, which a shared read cannot honour
      */
     async decryptShared(
         contextId: string,
         location: LocationOrNone,
         envelope: Uint8Array,
-        options: DecryptOptions,
+        options: SharedDecryptOptions,
     ): Promise<DecryptedSharedEnvelope> {
         const result = await this.native.decryptShared(this.servicePtr, [
             contextId,
@@ -1053,9 +1061,25 @@ export class GroupApi extends BaseApi {
         return this.native.encryptFileChunk(this.servicePtr, [fileHandle, plainChunk]);
     }
 
-    /** Ends the file, releases the handle and returns the file envelope. */
+    /**
+     * Ends the file, releases the handle and returns the file envelope. When it
+     * throws the handle stays open: call it again, or {@link abortFile}.
+     */
     async finishFileEncryption(fileHandle: number): Promise<Uint8Array> {
         return this.native.finishFileEncryption(this.servicePtr, [fileHandle]);
+    }
+
+    /**
+     * Releases a file handle of either kind, from a `beginFileEncryption...` or
+     * a `beginFileDecryption...` call, without finishing it: no envelope is
+     * made and completeness is not checked. For an upload or a read given up.
+     * The stream forms ({@link sealFile}, {@link openFile}) call it themselves.
+     *
+     * @param {number} fileHandle a handle from a `beginFile...` call
+     * @returns {Promise<void>} resolves once the handle is released
+     */
+    async abortFile(fileHandle: number): Promise<void> {
+        return this.native.abortFile(this.servicePtr, [fileHandle]);
     }
 
     /**
@@ -1110,7 +1134,7 @@ export class GroupApi extends BaseApi {
         contextId: string,
         location: LocationOrNone,
         envelope: Uint8Array,
-        options: DecryptOptions,
+        options: SharedDecryptOptions,
     ): Promise<number> {
         return this.native.beginSharedFileDecryption(this.servicePtr, [
             contextId,
@@ -1726,7 +1750,7 @@ export class GroupApi extends BaseApi {
         contextId: string,
         location: LocationOrNone,
         envelope: Uint8Array,
-        options: DecryptOptions & FileRange,
+        options: SharedDecryptOptions & FileRange,
     ): Promise<GroupFileReader> {
         return openGroupFile(
             this,

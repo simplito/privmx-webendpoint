@@ -129,6 +129,7 @@ API_FUNCTION_HEADER(GroupApi, getSpaceSequenceOrigin)
 API_FUNCTION_HEADER(GroupApi, encodePath)
 API_FUNCTION_HEADER(GroupApi, pinGroupToSubject)
 API_FUNCTION_HEADER(GroupApi, getSpaceLog)
+API_FUNCTION_HEADER(GroupApi, abortFile)
 
 // groupApiPtr: pointer to a created GroupApi so the module can grant/resolve group
 // access, or 0 for a group-unaware instance.

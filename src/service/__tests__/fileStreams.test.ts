@@ -91,8 +91,12 @@ function fakeGroup() {
     let nextHandle = 1;
     const feeds: number[] = [];
     const finished: number[] = [];
+    const aborted: number[] = [];
 
     const api: GroupFileApi = {
+        async abortFile(handle) {
+            aborted.push(handle);
+        },
         async encryptFileChunk(_handle, chunk) {
             return flip(chunk);
         },
@@ -115,7 +119,7 @@ function fakeGroup() {
             return { epoch: 1, size: 1000, complete: true, sharedWith: { groups: [], users: [] } };
         },
     };
-    return { api, feeds, finished, begin: () => Promise.resolve(nextHandle++) };
+    return { api, feeds, finished, aborted, begin: () => Promise.resolve(nextHandle++) };
 }
 
 describe("progressStream / takeStream", () => {
@@ -248,6 +252,30 @@ describe("group files", () => {
         void sealer.readable.cancel();
         await sealer.writable.abort(new Error("gone"));
         await expect(sealer.envelope).rejects.toThrow("gone");
+    });
+
+    test("a file given up on releases its handle: a cancelled or failed seal, a bad chunk, a cancelled read", async () => {
+        const { api, begin, aborted } = fakeGroup();
+        const cancelled = sealGroupFile(api, begin()); // handle 1
+        void cancelled.readable.cancel();
+        await cancelled.writable.abort(new Error("gone"));
+
+        api.finishFileEncryption = () => Promise.reject(new Error("key")); // the core keeps the handle open
+        await expect(collect(new Blob([bytes(10) as BlobPart]).stream().pipeThrough(sealGroupFile(api, begin())))).rejects.toThrow("key");
+
+        api.decryptFileChunk = () => Promise.reject(new Error("corrupted"));
+        const bad = await openGroupFile(api, 3);
+        await expect(collect(new Blob([bytes(10) as BlobPart]).stream().pipeThrough(bad.stream))).rejects.toThrow("corrupted");
+        await expect(bad.info).rejects.toThrow("corrupted");
+
+        const dropped = await openGroupFile(api, 4);
+        await dropped.stream.writable.abort(new Error("user"));
+
+        api.seekInEncryptedFile = () => Promise.reject(new Error("range"));
+        await expect(openGroupFile(api, 5, { from: 10 })).rejects.toThrow("range");
+
+        await new Promise((r) => setTimeout(r, 0));
+        expect(new Set(aborted)).toEqual(new Set([1, 2, 3, 4, 5]));
     });
 
     test("opens a range and reports which ciphertext bytes hold it", async () => {

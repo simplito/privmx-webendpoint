@@ -40,6 +40,7 @@ export interface GroupFileApi {
     getFileCipherRange(handle: number, from: number, to: number): Promise<CipherRange>;
     seekInEncryptedFile(handle: number, position: number): Promise<number>;
     finishFileDecryption(handle: number): Promise<DecryptedFileInfo>;
+    abortFile(handle: number): Promise<void>;
 }
 
 /** A part of a file's plaintext: from `from` (default 0), `length` bytes (default: to the end). */
@@ -355,6 +356,8 @@ export class GroupFileSealer extends TransformStream<Uint8Array, Uint8Array> {
         envelope.catch(() => {}); // nobody awaits it before the pipe finishes
         // A sealer cancelled or never written to does not await `begin`: a failed begin must not go unhandled.
         begin.catch((e) => fail(e));
+        // Releases a file given up on. A handle already released, or never begun, has nothing to release.
+        const abort = () => begin.then((handle) => api.abortFile(handle)).catch(() => {});
 
         // `cancel` is part of Transformer but missing from this build's `lib`,
         // hence the widened type. An aborted pipe never reaches `flush`, so
@@ -366,6 +369,7 @@ export class GroupFileSealer extends TransformStream<Uint8Array, Uint8Array> {
                     if (sealed.length) controller.enqueue(sealed);
                 } catch (e) {
                     fail(e); // an errored stream never reaches `flush`: the envelope must not hang
+                    await abort();
                     throw e;
                 }
             },
@@ -374,10 +378,14 @@ export class GroupFileSealer extends TransformStream<Uint8Array, Uint8Array> {
                     settle(await api.finishFileEncryption(await begin));
                 } catch (e) {
                     fail(e);
+                    await abort(); // a finish that threw keeps the handle open
                     throw e;
                 }
             },
-            cancel: (reason) => fail(reason),
+            cancel: (reason) => {
+                fail(reason);
+                void abort(); // not awaited: a pending cancel would turn the abort's reason into the cancel's
+            },
         };
         super(transformer);
         this.envelope = envelope;
@@ -427,8 +435,8 @@ export async function openGroupFile(
     const ranged = range.from !== undefined || range.length !== undefined;
     const from = range.from ?? 0;
     let cipherRange: { offset: number; length?: number } = { offset: 0 };
-    // ponytail: a no-op until the core has abortFile; then `() => api.abortFile(handle).catch(() => {})`.
-    const abort = async () => {};
+    // Releases a read given up on: no reader returned, a bad chunk, or a cancel.
+    const abort = () => api.abortFile(handle).catch(() => {});
     if (ranged) {
         try {
             const offset = await api.seekInEncryptedFile(handle, from);
@@ -455,18 +463,24 @@ export async function openGroupFile(
     let left = range.length ?? Infinity;
     const transformer: Transformer<Uint8Array, Uint8Array> & CancellableTransformer = {
         async transform(chunk, controller) {
-            for (let at = 0; at < chunk.length; at += MAX_DECRYPT_CHUNK) {
-                const plain = await api.decryptFileChunk(
-                    handle,
-                    chunk.slice(at, at + MAX_DECRYPT_CHUNK),
-                );
-                if (!plain.length || left <= 0) continue;
-                const piece = plain.length <= left ? plain : plain.slice(0, left);
-                left -= piece.length;
-                controller.enqueue(piece);
-                // Deliberately no `terminate()` here: ending a transform from
-                // inside its own `transform` deadlocks the pipe. Stop feeding
-                // instead - that is what makes a ranged read cheap anyway.
+            try {
+                for (let at = 0; at < chunk.length; at += MAX_DECRYPT_CHUNK) {
+                    const plain = await api.decryptFileChunk(
+                        handle,
+                        chunk.slice(at, at + MAX_DECRYPT_CHUNK),
+                    );
+                    if (!plain.length || left <= 0) continue;
+                    const piece = plain.length <= left ? plain : plain.slice(0, left);
+                    left -= piece.length;
+                    controller.enqueue(piece);
+                    // Deliberately no `terminate()` here: ending a transform from
+                    // inside its own `transform` deadlocks the pipe. Stop feeding
+                    // instead - that is what makes a ranged read cheap anyway.
+                }
+            } catch (e) {
+                fail(e); // an errored stream never reaches `flush`: `info` must not hang
+                await abort();
+                throw e;
             }
         },
         async flush() {
@@ -474,10 +488,14 @@ export async function openGroupFile(
                 settle(await api.finishFileDecryption(handle));
             } catch (e) {
                 fail(e);
+                await abort();
                 throw e;
             }
         },
-        cancel: (reason) => fail(reason), // an abort must reject `info`
+        cancel: (reason) => {
+            fail(reason); // an abort must reject `info`
+            void abort();
+        },
     };
     const stream = new TransformStream<Uint8Array, Uint8Array>(transformer);
 
