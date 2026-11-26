@@ -29,7 +29,7 @@ This README walks through both, in that order.
 ### Quick look
 
 ```ts
-import { Endpoint, setupAuto } from "@simplito/privmx-webendpoint";
+import { Endpoint, id, setupAuto } from "@simplito/privmx-webendpoint";
 
 await setupAuto();                                   // load the WASM core
 const conn   = await Endpoint.connect(privateKey, solutionId, bridgeUrl);
@@ -37,9 +37,11 @@ const groups = await conn.getGroupApi();
 
 const groupId = await groups.createGroup(contextId, [alice, bob], [alice], publicMeta, privateMeta);
 
-// A Group can encrypt on its own. No container needed.
-const sealed = await groups.encrypt(groupId, new TextEncoder().encode("ship it"));
-const opened = await groups.decrypt(sealed);         // you also learn who wrote it
+// A Group can encrypt on its own. No container needed. The envelope is bound to
+// where the value lives in your data, and a read says whose writing it expects.
+const place  = ["my-app", "note", id(noteId)] as const;
+const sealed = await groups.encrypt(groupId, place, new TextEncoder().encode("ship it"));
+const opened = await groups.decrypt(groupId, place, sealed, { expectedAuthor: "alice" });
 ```
 
 **You need** a browser page with cross-origin isolation (see
@@ -285,31 +287,81 @@ Removal cost grows with the *logarithm* of the Group size, so Groups of a few
 thousand people are fine. For which key versions stay readable and for whom, see
 the [API reference](https://docs.privmx.dev/docs/latest/reference/webendpoint/api-reference/connection).
 
-### 3. Encrypt something for a Group
-
-You do not need a container. `encrypt` seals the bytes for the Group and signs
-them with your key:
+**Roles, rules, and a member whose key changed.** A role is not a key, so
+changing one moves nothing anybody reads with:
 
 ```ts
-const sealed = await groups.encrypt(groupId, new TextEncoder().encode("ship it"));
+await groups.setGroupRoles(groupId, [{ userId: "dana", role: "manager" }]);
+
+// Who may add, remove, and rewrite metadata. Here: any member adds, managers remove.
+await groups.updateGroupRules(groupId, { addMembers: "user", removeMembers: "manager" });
+```
+
+Every change above is a signed statement, and `getGroupLog` returns them all,
+verified from the Group's creation:
+
+```ts
+const { readItems } = await groups.getGroupLog(groupId, { skip: 0, limit: 20, sortOrder: "desc" });
+for (const entry of readItems) console.log(entry.seq, entry.kind, entry.author);
+```
+
+When a member's identity key is replaced, they are still on the roster but can
+open nothing. With the old key at hand they fix it themselves, once, on
+connecting; without it, somebody else lets them back in:
+
+```ts
+// The member, old key still at hand:
+await connection.renewIdentity(previousPrivKeyWif);
+
+// Somebody else, after checking the new key really is Dana's:
+await groups.replaceGroupMemberKeys(groupId, ["dana"]);   // a new key version; Dana keeps her seat
+```
+
+The replacement wraps to the key the Context lists for Dana now, so whether that key
+is hers is your `UserVerifierInterface`'s answer. With no service to ask, a
+connection can keep to key continuity instead: it remembers the first key it
+sees each user with and refuses any other until told the change is genuine.
+
+```ts
+await connection.useKeyContinuity();                  // right after connecting
+await connection.acceptKeyChange(contextId, "dana", danaOldPubKey, danaPubKey);
+```
+
+### 3. Encrypt something for a Group
+
+You do not need a container. `encrypt` seals the bytes for the Group, signs them
+with your key, and binds them to **where the value lives in your data**:
+
+```ts
+import { id } from "@simplito/privmx-webendpoint";
+
+// A name you write in code is a string; anything that comes from data goes through id().
+const place  = ["my-app", "note", id(noteId), "body"] as const;
+const sealed = await groups.encrypt(groupId, place, new TextEncoder().encode("ship it"));
 await myBucket.put(key, sealed);                    // your storage sees ciphertext
 ```
 
-`decrypt` gives you the plaintext back together with the envelope's metadata,
-including who sealed it:
+`decrypt` takes the same place, and the author you are about to show - usually
+the one your server names next to the envelope:
 
 ```ts
-import { Types } from "@simplito/privmx-webendpoint";
-
-const opened = await groups.decrypt(await myBucket.get(key));
-if (opened.type === Types.EnvelopeType.ENVELOPE_FROM_MEMBER) {
-    console.log("written by", opened.authorPubKey);   // checked
-} else {
-    console.log("anonymous, and nobody can tell you who sent it");
-}
+const opened = await groups.decrypt(groupId, place, await myBucket.get(key), {
+    expectedAuthor: row.authorId,
+});
+console.log("written by", opened.author.userId, "as", opened.author.role);   // checked
 ```
 
-Check `type`. A filled-in author field proves nothing on its own.
+Three things your server could do, and what the read answers:
+
+- **Store the envelope under another record.** The place no longer matches:
+  `GroupErrorCode.ENVELOPE_WRONG_LOCATION`.
+- **Name another author beside it.** `GroupErrorCode.ENVELOPE_WRONG_AUTHOR`.
+- **Hand over what somebody outside the Group wrote.** `decrypt` reads a member's
+  envelope and nothing else: `GroupErrorCode.ENVELOPE_WRONG_KIND`.
+
+If you show the author only from the result, pass `ANY_AUTHOR` instead of a name.
+For a value that belongs to no record, pass `NO_LOCATION` as the place: it has to
+be said, and it gives up the first of the three checks above.
 
 An envelope carries its own Group id and key version, so any member can open it
 later, even after the key rotates, with nothing else alongside it.
@@ -327,41 +379,50 @@ bucket, a file the user downloads. Whoever stores them learns nothing from them.
 ### 4. Files of any size
 
 `sealFile` gives you a `TransformStream`. Plaintext goes in, ciphertext comes
-out, and the envelope arrives at the end.
+out, and the envelope arrives at the end. You do not need the size up front.
 
 ```ts
-const sealer = groups.sealFile({ groupId, size: file.size });
+const sealer = groups.sealFile({ groupId, location: ["my-app", "scan", id(scanId)] });
 
 await file.stream().pipeThrough(sealer).pipeTo(myBucket.writable(key));
 await myBucket.put(`${key}.envelope`, await sealer.envelope);
 ```
 
-Keep both. The ciphertext is the file. The envelope is a small header naming the
-Group, the key version, the author and the size, and without it nobody opens the
-file, including members.
+Keep both. The ciphertext is the file. The envelope names the Group, the key
+version, the author and the place, and lists the size and a digest of every
+chunk, signed by the author. Without it nobody opens the file, including
+members. With it, a chunk that anyone else rewrote, moved or swapped is refused
+at that chunk.
 
-Reading it back mirrors that:
+Reading it back mirrors that. As with `decrypt`, you say where the file belongs
+and who you expect it from:
 
 ```ts
-const reader = await groups.openFile(envelope);
-const blob   = await new Response(ciphertext.pipeThrough(reader.stream)).blob();
+const reader = await groups.openFile(groupId, ["my-app", "scan", id(scanId)], envelope, {
+    expectedAuthor: uploadedBy,
+});
+const blob = await new Response(ciphertext.pipeThrough(reader.stream)).blob();
 
-if (!(await reader.info).complete) throw new Error("the file was cut short");
+const info = await reader.info;                    // rejects if the file was cut short
+console.log(info.author?.userId, info.size);
 ```
 
-Only a start-to-end read can answer `info.complete`. For a **range**, ask where
-to start and fetch that part:
+For a **range**, ask which ciphertext bytes hold it and fetch only those:
 
 ```ts
-const r = await groups.openFile(envelope, { from: 1 << 20, length: 64 });
+const r = await groups.openFile(groupId, ["my-app", "scan", id(scanId)], envelope, {
+    expectedAuthor: uploadedBy,
+    from: 1 << 20,
+    length: 64,
+});
+const { offset, length } = r.cipherRange;          // for an HTTP Range request
 const head = await new Response(
-    myBucket.readableFrom(key, r.ciphertextOffset).pipeThrough(r.stream),
+    myBucket.readableRange(key, offset, length!).pipeThrough(r.stream),
 ).text();                                          // output starts at plaintext byte 1 MiB
 ```
 
-`ciphertextOffset` is the point. In a 2 MiB file, seeking to 1 MiB leaves about
-half the ciphertext unfetched. A seeked read gives up the completeness check, so
-`complete` comes back `false` there.
+A ranged read gives up the completeness check, so `complete` comes back `false`
+there. The bytes you did read are still the author's.
 
 Streams bring backpressure with them, so a slow sink slows the reader down and a
 file bigger than memory still goes through. Add progress and cancellation with
@@ -372,12 +433,47 @@ import { progressStream } from "@simplito/privmx-webendpoint";
 
 await file.stream()
     .pipeThrough(progressStream((sent) => setPct(sent / file.size)))
-    .pipeThrough(groups.sealFile({ groupId, size: file.size }))
+    .pipeThrough(groups.sealFile({ groupId, location: ["my-app", "scan", id(scanId)] }))
     .pipeTo(myBucket.writable(key), { signal });
 ```
 
 The chunked calls underneath (`beginFileEncryption`, `encryptFileChunk`,
 `finishFileEncryption`) are still there if you want to drive them.
+
+#### Many small items in order
+
+For edits of a shared document, live captions or cursors, signing every item is
+too slow. A **sequence** signs once, in its header, and then seals each item
+under the sequence's own key with its position. Every so often (64 items by
+default) the author signs a checkpoint over everything so far.
+
+```ts
+const ops = await groups.beginSequence(groupId, ["my-app", "doc", id(docId), "ops"]);
+send(await groups.getSequenceHeader(ops));          // first, before the items
+
+const { item, mark } = await groups.appendToSequence(ops, edit);
+send(item);
+if (mark) send(mark);                               // a checkpoint was due
+```
+
+```ts
+const reading = await groups.openSequence(groupId, ["my-app", "doc", id(docId), "ops"], header, {
+    expectedAuthor: authorId,
+});
+const { data, missing } = await groups.readSequenceItem(reading, item);
+const { attestedFrom, attestedItems } = await groups.verifySequenceMark(reading, mark);
+```
+
+An item is readable at once, and at that point you know a member of the Group
+made it and where it belongs. That the **author** made it you know after the
+next checkpoint verifies: items `attestedFrom .. attestedItems-1` are exactly
+the author's. `attestedFrom` is the count of the last checkpoint this reader
+verified or resumed from (0 at the start); after a failed checkpoint, that
+checkpoint's count, so the items before it stay unconfirmed. `GroupClient`'s `decryptSequence` keeps this for
+you: its `verified` event carries the checkpoint's `from`/`to` and
+`verifiedUpTo`, the end of the prefix confirmed with no gap. A sequence ends with its epoch: after a removal
+`appendToSequence` fails with `ENVELOPE_STALE_EPOCH` and you begin a new one, so
+the removed member reads nothing new.
 
 ### 5. Senders with no account
 
@@ -386,26 +482,30 @@ tipster, a customer with a link, a form on a public page. They need the Group's
 **id and public key**, both public:
 
 ```ts
-import { Endpoint } from "@simplito/privmx-webendpoint";
+import { Endpoint, id } from "@simplito/privmx-webendpoint";
 
 // No user, no registered key, no login.
 const guest       = await Endpoint.connectPublic(solutionId, bridgeUrl);
 const guestGroups = await Endpoint.createGroupApi(guest);
 
 const sealed = await guestGroups.encryptAnonymously(
-    groupId, groupPubKey, new TextEncoder().encode("I saw the invoices being rewritten"),
+    groupId, groupPubKey, ["my-app", "tip", id(tipId)],
+    new TextEncoder().encode("I saw the invoices being rewritten"),
 );
 
 // Files have their own call, which says what it does.
-const sealer = guestGroups.sealFileAnonymously({ groupId, groupPubKey, size: file.size });
+const sealer = guestGroups.sealFileAnonymously({
+    groupId, groupPubKey, location: ["my-app", "tip", id(tipId), "file"],
+});
 await file.stream().pipeThrough(sealer).pipeTo(myBucket.writable(key));
 ```
 
 Three properties come with it:
 
 - **Sealing calls no server.** The Bridge never learns the submission happened.
-- **Nobody can attribute it.** Each call uses a throwaway keypair, so members see
-  `ENVELOPE_ANONYMOUS` and no author.
+- **Nobody can attribute it.** Each call uses a throwaway keypair. Members open
+  it with `decryptAnonymous`, which reports no sender; `decrypt` refuses it, so
+  it is never shown as a member's.
 - **The sender cannot read it back.** Only the Group can.
 
 A guest cannot send Group notifications, which need membership. Whatever
@@ -456,6 +556,131 @@ Payloads cap out around 11 KB, and anyone offline misses the event. Put anything
 that has to survive in a container.
 
 ---
+
+### 7. Groups by the entity they serve
+
+Everything above names a Group by its ID. That ID usually comes from your
+server, in a row beside the record it protects, and whoever controls that row
+decides which Group your user encrypts for. `GroupClient` removes the row. A
+Group is named by its **subject**, the path of the entity it belongs to, and
+its ID follows from that path.
+
+```ts
+const client = await conn.groups(contextId);
+
+// A new chat: make its id at random, then the Group under it.
+const chatId = crypto.randomUUID();
+const chat = await client.create(
+    ["chat-app", "chat", id(chatId)],
+    [{ user: me, role: "manager" }, { user: dana, role: "user" }],
+);
+await myDb.chats.insert({ chatId, createdBy: me.userId });
+
+// Every value is bound to subject + place.
+const body = await chat.encrypt(["message", id(messageId), "body"], strToUint8("Hello"));
+```
+
+Reading it, on another device:
+
+```ts
+const chat = await client.open(["chat-app", "chat", id(chatRow.chatId)], {
+    createdBy: chatRow.createdBy,
+});
+const message = await chat.decrypt(["message", id(messageId), "body"], body, {
+    expectedAuthor: row.authorId,
+});
+```
+
+`createdBy` is checked against the Group's first signed statement. If someone
+else made a Group under your chat's subject first, `open` fails with
+`GROUP_WRONG_CREATOR` instead of handing you their Group.
+
+When do you need `createdBy`? Whoever knows a subject before its Group exists
+can create that Group first. So it depends on where the identifier came from:
+
+- **You made it at random right before `create`** (as above): nobody knew it,
+  nobody could be first, and `open(subject)` is enough.
+- **It existed before, or someone else chose it** (your server numbered the
+  row, a slug, a user's name): always `open(subject, { createdBy })`.
+
+If in doubt, pass `createdBy`. It is never wrong, only sometimes unnecessary.
+
+Pick the pair that fits the entity:
+
+| You have | Create | Open |
+|---|---|---|
+| An entity, id made at random just now | `create(subject, members)` | `open(subject)` |
+| An entity whose id was known earlier | `create(subject, members)` | `open(subject, { createdBy })` |
+| A 1:1 chat named by its two users | `createImmutable(subject, users)` | `open(subject, { immutableMembers: userIds })` |
+| A Group that already has an ID | `GroupApi.createGroup` | `openPinned(subject, groupId)` |
+| No entity at all | `createUnbound(members)` | `openUnbound(groupId)` |
+
+Never "open it, and create it if it is not there". That is how a Group someone
+else made under your subject gets used.
+
+A Group you are not in is named with its creator too, wherever something is
+wrapped for it or written to it:
+
+```ts
+// One note, also readable by billing.
+await chat.encrypt(["note", id(noteId)], strToUint8("Invoice sent"), {
+    alsoFor: [{ subject: ["chat-app", "billing"], createdBy: billingOwnerId }],
+});
+
+// A writer that is not a member: it can write, and read nothing back.
+const outsider = await client.openForWriting({
+    subject: ["chat-app", "chat", id(chatRow.chatId)],
+    createdBy: chatRow.createdBy,
+});
+await outsider.encrypt(["lab", id(noteId)], strToUint8("CRP 3.1"));
+```
+
+#### One key for several Groups
+
+`alsoFor` wraps a value's key once per reader, for every value. When the same
+Groups read the same records all the time, a **Space** wraps one key for them
+once, and writing a value wraps nothing.
+
+```ts
+const space = await client.createSpaceFor(["crm", "project", id(projectId)], [
+    { subject: ["crm", "team", id(salesId)], createdBy: me.userId, role: "manager" },
+    { subject: ["crm", "team", id(supportId)], createdBy: supportLeadId, role: "user" },
+]);
+const sealedNote = await space.encrypt(["note", id(noteId)], strToUint8("Call the client"));
+
+const opened = await space.decrypt(["note", id(noteId)], sealedNote, { expectedAuthor: row.authorId });
+if (opened.origin.authorAccess !== "yes") {
+    throw new Error("written by someone whose access is not confirmed");
+}
+```
+
+Check `authorAccess`. Someone removed from a team still holds the Space's key
+until it is replaced, so the key alone does not say the author had access. The
+Bridge marks the Space as stale after such a removal and the next write
+replaces the key first. To close the window at once, call `space.rotateKey()`
+right after the removal.
+
+`space.onChange(callback)` tells you when that happens, or anything else about
+the Space moves (`event.data.changeKind`: `keyStale`, `keyRotated`,
+`recipientsAdded`, `recipientsRemoved`, `metaUpdated`, `deleted`). The event is
+the Bridge's word; `space.state()` after it reads and verifies.
+
+#### Remember what was verified
+
+The library checks the signed history of every Group and Space, and remembers
+how far it got. In a browser that memory ends with the page unless you give it
+a place to live:
+
+```ts
+import { IndexedDbPinStore } from "@simplito/privmx-webendpoint";
+
+await connection.setPinStore(new IndexedDbPinStore()); // right after connecting, before any other API
+```
+
+Without it every reload starts from first contact, and a Bridge that serves an
+older history after a reload is not caught. Any object with `load(key)` and
+`save(key, blob, expected)` works (`PinStore`); `save` must be a
+compare-and-swap.
 
 ## What's included
 
@@ -932,6 +1157,8 @@ on an API after disconnect throws.
   than buffering whole files in memory on top of it.
 - **Compression:** the `.wasm` is ~6.7 MB; serve it gzip/brotli (brotli ≈ −70%).
 - **Errors:** treat `NativeError` as your typed failure channel (see above).
+- **Groups:** call `connection.setPinStore(new IndexedDbPinStore())` right after
+  connecting, so what was verified survives a reload.
 
 ---
 

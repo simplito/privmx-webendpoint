@@ -1,5 +1,5 @@
 /**
- * PrivMX Web Endpoint - searchable group chat (GroupApi + SearchApi).
+ * PrivMX Web Endpoint - searchable group chat (GroupClient + SearchApi).
  *
  * Two users share one page so the Group mechanics are visible as they happen,
  * instead of being spread over two browser tabs and a list of manual steps.
@@ -8,7 +8,7 @@
  *
  *   1. Alice creates a Group, a Search Index and a Thread. The Index and the
  *      Thread are granted to the *Group*, not to a list of users - that is the
- *      point of GroupApi: membership lives in one place.
+ *      point of Groups: membership lives in one place.
  *   2. Bob is registered in the Context but is not in the Group, so he cannot
  *      even see the room. `listThreads` returns nothing for him.
  *   3. Alice adds Bob. The Group's key epoch does NOT move, so nothing is
@@ -57,9 +57,9 @@ export function App() {
         // would seat Bob twice.
         setCanAdd(false);
         setCanRemove(true);
-        const group = await alice.groupApi.getGroup(alice.groupId);
+        const group = await alice.room!.state();
         const rejoining = bob.threadId !== "";
-        await alice.groupApi.addGroupMembers(alice.groupId, [{ user: bob.me, role: "user" }]);
+        await alice.room!.add([{ user: bob.me, role: "user" }]);
         // Adding never moves the epoch, so `group` is still current.
         log("alice", `${rejoining ? "re-added" : "added"} bob - epoch stays ${group.keyVersion}, nothing re-keyed`);
 
@@ -79,9 +79,9 @@ export function App() {
     async function removeBob(): Promise<void> {
         setCanRemove(false);
         setCanAdd(true); // he can always be let back in
-        const group = await alice.groupApi.getGroup(alice.groupId);
-        await alice.groupApi.removeGroupMembers(alice.groupId, [bob.userId]);
-        const after = await alice.groupApi.getGroup(alice.groupId);
+        const group = await alice.room!.state();
+        await alice.room!.remove([bob.userId]);
+        const after = await alice.room!.state();
         log("alice", `removed bob - epoch ${group.keyVersion} → ${after.keyVersion}`);
         showRoomState(after);
 
@@ -100,7 +100,7 @@ export function App() {
         // Alice joins an existing room if one is already on the Bridge, so the demo
         // survives a reload; otherwise she creates it.
         if (!(await alice.openRoom())) await alice.createRoom();
-        showRoomState(await alice.groupApi.getGroup(alice.groupId));
+        showRoomState(await alice.room!.state());
 
         if (await bob.openRoom()) {
             setCanRemove(true);

@@ -9,6 +9,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { GroupClient } from "./GroupClient.js";
 import { BaseApi } from "./BaseApi.js";
 import { ConnectionNative } from "../native/ConnectionNative.js";
 import {
@@ -23,6 +24,7 @@ import {
 } from "../Types.js";
 import { BaseNative } from "../native/BaseNative.js";
 import { UserVerifierInterface } from "./UserVerifierInterface.js";
+import type { PinStore } from "./PinStore.js";
 import type { ThreadApi } from "./ThreadApi.js";
 import type { StoreApi } from "./StoreApi.js";
 import type { InboxApi } from "./InboxApi.js";
@@ -386,6 +388,18 @@ export class Connection extends BaseApi {
     }
 
     /**
+     * The Groups and Spaces of one Context, addressed by the entity of your app
+     * they serve instead of by an ID read from a server. Built on
+     * {@link getGroupApi}; see {@link GroupClient}.
+     *
+     * @param {string} contextId the Context the Groups live in
+     * @returns {Promise<GroupClient>} a client for that Context
+     */
+    async groups(contextId: string): Promise<GroupClient> {
+        return new GroupClient(await this.getGroupApi(), contextId, () => this.getEventManager());
+    }
+
+    /**
      * Returns the single {@link EventManager} for this connection. Subscribe to
      * events of any module (Threads, Stores, Inboxes, KVDBs, custom events, user
      * and connection-state) through it - build entries with the typed
@@ -507,6 +521,92 @@ export class Connection extends BaseApi {
      */
     setUserVerifier(verifier: UserVerifierInterface): Promise<void> {
         return this.native.setUserVerifier(this.servicePtr, [this.servicePtr, verifier]);
+    }
+
+    /**
+     * Gives the connection a place to keep, between sessions, what this device
+     * has already verified about Groups and Spaces - see {@link PinStore}.
+     * Without it a reload forgets, and a Bridge may serve an older history.
+     *
+     * Call it right after connecting, before `getGroupApi()`, `groups()` or any
+     * other API of this connection: each reads the store when it is created.
+     *
+     * @param {PinStore} store e.g. `new IndexedDbPinStore()`
+     * @returns {Promise<void>} resolves when the store is registered with the WASM core
+     * @throws {Error} when this connection already has a GroupApi, which would not see the store
+     */
+    async setPinStore(store: PinStore): Promise<void> {
+        if (this.hasApi("groups")) {
+            throw new Error("setPinStore after the GroupApi was made: call it right after connecting");
+        }
+        return this.native.setPinStore(this.servicePtr, store);
+    }
+
+    /**
+     * After the user's identity key changed and the previous one is still at
+     * hand: from then on every GroupApi of this connection re-wraps the
+     * caller's own leaf to the current key by itself, the first time it reads a
+     * Group the current key does not open. Call it right after connecting, on
+     * every start for as long as some Group may still be waiting.
+     *
+     * Without the previous key there is nothing to renew with: another member
+     * lets the user back in with {@link GroupApi.replaceGroupMemberKeys}.
+     *
+     * @param {string} previousUserPrivKey the previous identity private key in WIF
+     */
+    renewIdentity(previousUserPrivKey: string): Promise<void> {
+        return this.native.renewIdentity(this.servicePtr, [previousUserPrivKey]);
+    }
+
+    /**
+     * Sets the built-in key-continuity verifier as this connection's
+     * UserVerifier: the first key a user of a Context is seen with is taken as
+     * theirs (trust on first use), and any other key for that user is refused
+     * until {@link acceptKeyChange}. For an application with no server of its
+     * own to ask; one that has such a service should implement
+     * {@link UserVerifierInterface} instead, which also covers the first key.
+     *
+     * Not the default, and not free of consequences. What it knows lives in
+     * this connection's memory, so every new connection trusts first use again
+     * and has to be told again of every change it must accept. And a user whose
+     * key changed is refused wherever both keys appear: in a Group's history
+     * after a leaf renewal, or on an item one user wrote and another edited.
+     * Call it right after connecting, before creating any module API.
+     */
+    useKeyContinuity(): Promise<void> {
+        return this.native.useKeyContinuity(this.servicePtr, []);
+    }
+
+    /**
+     * Tells this connection that a user's identity key changed, and that the
+     * application has checked the change. For a connection that keeps to key
+     * continuity ({@link useKeyContinuity}).
+     *
+     * After this call `newPubKey` is the user's key; `previousPubKey` stays
+     * good for what was signed before. The knowledge lives in this
+     * connection's memory only.
+     *
+     * Rejects when `previousPubKey` is not the key this connection knows the
+     * user by, or when key continuity is not on: the application's own
+     * verifier decides then, and is the thing to update.
+     *
+     * @param {string} contextId ID of the Context the user belongs to
+     * @param {string} userId ID of the user
+     * @param {string} previousPubKey the key the user had, in Base58DER
+     * @param {string} newPubKey the key the user has now, in Base58DER
+     */
+    acceptKeyChange(
+        contextId: string,
+        userId: string,
+        previousPubKey: string,
+        newPubKey: string,
+    ): Promise<void> {
+        return this.native.acceptKeyChange(this.servicePtr, [
+            contextId,
+            userId,
+            previousPubKey,
+            newPubKey,
+        ]);
     }
 
     private async freeApis() {

@@ -303,43 +303,82 @@ export const KvdbErrorCode = {
 } as const;
 
 /**
- * Error codes raised by the Group module (`NativeError.scope === "Group"`).
+ * Error codes raised by the Group module (`NativeError.scope === "Group"`). The module's scope is
+ * `0x000D` in the core this build links.
  */
 export const GroupErrorCode = {
     /** Endpoint not initialized */
-    NOT_INITIALIZED: 0xb0001,
+    NOT_INITIALIZED: 0xd0001,
     /** Cannot extract GroupCreatedEvent */
-    CANNOT_EXTRACT_GROUP_CREATED_EVENT: 0xb0002,
+    CANNOT_EXTRACT_GROUP_CREATED_EVENT: 0xd0002,
     /** Cannot extract GroupUpdatedEvent */
-    CANNOT_EXTRACT_GROUP_UPDATED_EVENT: 0xb0003,
+    CANNOT_EXTRACT_GROUP_UPDATED_EVENT: 0xd0003,
     /** Cannot extract GroupDeletedEvent */
-    CANNOT_EXTRACT_GROUP_DELETED_EVENT: 0xb0004,
+    CANNOT_EXTRACT_GROUP_DELETED_EVENT: 0xd0004,
     /** Already subscribed */
-    ALREADY_SUBSCRIBED: 0xb0005,
+    ALREADY_SUBSCRIBED: 0xd0005,
     /** Cannot unsubscribe if not subscribed */
-    NOT_SUBSCRIBED: 0xb0006,
+    NOT_SUBSCRIBED: 0xd0006,
     /** Invalid version of encrypted group data */
-    INVALID_ENCRYPTED_GROUP_DATA_VERSION: 0xb0007,
+    INVALID_ENCRYPTED_GROUP_DATA_VERSION: 0xd0007,
     /** Unknown Group format */
-    UNKNOWN_GROUP_FORMAT: 0xb0008,
+    UNKNOWN_GROUP_FORMAT: 0xd0008,
     /** Group public data mismatch */
-    GROUP_PUBLIC_DATA_MISMATCH: 0xb0009,
+    GROUP_PUBLIC_DATA_MISMATCH: 0xd0009,
     /** Failed group data integrity check */
-    GROUP_DATA_INTEGRITY: 0xb000a,
+    GROUP_DATA_INTEGRITY: 0xd000a,
     /** Group version chain link broken (G1) */
-    GROUP_CHAIN_BROKEN: 0xb000b,
+    GROUP_CHAIN_BROKEN: 0xd000b,
     /** Group version signer was not an authorized manager (G2) */
-    GROUP_UNAUTHORIZED_SIGNER: 0xb000c,
+    GROUP_UNAUTHORIZED_SIGNER: 0xd000c,
     /** Group membership in signed data does not match bridge-served fields */
-    GROUP_MEMBERSHIP_MISMATCH: 0xb000d,
+    GROUP_MEMBERSHIP_MISMATCH: 0xd000d,
     /** Invalid subscriptionQuery */
-    INVALID_SUBSCRIPTION_QUERY: 0xb000e,
+    INVALID_SUBSCRIPTION_QUERY: 0xd000e,
     /** Concurrent group key rotation: another manager won and one auto-retry did not resolve it */
-    ROTATED_ALREADY: 0xb000f,
+    ROTATED_ALREADY: 0xd000f,
     /** Group history diverged from a previously verified state (version or keyVersion regressed) */
-    GROUP_HISTORY_FORK: 0xb0010,
+    GROUP_HISTORY_FORK: 0xd0010,
     /** Rotation aborted: the epoch ladder rung set for the new epoch would be incomplete */
-    INCOMPLETE_EPOCH_LADDER: 0xb0011,
+    INCOMPLETE_EPOCH_LADDER: 0xd0011,
+    /** Malformed group envelope */
+    INVALID_ENVELOPE_FORMAT: 0xd0012,
+    /** Encrypted file is shorter than its envelope declares */
+    ENVELOPE_TRUNCATED_FILE: 0xd0013,
+    /** Cannot extract GroupCustomEvent */
+    CANNOT_EXTRACT_GROUP_CUSTOM_EVENT: 0xd0014,
+    /** Envelope was written for another location */
+    ENVELOPE_WRONG_LOCATION: 0xd0015,
+    /** Envelope is not the kind this call reads (member, outsider, anonymous or shared) */
+    ENVELOPE_WRONG_KIND: 0xd0016,
+    /** Caller is not among the envelope's recipients */
+    ENVELOPE_NOT_A_RECIPIENT: 0xd0017,
+    /** Envelope was written for another group */
+    ENVELOPE_WRONG_GROUP: 0xd0018,
+    /** Envelope was written by someone other than the expected author */
+    ENVELOPE_WRONG_AUTHOR: 0xd0019,
+    /** The UserVerifier does not accept the key the envelope was signed with for its author */
+    ENVELOPE_UNVERIFIED_AUTHOR: 0xd001a,
+    /** The envelope's author is not a member of the group */
+    ENVELOPE_AUTHOR_NOT_MEMBER: 0xd001b,
+    /** Envelope is not from the group's current epoch */
+    ENVELOPE_STALE_EPOCH: 0xd001c,
+    /** A read must name the expected author or say that any author is accepted */
+    ENVELOPE_AUTHOR_NOT_STATED: 0xd001d,
+    /** Sequence item or mark is out of order, repeated, or does not match what was read */
+    ENVELOPE_SEQUENCE_ORDER: 0xd001e,
+    /** Encrypted file data is not what its envelope lists */
+    ENVELOPE_FILE_CORRUPTED: 0xd001f,
+    /** The caller cannot see the current key of a recipient Group of the Space */
+    SPACE_RECIPIENT_UNAVAILABLE: 0xd0020,
+    /** A Group or Space already exists, or existed, under this subject */
+    GROUP_ALREADY_EXISTS: 0xd0021,
+    /** The Group or Space was created by someone other than the expected user */
+    GROUP_WRONG_CREATOR: 0xd0022,
+    /** This device knows the subject under another Group */
+    GROUP_SUBJECT_REBOUND: 0xd0023,
+    /** Cannot extract SpaceChangedEvent */
+    CANNOT_EXTRACT_SPACE_CHANGED_EVENT: 0xd0024,
 } as const;
 
 /**

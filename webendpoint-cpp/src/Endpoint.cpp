@@ -30,6 +30,7 @@ limitations under the License.
 #include <privmx/endpoint/thread/varinterface/ThreadApiVarInterface.hpp>
 
 #include "AsyncEngine.hpp"
+#include "CustomPinStoreInterface.hpp"
 #include "CustomUserVerifierInterface.hpp"
 #include "Macros.hpp"
 #include "Mapper.hpp"
@@ -111,6 +112,9 @@ API_FUNCTION(Connection, subscribeFor)
 API_FUNCTION(Connection, unsubscribeFrom)
 API_FUNCTION(Connection, buildSubscriptionQuery)
 API_FUNCTION(Connection, disconnect)
+API_FUNCTION(Connection, renewIdentity)
+API_FUNCTION(Connection, acceptKeyChange)
+API_FUNCTION(Connection, useKeyContinuity)
 
 void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int interfaceBindId) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, interfaceBindId] {
@@ -123,6 +127,15 @@ void Connection_newUserVerifierInterface(int taskId, int connectionPtr, int inte
 
 void Connection_deleteUserVerifierInterface(int taskId, int ptr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, ptr] { delete (UserVerifierHolder*)ptr; });
+}
+
+// The connection owns the store. Set it before any module API is made: each reads it when created.
+void Connection_setPinStore(int taskId, int connectionPtr, int interfaceBindId) {
+    AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, interfaceBindId] {
+        ((ConnectionVar*)connectionPtr)
+            ->getApi()
+            .setPinStore(std::make_shared<CustomPinStoreInterface>(interfaceBindId));
+    });
 }
 
 void GroupApi_newGroupApi(int taskId, int connectionPtr) {
@@ -164,6 +177,58 @@ API_FUNCTION(GroupApi, subscribeFor)
 API_FUNCTION(GroupApi, unsubscribeFrom)
 API_FUNCTION(GroupApi, buildSubscriptionQuery)
 API_FUNCTION(GroupApi, buildCustomEventSubscriptionQuery)
+API_FUNCTION(GroupApi, rotateGroupKey)
+API_FUNCTION(GroupApi, decryptMany)
+API_FUNCTION(GroupApi, encryptAsOutsider)
+API_FUNCTION(GroupApi, decryptFromOutsider)
+API_FUNCTION(GroupApi, decryptAnonymous)
+API_FUNCTION(GroupApi, decryptShared)
+API_FUNCTION(GroupApi, peekEnvelope)
+API_FUNCTION(GroupApi, deriveGroupId)
+API_FUNCTION(GroupApi, getGroups)
+API_FUNCTION(GroupApi, getGroupPublicKey)
+API_FUNCTION(GroupApi, setGroupVisibility)
+API_FUNCTION(GroupApi, replaceGroupMemberKeys)
+API_FUNCTION(GroupApi, setGroupRoles)
+API_FUNCTION(GroupApi, updateGroupRules)
+API_FUNCTION(GroupApi, getGroupLog)
+API_FUNCTION(GroupApi, createSpace)
+API_FUNCTION(GroupApi, deriveSpaceId)
+API_FUNCTION(GroupApi, getSpace)
+API_FUNCTION(GroupApi, listSpaces)
+API_FUNCTION(GroupApi, deleteSpace)
+API_FUNCTION(GroupApi, addSpaceRecipients)
+API_FUNCTION(GroupApi, removeSpaceRecipients)
+API_FUNCTION(GroupApi, rotateSpaceKey)
+API_FUNCTION(GroupApi, updateSpacePublicMeta)
+API_FUNCTION(GroupApi, updateSpacePrivateMeta)
+API_FUNCTION(GroupApi, encryptInSpace)
+API_FUNCTION(GroupApi, decryptInSpace)
+API_FUNCTION(GroupApi, decryptManyInSpace)
+API_FUNCTION(GroupApi, beginFileEncryptionInSpace)
+API_FUNCTION(GroupApi, beginFileDecryptionInSpace)
+API_FUNCTION(GroupApi, beginSequenceInSpace)
+API_FUNCTION(GroupApi, openSequenceInSpace)
+API_FUNCTION(GroupApi, getSpaceSequenceOrigin)
+API_FUNCTION(GroupApi, encodePath)
+API_FUNCTION(GroupApi, pinGroupToSubject)
+API_FUNCTION(GroupApi, getSpaceLog)
+API_FUNCTION(GroupApi, abortFile)
+API_FUNCTION(GroupApi, beginFileEncryptionAsOutsider)
+API_FUNCTION(GroupApi, beginFileDecryptionFromOutsider)
+API_FUNCTION(GroupApi, beginAnonymousFileDecryption)
+API_FUNCTION(GroupApi, beginSharedFileDecryption)
+API_FUNCTION(GroupApi, getFileCipherRange)
+API_FUNCTION(GroupApi, beginSequence)
+API_FUNCTION(GroupApi, getSequenceHeader)
+API_FUNCTION(GroupApi, appendToSequence)
+API_FUNCTION(GroupApi, checkpointSequence)
+API_FUNCTION(GroupApi, finishSequence)
+API_FUNCTION(GroupApi, openSequence)
+API_FUNCTION(GroupApi, readSequenceItem)
+API_FUNCTION(GroupApi, verifySequenceMark)
+API_FUNCTION(GroupApi, closeSequence)
+API_FUNCTION(GroupApi, peekSequenceItem)
 
 void ThreadApi_newThreadApi(int taskId, int connectionPtr, int groupApiPtr) {
     AsyncEngine::getInstance()->postWorkerTask(taskId, [&, connectionPtr, groupApiPtr] {

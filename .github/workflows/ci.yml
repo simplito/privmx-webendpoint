@@ -29,8 +29,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Pinned: the distro's clang-format changes with the runner image, and its output with it.
+      # Locally: `pipx install clang-format==18.1.8 --suffix=-18`, or Homebrew llvm@18.
       - name: Install clang-format
-        run: sudo apt-get update && sudo apt-get install -y clang-format
+        run: |
+          pipx install clang-format==18.1.8 --suffix=-18
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Lint (C++ formatting)
         run: npm run lint:clang-format

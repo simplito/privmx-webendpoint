@@ -15,7 +15,7 @@ import { groupGrant } from "./groupGrant.js";
 import {
     openGroupFile,
     sealGroupFile,
-    sealGroupFileAnonymously,
+    type FileRange,
     type GroupFileReader,
     type GroupFileSealer,
 } from "./fileStreams.js";
@@ -29,10 +29,170 @@ import {
     GroupMemberToAdd,
     ContainerPolicy,
     DecryptedEnvelope,
+    DecryptedOutsiderEnvelope,
+    DecryptedAnonymousEnvelope,
+    DecryptedSharedEnvelope,
+    DecryptOutcome,
+    EncryptOptions,
+    EnvelopeHeader,
+    GroupErrorDetails,
+    GroupOutcome,
+    GroupPublicKey,
+    GroupRoleChange,
+    GroupRulesUpdate,
+    GroupLogEntry,
     DecryptedFileInfo,
+    CipherRange,
+    SequenceAppendResult,
+    SequenceItem,
+    SequenceItemHeader,
+    SequenceMarkInfo,
+    SpaceRecipient,
+    SpaceRecipientRef,
+    SpaceState,
+    SpaceOrigin,
+    DecryptedSpaceEnvelope,
+    SpaceDecryptOutcome,
+    SpaceLogEntry,
     GroupEventType,
     GroupEventSelectorType,
 } from "../Types.js";
+import { ANY_AUTHOR, toNativePath, type Location, type LocationOrNone } from "./groupPaths.js";
+import type {
+    NativeSpaceEnvelope,
+    NativeSpaceOrigin,
+    NativeSpaceRecipient,
+    NativeSpaceState,
+    NativeDecryptedEnvelope,
+    NativeDecryptOptions,
+    NativeDecryptResult,
+    NativeEncryptOptions,
+} from "../native/GroupApiNative.js";
+
+/** Every read says whose writing it expects; there is no way to leave the question out. */
+export interface DecryptOptions {
+    /**
+     * The author you are about to show: usually the one your server names next
+     * to the envelope. A different author fails with
+     * `GroupErrorCode.ENVELOPE_WRONG_AUTHOR`. Pass {@link ANY_AUTHOR} only if
+     * you display `author.userId` from the result.
+     */
+    expectedAuthor: string | typeof ANY_AUTHOR;
+    /**
+     * For content that reached you as new: it must be from the current epoch.
+     * Not for a shared read ({@link GroupApi.decryptShared}): a recipient holds
+     * no epoch of the author's Group, so it is refused there.
+     */
+    currentEpochOnly?: boolean;
+}
+
+/** {@link DecryptOptions} for a shared read: there is no epoch of the author's Group to hold it to. */
+export type SharedDecryptOptions = Omit<DecryptOptions, "currentEpochOnly">;
+
+function toNativeDecryptOptions(options: DecryptOptions): NativeDecryptOptions {
+    // Checked here as well as in the core: a caller in plain JavaScript gets the reason, not a bare native error.
+    if (options === undefined || options === null || options.expectedAuthor === undefined) {
+        throw new TypeError("a read names its expectedAuthor, or passes ANY_AUTHOR");
+    }
+    if (options.expectedAuthor === ANY_AUTHOR) {
+        return {
+            anyAuthor: true,
+            currentEpochOnly: options.currentEpochOnly === true,
+        };
+    }
+    if (typeof options.expectedAuthor !== "string" || options.expectedAuthor.length === 0) {
+        throw new TypeError("expectedAuthor is a user ID, or ANY_AUTHOR");
+    }
+    return {
+        expectedAuthor: options.expectedAuthor,
+        currentEpochOnly: options.currentEpochOnly === true,
+    };
+}
+
+function toNativeEncryptOptions(options?: EncryptOptions): NativeEncryptOptions {
+    return {
+        alsoFor: (options?.alsoFor ?? []).map((recipient) =>
+            "group" in recipient ? { groupId: recipient.group } : { user: recipient.user },
+        ),
+    };
+}
+
+function fromNativeEnvelope(native: NativeDecryptedEnvelope): DecryptedEnvelope {
+    return {
+        data: native.data,
+        author: {
+            userId: native.author.userId,
+            pubKey: native.author.pubKey,
+            role: native.author.role === "manager" ? "manager" : "user",
+        },
+        epoch: native.keyVersion,
+        encryptedAt: native.encryptedAt,
+        sharedWith: native.sharedWith,
+    };
+}
+
+const asRole = (role: string): "user" | "manager" => (role === "manager" ? "manager" : "user");
+
+function toNativeSpaceRecipient(recipient: SpaceRecipient): NativeSpaceRecipient {
+    return "group" in recipient
+        ? { groupId: recipient.group, role: recipient.role }
+        : { user: recipient.user, role: recipient.role };
+}
+
+function fromNativeSpaceState(native: NativeSpaceState): SpaceState {
+    return {
+        spaceId: native.spaceId,
+        contextId: native.contextId,
+        createdBy: native.createdBy,
+        groups: native.groups.map((g) => ({
+            groupId: g.groupId,
+            role: asRole(g.role),
+            epoch: g.keyVersion,
+        })),
+        users: native.users.map((u) => ({ ...u, role: asRole(u.role) })),
+        keyVersion: native.keyVersion,
+        keyIsStale: native.keyIsStale,
+        publicMeta: native.publicMeta,
+        privateMeta: native.privateMeta,
+        publicMetaVersion: native.publicMetaVersion,
+        privateMetaVersion: native.privateMetaVersion,
+    };
+}
+
+function fromNativeSpaceOrigin(native: NativeSpaceOrigin): SpaceOrigin {
+    return {
+        author: native.author,
+        via: native.via,
+        // Anything the core does not positively call access or no access stays unknown.
+        authorAccess:
+            native.authorAccess === "yes" ? "yes" : native.authorAccess === "no" ? "no" : "unknown",
+        keyVersion: native.keyVersion,
+    };
+}
+
+function fromNativeSpaceEnvelope(native: NativeSpaceEnvelope): DecryptedSpaceEnvelope {
+    return {
+        data: native.data,
+        origin: fromNativeSpaceOrigin(native.origin),
+        encryptedAt: native.encryptedAt,
+    };
+}
+
+function fromNativeDetails(native: NativeDecryptResult["details"]): GroupErrorDetails {
+    const details: GroupErrorDetails = {};
+    if (native?.userId) details.userId = native.userId;
+    if (native?.pubKey) details.pubKey = native.pubKey;
+    if (
+        native?.envelopeKind === "member" ||
+        native?.envelopeKind === "outsider" ||
+        native?.envelopeKind === "anonymous" ||
+        native?.envelopeKind === "shared" ||
+        native?.envelopeKind === "space"
+    ) {
+        details.envelopeKind = native.envelopeKind;
+    }
+    return details;
+}
 
 /**
  * Groups: who your app shares things with.
@@ -214,6 +374,7 @@ export class GroupApi extends BaseApi {
         publicMeta: Uint8Array,
         privateMeta: Uint8Array,
         policies?: ContainerPolicy,
+        options?: { idSeed?: Uint8Array; visibleTo?: "members" | "context" },
     ): Promise<string> {
         return this.native.createGroup(this.servicePtr, [
             contextId,
@@ -222,6 +383,8 @@ export class GroupApi extends BaseApi {
             publicMeta,
             privateMeta,
             policies,
+            options?.idSeed,
+            options?.visibleTo ?? "members",
         ]);
     }
 
@@ -284,7 +447,7 @@ export class GroupApi extends BaseApi {
      * @throws {NativeError} when the Group does not exist or the user lacks
      *   management rights
      */
-    async removeGroupMembers(groupId: string, userIds: string[]): Promise<void> {
+    async removeGroupMembers(groupId: string, userIds: string[]): Promise<number> {
         return this.native.removeGroupMembers(this.servicePtr, [groupId, userIds]);
     }
 
@@ -442,304 +605,698 @@ export class GroupApi extends BaseApi {
     }
 
     /**
-     * Seals content for a Group, as one of its members.
+     * Seals content for a Group, as one of its members, bound to a location in
+     * your data.
      *
-     * The returned envelope is self-contained: it names the Group and the key
-     * version it was sealed under, so any member can {@link decrypt} it later -
-     * including after the Group's key has rotated - without being told anything
-     * alongside it. It is signed with your own key, so a reader also learns that
-     * you wrote it.
-     *
-     * Requires membership. To seal for a Group you are not in, use
-     * {@link encryptAnonymously}.
-     *
-     * @param {string} groupId ID of the Group to seal for
-     * @param {Uint8Array} content data to encrypt
-     * @returns {Uint8Array} the envelope
-     * @throws {NativeError} when the Group does not exist or the user is not a
-     *   member of it
-     */
-    async encrypt(groupId: string, content: Uint8Array): Promise<Uint8Array> {
-        return this.native.encrypt(this.servicePtr, [groupId, content]);
-    }
-
-    /**
-     * Seals content for a Group without revealing, or proving, who sent it.
-     *
-     * Needs only public information - the Group's ID and its identity public key
-     * (`Group.groupPubKey`) - so it works whether or not you are a member, and
-     * makes no server call. A throwaway keypair is generated per call and
-     * discarded, which is what makes the result unattributable: members open it
-     * with {@link decrypt}, which reports `ENVELOPE_ANONYMOUS` and no author.
-     *
-     * You cannot read back what you sealed here. Only the Group can.
-     *
-     * @param {string} groupId ID of the Group to seal for
-     * @param {string} groupPubKey the Group's identity public key (base58-DER
-     *   encoded), from `Group.groupPubKey`
-     * @param {Uint8Array} content data to encrypt
-     * @returns {Uint8Array} the envelope
-     * @throws {NativeError} when `groupPubKey` is not a valid public key
-     */
-    async encryptAnonymously(
-        groupId: string,
-        groupPubKey: string,
-        content: Uint8Array,
-    ): Promise<Uint8Array> {
-        return this.native.encryptAnonymously(this.servicePtr, [groupId, groupPubKey, content]);
-    }
-
-    /**
-     * Opens an envelope sealed by {@link encrypt} or {@link encryptAnonymously}.
-     *
-     * Which of the two it was is reported as `DecryptedEnvelope.type`, and that
-     * decides what `authorPubKey` is worth: `ENVELOPE_FROM_MEMBER` means the
-     * signature was verified and the author is who it says;
-     * `ENVELOPE_ANONYMOUS` means the sender is unknown and `authorPubKey` is
-     * empty. Branch on the type, not on the field being non-empty.
-     *
-     * A file envelope is not accepted here - open one with
-     * {@link beginFileDecryption}.
-     *
-     * @param {Uint8Array} envelope envelope to open
-     * @returns {DecryptedEnvelope} the content, and what could be established
-     *   about its author
-     * @throws {NativeError} when the envelope does not decrypt or does not
-     *   verify
-     */
-    async decrypt(envelope: Uint8Array): Promise<DecryptedEnvelope> {
-        return this.native.decrypt(this.servicePtr, [envelope]);
-    }
-
-    /**
-     * Begins sealing a file for a Group, as one of its members.
-     *
-     * Nothing is read or written for you - the library converts bytes and hands
-     * them straight back. Drive it in three steps: `beginFileEncryption` →
-     * {@link encryptFileChunk} (as many times as you like) →
-     * {@link finishFileEncryption}.
-     *
-     * Keep **both** outputs. The ciphertext is the file; the envelope is a small
-     * header naming the Group, the key version, the author and the size, and
-     * without it nobody can open the ciphertext - not even a member of the
-     * Group.
+     * The envelope opens only with the same `location`: a server that stores it
+     * under another record gets `ENVELOPE_WRONG_LOCATION` on every reader. It is
+     * signed with your key and names you. `options.alsoFor` adds readers beside
+     * the Group: other Groups, single users.
      *
      * ```ts
-     * const handle = await groupApi.beginFileEncryption(groupId, plaintext.length);
-     * for (const block of blocks) {
-     *     sink.write(await groupApi.encryptFileChunk(handle, block));
-     * }
-     * const envelope = await groupApi.finishFileEncryption(handle); // keep alongside the ciphertext
+     * const body = await api.encrypt(groupId, ["chat", id(chatId), "message", id(messageId), "body"], data);
      * ```
      *
-     * Memory stays flat no matter how large the file, but only if each
-     * {@link encryptFileChunk} result is written out as it arrives - collecting
-     * the ciphertext in a buffer will exhaust the WASM heap.
-     *
-     * The size is declared up front and enforced at
-     * {@link finishFileEncryption}: supplying less than promised is an error,
-     * because it cannot be told apart from a file cut short.
-     *
-     * @param {string} groupId ID of the Group to seal for
-     * @param {number} size total size of the plaintext file, in bytes
-     * @returns {number} handle to seal file data with
-     * @throws {NativeError} when the Group does not exist or the user is not a
-     *   member of it
+     * @param {string} groupId ID of the Group to seal for; you must be a member
+     * @param {LocationOrNone} location where the value lives, or {@link NO_LOCATION}
+     * @param {Uint8Array} content data to encrypt
+     * @param {EncryptOptions} [options] further recipients
+     * @returns {Uint8Array} the envelope
+     * @throws {NativeError} when the Group does not exist or you are not a member of it
      */
-    async beginFileEncryption(groupId: string, size: number): Promise<number> {
-        return this.native.beginFileEncryption(this.servicePtr, [groupId, size]);
-    }
-
-    /**
-     * Begins sealing a file for a Group without revealing, or proving, who sent
-     * it.
-     *
-     * The file counterpart of {@link encryptAnonymously}, driven exactly like
-     * {@link beginFileEncryption} - same {@link encryptFileChunk}, same
-     * {@link finishFileEncryption}. Needs public information only, makes no
-     * server call, and the result is unattributable and therefore unreadable to
-     * you afterwards. Only the Group can open it.
-     *
-     * Because nothing about it is attributable, nothing about it is authorised
-     * or metered either: if you accept these from the open internet, bound the
-     * size and the volume in your own transport.
-     *
-     * @param {string} groupId ID of the Group to seal for
-     * @param {string} groupPubKey the Group's identity public key (base58-DER
-     *   encoded), from `Group.groupPubKey`
-     * @param {number} size total size of the plaintext file, in bytes
-     * @returns {number} handle to seal file data with
-     * @throws {NativeError} when `groupPubKey` is not a valid public key
-     */
-    async beginFileEncryptionAnonymously(
+    async encrypt(
         groupId: string,
-        groupPubKey: string,
-        size: number,
-    ): Promise<number> {
-        return this.native.beginFileEncryptionAnonymously(this.servicePtr, [
+        location: LocationOrNone,
+        content: Uint8Array,
+        options?: EncryptOptions,
+    ): Promise<Uint8Array> {
+        return this.native.encrypt(this.servicePtr, [
             groupId,
-            groupPubKey,
-            size,
+            toNativePath(location),
+            content,
+            toNativeEncryptOptions(options),
         ]);
     }
 
     /**
-     * Seals the next piece of a file: takes plaintext, returns ciphertext.
+     * Opens an envelope written by a member of `groupId` with {@link encrypt}.
      *
-     * Blocks may be any size up to 4 MiB and need not align with anything. The
-     * return covers whichever internal chunks this call completed, so it is
-     * **empty whenever your block did not finish one**, and larger than your
-     * block when it finished several. Neither is an error - write whatever comes
-     * back straight out, in the order it comes back.
+     * Each of the four reading calls takes exactly one kind of envelope and
+     * throws `ENVELOPE_WRONG_KIND` for the others: {@link decrypt} (a member's),
+     * {@link decryptFromOutsider} (signed by a non-member),
+     * {@link decryptAnonymous} (unsigned), {@link decryptShared} (written in
+     * another Group). So what a non-member wrote is never shown as a member's,
+     * and what nobody signed is never shown as somebody's.
      *
-     * @param {number} fileHandle handle from {@link beginFileEncryption} or
-     *   {@link beginFileEncryptionAnonymously}
-     * @param {Uint8Array} plainChunk plaintext to append, at most 4 MiB
-     * @returns {Uint8Array} ciphertext to store, possibly empty
-     * @throws {NativeError} when the handle is unknown or the block exceeds
-     *   4 MiB
+     * Every read says whose writing it expects: the author your server names
+     * next to the envelope, or {@link ANY_AUTHOR} if you show the author from
+     * the result and from nowhere else.
+     *
+     * A removed member keeps the keys of the epochs they were in. For content
+     * that arrived as new, set `currentEpochOnly`, and have your server refuse
+     * envelopes that are not from the current epoch ({@link peekEnvelope}).
+     *
+     * @throws {NativeError} `GroupErrorCode.ENVELOPE_WRONG_LOCATION`, `ENVELOPE_WRONG_GROUP`,
+     *   `ENVELOPE_WRONG_AUTHOR`, `ENVELOPE_UNVERIFIED_AUTHOR`, `ENVELOPE_AUTHOR_NOT_MEMBER`,
+     *   `ENVELOPE_STALE_EPOCH`, `ENVELOPE_WRONG_KIND`
+     */
+    async decrypt(
+        groupId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: DecryptOptions,
+    ): Promise<DecryptedEnvelope> {
+        return fromNativeEnvelope(
+            await this.native.decrypt(this.servicePtr, [
+                groupId,
+                toNativePath(location),
+                envelope,
+                toNativeDecryptOptions(options),
+            ]),
+        );
+    }
+
+    /**
+     * {@link decrypt} for a page of envelopes of one Group. Never throws for a
+     * bad item: each reports on its own, so one moved or forged message becomes
+     * a warning and the rest still show.
+     */
+    async decryptMany(
+        groupId: string,
+        items: ReadonlyArray<{
+            location: LocationOrNone;
+            envelope: Uint8Array;
+            options: DecryptOptions;
+        }>,
+    ): Promise<DecryptOutcome[]> {
+        const results = await this.native.decryptMany(this.servicePtr, [
+            groupId,
+            items.map((item) => ({
+                envelope: item.envelope,
+                location: toNativePath(item.location),
+                options: toNativeDecryptOptions(item.options),
+            })),
+        ]);
+        return results.map((result) =>
+            result.statusCode === 0
+                ? { ok: true as const, ...fromNativeEnvelope(result.envelope) }
+                : {
+                      ok: false as const,
+                      code: result.statusCode,
+                      details: fromNativeDetails(result.details),
+                  },
+        );
+    }
+
+    /**
+     * Seals content for a Group you are not a member of, signed by you: you can
+     * write and prove it was you, and cannot read it back. The Group opens it
+     * with {@link decryptFromOutsider}.
+     *
+     * The Group's current key is read and verified here; none is passed in. The
+     * Group has to be visible to the Context ({@link setGroupVisibility}).
+     */
+    async encryptAsOutsider(
+        contextId: string,
+        groupId: string,
+        location: LocationOrNone,
+        content: Uint8Array,
+        options?: EncryptOptions,
+    ): Promise<Uint8Array> {
+        return this.native.encryptAsOutsider(this.servicePtr, [
+            contextId,
+            groupId,
+            toNativePath(location),
+            content,
+            toNativeEncryptOptions(options),
+        ]);
+    }
+
+    /**
+     * Seals content for a Group without revealing, or proving, who sent it.
+     * Needs only public information - the Group's ID and its identity public
+     * key - and makes no server call. The Group opens it with
+     * {@link decryptAnonymous}, which reports no sender.
+     *
+     * @param {string} groupPubKey the Group's identity public key (base58-DER encoded)
+     */
+    async encryptAnonymously(
+        groupId: string,
+        groupPubKey: string,
+        location: LocationOrNone,
+        content: Uint8Array,
+    ): Promise<Uint8Array> {
+        return this.native.encryptAnonymously(this.servicePtr, [
+            groupId,
+            groupPubKey,
+            toNativePath(location),
+            content,
+        ]);
+    }
+
+    /**
+     * Opens an envelope written to `groupId`, and signed, by someone who is not
+     * a member ({@link encryptAsOutsider}). The sender is who they say; whether
+     * they may write here is your question to answer.
+     */
+    async decryptFromOutsider(
+        groupId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: DecryptOptions,
+    ): Promise<DecryptedOutsiderEnvelope> {
+        const result = await this.native.decryptFromOutsider(this.servicePtr, [
+            groupId,
+            toNativePath(location),
+            envelope,
+            toNativeDecryptOptions(options),
+        ]);
+        return {
+            data: result.data,
+            epoch: result.keyVersion,
+            sender: result.sender,
+            encryptedAt: result.encryptedAt,
+            sharedWith: result.sharedWith,
+        };
+    }
+
+    /** Opens an unsigned envelope written to `groupId` ({@link encryptAnonymously}). There is no sender to report. */
+    async decryptAnonymous(
+        groupId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+    ): Promise<DecryptedAnonymousEnvelope> {
+        const result = await this.native.decryptAnonymous(this.servicePtr, [
+            groupId,
+            toNativePath(location),
+            envelope,
+        ]);
+        return { data: result.data, epoch: result.keyVersion };
+    }
+
+    /**
+     * Opens an envelope written in another Group and shared with you through
+     * `alsoFor`: as a user, or as a member of one of the recipient Groups. You
+     * need not know which. `location` is the one the author wrote it at.
+     *
+     * The result has a sender, not an author. Check `senderIsMember`: anyone in
+     * the Context can address an envelope to you and name any Group as its
+     * origin.
+     *
+     * @throws {NativeError} `GroupErrorCode.ENVELOPE_NOT_A_RECIPIENT` when you are not among the recipients,
+     *   and `InvalidParams` for `currentEpochOnly`, which a shared read cannot honour
+     */
+    async decryptShared(
+        contextId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: SharedDecryptOptions,
+    ): Promise<DecryptedSharedEnvelope> {
+        const result = await this.native.decryptShared(this.servicePtr, [
+            contextId,
+            toNativePath(location),
+            envelope,
+            toNativeDecryptOptions(options),
+        ]);
+        return {
+            data: result.data,
+            sender: result.sender,
+            homeGroupId: result.homeGroupId,
+            // Anything the core does not positively call a member or a non-member stays unknown.
+            senderIsMember:
+                result.senderMembership === "member"
+                    ? true
+                    : result.senderMembership === "notMember"
+                      ? false
+                      : "unknown",
+            via: result.via,
+            encryptedAt: result.encryptedAt,
+            sharedWith: result.sharedWith,
+        };
+    }
+
+    /**
+     * The part of an envelope (a message's or a file's) readable without any
+     * key: for a server that refuses writes early, such as one from a stale
+     * epoch. Nothing in it is authenticated.
+     */
+    async peekEnvelope(envelope: Uint8Array): Promise<EnvelopeHeader> {
+        const header = await this.native.peekEnvelope(this.servicePtr, [envelope]);
+        return {
+            version: header.version,
+            groupId: header.groupId,
+            epoch: header.keyVersion,
+            fromOutsider: header.fromOutsider,
+            isSigned: header.isSigned,
+            isFile: header.isFile,
+            hasLocation: header.hasLocation,
+            authorUserId: header.authorUserId,
+            ...(header.sequenceId ? { sequenceId: header.sequenceId } : {}),
+            ...(header.spaceId ? { spaceId: header.spaceId } : {}),
+            alsoForGroups: header.alsoForGroups.map((g) => ({
+                groupId: g.groupId,
+                epoch: g.keyVersion,
+            })),
+            alsoForUsers: header.alsoForUsers,
+        };
+    }
+
+    /**
+     * The ID of a Group created with `idSeed`: every client computes the same
+     * one from the Context and the seed, so no server has to be asked which
+     * Group belongs to an entity.
+     *
+     * A seed anybody can compute is a name anybody can take first. Creating a
+     * Group under a seed fails when one exists or ever existed; when you find a
+     * Group under a derived ID, check `Group.creator` against who owns the
+     * entity before you trust it.
+     */
+    async deriveGroupId(contextId: string, idSeed: Uint8Array): Promise<string> {
+        return this.native.deriveGroupId(this.servicePtr, [contextId, idSeed]);
+    }
+
+    /** {@link getGroup} for several Groups. One result per ID, in order; a Group that fails reports its own code. */
+    async getGroups(groupIds: string[]): Promise<GroupOutcome[]> {
+        const results = await this.native.getGroups(this.servicePtr, [groupIds]);
+        return results.map((result) =>
+            result.statusCode === 0
+                ? { ok: true as const, group: result.group }
+                : { ok: false as const, code: result.statusCode },
+        );
+    }
+
+    /**
+     * The Group's current identity key, read and verified against the Group's
+     * latest statement. For a member, and for any user of the Context when the
+     * Group is visible to the Context.
+     */
+    async getGroupPublicKey(contextId: string, groupId: string): Promise<GroupPublicKey> {
+        const key = await this.native.getGroupPublicKey(this.servicePtr, [contextId, groupId]);
+        return {
+            groupId: key.groupId,
+            epoch: key.keyVersion,
+            pubKey: key.pubKey,
+            creator: key.creator,
+        };
+    }
+
+    /**
+     * Sets who beside the members may read the Group's identity key, roster and
+     * statements. A manager's call. Making a Group visible to the Context is
+     * what lets someone outside it write to it with {@link encryptAsOutsider};
+     * it also shows the roster to every user of the Context.
+     */
+    async setGroupVisibility(groupId: string, visibleTo: "members" | "context"): Promise<void> {
+        return this.native.setGroupVisibility(this.servicePtr, [groupId, visibleTo]);
+    }
+
+    /**
+     * Lets members back in after their identity key was replaced and they
+     * cannot renew their own leaf (that needs the previous key,
+     * {@link Connection.renewIdentity}). Everything they could open is re-keyed
+     * and the key epoch advances once; they keep their seats, their roles and
+     * their place on the roster. Whoever still holds a previous key reads
+     * nothing written from here on.
+     *
+     * The members' current keys go through the Connection's UserVerifier like
+     * any key this client wraps to. With key continuity on
+     * ({@link Connection.useKeyContinuity}), accept the change first
+     * ({@link Connection.acceptKeyChange}), after checking it is genuine.
+     *
+     * Allowed by the `removeMembers` rule. The caller cannot be among `userIds`.
+     *
+     * @param {string} groupId ID of the Group
+     * @param {string[]} userIds IDs of the members whose key is replaced
+     * @returns {Promise<number>} the Group's key epoch after the call
+     */
+    async replaceGroupMemberKeys(groupId: string, userIds: string[]): Promise<number> {
+        return this.native.replaceGroupMemberKeys(this.servicePtr, [groupId, userIds]);
+    }
+
+    /**
+     * Changes the role of members already in the Group. No key moves: a role
+     * decides what the Bridge and the other members accept from somebody, not
+     * what they can read.
+     *
+     * Allowed by the `updatePolicy` rule (managers, by default). Refused when it
+     * would leave a Group that has managers with none.
+     *
+     * @param {string} groupId ID of the Group
+     * @param {GroupRoleChange[]} changes the members and the role each takes
+     */
+    async setGroupRoles(groupId: string, changes: GroupRoleChange[]): Promise<void> {
+        return this.native.setGroupRoles(this.servicePtr, [groupId, changes]);
+    }
+
+    /**
+     * Changes who may add members, remove members and rewrite the Group's
+     * metadata, leaving the rest of the policy as it is. A signed commit like
+     * {@link updateGroupPolicy}, under the same rule.
+     *
+     * @param {string} groupId ID of the Group
+     * @param {GroupRulesUpdate} rules the rules to change; one left out stays
+     */
+    async updateGroupRules(groupId: string, rules: GroupRulesUpdate): Promise<void> {
+        return this.native.updateGroupRules(this.servicePtr, [groupId, rules]);
+    }
+
+    /**
+     * The Group's history: every signed statement since its creation, verified
+     * from the first to the one the Group is at now. Reads the whole chain on
+     * every call, so its cost grows with the Group's age, not with `limit`.
+     *
+     * @param {string} groupId ID of the Group
+     * @param {PagingQuery} pagingQuery `skip`, `limit` and `sortOrder`
+     *   ("asc": oldest first)
+     * @returns {Promise<PagingList<GroupLogEntry>>} the statements in the
+     *   window, and how many there are in all
+     */
+    async getGroupLog(
+        groupId: string,
+        pagingQuery: PagingQuery,
+    ): Promise<PagingList<GroupLogEntry>> {
+        const page = await this.native.getGroupLog(this.servicePtr, [groupId, pagingQuery]);
+        return {
+            totalAvailable: page.totalAvailable,
+            readItems: page.readItems.map(({ keyVersion, ...entry }) => ({
+                ...entry,
+                epoch: keyVersion,
+            })),
+        };
+    }
+
+    /**
+     * Replaces the Group's key without changing its members.
+     * @returns {number} the Group's epoch after the call
+     */
+    async rotateGroupKey(groupId: string): Promise<number> {
+        return this.native.rotateGroupKey(this.servicePtr, [groupId]);
+    }
+
+    // ── Files ──────────────────────────────────────────────────────────────
+    //
+    // A file comes out as two things: the ciphertext, which `encryptFileChunk`
+    // hands back call by call, and the envelope, which `finishFileEncryption`
+    // returns. Store both. The envelope is made when the file ends and lists the
+    // size and a digest of every chunk, signed by the writer: the size need not
+    // be known up front, a file cut short is detected, and a chunk another
+    // member rewrote is caught at that chunk. Most apps want the stream forms,
+    // {@link sealFile} and {@link openFile}.
+
+    /**
+     * Begins encrypting a file for a Group, as one of its members.
+     *
+     * @param {string} groupId ID of the Group
+     * @param {LocationOrNone} location where the file lives in your data; its envelope opens nowhere else
+     * @param {EncryptOptions} [options] further readers, as for {@link encrypt}
+     * @returns {number} handle for {@link encryptFileChunk} and {@link finishFileEncryption}
+     */
+    async beginFileEncryption(
+        groupId: string,
+        location: LocationOrNone,
+        options?: EncryptOptions,
+    ): Promise<number> {
+        return this.native.beginFileEncryption(this.servicePtr, [
+            groupId,
+            toNativePath(location),
+            toNativeEncryptOptions(options),
+        ]);
+    }
+
+    /** As {@link beginFileEncryption}, for a writer who is not a member. The file form of {@link encryptAsOutsider}. */
+    async beginFileEncryptionAsOutsider(
+        contextId: string,
+        groupId: string,
+        location: LocationOrNone,
+        options?: EncryptOptions,
+    ): Promise<number> {
+        return this.native.beginFileEncryptionAsOutsider(this.servicePtr, [
+            contextId,
+            groupId,
+            toNativePath(location),
+            toNativeEncryptOptions(options),
+        ]);
+    }
+
+    /** The file form of {@link encryptAnonymously}: nobody signs the file, and no server call is made. */
+    async beginFileEncryptionAnonymously(
+        groupId: string,
+        groupPubKey: string,
+        location: LocationOrNone,
+    ): Promise<number> {
+        return this.native.beginFileEncryptionAnonymously(this.servicePtr, [
+            groupId,
+            groupPubKey,
+            toNativePath(location),
+        ]);
+    }
+
+    /**
+     * Encrypts the next piece of a file and returns all of its ciphertext:
+     * nothing is held back for the finish. Each call makes one chunk (more above
+     * 128 KiB) and a chunk costs 36 bytes of envelope, so pass blocks of tens of
+     * kilobytes or more.
      */
     async encryptFileChunk(fileHandle: number, plainChunk: Uint8Array): Promise<Uint8Array> {
         return this.native.encryptFileChunk(this.servicePtr, [fileHandle, plainChunk]);
     }
 
     /**
-     * Finishes sealing a file and releases its handle.
-     *
-     * Returns the envelope - the one piece without which the ciphertext is
-     * unopenable. Store it.
-     *
-     * @param {number} fileHandle handle from {@link beginFileEncryption} or
-     *   {@link beginFileEncryptionAnonymously}
-     * @returns {Uint8Array} the envelope, needed to read the file back
-     * @throws {NativeError} when less plaintext arrived than was declared; the
-     *   handle is released either way
+     * Ends the file, releases the handle and returns the file envelope. When it
+     * throws the handle stays open: call it again, or {@link abortFile}.
      */
     async finishFileEncryption(fileHandle: number): Promise<Uint8Array> {
         return this.native.finishFileEncryption(this.servicePtr, [fileHandle]);
     }
 
     /**
-     * Begins opening a sealed file.
+     * Releases a file handle of either kind, from a `beginFileEncryption...` or
+     * a `beginFileDecryption...` call, without finishing it: no envelope is
+     * made and completeness is not checked. For an upload or a read given up.
+     * The stream forms ({@link sealFile}, {@link openFile}) call it themselves.
      *
-     * The mirror of sealing: you fetch the ciphertext from wherever you put it,
-     * push it through {@link decryptFileChunk}, and finish with
-     * {@link finishFileDecryption}.
-     *
-     * ```ts
-     * const handle = await groupApi.beginFileDecryption(envelope);
-     * for (const block of storedBlocks) {
-     *     sink.write(await groupApi.decryptFileChunk(handle, block));
-     * }
-     * const info = await groupApi.finishFileDecryption(handle); // who sent it, and was it whole
-     * ```
-     *
-     * Feed the ciphertext in the order it was produced; block sizes need not
-     * match the ones used when sealing. To read only part of a file, see
-     * {@link seekInEncryptedFile}.
-     *
-     * Accepts envelopes from both {@link beginFileEncryption} and
-     * {@link beginFileEncryptionAnonymously}; which one it was is reported by
-     * {@link finishFileDecryption}.
-     *
-     * @param {Uint8Array} envelope envelope returned by
-     *   {@link finishFileEncryption}
-     * @returns {number} handle to open file data with
-     * @throws {NativeError} when the envelope does not verify or its key cannot
-     *   be resolved
+     * @param {number} fileHandle a handle from a `beginFile...` call
+     * @returns {Promise<void>} resolves once the handle is released
      */
-    async beginFileDecryption(envelope: Uint8Array): Promise<number> {
-        return this.native.beginFileDecryption(this.servicePtr, [envelope]);
+    async abortFile(fileHandle: number): Promise<void> {
+        return this.native.abortFile(this.servicePtr, [fileHandle]);
     }
 
     /**
-     * Opens the next piece of a file: takes ciphertext, returns plaintext.
+     * Begins decrypting a file a member of the Group wrote. The envelope is
+     * checked exactly as {@link decrypt} checks a message's: location, Group,
+     * kind and author.
+     */
+    async beginFileDecryption(
+        groupId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: DecryptOptions,
+    ): Promise<number> {
+        return this.native.beginFileDecryption(this.servicePtr, [
+            groupId,
+            toNativePath(location),
+            envelope,
+            toNativeDecryptOptions(options),
+        ]);
+    }
+
+    /** The file form of {@link decryptFromOutsider}. */
+    async beginFileDecryptionFromOutsider(
+        groupId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: DecryptOptions,
+    ): Promise<number> {
+        return this.native.beginFileDecryptionFromOutsider(this.servicePtr, [
+            groupId,
+            toNativePath(location),
+            envelope,
+            toNativeDecryptOptions(options),
+        ]);
+    }
+
+    /** The file form of {@link decryptAnonymous}. */
+    async beginAnonymousFileDecryption(
+        groupId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+    ): Promise<number> {
+        return this.native.beginAnonymousFileDecryption(this.servicePtr, [
+            groupId,
+            toNativePath(location),
+            envelope,
+        ]);
+    }
+
+    /** The file form of {@link decryptShared}. */
+    async beginSharedFileDecryption(
+        contextId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: SharedDecryptOptions,
+    ): Promise<number> {
+        return this.native.beginSharedFileDecryption(this.servicePtr, [
+            contextId,
+            toNativePath(location),
+            envelope,
+            toNativeDecryptOptions(options),
+        ]);
+    }
+
+    /**
+     * Decrypts the next piece of a file. The ciphertext may be cut any way;
+     * bytes that do not yet make a whole chunk wait, so a call may return
+     * nothing. Every chunk is checked against the writer's digest before it is
+     * returned.
      *
-     * Note the difference from `StoreApi.readFromFile`, which fetches for you
-     * and takes a *length* - here the second argument is the data itself, and
-     * nothing is fetched. As on the sealing side, the return covers whichever
-     * internal chunks this call completed, so it may be empty or cover several.
-     *
-     * @param {number} fileHandle handle from {@link beginFileDecryption}
-     * @param {Uint8Array} cipherChunk ciphertext to append, at most 4 MiB
-     * @returns {Uint8Array} plaintext, possibly empty
-     * @throws {NativeError} when the handle is unknown, the block exceeds 4 MiB,
-     *   or a chunk fails to verify
+     * @throws {NativeError} `GroupErrorCode.ENVELOPE_FILE_CORRUPTED` at a chunk that was changed, moved or swapped
      */
     async decryptFileChunk(fileHandle: number, cipherChunk: Uint8Array): Promise<Uint8Array> {
         return this.native.decryptFileChunk(this.servicePtr, [fileHandle, cipherChunk]);
     }
 
+    /** Which ciphertext bytes hold plaintext bytes `[from, to)`: for an HTTP Range request. */
+    async getFileCipherRange(fileHandle: number, from: number, to: number): Promise<CipherRange> {
+        return this.native.getFileCipherRange(this.servicePtr, [fileHandle, from, to]);
+    }
+
     /**
-     * Moves the read cursor to `position` in the plaintext, and returns where to
-     * resume feeding ciphertext.
-     *
-     * It returns an offset rather than just moving a cursor because you are the
-     * source of the bytes: the file is sealed in chunks slightly larger than the
-     * plaintext they carry, so plaintext byte N does not sit at ciphertext byte
-     * N, and only the library knows that mapping. A chunk is the smallest thing
-     * that can be opened, so the offset points at the start of the chunk
-     * *containing* `position`; the head of that chunk is discarded for you, so
-     * the next {@link decryptFileChunk} still begins exactly at `position`.
-     *
-     * ```ts
-     * const handle = await groupApi.beginFileDecryption(envelope);
-     * let at = await groupApi.seekInEncryptedFile(handle, from);
-     * const out: Uint8Array[] = [];
-     * let got = 0;
-     * while (got < length) {
-     *     const block = await storage.read(at, 1 << 20); // your storage, your transport
-     *     if (block.length === 0) break;                 // ran off the end of the ciphertext
-     *     at += block.length;
-     *     const plain = await groupApi.decryptFileChunk(handle, block);
-     *     out.push(plain);
-     *     got += plain.length;
-     * }
-     * await groupApi.finishFileDecryption(handle);
-     * ```
-     *
-     * The output starts exactly where you asked and may run past where you
-     * stopped asking - trim the tail yourself. Seek as often as you like on one
-     * handle, forwards or backwards; anything buffered from the previous
-     * position is discarded.
-     *
-     * Seeking gives up the truncation guarantee for this handle, so
-     * `DecryptedFileInfo.complete` comes back `false`. Everything you do read
-     * stays fully authenticated - a chunk cannot be forged, reordered, or lifted
-     * from another file; only "is the rest of it present" becomes unanswerable.
-     *
-     * @param {number} fileHandle handle from {@link beginFileDecryption}
-     * @param {number} position new cursor position in the plaintext, from 0 to
-     *   the file size
-     * @returns {number} ciphertext byte offset to resume feeding from
-     * @throws {NativeError} when the handle is unknown or `position` is out of
-     *   range
+     * Moves reading to `position` in the plaintext and returns where in the
+     * ciphertext to continue from. What the next {@link decryptFileChunk}
+     * returns begins exactly at `position`.
      */
     async seekInEncryptedFile(fileHandle: number, position: number): Promise<number> {
         return this.native.seekInEncryptedFile(this.servicePtr, [fileHandle, position]);
     }
 
     /**
-     * Finishes opening a file, reports where it came from, and releases its
-     * handle.
+     * Ends reading and releases the handle.
      *
-     * Call it even when you are sure you are done: each chunk verifies on its
-     * own, so a missing tail is detectable here and nowhere else - this is the
-     * only point at which "the file ended early" can be distinguished from "the
-     * file ended".
-     *
-     * Check `DecryptedFileInfo.type` before trusting `authorPubKey`, and
-     * `DecryptedFileInfo.complete` before treating the file as whole.
-     *
-     * @param {number} fileHandle handle from {@link beginFileDecryption}
-     * @returns {DecryptedFileInfo} which Group the file was sealed for, who - if
-     *   anyone - is provably its author, and whether all of it arrived
-     * @throws {NativeError} when less ciphertext arrived than the envelope
-     *   declares and the handle was never seeked; the handle is released either
-     *   way
+     * @throws {NativeError} `GroupErrorCode.ENVELOPE_TRUNCATED_FILE` when listed chunks never arrived
+     *   (after a seek `complete` is `false` instead)
      */
     async finishFileDecryption(fileHandle: number): Promise<DecryptedFileInfo> {
-        return this.native.finishFileDecryption(this.servicePtr, [fileHandle]);
+        const info = await this.native.finishFileDecryption(this.servicePtr, [fileHandle]);
+        const result: DecryptedFileInfo = {
+            epoch: info.keyVersion,
+            size: info.size,
+            complete: info.complete,
+            sharedWith: info.sharedWith,
+        };
+        if (info.author) {
+            result.author = { ...info.author, role: info.author.role === "manager" ? "manager" : "user" };
+        }
+        if (info.sender) result.sender = info.sender;
+        if (info.via) {
+            result.via = info.via;
+            result.homeGroupId = info.homeGroupId;
+            result.senderIsMember =
+                info.senderMembership === "member"
+                    ? true
+                    : info.senderMembership === "notMember"
+                      ? false
+                      : "unknown";
+        }
+        return result;
+    }
+
+    // ── Sequences: many small items from one author, in order ──────────────
+    //
+    // For what is too frequent to sign one by one: edits of a shared document,
+    // live captions, cursors. The author signs once, in the header. An item is
+    // then sealed under the sequence's own key with its position. A reader
+    // knows at once that a holder of the Group's key made the item and where it
+    // belongs; that the *author* made it, only after the next checkpoint or the
+    // close verifies. A sequence belongs to one epoch: after a removal or a
+    // rotation {@link appendToSequence} fails with `ENVELOPE_STALE_EPOCH`.
+
+    /**
+     * @param {number} [checkpointEvery] a checkpoint is made by itself after this many items (default 64);
+     *   0 turns that off, for a writer that calls {@link checkpointSequence} on its own schedule
+     */
+    async beginSequence(
+        groupId: string,
+        location: LocationOrNone,
+        checkpointEvery = 64,
+    ): Promise<number> {
+        return this.native.beginSequence(this.servicePtr, [
+            groupId,
+            toNativePath(location),
+            checkpointEvery,
+        ]);
+    }
+
+    /** The signed header. Send or store it before the items. */
+    async getSequenceHeader(sequence: number): Promise<Uint8Array> {
+        return this.native.getSequenceHeader(this.servicePtr, [sequence]);
+    }
+
+    /** Send `item`, then `mark` when there is one. */
+    async appendToSequence(sequence: number, data: Uint8Array): Promise<SequenceAppendResult> {
+        const result = await this.native.appendToSequence(this.servicePtr, [sequence, data]);
+        return result.mark ? { item: result.item, mark: result.mark } : { item: result.item };
+    }
+
+    /** A signature over everything appended so far. Send it like an item. */
+    async checkpointSequence(sequence: number): Promise<Uint8Array> {
+        return this.native.checkpointSequence(this.servicePtr, [sequence]);
+    }
+
+    /** A final checkpoint that also says nothing follows. Frees the handle. */
+    async finishSequence(sequence: number): Promise<Uint8Array> {
+        return this.native.finishSequence(this.servicePtr, [sequence]);
+    }
+
+    /**
+     * Opens a sequence for reading; the header is checked as {@link decrypt}
+     * checks an envelope.
+     *
+     * @param {Uint8Array} [resumeFrom] a checkpoint of this sequence to start after
+     */
+    async openSequence(
+        groupId: string,
+        location: LocationOrNone,
+        header: Uint8Array,
+        options: DecryptOptions,
+        resumeFrom?: Uint8Array,
+    ): Promise<number> {
+        return this.native.openSequence(this.servicePtr, [
+            groupId,
+            toNativePath(location),
+            header,
+            toNativeDecryptOptions(options),
+            resumeFrom,
+        ]);
+    }
+
+    /**
+     * Items arrive in order. A skipped one is reported in `missing`.
+     *
+     * @throws {NativeError} `GroupErrorCode.ENVELOPE_SEQUENCE_ORDER` for an earlier or repeated item
+     */
+    async readSequenceItem(sequence: number, item: Uint8Array): Promise<SequenceItem> {
+        return this.native.readSequenceItem(this.servicePtr, [sequence, item]);
+    }
+
+    /**
+     * Checks a checkpoint or a close against the items read.
+     *
+     * @throws {NativeError} `GroupErrorCode.ENVELOPE_SEQUENCE_ORDER` when an item was missing or forged;
+     *   reading may go on, and the next mark attests what follows this one
+     */
+    async verifySequenceMark(sequence: number, mark: Uint8Array): Promise<SequenceMarkInfo> {
+        return this.native.verifySequenceMark(this.servicePtr, [sequence, mark]);
+    }
+
+    /** Frees a handle from {@link openSequence}, or from {@link beginSequence} without finishing it. */
+    async closeSequence(sequence: number): Promise<void> {
+        return this.native.closeSequence(this.servicePtr, [sequence]);
+    }
+
+    /** The plain part of a sequence item or mark. Not authenticated: for a server that refuses stale writes. */
+    async peekSequenceItem(itemOrMark: Uint8Array): Promise<SequenceItemHeader> {
+        return this.native.peekSequenceItem(this.servicePtr, [itemOrMark]);
     }
 
     /**
@@ -845,7 +1402,7 @@ export class GroupApi extends BaseApi {
      *
      * @param {GroupEventType} eventType which Group event class to listen for
      * @param {GroupEventSelectorType} selectorType what `selectorId` refers to
-     *   (a whole Context or a single Group)
+     *   (a whole Context, a single Group, or a single Space for the `SPACE_*` types)
      * @param {string} selectorId ID of the selected scope
      * @returns {string} query string consumed by {@link subscribeFor}
      */
@@ -863,96 +1420,343 @@ export class GroupApi extends BaseApi {
 
     // --- files, as streams ------------------------------------------------
 
+    // ── Spaces: one key for several Groups ─────────────────────────────────
+    //
+    // For records that the same Groups read all the time. `alsoFor` wraps a
+    // value's key once per recipient, for every value; a Space wraps its key
+    // once per recipient when it is created and when the key is replaced, and
+    // writing a value wraps nothing. A Space has its own kind of envelope:
+    // `decrypt` refuses it and `decryptInSpace` refuses the others.
+    //
+    // A Space has a signed history, like a Group. Who its recipients are, which
+    // key is current and who made it is what its statements add up to, checked
+    // by the core; the Bridge cannot add a recipient or plant a key.
+
     /**
-     * Seals a file for this Group as a `TransformStream`: plaintext in,
-     * ciphertext out, envelope on the side.
-     *
-     * The high-level counterpart of {@link beginFileEncryption} /
-     * {@link encryptFileChunk} / {@link finishFileEncryption} - same core, but
-     * the chunking, the ordering and the backpressure are the stream's problem
-     * rather than yours. A slow sink throttles the reader, so a file larger than
-     * memory still goes through.
-     *
-     * This signs the file as you. To seal one without saying who sent it, use
-     * {@link sealFileAnonymously}.
-     *
-     * Keep both outputs. The ciphertext is the file; the envelope is the header
-     * naming the Group, the key version, the author and the size, and without it
-     * nobody opens the ciphertext - not even a member of the Group.
-     *
-     * @param {object} opts `groupId` and the plaintext `size` in bytes
-     * @returns {GroupFileSealer} a `TransformStream` whose `envelope` resolves
-     *   once the stream has closed
-     * @throws {NativeError} when the Group does not exist or you are not a
-     *   member of it
-     * @example
-     * const sealer = groups.sealFile({ groupId, size: file.size });
-     * await file.stream().pipeThrough(sealer).pipeTo(myBucket.writable(key));
-     * await myBucket.put(`${key}.envelope`, await sealer.envelope);
+     * @param {SpaceRecipient[]} recipients the Groups and users the key is wrapped for; the caller must be
+     *   among them as a manager, themselves or through a Group
+     * @param {Uint8Array} [idSeed] when set, the Space's ID is `deriveSpaceId(contextId, idSeed)` instead of random
+     * @returns {string} the Space's ID
      */
-    sealFile(opts: { groupId: string; size: number }): GroupFileSealer {
-        return sealGroupFile(this, opts);
+    async createSpace(
+        contextId: string,
+        recipients: SpaceRecipient[],
+        publicMeta: Uint8Array,
+        privateMeta: Uint8Array,
+        idSeed?: Uint8Array,
+    ): Promise<string> {
+        return this.native.createSpace(this.servicePtr, [
+            contextId,
+            recipients.map(toNativeSpaceRecipient),
+            publicMeta,
+            privateMeta,
+            idSeed,
+        ]);
+    }
+
+    async deriveSpaceId(contextId: string, idSeed: Uint8Array): Promise<string> {
+        return this.native.deriveSpaceId(this.servicePtr, [contextId, idSeed]);
+    }
+
+    async getSpace(spaceId: string): Promise<SpaceState> {
+        return fromNativeSpaceState(await this.native.getSpace(this.servicePtr, [spaceId]));
+    }
+
+    async listSpaces(contextId: string, pagingQuery: PagingQuery): Promise<PagingList<SpaceState>> {
+        const page = await this.native.listSpaces(this.servicePtr, [contextId, pagingQuery]);
+        return {
+            totalAvailable: page.totalAvailable,
+            readItems: page.readItems.map(fromNativeSpaceState),
+        };
+    }
+
+    async deleteSpace(spaceId: string): Promise<void> {
+        return this.native.deleteSpace(this.servicePtr, [spaceId]);
+    }
+
+    /** The current key and every earlier version are wrapped for them: they read what is already there. */
+    async addSpaceRecipients(spaceId: string, recipients: SpaceRecipient[]): Promise<void> {
+        return this.native.addSpaceRecipients(this.servicePtr, [
+            spaceId,
+            recipients.map(toNativeSpaceRecipient),
+        ]);
+    }
+
+    /** Makes a new key the removed do not get, and returns its version. */
+    async removeSpaceRecipients(spaceId: string, recipients: SpaceRecipientRef[]): Promise<number> {
+        return this.native.removeSpaceRecipients(this.servicePtr, [
+            spaceId,
+            recipients.map((r) => ("group" in r ? { groupId: r.group } : { userId: r.userId })),
+        ]);
     }
 
     /**
-     * Seals a file for a Group without saying who sent it.
+     * Makes a new key, wrapped for every recipient's current key, and returns its version.
      *
-     * The file counterpart of {@link encryptAnonymously}, and driven exactly
-     * like {@link sealFile}. It needs public information only - the Group's ID
-     * and its `groupPubKey` - so it works without membership and makes no
-     * server call. A throwaway keypair per call is what makes the result
-     * unattributable, and it is also why you cannot read back what you sealed.
-     *
-     * Nothing about it is attributable, so nothing about it is authorised or
-     * metered either: if you accept these from the open internet, bound the size
-     * and the volume in your own transport.
-     *
-     * @param {object} opts `groupId`, the Group's `groupPubKey` (base58-DER, from
-     *   `Group.groupPubKey`), and the plaintext `size` in bytes
-     * @returns {GroupFileSealer} a `TransformStream` whose `envelope` resolves
-     *   once the stream has closed
-     * @throws {NativeError} when `groupPubKey` is not a valid public key
-     * @example
-     * const sealer = groups.sealFileAnonymously({ groupId, groupPubKey, size: file.size });
-     * await file.stream().pipeThrough(sealer).pipeTo(anywhere);
+     * @throws {NativeError} `GroupErrorCode.SPACE_RECIPIENT_UNAVAILABLE` when the caller cannot see a recipient Group's key
      */
+    async rotateSpaceKey(spaceId: string): Promise<number> {
+        return this.native.rotateSpaceKey(this.servicePtr, [spaceId]);
+    }
+
+    async updateSpacePublicMeta(spaceId: string, meta: Uint8Array, version: number): Promise<void> {
+        return this.native.updateSpacePublicMeta(this.servicePtr, [spaceId, meta, version]);
+    }
+
+    async updateSpacePrivateMeta(spaceId: string, meta: Uint8Array, version: number): Promise<void> {
+        return this.native.updateSpacePrivateMeta(this.servicePtr, [spaceId, meta, version]);
+    }
+
+    /** One symmetric encryption and one signature. When the key is stale, it is replaced first. */
+    async encryptInSpace(
+        spaceId: string,
+        location: LocationOrNone,
+        data: Uint8Array,
+    ): Promise<Uint8Array> {
+        return this.native.encryptInSpace(this.servicePtr, [spaceId, toNativePath(location), data]);
+    }
+
+    /** `options.currentEpochOnly` means the Space's current key version. */
+    async decryptInSpace(
+        spaceId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: DecryptOptions,
+    ): Promise<DecryptedSpaceEnvelope> {
+        return fromNativeSpaceEnvelope(
+            await this.native.decryptInSpace(this.servicePtr, [
+                spaceId,
+                toNativePath(location),
+                envelope,
+                toNativeDecryptOptions(options),
+            ]),
+        );
+    }
+
+    async decryptManyInSpace(
+        spaceId: string,
+        items: ReadonlyArray<{
+            location: LocationOrNone;
+            envelope: Uint8Array;
+            options: DecryptOptions;
+        }>,
+    ): Promise<SpaceDecryptOutcome[]> {
+        const results = await this.native.decryptManyInSpace(this.servicePtr, [
+            spaceId,
+            items.map((item) => ({
+                envelope: item.envelope,
+                location: toNativePath(item.location),
+                options: toNativeDecryptOptions(item.options),
+            })),
+        ]);
+        return results.map((result) =>
+            result.statusCode === 0
+                ? { ok: true as const, ...fromNativeSpaceEnvelope(result.envelope) }
+                : {
+                      ok: false as const,
+                      code: result.statusCode,
+                      details: fromNativeDetails(result.details),
+                  },
+        );
+    }
+
+    async beginFileEncryptionInSpace(spaceId: string, location: LocationOrNone): Promise<number> {
+        return this.native.beginFileEncryptionInSpace(this.servicePtr, [
+            spaceId,
+            toNativePath(location),
+        ]);
+    }
+
+    async beginFileDecryptionInSpace(
+        spaceId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: DecryptOptions,
+    ): Promise<number> {
+        return this.native.beginFileDecryptionInSpace(this.servicePtr, [
+            spaceId,
+            toNativePath(location),
+            envelope,
+            toNativeDecryptOptions(options),
+        ]);
+    }
+
+    async beginSequenceInSpace(
+        spaceId: string,
+        location: LocationOrNone,
+        checkpointEvery = 64,
+    ): Promise<number> {
+        return this.native.beginSequenceInSpace(this.servicePtr, [
+            spaceId,
+            toNativePath(location),
+            checkpointEvery,
+        ]);
+    }
+
+    async openSequenceInSpace(
+        spaceId: string,
+        location: LocationOrNone,
+        header: Uint8Array,
+        options: DecryptOptions,
+        resumeFrom?: Uint8Array,
+    ): Promise<number> {
+        return this.native.openSequenceInSpace(this.servicePtr, [
+            spaceId,
+            toNativePath(location),
+            header,
+            toNativeDecryptOptions(options),
+            resumeFrom,
+        ]);
+    }
+
+    /** Who wrote the sequence opened with {@link openSequenceInSpace}, and how they had access. */
+    async getSpaceSequenceOrigin(sequence: number): Promise<SpaceOrigin> {
+        return fromNativeSpaceOrigin(
+            await this.native.getSpaceSequenceOrigin(this.servicePtr, [sequence]),
+        );
+    }
+
+    /**
+     * The Space's history: every change of its recipients and its key, verified
+     * from the creation. Each statement is signed by a recipient - themselves,
+     * or through a recipient Group, shown by that Group's key.
+     */
+    async getSpaceLog(spaceId: string, pagingQuery: PagingQuery): Promise<PagingList<SpaceLogEntry>> {
+        return this.native.getSpaceLog(this.servicePtr, [spaceId, pagingQuery]);
+    }
+
+    /**
+     * The one spelling of a path, as bytes: the seed of a Group or Space
+     * addressed by its subject ({@link deriveGroupId}, {@link deriveSpaceId}).
+     */
+    async encodePath(path: Location): Promise<Uint8Array> {
+        return this.native.encodePath(this.servicePtr, [toNativePath(path)]);
+    }
+
+    /**
+     * Ties a Group to a subject on this device.
+     *
+     * @throws {NativeError} `GroupErrorCode.GROUP_SUBJECT_REBOUND` when the device knows the subject under another Group
+     */
+    async pinGroupToSubject(contextId: string, subject: Location, groupId: string): Promise<void> {
+        return this.native.pinGroupToSubject(this.servicePtr, [
+            contextId,
+            toNativePath(subject),
+            groupId,
+        ]);
+    }
+
+    /**
+     * Encrypts a file for a Group as a stream: plaintext in, ciphertext out.
+     * The envelope settles once the stream has been read to the end. No size is
+     * needed up front.
+     *
+     * @example
+     * const sealer = groupApi.sealFile({ groupId, location: ["scan", id(scanId)] });
+     * await file.stream().pipeThrough(sealer).pipeTo(bucketWritable);
+     * const envelope = await sealer.envelope; // keep it next to the ciphertext
+     */
+    sealFile(opts: {
+        groupId: string;
+        location: LocationOrNone;
+        alsoFor?: EncryptOptions["alsoFor"];
+    }): GroupFileSealer {
+        return sealGroupFile(
+            this,
+            this.beginFileEncryption(opts.groupId, opts.location, { alsoFor: opts.alsoFor }),
+        );
+    }
+
+    /** {@link sealFile} for a writer who is not a member of the Group. */
+    sealFileAsOutsider(opts: {
+        contextId: string;
+        groupId: string;
+        location: LocationOrNone;
+        alsoFor?: EncryptOptions["alsoFor"];
+    }): GroupFileSealer {
+        return sealGroupFile(
+            this,
+            this.beginFileEncryptionAsOutsider(opts.contextId, opts.groupId, opts.location, {
+                alsoFor: opts.alsoFor,
+            }),
+        );
+    }
+
+    /** {@link sealFile} without a signature: needs public information only, and no server call. */
     sealFileAnonymously(opts: {
         groupId: string;
         groupPubKey: string;
-        size: number;
+        location: LocationOrNone;
     }): GroupFileSealer {
-        return sealGroupFileAnonymously(this, opts);
+        return sealGroupFile(
+            this,
+            this.beginFileEncryptionAnonymously(opts.groupId, opts.groupPubKey, opts.location),
+        );
     }
 
     /**
-     * Opens a file sealed for this Group: ciphertext in, plaintext out.
+     * Opens a member's file for reading as a stream: ciphertext in, plaintext
+     * out. With `from`/`length`, fetch `cipherRange` (an HTTP Range request) and
+     * pipe only that; `info` then reports `complete: false`.
      *
-     * The high-level counterpart of {@link beginFileDecryption} /
-     * {@link decryptFileChunk} / {@link finishFileDecryption}, including the
-     * 4 MiB feed limit, which it applies for you.
-     *
-     * Feed the whole ciphertext and `info.complete` tells you whether the file
-     * arrived whole - the one question only a start-to-end read can answer. Pass
-     * `from` to read a range instead: fetch from the returned
-     * `ciphertextOffset` and the output starts exactly at the plaintext byte you
-     * asked for. Fetch only the range you need; that, not the `length` trim, is
-     * what makes a ranged read cheap.
-     *
-     * @param {Uint8Array} envelope the envelope kept alongside the ciphertext
-     * @param {object} [opts] `from` - plaintext offset to start at; `length` -
-     *   trim the output to this many bytes
-     * @returns {Promise<GroupFileReader>} the stream, where to feed it from, and
-     *   what the file turned out to be
      * @example
-     * const r = await groups.openFile(envelope);
-     * const blob = await new Response(ciphertext.pipeThrough(r.stream)).blob();
-     * if (!(await r.info).complete) throw new Error("the file was cut short");
+     * const reader = await groupApi.openFile(groupId, ["scan", id(scanId)], envelope, { expectedAuthor });
+     * await response.body.pipeThrough(reader.stream).pipeTo(sink);
+     * const info = await reader.info;
      */
-    openFile(
+    async openFile(
+        groupId: string,
+        location: LocationOrNone,
         envelope: Uint8Array,
-        opts: { from?: number; length?: number } = {},
+        options: DecryptOptions & FileRange,
     ): Promise<GroupFileReader> {
-        return openGroupFile(this, envelope, opts);
+        return openGroupFile(
+            this,
+            await this.beginFileDecryption(groupId, location, envelope, options),
+            options,
+        );
+    }
+
+    /** {@link openFile} for a file written with {@link sealFileAsOutsider}. */
+    async openFileFromOutsider(
+        groupId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: DecryptOptions & FileRange,
+    ): Promise<GroupFileReader> {
+        return openGroupFile(
+            this,
+            await this.beginFileDecryptionFromOutsider(groupId, location, envelope, options),
+            options,
+        );
+    }
+
+    /** {@link openFile} for a file written with {@link sealFileAnonymously}. */
+    async openAnonymousFile(
+        groupId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        range: FileRange = {},
+    ): Promise<GroupFileReader> {
+        return openGroupFile(
+            this,
+            await this.beginAnonymousFileDecryption(groupId, location, envelope),
+            range,
+        );
+    }
+
+    /** {@link openFile} for a file shared with the caller through `alsoFor`. */
+    async openSharedFile(
+        contextId: string,
+        location: LocationOrNone,
+        envelope: Uint8Array,
+        options: SharedDecryptOptions & FileRange,
+    ): Promise<GroupFileReader> {
+        return openGroupFile(
+            this,
+            await this.beginSharedFileDecryption(contextId, location, envelope, options),
+            options,
+        );
     }
 
     /**

@@ -5,7 +5,6 @@ import {
     openGroupFile,
     progressStream,
     sealGroupFile,
-    sealGroupFileAnonymously,
     takeStream,
     uploadFile,
     type FileReadApi,
@@ -89,50 +88,38 @@ function fakeStore() {
 /** A Group whose "cipher" is a reversible byte flip, chunked at 100 bytes. */
 function fakeGroup() {
     const flip = (b: Uint8Array) => b.map((x) => x ^ 0xff);
-    const sealing = new Map<number, { size: number; sealed: number }>();
-    const opening = new Map<number, { at: number }>();
     let nextHandle = 1;
     const feeds: number[] = [];
-    const anonymousBegins: { groupId: string; groupPubKey: string; size: number }[] = [];
+    const finished: number[] = [];
+    const aborted: number[] = [];
 
-    const api = {
-        async beginFileEncryption(_groupId: string, size: number) {
-            const handle = nextHandle++;
-            sealing.set(handle, { size, sealed: 0 });
-            return handle;
+    const api: GroupFileApi = {
+        async abortFile(handle) {
+            aborted.push(handle);
         },
-        async beginFileEncryptionAnonymously(groupId: string, groupPubKey: string, size: number) {
-            anonymousBegins.push({ groupId, groupPubKey, size });
-            return api.beginFileEncryption(groupId, size);
-        },
-        async encryptFileChunk(handle: number, chunk: Uint8Array) {
-            sealing.get(handle)!.sealed += chunk.length;
+        async encryptFileChunk(_handle, chunk) {
             return flip(chunk);
         },
-        async finishFileEncryption(handle: number) {
-            const state = sealing.get(handle)!;
-            if (state.sealed !== state.size) throw new Error("declared size not written");
+        async finishFileEncryption(handle) {
+            finished.push(handle);
             return new Uint8Array([1, 2, 3]);
         },
-        async beginFileDecryption(_envelope: Uint8Array) {
-            const handle = nextHandle++;
-            opening.set(handle, { at: 0 });
-            return handle;
+        async seekInEncryptedFile(_handle, position) {
+            return Math.floor(position / 100) * 100; // whole internal chunks only
         },
-        async seekInEncryptedFile(handle: number, position: number) {
-            const at = Math.floor(position / 100) * 100; // whole internal chunks only
-            opening.get(handle)!.at = at;
-            return at;
+        async getFileCipherRange(_handle, from, to) {
+            const offset = Math.floor(from / 100) * 100;
+            return { offset, length: Math.ceil(to / 100) * 100 - offset };
         },
-        async decryptFileChunk(_handle: number, chunk: Uint8Array) {
+        async decryptFileChunk(_handle, chunk) {
             feeds.push(chunk.length);
             return flip(chunk);
         },
         async finishFileDecryption() {
-            return { groupId: "g", authorPubKey: "", type: 2, complete: true };
+            return { epoch: 1, size: 1000, complete: true, sharedWith: { groups: [], users: [] } };
         },
     };
-    return { api: api as unknown as GroupFileApi, feeds, anonymousBegins };
+    return { api, feeds, finished, aborted, begin: () => Promise.resolve(nextHandle++) };
 }
 
 describe("progressStream / takeStream", () => {
@@ -229,64 +216,95 @@ describe("store files", () => {
 });
 
 describe("group files", () => {
-    test("the anonymous sealer takes the anonymous path", async () => {
-        const { api, anonymousBegins } = fakeGroup();
-        const sealer = sealGroupFileAnonymously(api, {
-            groupId: "g",
-            groupPubKey: "PUBKEY",
-            size: 10,
-        });
-        await collect(new Blob([bytes(10) as BlobPart]).stream().pipeThrough(sealer));
-        await sealer.envelope;
-        expect(anonymousBegins).toEqual([{ groupId: "g", groupPubKey: "PUBKEY", size: 10 }]);
-    });
-
-    test("seals a file and yields the envelope after the stream closes", async () => {
-        const { api } = fakeGroup();
+    test("seals a file of any size and yields the envelope after the stream closes", async () => {
+        const { api, begin, finished } = fakeGroup();
         const data = bytes(250);
-        const sealer = sealGroupFile(api, { groupId: "g", size: data.length });
+        const sealer = sealGroupFile(api, begin());
         const sealed = await collect(new Blob([data as BlobPart]).stream().pipeThrough(sealer));
         expect(await sealer.envelope).toEqual(new Uint8Array([1, 2, 3]));
         expect(sealed).toEqual(data.map((b) => b ^ 0xff));
+        expect(finished).toEqual([1]);
     });
 
-    test("a short upload fails the envelope rather than passing silently", async () => {
+    test("a file that cannot be begun fails the envelope rather than passing silently", async () => {
         const { api } = fakeGroup();
-        const sealer = sealGroupFile(api, { groupId: "g", size: 999 });
+        const sealer = sealGroupFile(api, Promise.reject(new Error("not a member")));
         await expect(
             collect(new Blob([bytes(10) as BlobPart]).stream().pipeThrough(sealer)),
-        ).rejects.toThrow("declared size not written");
-        await expect(sealer.envelope).rejects.toThrow("declared size not written");
+        ).rejects.toThrow("not a member");
+        await expect(sealer.envelope).rejects.toThrow();
+    });
+
+    test("a sealer never written to still handles a failed begin, and its envelope says so", async () => {
+        const { api } = fakeGroup();
+        const unhandled = vi.fn();
+        process.on("unhandledRejection", unhandled);
+        const sealer = sealGroupFile(api, Promise.reject(new Error("not a member")));
+        await expect(sealer.envelope).rejects.toThrow("not a member");
+        await new Promise((r) => setTimeout(r, 0));
+        process.off("unhandledRejection", unhandled);
+        expect(unhandled).not.toHaveBeenCalled();
     });
 
     test("an aborted seal rejects the envelope instead of hanging", async () => {
-        const { api } = fakeGroup();
-        const sealer = sealGroupFile(api, { groupId: "g", size: 100 });
+        const { api, begin } = fakeGroup();
+        const sealer = sealGroupFile(api, begin());
         void sealer.readable.cancel();
         await sealer.writable.abort(new Error("gone"));
         await expect(sealer.envelope).rejects.toThrow("gone");
     });
 
-    test("opens a range and reports where the ciphertext must be read from", async () => {
+    test("a file given up on releases its handle: a cancelled or failed seal, a bad chunk, a cancelled read", async () => {
+        const { api, begin, aborted } = fakeGroup();
+        const cancelled = sealGroupFile(api, begin()); // handle 1
+        void cancelled.readable.cancel();
+        await cancelled.writable.abort(new Error("gone"));
+
+        api.finishFileEncryption = () => Promise.reject(new Error("key")); // the core keeps the handle open
+        await expect(collect(new Blob([bytes(10) as BlobPart]).stream().pipeThrough(sealGroupFile(api, begin())))).rejects.toThrow("key");
+
+        api.decryptFileChunk = () => Promise.reject(new Error("corrupted"));
+        const bad = await openGroupFile(api, 3);
+        await expect(collect(new Blob([bytes(10) as BlobPart]).stream().pipeThrough(bad.stream))).rejects.toThrow("corrupted");
+        await expect(bad.info).rejects.toThrow("corrupted");
+
+        const dropped = await openGroupFile(api, 4);
+        await dropped.stream.writable.abort(new Error("user"));
+
+        api.seekInEncryptedFile = () => Promise.reject(new Error("range"));
+        await expect(openGroupFile(api, 5, { from: 10 })).rejects.toThrow("range");
+
+        await new Promise((r) => setTimeout(r, 0));
+        expect(new Set(aborted)).toEqual(new Set([1, 2, 3, 4, 5]));
+    });
+
+    test("opens a range and reports which ciphertext bytes hold it", async () => {
         const { api } = fakeGroup();
         const plain = bytes(1000);
         const cipher = plain.map((b) => b ^ 0xff);
 
-        const reader = await openGroupFile(api, new Uint8Array([1]), { from: 250, length: 20 });
-        expect(reader.ciphertextOffset).toBe(200); // start of the chunk holding byte 250
+        const reader = await openGroupFile(api, 1, { from: 250, length: 20 });
+        expect(reader.cipherRange).toEqual({ offset: 200, length: 100 }); // the chunk holding 250..270
 
+        const { offset, length } = reader.cipherRange;
         const out = await collect(
-            new Blob([cipher.slice(reader.ciphertextOffset) as BlobPart])
+            new Blob([cipher.slice(offset, offset + length!) as BlobPart])
                 .stream()
                 .pipeThrough(reader.stream),
         );
         expect(out.length).toBe(20);
-        expect((await reader.info).complete).toBe(true);
+        expect((await reader.info).size).toBe(1000);
+    });
+
+    test("an open-ended range runs to the end of the ciphertext; no range is the whole file", async () => {
+        const { api } = fakeGroup();
+        expect((await openGroupFile(api, 1, { from: 250 })).cipherRange).toEqual({ offset: 200 });
+        expect((await openGroupFile(api, 2)).cipherRange).toEqual({ offset: 0 });
     });
 
     test("feeds larger than the 4 MiB limit are split", async () => {
         const { api, feeds } = fakeGroup();
-        const reader = await openGroupFile(api, new Uint8Array([1]));
+        const reader = await openGroupFile(api, 1);
         const big = new Uint8Array(9 * 1_048_576);
         await collect(new Blob([big as BlobPart]).stream().pipeThrough(reader.stream));
         expect(Math.max(...feeds)).toBeLessThanOrEqual(4 * 1_048_576);

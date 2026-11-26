@@ -619,7 +619,67 @@ export interface Group {
     statusCode: number;
     schemaVersion: number;
     keyVersion: number;
+    /** Who beside the members may read the Group's identity key, roster and statements. The Bridge's own setting. */
+    visibleTo: "members" | "context";
+    /** The Group's signed rules, resolved. Empty strings when the policy served did not verify. */
+    rules: GroupRules;
     type?: string;
+}
+
+/**
+ * Who may change what in a Group, as the Group's signed statements bind it.
+ * `updateMeta` is the policy's `update`; the other two follow it until set.
+ */
+export interface GroupRules {
+    /** Who may add members. */
+    addMembers: PolicyEntry;
+    /** Who may remove members or replace their keys. */
+    removeMembers: PolicyEntry;
+    /** Who may rewrite the Group's metadata. */
+    updateMeta: PolicyEntry;
+}
+
+/** The rules {@link GroupApi.updateGroupRules} changes; one left out stays as it is. */
+export type GroupRulesUpdate = Partial<GroupRules>;
+
+/** A member of a Group and the role {@link GroupApi.setGroupRoles} gives them. */
+export interface GroupRoleChange {
+    userId: string;
+    role: "user" | "manager";
+}
+
+/** What a statement of a Group's history did. */
+export type GroupLogKind =
+    | "create"
+    | "add"
+    | "remove"
+    | "reseat"
+    | "roles"
+    | "rotate"
+    | "policy"
+    | "selfUpdate";
+
+/**
+ * One signed statement of a Group's history, as {@link GroupApi.getGroupLog}
+ * returns it: verified, from the creation on.
+ */
+export interface GroupLogEntry {
+    /** 1 for the creation, one more for each later statement. */
+    seq: number;
+    kind: GroupLogKind;
+    /** The member who signed it, and the identity key it was signed with. */
+    author: string;
+    authorPubKey: string;
+    /** The author's clock, in milliseconds. */
+    date: number;
+    /** The Group's key epoch and roster version after it. */
+    epoch: number;
+    rosterVersion: number;
+    /** "add": who joined as a user or as a manager. "roles": who became one. */
+    addedUsers: string[];
+    addedManagers: string[];
+    /** "remove": who left. "reseat": whose key was replaced ({@link GroupApi.replaceGroupMemberKeys}). */
+    removed: string[];
 }
 
 /**
@@ -648,45 +708,296 @@ export enum EnvelopeType {
     ENVELOPE_FROM_MEMBER = 1,
     /** Sealed to the Group's identity public key by an outsider using a throwaway keypair. Unattributable. */
     ENVELOPE_ANONYMOUS = 2,
+    /** Sealed to the Group's identity public key by someone who is not a member, and signed by them. */
+    ENVELOPE_FROM_OUTSIDER = 3,
 }
 
-/**
- * The plaintext of an envelope, together with what could be established about
- * who wrote it. Returned by {@link GroupApi.decrypt}.
- *
- * @type {DecryptedEnvelope}
- *
- * @param {Uint8Array} data decrypted content
- * @param {string} groupId ID of the Group the envelope was sealed for; authenticated
- * @param {string} authorPubKey verified author public key (base58-DER encoded), EMPTY when
- *   `type` is `ENVELOPE_ANONYMOUS` - branch on `type`, not on this field being non-empty
- * @param {EnvelopeType} type which of the Group's keys sealed this envelope
- */
+/** The verified author of a member's envelope. */
+export interface EnvelopeAuthor {
+    userId: string;
+    /** Base58-DER. The key the envelope was signed with; your UserVerifier accepted it for `userId`. */
+    pubKey: string;
+    /** The author's role in the Group **now**. Past rosters are not kept, so this is not the role they had when they wrote. */
+    role: "user" | "manager";
+}
+
+/** A verified writer who is not a member of the Group you read with. */
+export interface EnvelopeSender {
+    userId: string;
+    pubKey: string;
+}
+
+/** Who else an envelope was written for (`alsoFor`). Signed by the writer. */
+export interface EnvelopeAudience {
+    groups: string[];
+    users: string[];
+}
+
+/** A member's envelope, opened. Returned by {@link GroupApi.decrypt}. */
 export interface DecryptedEnvelope {
     data: Uint8Array;
+    author: EnvelopeAuthor;
+    /** The epoch of the Group key it was sealed under. */
+    epoch: number;
+    /** The author's clock, in milliseconds. Not proof of when it was written. */
+    encryptedAt: number;
+    sharedWith: EnvelopeAudience;
+}
+
+/** Written to a Group, and signed, by someone who is not in it. Returned by {@link GroupApi.decryptFromOutsider}. */
+export interface DecryptedOutsiderEnvelope {
+    data: Uint8Array;
+    epoch: number;
+    sender: EnvelopeSender;
+    encryptedAt: number;
+    sharedWith: EnvelopeAudience;
+}
+
+/** An unsigned envelope. No sender: anyone who knows the Group's public key could have written it. */
+export interface DecryptedAnonymousEnvelope {
+    data: Uint8Array;
+    epoch: number;
+}
+
+/** Written in another Group and shared with you through `alsoFor`. Returned by {@link GroupApi.decryptShared}. */
+export interface DecryptedSharedEnvelope {
+    data: Uint8Array;
+    sender: EnvelopeSender;
+    /** The Group it says it was written in. The writer's claim; see `senderIsMember`. */
+    homeGroupId: string;
+    /**
+     * Whether the sender is a member of `homeGroupId` now; `"unknown"` when you
+     * cannot see its roster. Anyone in the Context can address an envelope to
+     * you and name any Group as its origin: only `true` says it came from inside.
+     */
+    senderIsMember: boolean | "unknown";
+    /** How you had access: as a user, or through the recipient Group you are a member of. */
+    via: "user" | string;
+    encryptedAt: number;
+    sharedWith: EnvelopeAudience;
+}
+
+/** One more reader of an envelope, beside the Group it is written in. */
+export type EnvelopeRecipient =
+    /** Another Group, by its ID. Its current, verified key is fetched at every encryption. */
+    | { group: string }
+    /** One user. Their key goes through your UserVerifier first. */
+    | { user: UserWithPubKey };
+
+export interface EncryptOptions {
+    alsoFor?: EnvelopeRecipient[];
+}
+
+/** Who or what a failure is about. Only the fields that apply are set. */
+export interface GroupErrorDetails {
+    /** The user and key in question: who really signed, or whose key your UserVerifier refused. */
+    userId?: string;
+    pubKey?: string;
+    /** On a wrong kind of envelope. */
+    envelopeKind?: "member" | "outsider" | "anonymous" | "shared" | "space";
+}
+
+/** One result of {@link GroupApi.decryptMany}. `code` is a `GroupErrorCode` (or another `NativeError` code). */
+export type DecryptOutcome =
+    | ({ ok: true } & DecryptedEnvelope)
+    | { ok: false; code: number; details: GroupErrorDetails };
+
+/** One result of {@link GroupApi.getGroups}. */
+export type GroupOutcome = { ok: true; group: Group } | { ok: false; code: number };
+
+/**
+ * A Group's current identity key, verified against the Group's latest
+ * statement. Stale after the Group's next removal or rotation: fetch it when
+ * you need it, do not store it.
+ */
+export interface GroupPublicKey {
     groupId: string;
+    epoch: number;
+    pubKey: string;
+    /** Who created the Group. Held to the Group's latest signed statement: its policy names the creator. */
+    creator: string;
+}
+
+// ── Spaces: one key for several Groups ──────────────────────────────────────
+
+/**
+ * Who a Space's key is wrapped for: a Group, by its ID, or one user. A
+ * "manager" may change the recipients and the meta; everyone may write, read
+ * and replace the key.
+ */
+export type SpaceRecipient =
+    | { group: string; role: "user" | "manager" }
+    | { user: UserWithPubKey; role: "user" | "manager" };
+
+/** A recipient to remove. */
+export type SpaceRecipientRef = { group: string } | { userId: string };
+
+export interface SpaceState {
+    spaceId: string;
+    contextId: string;
+    /** Who created the Space: the signer of its first statement. */
+    createdBy: string;
+    /** `epoch`: the Group's epoch the current key is wrapped for. */
+    groups: Array<{ groupId: string; role: "user" | "manager"; epoch: number }>;
+    users: Array<{ userId: string; pubKey: string; role: "user" | "manager" }>;
+    keyVersion: number;
+    /**
+     * `true` when a recipient Group has had a removal since the key was made:
+     * whoever was removed still holds this key. The next write replaces it.
+     */
+    keyIsStale: boolean;
+    publicMeta: Uint8Array;
+    privateMeta: Uint8Array;
+    publicMetaVersion: number;
+    privateMetaVersion: number;
+}
+
+/** How the author of a value in a Space had access to it. */
+export interface SpaceOrigin {
+    author: { userId: string; pubKey: string };
+    /** `"user"`, or the ID of the Group the author wrote through. Signed by the author. */
+    via: string;
+    /**
+     * Whether the author is a recipient now - themselves, or as a member of
+     * `via`. `"unknown"` when `via` is a Group whose roster you cannot see. The
+     * key alone does not answer this: someone removed from a Group keeps the
+     * Space's key until it is replaced. Only `"yes"` says they have access.
+     */
+    authorAccess: "yes" | "no" | "unknown";
+    /** The version of the Space's key the value was sealed under. */
+    keyVersion: number;
+}
+
+/** One signed statement of a Space's history. Returned by {@link GroupApi.getSpaceLog}. */
+export interface SpaceLogEntry {
+    /** 1 for the creation, one more for each later statement. */
+    seq: number;
+    kind: "create" | "add" | "remove" | "rotate";
+    /** The recipient who signed it, and the identity key it was signed with. */
+    author: string;
     authorPubKey: string;
-    type: EnvelopeType;
+    /** `"user"`, or the ID of the recipient Group the author acted through (shown by that Group's key). */
+    via: string;
+    /** The author's clock, in milliseconds. */
+    date: number;
+    /** The version of the Space's key after it. */
+    keyVersion: number;
+    addedGroups: string[];
+    addedUsers: string[];
+    removedGroups: string[];
+    removedUsers: string[];
+}
+
+export interface DecryptedSpaceEnvelope {
+    data: Uint8Array;
+    origin: SpaceOrigin;
+    /** The author's clock, in milliseconds. Not proof of when it was written. */
+    encryptedAt: number;
+}
+
+/** One result of {@link GroupApi.decryptManyInSpace}. */
+export type SpaceDecryptOutcome =
+    | ({ ok: true } & DecryptedSpaceEnvelope)
+    | { ok: false; code: number; details: GroupErrorDetails };
+
+/** The part of an envelope readable without any key. Not authenticated: for refusing writes early. */
+export interface EnvelopeHeader {
+    version: number;
+    groupId: string;
+    /** The epoch the writer claims. 0 for an envelope written from outside the Group. */
+    epoch: number;
+    /** `true` when the writer is not a member of `groupId`. */
+    fromOutsider: boolean;
+    /** `true` when a writer signed it. Always `true` for a member's envelope. */
+    isSigned: boolean;
+    isFile: boolean;
+    /** `false` for an envelope written with `NO_LOCATION`. A server can refuse those. */
+    hasLocation: boolean;
+    /** The writer's claim, for a signed envelope; empty otherwise. */
+    authorUserId: string;
+    /** Set when the envelope is the header of a sequence: the id its items and marks carry. */
+    sequenceId?: string;
+    /**
+     * Set when the envelope was written in a Space. `epoch` is then the version
+     * of the Space's key, and `groupId` the Group the author wrote through.
+     */
+    spaceId?: string;
+    alsoForGroups: Array<{ groupId: string; epoch: number }>;
+    alsoForUsers: string[];
 }
 
 /**
- * What could be established about a sealed file, once all of it has been
- * received. Returned by {@link GroupApi.finishFileDecryption}.
+ * What is known about a decrypted Group file. Returned by
+ * {@link GroupApi.finishFileDecryption} and as `info` of the stream readers.
+ * Which optional fields are set follows from the call that opened the file:
+ * a member's file has `author`, an outsider's `sender`, an anonymous one
+ * neither, a shared one `sender` with `homeGroupId`, `senderIsMember` and `via`.
+ * A sender is never reported as an author.
  *
  * @type {DecryptedFileInfo}
- *
- * @param {string} groupId ID of the Group the file was sealed for
- * @param {string} authorPubKey verified author public key (base58-DER encoded), EMPTY when
- *   `type` is `ENVELOPE_ANONYMOUS`
- * @param {EnvelopeType} type whether the file came from a member or an anonymous outsider
- * @param {boolean} complete whether the whole file was verified to be present; `false` once
- *   {@link GroupApi.seekInEncryptedFile} has been used on the handle
  */
 export interface DecryptedFileInfo {
-    groupId: string;
-    authorPubKey: string;
-    type: EnvelopeType;
+    author?: EnvelopeAuthor;
+    sender?: { userId: string; pubKey: string };
+    /** For a shared file: as in {@link DecryptedSharedEnvelope}. */
+    homeGroupId?: string;
+    senderIsMember?: boolean | "unknown";
+    via?: string;
+    sharedWith: EnvelopeAudience;
+    /** The epoch of the Group key the envelope was sealed to. 0 for a shared file. */
+    epoch: number;
+    /** The size of the plaintext, in bytes. */
+    size: number;
+    /** `false` after a ranged read: the parts read are the writer's, the whole file is not proven. */
     complete: boolean;
+}
+
+/** Where in the ciphertext a range of a file's plaintext lives. */
+export interface CipherRange {
+    offset: number;
+    length: number;
+}
+
+/** The plain part of a sequence item, checkpoint or close. Not authenticated. */
+export interface SequenceItemHeader {
+    sequenceId: string;
+    /** An item's position; for a mark, how many items it covers. */
+    index: number;
+    isMark: boolean;
+}
+
+/** What {@link GroupApi.appendToSequence} produced: send `item`, then `mark` when there is one. */
+export interface SequenceAppendResult {
+    item: Uint8Array;
+    /** An automatic checkpoint, when one was due. */
+    mark?: Uint8Array;
+}
+
+/**
+ * One decrypted item of a sequence. Not yet the author's: until a later mark
+ * verifies, another member could have forged it.
+ */
+export interface SequenceItem {
+    data: Uint8Array;
+    /** Position in the sequence, from 0. */
+    index: number;
+    /** How many items before this one never arrived. */
+    missing: number;
+}
+
+/** What a checkpoint or a close proved. */
+export interface SequenceMarkInfo {
+    /**
+     * The first item this mark proves. Items `attestedFrom .. attestedItems-1` are
+     * exactly what the author wrote, in that order. It is the count of the last
+     * mark this reader verified or resumed from (0 at the start); after a failed
+     * mark, that mark's count - the items before it are not confirmed by this one.
+     */
+    attestedFrom: number;
+    /** One past the last item this mark proves: how many items the author had written at the mark. */
+    attestedItems: number;
+    /** `true` for a close: the author wrote nothing after it. */
+    closed: boolean;
 }
 
 /**
@@ -714,6 +1025,7 @@ export interface GroupSummary {
     rosterVersion: number;
     policy: ContainerPolicy;
     keyVersion: number;
+    visibleTo: "members" | "context";
     type?: string;
 }
 
@@ -771,6 +1083,30 @@ export interface GroupCustomEventData {
 }
 
 /**
+ * Payload of every Space event (created, changed, deleted). It is the Bridge's
+ * word alone: treat it as a hint to read the Space again, which verifies its
+ * signed history.
+ *
+ * @type {SpaceChangedEventData}
+ *
+ * @param {string} spaceId ID of the Space
+ * @param {string} contextId ID of the Context
+ * @param {number} keyVersion version of the Space key after the change (0 when deleted)
+ * @param {number} publicMetaVersion version of the public metadata after the change
+ * @param {number} privateMetaVersion version of the private metadata after the change
+ * @param {string} changeKind "created", "recipientsAdded", "recipientsRemoved",
+ *   "keyRotated", "keyStale", "metaUpdated" or "deleted"
+ */
+export interface SpaceChangedEventData {
+    spaceId: string;
+    contextId: string;
+    keyVersion: number;
+    publicMetaVersion: number;
+    privateMetaVersion: number;
+    changeKind: string;
+}
+
+/**
  * Payload of a Group deleted event.
  *
  * @type {GroupDeletedEventData}
@@ -804,6 +1140,10 @@ export interface ContainerWithoutItemPolicy {
     updaterCanBeRemovedFromManagers?: PolicyBooleanEntry;
     ownerCanBeRemovedFromManagers?: PolicyBooleanEntry;
     forwardSecrecy?: PolicyBooleanEntry;
+    /** Groups only: who can add members. Unset, whoever `update` allows. Refused on any other container. */
+    addMembers?: PolicyEntry;
+    /** Groups only: who can remove members or replace their keys. Unset, whoever `update` allows. */
+    removeMembers?: PolicyEntry;
 }
 
 /**
@@ -1236,11 +1576,18 @@ export enum GroupEventType {
     GROUP_CREATE = 0,
     GROUP_UPDATE = 1,
     GROUP_DELETE = 2,
+    /** A Space the user can read was created. Selector: `CONTEXT_ID`. */
+    SPACE_CREATE = 3,
+    /** A Space changed: recipients, key, stale key or metadata. Selector: `CONTEXT_ID` or `SPACE_ID`. */
+    SPACE_UPDATE = 4,
+    /** A Space was deleted. Selector: `CONTEXT_ID` or `SPACE_ID`. */
+    SPACE_DELETE = 5,
 }
 
 export enum GroupEventSelectorType {
     CONTEXT_ID = 0,
     GROUP_ID = 1,
+    SPACE_ID = 2,
 }
 
 export enum StreamEventType {

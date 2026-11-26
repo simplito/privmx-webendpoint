@@ -161,7 +161,7 @@ test.describe("LockUsingGroupsTest", () => {
         expect(result.exclusive.currentLevel).toEqual(LockLevel.EXCLUSIVE);
     });
 
-    test('lock on another user\'s file is denied for a group "user" grant', async ({
+    test('a group "user" grant reads another user\'s file under a shared lock and cannot write-lock it', async ({
         page,
         backend,
         cli,
@@ -180,9 +180,10 @@ test.describe("LockUsingGroupsTest", () => {
                 const storeApi1 = await window.Endpoint.createStoreApi(conn1);
                 const u1 = gk.u(users.u1);
 
-                // Same grant, someone else's file: "itemOwner&user,manager" is
-                // satisfied by neither half. This is the policy talking, not the
-                // group - a direct member with the same role fares the same.
+                // Same grant, someone else's file. The grant makes it readable, so
+                // the shared lock a reader takes is granted; a write lock is not:
+                // "itemOwner&user,manager" is satisfied by neither half. This is the
+                // policy talking, not the group.
                 const group2 = await gk.mkGroup(
                     groupApi1,
                     contextId,
@@ -207,15 +208,18 @@ test.describe("LockUsingGroupsTest", () => {
                     bridgeUrl,
                 );
                 const lockApi2 = await window.Endpoint.createLockApi(conn2);
+                const uuid = gk.uuid();
+                const shared = await lockApi2.lock(resourceId, uuid, lockLevel.SHARED);
                 const rejected = await gk.caught(() =>
-                    lockApi2.lock(resourceId, gk.uuid(), lockLevel.SHARED),
+                    lockApi2.lock(resourceId, uuid, lockLevel.EXCLUSIVE),
                 );
 
-                return { rejected };
+                return { shared: shared.success, rejected };
             },
             argsFor(backend, users),
         );
 
+        expect(result.shared).toBe(true);
         expect(result.rejected).toBe(true);
     });
 

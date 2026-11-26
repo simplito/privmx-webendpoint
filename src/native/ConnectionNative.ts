@@ -21,14 +21,29 @@ import {
     ConnectionEventSelectorType,
 } from "../Types.js";
 import { BaseNative } from "./BaseNative.js";
+import type { PinStore } from "../service/PinStore.js";
 
 type UserVierifierVerifyFunc = (request: VerificationRequest[]) => Promise<boolean[]>;
 
 declare global {
     interface Window {
         userVerifierBinder?: { [id: number]: { userVierifier_verify: UserVierifierVerifyFunc } };
+        pinStoreBinder?: {
+            [id: number]: {
+                load: (key: string) => Promise<string>;
+                save: (key: string, blob: string, expected: string) => Promise<boolean>;
+            };
+        };
     }
 }
+
+// Blobs cross the WASM boundary as base64.
+const toBase64 = (bytes: Uint8Array) => {
+    let text = "";
+    for (const byte of bytes) text += String.fromCharCode(byte); // no spread: a blob may outgrow the argument limit
+    return btoa(text);
+};
+const fromBase64 = (text: string) => Uint8Array.from(atob(text), (c) => c.charCodeAt(0));
 /**
  * Raw WASM wrapper for the C++ Connection - holds and forwards raw pointers.
  * Use {@link Connection} (src/service) instead.
@@ -37,6 +52,7 @@ declare global {
 export class ConnectionNative extends BaseNative {
     protected lastConnectionId: number = -1;
     protected userVerifierPtr: number = -1;
+    protected pinStoreBindingId: number = -1;
 
     protected static verifierBindingId: number = -1;
     protected static getVerifierBindingId() {
@@ -44,10 +60,7 @@ export class ConnectionNative extends BaseNative {
     }
 
     async deleteApi(ptr: number): Promise<void> {
-        await this.runAsync<void>((taskId) =>
-            this.api.lib.Connection_deleteConnection(taskId, ptr),
-        );
-        this.deleteApiRef();
+        await this.deleteConnection(ptr);
     }
     async newConnection(): Promise<number> {
         return this.runAsync<number>((taskId) => this.api.lib.Connection_newConnection(taskId));
@@ -57,6 +70,11 @@ export class ConnectionNative extends BaseNative {
             this.api.lib.Connection_deleteConnection(taskId, ptr),
         );
         this.deleteApiRef();
+        this.unbindPinStore();
+    }
+    private unbindPinStore() {
+        if (this.pinStoreBindingId > -1) delete window.pinStoreBinder?.[this.pinStoreBindingId];
+        this.pinStoreBindingId = -1;
     }
     async connect(
         ptr: number,
@@ -117,6 +135,21 @@ export class ConnectionNative extends BaseNative {
             this.api.lib.Connection_disconnect(taskId, ptr, args),
         );
     }
+    async renewIdentity(ptr: number, args: [string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.Connection_renewIdentity(taskId, ptr, args),
+        );
+    }
+    async useKeyContinuity(ptr: number, args: []): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.Connection_useKeyContinuity(taskId, ptr, args),
+        );
+    }
+    async acceptKeyChange(ptr: number, args: [string, string, string, string]): Promise<void> {
+        return this.runAsync<void>((taskId) =>
+            this.api.lib.Connection_acceptKeyChange(taskId, ptr, args),
+        );
+    }
     async setUserVerifier(_ptr: number, args: [number, UserVerifierInterface]): Promise<void> {
         if (this.userVerifierPtr > -1) {
             await this.deleteUserVerifierInterface(this.userVerifierPtr);
@@ -140,6 +173,22 @@ export class ConnectionNative extends BaseNative {
         this.userVerifierPtr = await this.runAsync<number>((taskId) =>
             this.api.lib.Connection_newUserVerifierInterface(taskId, connectionPtr, bindingId),
         );
+    }
+
+    async setPinStore(connectionPtr: number, store: PinStore): Promise<void> {
+        const bindingId = ConnectionNative.getVerifierBindingId();
+        (window.pinStoreBinder ??= {})[bindingId] = {
+            load: async (key) => toBase64(await store.load(key)),
+            save: (key, blob, expected) => store.save(key, fromBase64(blob), fromBase64(expected)),
+        };
+        try {
+            await this.runAsync<void>((taskId) => this.api.lib.Connection_setPinStore(taskId, connectionPtr, bindingId));
+        } catch (e) {
+            delete window.pinStoreBinder[bindingId]; // the core never took it
+            throw e;
+        }
+        this.unbindPinStore(); // the store it replaced
+        this.pinStoreBindingId = bindingId;
     }
 
     protected async newUserVerifierInterface(connectionPtr: number): Promise<number> {

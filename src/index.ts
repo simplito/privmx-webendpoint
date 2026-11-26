@@ -88,6 +88,32 @@ export type {
 // Small helpers that need no API instance: data shaping you would otherwise
 // write again in every project.
 export { groupGrant } from "./service/groupGrant.js";
+export { id, NO_LOCATION, ANY_AUTHOR } from "./service/groupPaths.js";
+export type { Id, PathSegment, Location, LocationOrNone } from "./service/groupPaths.js";
+export type { DecryptOptions, SharedDecryptOptions } from "./service/GroupApi.js";
+export { IndexedDbPinStore } from "./service/PinStore.js";
+export type { PinStore } from "./service/PinStore.js";
+export {
+    GroupClient,
+    GroupClientError,
+    Group,
+    GroupOutsider,
+    Space,
+    SequenceEncryptor,
+    SequenceDecryptor,
+} from "./service/GroupClient.js";
+export type {
+    Subject,
+    Place,
+    GroupBySubject,
+    ClientRecipient,
+    ClientSpaceRecipient,
+    OpenOptions,
+    OpenItem,
+    OpenOutcome,
+    CreateOptions,
+    SequenceEvent,
+} from "./service/GroupClient.js";
 export { serializeObject, deserializeObject, strToUint8, uint8ToStr } from "./extra/utils.js";
 
 // Stream pieces that belong to no single API: drop them into any pipeline.
@@ -95,6 +121,7 @@ export { progressStream, takeStream, DEFAULT_CHUNK_SIZE } from "./service/fileSt
 export type {
     FileLike,
     GroupFileReader,
+    FileRange,
     GroupFileSealer,
     StoreFileHandle,
     StoreFileWriter,

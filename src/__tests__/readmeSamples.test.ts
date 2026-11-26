@@ -38,6 +38,8 @@ const PLACEHOLDERS: Record<string, string> = {
     bob: "__Types.UserWithPubKey",
     danaPubKey: "string",
     erinPubKey: "string",
+    danaOldPubKey: "string",
+    previousPrivKeyWif: "string",
     // APIs and values earlier blocks produce
     conn: "__Connection",
     groups: "__GroupApi",
@@ -56,6 +58,33 @@ const PLACEHOLDERS: Record<string, string> = {
     roomId: "string",
     indexId: "string",
     messageId: "string",
+    noteId: "string",
+    tipId: "string",
+    scanId: "string",
+    projectId: "string",
+    salesId: "string",
+    supportId: "string",
+    supportLeadId: "string",
+    billingOwnerId: "string",
+    dana: "__Types.UserWithPubKey",
+    client: "__GroupClient",
+    chat: "__Group",
+    chatRow: "{ chatId: string; createdBy: string }",
+    body: "Uint8Array",
+    myDb: "any",
+    strToUint8: "(text: string) => Uint8Array",
+    docId: "string",
+    uploadedBy: "string",
+    authorId: "string",
+    edit: "Uint8Array",
+    header: "Uint8Array",
+    item: "Uint8Array",
+    mark: "Uint8Array",
+    send: "(bytes: Uint8Array) => void",
+    id: "(identifier: string) => __Id",
+    // where a Group envelope lives in the reader's data, and the row the server served beside it
+    place: 'readonly ["my-app", "note", __Id, "body"]',
+    row: "{ authorId: string }",
     handle: "number",
     envelope: "Uint8Array",
     ciphertext: "ReadableStream<Uint8Array>",
@@ -87,6 +116,9 @@ const PRELUDE_IMPORT =
     "    StreamApi as __StreamApi,\n" +
     "    SearchApi as __SearchApi,\n" +
     "    Types as __Types,\n" +
+    "    Id as __Id,\n" +
+    "    GroupClient as __GroupClient,\n" +
+    "    Group as __Group,\n" +
     '} from "@simplito/privmx-webendpoint";\n';
 
 /** Names the sample declares itself, which the prelude must then leave alone. */
