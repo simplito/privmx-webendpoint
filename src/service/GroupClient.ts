@@ -187,6 +187,11 @@ function isDuplicate(e: unknown): boolean {
     );
 }
 
+// How many items the mark a reader resumed from covers. openSequence verified it, so its wire count is the author's.
+async function resumedAt(api: GroupApi, resumeFrom?: Uint8Array): Promise<number> {
+    return resumeFrom ? (await api.peekSequenceItem(resumeFrom)).index : 0;
+}
+
 // Frees a sequence handle when the step that follows its opening fails.
 async function closeOnError<T>(api: GroupApi, handle: number, step: () => Promise<T>): Promise<T> {
     try {
@@ -329,8 +334,11 @@ export class SequenceDecryptor extends TransformStream<Uint8Array, SequenceEvent
     /** For a sequence read from a Space: who wrote it, and how they had access. */
     readonly spaceOrigin?: SpaceOrigin;
 
-    /** @internal */
-    constructor(api: GroupApi, handle: number, spaceOrigin?: SpaceOrigin) {
+    /**
+     * @internal
+     * @param resumedAt the count of the mark reading resumed from: the items it already confirmed
+     */
+    constructor(api: GroupApi, handle: number, resumedAt = 0, spaceOrigin?: SpaceOrigin) {
         const free = () => api.closeSequence(handle).catch(() => {});
         const transformer: Transformer<Uint8Array, SequenceEvent> & { cancel?: () => Promise<void> } = {
             transform: async (packet, out) => {
@@ -362,6 +370,7 @@ export class SequenceDecryptor extends TransformStream<Uint8Array, SequenceEvent
             cancel: free,
         };
         super(transformer);
+        this.verifiedUpTo = resumedAt;
         this.spaceOrigin = spaceOrigin;
     }
 }
@@ -446,10 +455,8 @@ export class Group<P = Place> {
         opts: DecryptOptions & { resumeFrom?: Uint8Array },
     ): Promise<SequenceDecryptor> {
         const api = this.core.api;
-        return new SequenceDecryptor(
-            api,
-            await api.openSequence(this.groupId, this.at(place), header, opts, opts.resumeFrom),
-        );
+        const handle = await api.openSequence(this.groupId, this.at(place), header, opts, opts.resumeFrom);
+        return new SequenceDecryptor(api, handle, await closeOnError(api, handle, () => resumedAt(api, opts.resumeFrom)));
     }
 
     // ── membership ──
@@ -479,6 +486,11 @@ export class Group<P = Place> {
     updateRules(rules: GroupRulesUpdate): Promise<void> {
         return this.core.api.updateGroupRules(this.groupId, rules);
     }
+    /**
+     * `"context"` lets every user of the Context read the Group's signed
+     * history: its whole membership, past members included. Going back to
+     * `"members"` later does not take back what was read.
+     */
     setVisibility(visibleTo: "members" | "context"): Promise<void> {
         return this.core.api.setGroupVisibility(this.groupId, visibleTo);
     }
@@ -630,7 +642,10 @@ export class Space<P = Place> {
     ): Promise<SequenceDecryptor> {
         const api = this.core.api;
         const handle = await api.openSequenceInSpace(this.spaceId, this.at(place), header, opts, opts.resumeFrom);
-        return new SequenceDecryptor(api, handle, await closeOnError(api, handle, () => api.getSpaceSequenceOrigin(handle)));
+        const [from, origin] = await closeOnError(api, handle, () =>
+            Promise.all([resumedAt(api, opts.resumeFrom), api.getSpaceSequenceOrigin(handle)]),
+        );
+        return new SequenceDecryptor(api, handle, from, origin);
     }
 
     // ── recipients: managers only ──
@@ -988,6 +1003,10 @@ export class GroupClient {
     /**
      * A writer with no account, from a key the Group published. Makes no
      * request; its envelopes are unsigned and read with `decryptAnonymous`.
+     *
+     * Only for a Group whose ID follows from its subject. A Group with an ID
+     * of its own (opened with `openPinned`) gets no anonymous writer here: use
+     * `GroupApi.encryptAnonymously` with its ID and key.
      *
      * @param subject the subject of the Group the key belongs to; a key of
      *   another Group fails with `ENVELOPE_WRONG_GROUP`

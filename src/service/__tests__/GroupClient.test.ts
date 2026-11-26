@@ -372,6 +372,32 @@ describe("Group: values at subject + place", () => {
         expect(api.closeSequence).toHaveBeenCalledWith(6);
     });
 
+    it("a reader resumed from a mark starts with what that mark confirmed, in a Group and in a Space", async () => {
+        const resumeFrom = new Uint8Array([7]);
+        const mark = new Uint8Array([8]);
+        const returns = {
+            openSequence: 6,
+            openSequenceInSpace: 9,
+            getSpace: { contextId: CTX, createdBy: "alice" },
+            peekSequenceItem: (p: Uint8Array) => ({ sequenceId: "q", index: p === resumeFrom ? 5 : 8, isMark: true }),
+            verifySequenceMark: { attestedFrom: 5, attestedItems: 8, closed: true }, // the core resumes at 5
+        };
+        const { group } = await chat(returns);
+        const { groups } = setup(returns);
+        for (const dec of [
+            await group.decryptSequence(["ops"], ENVELOPE, { ...BY_ALICE, resumeFrom }),
+            await (await groups.openSpace(["crm", "project", id("p1")])).decryptSequence(["ops"], ENVELOPE, { ...BY_ALICE, resumeFrom }),
+        ]) {
+            expect(dec.verifiedUpTo).toBe(5);
+            const events = collect(dec.readable);
+            const w = dec.writable.getWriter();
+            await w.write(mark);
+            await w.close();
+            expect(await events).toEqual([{ kind: "verified", from: 5, to: 8, verifiedUpTo: 8, closed: true }]);
+            expect([dec.verifiedUpTo, dec.closed]).toEqual([8, true]);
+        }
+    });
+
     it("a mark after a rejected one does not confirm the gap: verifiedUpTo stays at the forged item", async () => {
         const [first, firstMark, forged, badMark, third, closeMark] = [1, 2, 3, 4, 5, 6].map((n) => new Uint8Array([n]));
         const marks = [firstMark, badMark, closeMark];

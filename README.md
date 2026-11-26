@@ -467,9 +467,9 @@ const { attestedFrom, attestedItems } = await groups.verifySequenceMark(reading,
 An item is readable at once, and at that point you know a member of the Group
 made it and where it belongs. That the **author** made it you know after the
 next checkpoint verifies: items `attestedFrom .. attestedItems-1` are exactly
-the author's. `attestedFrom` is 0 unless an earlier checkpoint failed; after
-one, a later checkpoint vouches only from the failed one on, and the items
-before it stay unconfirmed. `GroupClient`'s `decryptSequence` keeps this for
+the author's. `attestedFrom` is the count of the last checkpoint this reader
+verified or resumed from (0 at the start); after a failed checkpoint, that
+checkpoint's count, so the items before it stay unconfirmed. `GroupClient`'s `decryptSequence` keeps this for
 you: its `verified` event carries the checkpoint's `from`/`to` and
 `verifiedUpTo`, the end of the prefix confirmed with no gap. A sequence ends with its epoch: after a removal
 `appendToSequence` fails with `ENVELOPE_STALE_EPOCH` and you begin a new one, so

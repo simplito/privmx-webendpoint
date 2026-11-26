@@ -181,7 +181,12 @@ export class ConnectionNative extends BaseNative {
             load: async (key) => toBase64(await store.load(key)),
             save: (key, blob, expected) => store.save(key, fromBase64(blob), fromBase64(expected)),
         };
-        await this.runAsync<void>((taskId) => this.api.lib.Connection_setPinStore(taskId, connectionPtr, bindingId));
+        try {
+            await this.runAsync<void>((taskId) => this.api.lib.Connection_setPinStore(taskId, connectionPtr, bindingId));
+        } catch (e) {
+            delete window.pinStoreBinder[bindingId]; // the core never took it
+            throw e;
+        }
         this.unbindPinStore(); // the store it replaced
         this.pinStoreBindingId = bindingId;
     }

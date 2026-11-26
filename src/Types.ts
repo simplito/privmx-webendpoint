@@ -989,9 +989,9 @@ export interface SequenceItem {
 export interface SequenceMarkInfo {
     /**
      * The first item this mark proves. Items `attestedFrom .. attestedItems-1` are
-     * exactly what the author wrote, in that order. It is 0 unless an earlier
-     * mark failed: after one, a mark attests only from that mark on, and the
-     * items before it are not confirmed by it.
+     * exactly what the author wrote, in that order. It is the count of the last
+     * mark this reader verified or resumed from (0 at the start); after a failed
+     * mark, that mark's count - the items before it are not confirmed by this one.
      */
     attestedFrom: number;
     /** One past the last item this mark proves: how many items the author had written at the mark. */
